@@ -369,7 +369,7 @@ query GetTenantMetrics($tenantId: ID!) {
 ### Prerequisites
 
 - Go 1.24.10+
-- PostgreSQL 13+
+- PostgreSQL 17+
 - Make
 - Docker (optional)
 
@@ -589,7 +589,7 @@ services:
       - iota-network
 
   db:
-    image: postgres:13
+    image: postgres:17
     environment:
       POSTGRES_DB: iota_erp
       POSTGRES_USER: postgres

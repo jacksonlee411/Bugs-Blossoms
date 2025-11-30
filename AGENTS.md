@@ -105,6 +105,7 @@ modules/{module}/
 - Run specific subtest: `go test -v ./path/to/package -run TestName/SubtestName`
 - Check translation files: `make check tr`
 - Apply migrations: `make db migrate up`
+- Default database runtime: PostgreSQL 17 (local compose + CI)
 
 ## Code Style Guidelines
 - Use `go fmt` for formatting. Do not indent code manually.

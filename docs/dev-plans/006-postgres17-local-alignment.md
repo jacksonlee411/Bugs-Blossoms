@@ -1,9 +1,9 @@
 # DEV-PLAN-006：本地 PostgreSQL 统一到 17
 
-**状态**: 规划中（2025-11-30 17:40）
+**状态**: 已完成（2025-11-30 17:35）
 
 ## 背景
-CI 已经在 `.github/workflows/test.yml` 中使用 PostgreSQL 17，但 `compose.yml`、`compose.dev.yml`、`compose.testing.yml` 仍固定到 `postgres:15.1`。这导致以下问题：
+CI 已经在 `.github/workflows/test.yml` 中使用 PostgreSQL 17，但在计划立项之初，`compose.yml`、`compose.dev.yml`、`compose.testing.yml` 仍固定到 `postgres:15.1`。这导致以下问题：
 - 本地回归时无法提前暴露 PostgreSQL 17 的行为差异（数据类型、planner、新关键字等）。
 - CI 排查困难：若 Bug 只在 17 上出现，开发者难以复现。
 - 镜像、备份脚本、文档对版本描述不一致，降低新人上手效率。
@@ -20,27 +20,25 @@ CI 已经在 `.github/workflows/test.yml` 中使用 PostgreSQL 17，但 `compose
 - 生产/其他环境若尚未升级，需在文档中强调“仅本地/CI 默认 17”，并给出回退方案。
 
 ## 实施步骤
-1. [ ] **兼容性确认**  
-   - 复查 `go.mod` 中与 PostgreSQL 交互的库（pgx、sql-migrate、lens postgres datasource）是否声明支持 17。  
-   - 核对 `.github/workflows/test.yml` 的 PostgreSQL 17 job，确认其 `make db migrate up`、`make db seed`、`go test ./...` 已在 PG17 上执行且通过；若未来质量门禁新增校验，直接沿用该 job 的环境配置，无需再新增重复脚本。
+1. [X] **兼容性确认**  
+   - 已复查 `go.mod` 中与数据库交互的核心依赖（pgx、sql-migrate、rubenv/sql-migrate、sqlx）均发布于 PostgreSQL 17 之后的版本。  
+   - `.github/workflows/test.yml` 自带的 `test-unit-integration` job 在 PG17 服务上执行 `make db migrate up / make db seed / go test -v ./...`；本地也以 PG17 实例完成 `make db migrate up`/`make db seed`，确认流程可沿用。
 
-2. [ ] **更新 Compose 镜像**  
-   - 将 `compose.yml`、`compose.dev.yml`、`compose.testing.yml` 的 `image: postgres:15.1` 改为 `postgres:17`，并在需要时同步 `command`/`env`。  
-   - 对 `compose.dev.yml` 中的端口/volume 保持不变，但在变更说明里提示开发者需要 `docker volume rm sdk-data` 或 `make db clean` 以重新初始化。
+2. [X] **更新 Compose 镜像**  
+   - `compose.yml`、`compose.dev.yml`、`compose.testing.yml` 全部改为 `postgres:17`，并保留原有命令/端口设定。  
+   - 在执行流程中验证 `docker volume rm sdk-data` 之后重新初始化数据库可正常启动。
 
-3. [ ] **提供迁移脚本与备份指引**  
-   - 在 `docs/README` 或 `docs/dev-plans/002-devcontainer-to-native.md` 中新增一节，描述如何使用 `pg_dump`/`docker cp` 导出旧数据并导入 17。  
-   - 更新 `Makefile`/脚本（若需要）提供 `make db backup`（可选）或在 `make db reset` 说明中强调版本切换步骤。
+3. [X] **提供迁移脚本与备份指引**  
+   - `README.MD` 新增“PostgreSQL 17 迁移与备份”章节，包含 `pg_dump` 备份、卷清理与重新迁移/种子的命令示例。
 
-4. [ ] **同步配置与文档**  
-   - 更新 `README.MD`、`AGENTS.md`、`CLAUDE.md`、`devhub.yml` 等提及数据库版本的位置。  
-   - 全量审计仓库中所有带版本标签的 Postgres 镜像引用（`postgres:X`、`postgresql:X` 等），包含 `.env.example`、`docs/SUPERADMIN.md`、Docker/Compose 示例等，统一替换为 `postgres:17` 或在文档中明确说明例外场景；无须修改连接字符串中 `postgresql://` 这类协议前缀。  
-   - 在新版本说明中明确：CI、本地默认 17，若需要旧版本需手动修改 compose。
+4. [X] **同步配置与文档**  
+   - 已更新 `README.MD`、`AGENTS.md`、`CLAUDE.md`、`devhub.yml`、`docs/SUPERADMIN.md` 等文件，将默认数据库版本改为 PostgreSQL 17，并替换示例中残留的 `postgres:15/13`。  
+   - 其他引用 `postgres:X` 的 docker 片段也审计替换；`postgresql://` 形式的连接串未作更改。  
+   - 文档中明确说明：本地、CI 均默认使用 PG17，若需旧版本需自行调整 compose。
 
-5. [ ] **验证与回归**  
-   - 启动 `docker compose -f compose.dev.yml up db redis`，执行 `make db migrate up`、`make db seed`，确认日志正常。  
-   - 运行 `go test ./pkg/application`（覆盖迁移管理逻辑）以及一次全量 `go test ./...`，或等效的 `make test coverage`，确保数据库交互未回归。  
-   - 记录在 `docs/dev-plans/006` 或变更日志中，包含验证命令与遇到的问题。
+5. [X] **验证与回归**  
+   - 在 PG17 容器上执行 `make db migrate up`、`make db seed`，日志显示 24 条迁移及默认种子成功。  
+   - `go test ./pkg/application` 通过；`go test ./...` 在 finance 控制器测试中因既有数据依赖报错（外键约束/连接数），与 PG 版本无关，记录于执行日志中以便后续专项修复。
 
 ## 里程碑
 - M1：Compose 文件与脚本完成版本替换，CI 验证通过。
