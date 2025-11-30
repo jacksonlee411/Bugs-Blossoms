@@ -27,13 +27,11 @@
 | 质量概览 | `go tool cover` 或 sonar-like 报告（后续扩展） | 可选 | 大型功能分支 |
 
 ## 实施步骤
-1. [ ] **CI 基线搭建** —— 以 `.github/workflows/test.yml` 为基础改名为 `quality-gates`，触发条件设置为 `push`（限 main/dev 等关键分支）+ `pull_request`。在 workflow 中统一使用 Go 1.24.10，并确保 templ、Tailwind、golangci-lint、pgformatter 等工具版本与 `docs/CONTRIBUTING.MD` 相同，避免本地/CI 不一致。  
-2. [ ] **Go Lint/Test 门禁** —— 在 workflow 的 Go job 里串联以下步骤：`go fmt ./...` + `git diff --exit-code`、`go vet ./...`、`golangci-lint run ./...`、`go test -v ./...`（带覆盖率）。同时在 Makefile 新增 `make verify-go`：内部依次执行 `go fmt`, `go vet`, `golangci-lint run`, `go test -v ./...` 并在失败时返回非零；`make verify` 则聚合 `verify-go` 与 UI/i18n/db 检查。  
-3. [ ] **前端模板与样式门禁** —— 在 workflow 添加条件步骤：当 `.templ`、`tailwind.config.js`、`modules/**/presentation/assets/**` 变更时，运行 `templ generate && make css`，随后执行 `git status --porcelain` 保证生成文件已提交。Makefile 中新增 `make verify-ui`，复用同一套命令以便开发者本地预检。  
-4. [ ] **翻译与本地化门禁** —— 对 `modules/**/presentation/locales/*.json` 的 diff 才执行 `make check tr`（或轻量 JSON 校验脚本），并将其纳入 `make verify-i18n`（被 `make verify` 调用）。同时在 workflow 中根据路径过滤控制步骤，减少不必要运行时间。  
-5. [ ] **数据库与缓存门禁** —— 继续使用 PostgreSQL 17 + Redis latest 服务容器，但将环境变量固定到 `DB_HOST=localhost` 等计划值，并在步骤中串联 `make db migrate up`, `make db migrate down` smoke（可选）, `make db seed`。输出 `migrate.log` 作为 artifact 以便排障。  
-6. [ ] **分支保护策略** —— 在 GitHub `main` 分支启用保护：要求 `quality-gates` workflow 成功才能合并，禁止直接 push/force push，并开启最少一条 review。必要时在 `docs/dev-plans/005` 附带操作指引（截图/CLI 命令）。  
-7. [ ] **文档与宣传** —— 更新 `docs/CONTRIBUTING.MD`、`README.MD`、`AGENTS.md`、`CLAUDE.md`，新增“质量门禁 & 本地验证”章节，列出 `make verify`, `make verify-go`, `make verify-ui`, `make verify-i18n` 的用途与触发条件。PR 模版中也提醒贡献者本地执行 `make verify`。
+1. [ ] **CI 基线调整** —— 以现有 `.github/workflows/test.yml` 为基础改名为 `quality-gates`，触发条件扩展为 `push`（限定 main/dev 等关键分支）+ `pull_request`，统一切换到 Go 1.24.10，并让 templ/Tailwind/golangci-lint/pgformatter 版本与 `docs/CONTRIBUTING.MD` 中记录的版本保持一致，避免本地与 CI 发散。  
+2. [ ] **条件化资源检查** —— 沿用当前 lint/test job 中的 `go fmt`、`go vet`、`make check lint`、`go test -v` 等步骤，但为成本较高的任务增加 `paths` 条件：`.templ`、`tailwind.config.js`、`modules/**/presentation/assets/**` 触发 `go generate ./... && make generate` + `make css` + `git status --porcelain`，`modules/**/presentation/locales/*.json` 触发 `make check tr`，`migrations/**` 或 `modules/**/schema/**` 触发 `make db migrate up/down` 与 `make db seed`。借助 `if: steps.changed-files.outputs.any_changed == 'true'` 等模式削减重复执行。  
+3. [ ] **数据库/缓存日志可观测性** —— 保留现有 PostgreSQL 17 + Redis 服务容器，固定 `DB_HOST=localhost` 等变量，但补充 `tee migrate.log` 或 artifact 上传，便于排查迁移失败；同时在 job 结尾上传 `coverage.out`、`migrate.log` 等核心产物。  
+4. [ ] **分支保护策略** —— 在 GitHub `main` 分支启用保护：要求 `quality-gates` workflow 通过才能合并，禁止直接 push/force push，并开启至少一条 review。整理操作说明（CLI/API/截图）附在本计划，方便后续执行。  
+5. [ ] **文档同步** —— 在 `README.MD`、`docs/CONTRIBUTING.MD`、`AGENTS.md`、`CLAUDE.md` 更新“质量门禁 & 本地校验”章节，强调 `make check lint`、`make test`、`make css`、`make check tr`、`make db migrate` 等现有命令即可复现 CI 行为，提醒贡献者在提交前手动运行与自己改动相关的命令。
 
 ## 里程碑
 - M1：质量门禁 workflow 雏形（Lint/Test）上线，并在 main 分支开启必需检查。
