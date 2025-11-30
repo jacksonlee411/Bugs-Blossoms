@@ -78,7 +78,7 @@ DevHub is a development environment orchestrator that manages all development se
 - Run specific subtest: `go test -v ./path/to/package -run TestName/SubtestName`
 
 ## Code Style Guidelines
-- Use Go v1.23.2 and follow standard Go idioms
+- Use Go v1.24.10 and follow standard Go idioms
 - Naming: use camelCase for variables, PascalCase for exported functions/types
 - Testing: table-driven tests with descriptive names (TestFunctionName_Scenario), use the `require` and `assert` packages from `github.com/stretchr/testify`
 - Type safety: use strong typing and avoid `interface{}/any` where possible
@@ -171,4 +171,3 @@ modules/{module}/
   - Add service to `app.RegisterServices()` call
   - Add controller to `app.RegisterControllers()` call  
   - Add quick links to `app.QuickLinks().Add()` call
-

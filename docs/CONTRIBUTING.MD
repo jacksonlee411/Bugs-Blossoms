@@ -4,7 +4,7 @@
 
 Ensure these tools are installed before you begin:
 
-- [Go v1.23.2](https://golang.org/doc/install)
+- [Go v1.24.10](https://golang.org/doc/install)
 - [Air v1.61.5](https://github.com/air-verse/air#Installation) - Hot-reloading
 - [Docker v27.2.0](https://docs.docker.com/get-docker/) - Containerization
 - [Templ v0.3.857](https://templ.guide/) - Templating

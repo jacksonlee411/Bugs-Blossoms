@@ -108,7 +108,7 @@ modules/{module}/
 
 ## Code Style Guidelines
 - Use `go fmt` for formatting. Do not indent code manually.
-- Use Go v1.23.2 and follow standard Go idioms
+- Use Go v1.24.10 and follow standard Go idioms
 - File organization: group related functionality in modules/ or pkg/ directories
 - Naming: use camelCase for variables, PascalCase for exported functions/types
 - Testing: table-driven tests with descriptive names (TestFunctionName_Scenario), use the `require` and `assert` packages from `github.com/stretchr/testify`
@@ -123,4 +123,3 @@ modules/{module}/
 ### HTMX Best Practices
 - Use `htmx.IsHxRequest(r)` to check if a request is from HTMX
 - Use `htmx.SetTrigger(w, "eventName", payload)` for setting HTMX response triggers
-

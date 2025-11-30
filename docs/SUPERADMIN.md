@@ -368,7 +368,7 @@ query GetTenantMetrics($tenantId: ID!) {
 
 ### Prerequisites
 
-- Go 1.23.2+
+- Go 1.24.10+
 - PostgreSQL 13+
 - Make
 - Docker (optional)
