@@ -19,6 +19,36 @@
 - [Alpine.js](https://alpinejs.dev): A lightweight JavaScript framework for reactive components.
 - [Templ](https://templ.sh): A powerful templating system for building server-rendered web applications.
 
+## ⚙️ Prerequisites
+
+- Go 1.24.10+
+- Node.js 20+ (for tooling like Playwright/Tailwind)
+- PostgreSQL 17 (local `docker compose` files run `postgres:17` to mirror CI)
+
+### PostgreSQL 17 迁移与备份
+
+1. **备份旧数据**（如果之前运行的是 `postgres:15`）：  
+   ```bash
+   docker compose -f compose.dev.yml down db
+   docker run --rm --network host -v sdk-data:/var/lib/postgresql/data postgres:15 \
+     pg_dump -h localhost -p 5438 -U postgres -F c -b -v -f /tmp/pg15-backup.dump iota_erp
+   ```
+   将 `/tmp/pg15-backup.dump` 复制到安全位置。
+
+2. **清理旧卷并切换到 17**：  
+   ```bash
+   docker volume rm sdk-data
+   docker compose -f compose.dev.yml up -d db redis
+   ```
+
+3. **重新迁移与种子**：  
+   ```bash
+   DB_HOST=localhost DB_PORT=5438 DB_NAME=iota_erp DB_USER=postgres DB_PASSWORD=postgres make db migrate up
+   DB_HOST=localhost DB_PORT=5438 DB_NAME=iota_erp DB_USER=postgres DB_PASSWORD=postgres make db seed
+   ```
+
+若需要从备份恢复，可使用 `pg_restore` 将 `pg15-backup.dump` 导入新的 `postgres:17` 实例。
+
 ---  
 
 ## A Modular and Configurable ERP Solution
@@ -122,4 +152,3 @@ Updated at Jan 6, 2025
 
 We welcome contributions to improve and expand IOTA SDK! Check out our [contributing guide](docs/CONTRIBUTING.MD) to get
 started.
-

@@ -2,7 +2,7 @@
 # Simple, clean format with sensible defaults
 
 postgres:
-  desc: Database container
+  desc: Database container (PostgreSQL 17)
   port: 5432
   run: docker compose -f compose.dev.yml up db
   health:
