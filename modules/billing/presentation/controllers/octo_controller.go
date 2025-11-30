@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -196,7 +197,7 @@ func (c *OctoController) findTransaction(
 			"octo_payment_uuid":   notification.OctoPaymentUUID,
 			"count":               len(entities),
 		}).Error("Unexpected number of transactions found")
-		return nil, fmt.Errorf(errMsgTransactionNotFound)
+		return nil, errors.New(errMsgTransactionNotFound)
 	}
 
 	return entities[0], nil
@@ -212,7 +213,7 @@ func (c *OctoController) updateTransactionFromNotification(
 	octoDetails, ok := entity.Details().(details.OctoDetails)
 	if !ok {
 		logger.Error("Details is not of type OctoDetails")
-		return nil, fmt.Errorf(errMsgInvalidDetailsType)
+		return nil, errors.New(errMsgInvalidDetailsType)
 	}
 
 	// Update details with notification data
@@ -316,7 +317,7 @@ func (c *OctoController) sendCallbackResponse(
 	if !ok {
 		logger.Error("Details is not of type OctoDetails in final response")
 		http.Error(w, errMsgInvalidDetailsType, http.StatusInternalServerError)
-		return fmt.Errorf(errMsgInvalidDetailsType)
+		return errors.New(errMsgInvalidDetailsType)
 	}
 
 	// Determine final accept status for response

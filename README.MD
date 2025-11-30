@@ -38,6 +38,7 @@
 - Templates/Tailwind assets: `make generate && make css` followed by `git status --short`
 - Locales: `make check tr`
 - Schema/migrations: `make db migrate up && make db seed`
+- Finance 模块的集成测试暂时停用，如需修改 `modules/finance/**` 请在本地运行相关 `go test` 并附上结果。
 
 ### PostgreSQL 17 迁移与备份
 

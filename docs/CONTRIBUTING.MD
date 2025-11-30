@@ -125,6 +125,8 @@ All pushes to `main`/`dev` and every pull request run `.github/workflows/quality
 | `modules/**/presentation/locales/**/*.json` | `make check tr` | `make check tr` |
 | `migrations/**` or `modules/**/infrastructure/persistence/schema/**` | PostgreSQL/Redis services + `make db migrate up/down` + `make db seed` (logs stored in `migrate.log`) | `make db migrate up && make db seed` (optionally `make db migrate down` to smoke test) |
 
+> **说明**：Finance 模块（`modules/finance/**`）的自动化测试暂时停用，如修改该模块请自行运行 `go test ./modules/finance/...` 并在 PR 描述中附上结果。
+
 Running the matching commands locally ensures your branch passes the `quality-gates` check before you open a PR.
 
 ## 🧪 Running Tests
