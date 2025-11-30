@@ -11,6 +11,11 @@
 - 针对受限资源（templ、Tailwind、翻译、迁移）建立专属检查，避免仅依赖 Go 代码测试。
 - 在仓库文档（CONTRIBUTING、README、dev-plan）中同步门禁策略，让协作者明确要求。
 
+## 现状评估
+- `.github/workflows/test.yml` 已经具备完整的工具安装、Go fmt/vet、templ fmt、CSS 构建、翻译校验与带 PostgreSQL/Redis 的 `go test` 流程，可以作为统一 workflow 的基础。
+- Makefile 中已有 `test`、`css`、`check lint`/`check tr`、`db migrate`/`seed` 等细粒度目标，后续 `make verify-*` 可直接复用这些命令组合。
+- 仍存在关键缺口：workflow 只在 push 时触发（PR 不受保护）、Go 版本固定为 1.23.2、缺少 `make verify-go` / `make verify-ui` 等本地入口，templ/Tailwind 校验未按路径条件执行且缺少 `git status` 检查，分支保护与文档同步尚未开展。
+
 ## 门禁矩阵
 | 阶段 | 内容 | 命令/工具 | 触发场景 |
 | --- | --- | --- | --- |
@@ -22,13 +27,13 @@
 | 质量概览 | `go tool cover` 或 sonar-like 报告（后续扩展） | 可选 | 大型功能分支 |
 
 ## 实施步骤
-1. [ ] **CI 基线搭建** —— 直接扩展现有 `.github/workflows/test.yml`（必要时改名但保持一个 workflow），触发条件仍为 push main + 所有 PR。统一安装 Go 1.24.10、templ、tailwind、golangci-lint、pgformatter 等依赖，并预置门禁矩阵对应 job/step，避免维护两套 CI。  
-2. [ ] **Go Lint/Test 门禁** —— 在 workflow 中串联 `go fmt`（配合 `git diff --exit-code`）、`go vet`、`go test -v`，并保持 `golangci-lint run ./...` 等现有静态分析步骤；同时在 Makefile 中提供 `make verify-go` 并更新 CONTRIBUTING。  
-3. [ ] **前端模板与样式门禁** —— 通过 paths 条件检测 `.templ`、`tailwind.config.js`、`modules/**/presentation/assets` 变更，执行 `templ generate && make css` 与 `git status --porcelain`，并提供 `make verify-ui`。  
-4. [ ] **翻译与本地化门禁** —— 针对 `modules/**/presentation/locales/*.json` 执行 `make check tr` 或新增 JSON 校验脚本，确保 key 完整性与排序，并纳入 `make verify-ui` 或独立 `make verify-i18n`。  
-5. [ ] **数据库与缓存门禁** —— 在 workflow 中启用 PostgreSQL 17 与 Redis latest 服务容器（保持 `DB_HOST=localhost`、`DB_PORT=5432`、`DB_NAME=iota_erp`、`DB_USER=postgres`、`DB_PASSWORD=postgres`、`REDIS_URL=localhost:6379`），运行 `make db migrate up`（必要时附 `down` smoke）以及 `make db seed` 验证，并保存 `migrate.log` 以便排查。  
-6. [ ] **分支保护策略** —— 在 GitHub 设置里要求 `main` 分支通过 `quality-gates` workflow 才可合并，禁止直接推送与 force push，必要时要求至少一条 review。  
-7. [ ] **文档与宣传** —— 更新 `docs/CONTRIBUTING.MD`、`README.MD`、`AGENTS.md`、`CLAUDE.md` 等门禁说明，引导开发者使用 `make verify-*`。
+1. [ ] **CI 基线搭建** —— 以 `.github/workflows/test.yml` 为基础改名为 `quality-gates`，触发条件设置为 `push`（限 main/dev 等关键分支）+ `pull_request`。在 workflow 中统一使用 Go 1.24.10，并确保 templ、Tailwind、golangci-lint、pgformatter 等工具版本与 `docs/CONTRIBUTING.MD` 相同，避免本地/CI 不一致。  
+2. [ ] **Go Lint/Test 门禁** —— 在 workflow 的 Go job 里串联以下步骤：`go fmt ./...` + `git diff --exit-code`、`go vet ./...`、`golangci-lint run ./...`、`go test -v ./...`（带覆盖率）。同时在 Makefile 新增 `make verify-go`：内部依次执行 `go fmt`, `go vet`, `golangci-lint run`, `go test -v ./...` 并在失败时返回非零；`make verify` 则聚合 `verify-go` 与 UI/i18n/db 检查。  
+3. [ ] **前端模板与样式门禁** —— 在 workflow 添加条件步骤：当 `.templ`、`tailwind.config.js`、`modules/**/presentation/assets/**` 变更时，运行 `templ generate && make css`，随后执行 `git status --porcelain` 保证生成文件已提交。Makefile 中新增 `make verify-ui`，复用同一套命令以便开发者本地预检。  
+4. [ ] **翻译与本地化门禁** —— 对 `modules/**/presentation/locales/*.json` 的 diff 才执行 `make check tr`（或轻量 JSON 校验脚本），并将其纳入 `make verify-i18n`（被 `make verify` 调用）。同时在 workflow 中根据路径过滤控制步骤，减少不必要运行时间。  
+5. [ ] **数据库与缓存门禁** —— 继续使用 PostgreSQL 17 + Redis latest 服务容器，但将环境变量固定到 `DB_HOST=localhost` 等计划值，并在步骤中串联 `make db migrate up`, `make db migrate down` smoke（可选）, `make db seed`。输出 `migrate.log` 作为 artifact 以便排障。  
+6. [ ] **分支保护策略** —— 在 GitHub `main` 分支启用保护：要求 `quality-gates` workflow 成功才能合并，禁止直接 push/force push，并开启最少一条 review。必要时在 `docs/dev-plans/005` 附带操作指引（截图/CLI 命令）。  
+7. [ ] **文档与宣传** —— 更新 `docs/CONTRIBUTING.MD`、`README.MD`、`AGENTS.md`、`CLAUDE.md`，新增“质量门禁 & 本地验证”章节，列出 `make verify`, `make verify-go`, `make verify-ui`, `make verify-i18n` 的用途与触发条件。PR 模版中也提醒贡献者本地执行 `make verify`。
 
 ## 里程碑
 - M1：质量门禁 workflow 雏形（Lint/Test）上线，并在 main 分支开启必需检查。
