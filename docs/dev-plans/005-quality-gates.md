@@ -22,11 +22,11 @@
 | 质量概览 | `go tool cover` 或 sonar-like 报告（后续扩展） | 可选 | 大型功能分支 |
 
 ## 实施步骤
-1. [ ] **CI 基线搭建** —— 新建 `.github/workflows/quality-gates.yml`（触发：push 到 main + 所有 PR），统一安装 Go 1.24.10、templ、tailwind 等依赖，并预置门禁矩阵对应 job/step。  
-2. [ ] **Go Lint/Test 门禁** —— 在 workflow 中串联 `go fmt`（配合 `git diff --exit-code`）、`go vet`、`go test -v`，同时在 Makefile 中提供 `make verify-go` 并更新 CONTRIBUTING。  
+1. [ ] **CI 基线搭建** —— 直接扩展现有 `.github/workflows/test.yml`（必要时改名但保持一个 workflow），触发条件仍为 push main + 所有 PR。统一安装 Go 1.24.10、templ、tailwind、golangci-lint、pgformatter 等依赖，并预置门禁矩阵对应 job/step，避免维护两套 CI。  
+2. [ ] **Go Lint/Test 门禁** —— 在 workflow 中串联 `go fmt`（配合 `git diff --exit-code`）、`go vet`、`go test -v`，并保持 `golangci-lint run ./...` 等现有静态分析步骤；同时在 Makefile 中提供 `make verify-go` 并更新 CONTRIBUTING。  
 3. [ ] **前端模板与样式门禁** —— 通过 paths 条件检测 `.templ`、`tailwind.config.js`、`modules/**/presentation/assets` 变更，执行 `templ generate && make css` 与 `git status --porcelain`，并提供 `make verify-ui`。  
-4. [ ] **翻译与本地化门禁** —— 针对 `modules/**/presentation/locales/*.json` 执行 `make check tr` 或新增 JSON 校验脚本，确保 key 完整性与排序。  
-5. [ ] **数据库迁移门禁** —— 在 workflow 中启用 PostgreSQL 服务容器，运行 `make db migrate up`（必要时附 `down` smoke），并保存 `migrate.log` 以便排查。  
+4. [ ] **翻译与本地化门禁** —— 针对 `modules/**/presentation/locales/*.json` 执行 `make check tr` 或新增 JSON 校验脚本，确保 key 完整性与排序，并纳入 `make verify-ui` 或独立 `make verify-i18n`。  
+5. [ ] **数据库与缓存门禁** —— 在 workflow 中启用 PostgreSQL 17 与 Redis latest 服务容器（保持 `DB_HOST=localhost`、`DB_PORT=5432`、`DB_NAME=iota_erp`、`DB_USER=postgres`、`DB_PASSWORD=postgres`、`REDIS_URL=localhost:6379`），运行 `make db migrate up`（必要时附 `down` smoke）以及 `make db seed` 验证，并保存 `migrate.log` 以便排查。  
 6. [ ] **分支保护策略** —— 在 GitHub 设置里要求 `main` 分支通过 `quality-gates` workflow 才可合并，禁止直接推送与 force push，必要时要求至少一条 review。  
 7. [ ] **文档与宣传** —— 更新 `docs/CONTRIBUTING.MD`、`README.MD`、`AGENTS.md`、`CLAUDE.md` 等门禁说明，引导开发者使用 `make verify-*`。
 
@@ -36,7 +36,7 @@
 - M3：文档同步 & 分支保护策略启用，形成稳定运作的 PR 审核流程。
 
 ## 交付物
-- `.github/workflows/quality-gates.yml`（含所有门禁任务）。
+- 更新后的 `.github/workflows/test.yml`（或改名后的单一质量门禁 workflow，涵盖所有门禁任务）。
 - 新的 `make verify`, `make verify-go`, `make verify-ui` 等辅助命令。
 - 更新后的文档：CONTRIBUTING、README、AGENTS/CLAUDE 门禁章节。
 - GitHub 分支保护及 PR 检查配置说明。
