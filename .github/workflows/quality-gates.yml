@@ -12,7 +12,7 @@ on:
 
 jobs:
   lint-and-format:
-    runs-on: blacksmith-8vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     name: Code Quality & Formatting
 
@@ -129,7 +129,7 @@ jobs:
         run: make check lint
 
   test-unit-integration:
-    runs-on: blacksmith-8vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     name: Unit & Integration Tests
 
     services:
@@ -292,7 +292,7 @@ jobs:
             migrate.log
 
   test-e2e:
-    runs-on: blacksmith-8vcpu-ubuntu-2204
+    runs-on: ubuntu-latest
     name: E2E Tests
 
     services:
