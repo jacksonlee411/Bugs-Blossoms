@@ -114,6 +114,19 @@ The DevHub allows you to:
 
 Navigate with arrow keys, toggle services with Space/Enter, and quit with 'q'.
 
+## ✅ Quality Gates & Local Checks
+
+All pushes to `main`/`dev` and every pull request run `.github/workflows/quality-gates.yml`. The workflow enforces Go formatting/linting/testing on Go 1.24.10, regenerates templ/Tailwind artifacts only when presentation files change, checks locale JSON diffs, and runs PostgreSQL 17 + Redis-backed migrations with a `migrate.log` artifact.
+
+| When you change… | CI step | Run locally before pushing |
+| --- | --- | --- |
+| Any Go code | `go fmt ./...`, `go vet ./...`, `make check lint`, `go test -v ./...` | `go fmt ./... && go vet ./... && make check lint && make test` |
+| `.templ`, `tailwind.config.js`, or `modules/**/presentation/assets/**` | `make generate`, `make css`, `git status --short` | `make generate && make css` then `git status --short` |
+| `modules/**/presentation/locales/**/*.json` | `make check tr` | `make check tr` |
+| `migrations/**` or `modules/**/infrastructure/persistence/schema/**` | PostgreSQL/Redis services + `make db migrate up/down` + `make db seed` (logs stored in `migrate.log`) | `make db migrate up && make db seed` (optionally `make db migrate down` to smoke test) |
+
+Running the matching commands locally ensures your branch passes the `quality-gates` check before you open a PR.
+
 ## 🧪 Running Tests
 
 ### E2E Testing

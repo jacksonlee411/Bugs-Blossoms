@@ -12,9 +12,9 @@
 - 在仓库文档（CONTRIBUTING、README、dev-plan）中同步门禁策略，让协作者明确要求。
 
 ## 现状评估
-- `.github/workflows/test.yml` 已经具备完整的工具安装、Go fmt/vet、templ fmt、CSS 构建、翻译校验与带 PostgreSQL/Redis 的 `go test` 流程，可以作为统一 workflow 的基础。
-- Makefile 中已有 `test`、`css`、`check lint`/`check tr`、`db migrate`/`seed` 等细粒度目标，后续 `make verify-*` 可直接复用这些命令组合。
-- 仍存在关键缺口：workflow 只在 push 时触发（PR 不受保护）、Go 版本固定为 1.23.2、缺少 `make verify-go` / `make verify-ui` 等本地入口，templ/Tailwind 校验未按路径条件执行且缺少 `git status` 检查，分支保护与文档同步尚未开展。
+- `.github/workflows/quality-gates.yml` 已经具备完整的工具安装、Go fmt/vet、templ fmt、CSS 构建、翻译校验与带 PostgreSQL/Redis 的 `go test` 流程，并通过路径过滤实现模板/翻译/迁移等受限资源的条件化执行。
+- Makefile 中已有 `test`、`css`、`check lint`/`check tr`、`db migrate`/`seed` 等细粒度目标，开发者可直接复用这些命令组合进行本地校验。
+- 分支保护尚未开启，GitHub 侧仍允许直接 push，因此需要单独执行 `gh api`（或页面操作）来要求 `Quality Gates` 状态检查并强制至少一条 review。
 
 ## 门禁矩阵
 | 阶段 | 内容 | 命令/工具 | 触发场景 |
@@ -27,11 +27,11 @@
 | 质量概览 | `go tool cover` 或 sonar-like 报告（后续扩展） | 可选 | 大型功能分支 |
 
 ## 实施步骤
-1. [ ] **CI 基线调整** —— 以现有 `.github/workflows/test.yml` 为基础改名为 `quality-gates`，触发条件扩展为 `push`（限定 main/dev 等关键分支）+ `pull_request`，统一切换到 Go 1.24.10，并让 templ/Tailwind/golangci-lint/pgformatter 版本与 `docs/CONTRIBUTING.MD` 中记录的版本保持一致，避免本地与 CI 发散。  
-2. [ ] **条件化资源检查** —— 沿用当前 lint/test job 中的 `go fmt`、`go vet`、`make check lint`、`go test -v` 等步骤，但为成本较高的任务增加 `paths` 条件：`.templ`、`tailwind.config.js`、`modules/**/presentation/assets/**` 触发 `go generate ./... && make generate` + `make css` + `git status --porcelain`，`modules/**/presentation/locales/*.json` 触发 `make check tr`，`migrations/**` 或 `modules/**/schema/**` 触发 `make db migrate up/down` 与 `make db seed`。借助 `if: steps.changed-files.outputs.any_changed == 'true'` 等模式削减重复执行。  
-3. [ ] **数据库/缓存日志可观测性** —— 保留现有 PostgreSQL 17 + Redis 服务容器，固定 `DB_HOST=localhost` 等变量，但补充 `tee migrate.log` 或 artifact 上传，便于排查迁移失败；同时在 job 结尾上传 `coverage.out`、`migrate.log` 等核心产物。  
-4. [ ] **分支保护策略** —— 在 GitHub `main` 分支启用保护：要求 `quality-gates` workflow 通过才能合并，禁止直接 push/force push，并开启至少一条 review。整理操作说明（CLI/API/截图）附在本计划，方便后续执行。  
-5. [ ] **文档同步** —— 在 `README.MD`、`docs/CONTRIBUTING.MD`、`AGENTS.md`、`CLAUDE.md` 更新“质量门禁 & 本地校验”章节，强调 `make check lint`、`make test`、`make css`、`make check tr`、`make db migrate` 等现有命令即可复现 CI 行为，提醒贡献者在提交前手动运行与自己改动相关的命令。
+1. [x] **CI 基线调整** —— 以现有 `.github/workflows/quality-gates.yml` 为基础改名为 `quality-gates`，触发条件扩展为 `push`（限定 main/dev 等关键分支）+ `pull_request`，统一切换到 Go 1.24.10，并让 templ/Tailwind/golangci-lint/pgformatter 版本与 `docs/CONTRIBUTING.MD` 中记录的版本保持一致，避免本地与 CI 发散。  
+2. [x] **条件化资源检查** —— 沿用当前 lint/test job 中的 `go fmt`、`go vet`、`make check lint`、`go test -v` 等步骤，但为成本较高的任务增加 `paths` 条件：`.templ`、`tailwind.config.js`、`modules/**/presentation/assets/**` 触发 `go generate ./... && make generate` + `make css` + `git status --porcelain`，`modules/**/presentation/locales/*.json` 触发 `make check tr`，`migrations/**` 或 `modules/**/schema/**` 触发 `make db migrate up/down` 与 `make db seed`。借助 `if: steps.changed-files.outputs.any_changed == 'true'` 等模式削减重复执行。  
+3. [x] **数据库/缓存日志可观测性** —— 保留现有 PostgreSQL 17 + Redis 服务容器，固定 `DB_HOST=localhost` 等变量，但补充 `tee migrate.log` 或 artifact 上传，便于排查迁移失败；同时在 job 结尾上传 `coverage.out`、`migrate.log` 等核心产物。  
+4. [ ] **分支保护策略** —— 在 GitHub `main` 分支启用保护：要求 `quality-gates` workflow 通过才能合并，禁止直接 push/force push，并开启至少一条 review。整理操作说明（CLI/API/截图）附在本计划，例如 `gh api -X PUT repos/jacksonlee411/Bugs-Blossoms/branches/main/protection -F required_status_checks.strict=true -F required_status_checks.contexts[]=\"Quality Gates\" -F enforce_admins=true -F required_pull_request_reviews.dismiss_stale_reviews=true`，以便后续执行。  
+5. [x] **文档同步** —— 在 `README.MD`、`docs/CONTRIBUTING.MD`、`AGENTS.md`、`CLAUDE.md` 更新“质量门禁 & 本地校验”章节，强调 `make check lint`、`make test`、`make css`、`make check tr`、`make db migrate` 等现有命令即可复现 CI 行为，提醒贡献者在提交前手动运行与自己改动相关的命令。
 
 ## 里程碑
 - M1：质量门禁 workflow 雏形（Lint/Test）上线，并在 main 分支开启必需检查。
@@ -39,7 +39,6 @@
 - M3：文档同步 & 分支保护策略启用，形成稳定运作的 PR 审核流程。
 
 ## 交付物
-- 更新后的 `.github/workflows/test.yml`（或改名后的单一质量门禁 workflow，涵盖所有门禁任务）。
-- 新的 `make verify`, `make verify-go`, `make verify-ui` 等辅助命令。
+- 更新后的 `.github/workflows/quality-gates.yml`（单一质量门禁 workflow，涵盖 lint/test/模板/迁移 条件化任务）。
 - 更新后的文档：CONTRIBUTING、README、AGENTS/CLAUDE 门禁章节。
 - GitHub 分支保护及 PR 检查配置说明。

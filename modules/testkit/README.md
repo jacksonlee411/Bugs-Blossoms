@@ -248,7 +248,7 @@ ENABLE_TEST_ENDPOINTS=true make e2e dev
 
 ### CI/CD Integration
 
-The environment variable is automatically set in `.github/workflows/test.yml` for E2E test jobs.
+The environment variable is automatically set in `.github/workflows/quality-gates.yml` for E2E test jobs.
 
 ## Data Structure Support
 
