@@ -22,12 +22,14 @@ SELECT
     em.birth_date,
     em.hire_date,
     em.resignation_date
-FROM employees e
-LEFT JOIN employee_meta em ON e.id = em.employee_id
-WHERE e.tenant_id = sqlc.arg(tenant_id)
-ORDER BY e.id
-LIMIT sqlc.arg(row_limit)
-OFFSET sqlc.arg(row_offset);
+FROM
+    employees e
+    LEFT JOIN employee_meta em ON e.id = em.employee_id
+WHERE
+    e.tenant_id = sqlc.arg (tenant_id)
+ORDER BY
+    e.id
+LIMIT sqlc.arg (row_limit) OFFSET sqlc.arg (row_offset);
 
 -- name: ListEmployeesByTenant :many
 SELECT
@@ -53,10 +55,13 @@ SELECT
     em.birth_date,
     em.hire_date,
     em.resignation_date
-FROM employees e
-LEFT JOIN employee_meta em ON e.id = em.employee_id
-WHERE e.tenant_id = sqlc.arg(tenant_id)
-ORDER BY e.id;
+FROM
+    employees e
+    LEFT JOIN employee_meta em ON e.id = em.employee_id
+WHERE
+    e.tenant_id = sqlc.arg (tenant_id)
+ORDER BY
+    e.id;
 
 -- name: GetEmployeeByID :one
 SELECT
@@ -82,12 +87,18 @@ SELECT
     em.birth_date,
     em.hire_date,
     em.resignation_date
-FROM employees e
-LEFT JOIN employee_meta em ON e.id = em.employee_id
-WHERE e.id = sqlc.arg(id)
-  AND e.tenant_id = sqlc.arg(tenant_id);
+FROM
+    employees e
+    LEFT JOIN employee_meta em ON e.id = em.employee_id
+WHERE
+    e.id = sqlc.arg (id)
+    AND e.tenant_id = sqlc.arg (tenant_id);
 
 -- name: CountEmployees :one
-SELECT COUNT(*)
-FROM employees
-WHERE tenant_id = sqlc.arg(tenant_id);
+SELECT
+    COUNT(*)
+FROM
+    employees
+WHERE
+    tenant_id = sqlc.arg (tenant_id);
+

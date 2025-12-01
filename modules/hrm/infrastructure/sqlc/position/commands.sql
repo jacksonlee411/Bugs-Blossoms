@@ -1,3 +1,4 @@
+-- name: CreatePosition :one
 INSERT INTO positions (tenant_id, name, description)
     VALUES (sqlc.arg (tenant_id), sqlc.arg (name), sqlc.arg (description))
 RETURNING
@@ -17,3 +18,4 @@ WHERE
 DELETE FROM positions
 WHERE id = sqlc.arg (id)
     AND tenant_id = sqlc.arg (tenant_id);
+
