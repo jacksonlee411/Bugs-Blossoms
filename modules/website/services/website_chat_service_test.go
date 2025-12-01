@@ -1,8 +1,10 @@
 package services_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/country"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/internet"
@@ -308,14 +310,13 @@ func TestWebsiteChatService_ReplyToThread(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, thread)
 
-	createdUser, err := userRepo.Create(fixtures.Ctx, user.New(
+	createdUser := createUserInTx(t, fixtures.Ctx, userRepo, fixtures.TenantID(), user.New(
 		"Support",
 		"Agent",
 		internet.MustParseEmail("test@gmail.com"),
 		user.UILanguageEN,
 		user.WithTenantID(fixtures.TenantID()),
 	))
-	require.NoError(t, err)
 
 	// Create reply DTO
 	dto := services.ReplyToThreadDTO{
@@ -390,4 +391,23 @@ func TestWebsiteChatService_ReplyToThread_UserNotFound(t *testing.T) {
 	_, err = sut.ReplyToThread(fixtures.Ctx, dto)
 	require.Error(t, err)
 	require.ErrorIs(t, err, corePersistence.ErrUserNotFound)
+}
+
+func createUserInTx(
+	t *testing.T,
+	ctx context.Context,
+	repo user.Repository,
+	tenantID uuid.UUID,
+	entity user.User,
+) user.User {
+	t.Helper()
+
+	var created user.User
+	err := composables.InTx(ctx, func(txCtx context.Context) error {
+		var err error
+		created, err = repo.Create(txCtx, entity)
+		return err
+	})
+	require.NoError(t, err)
+	return created
 }
