@@ -14,6 +14,7 @@ import (
 	coreservices "github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/modules/superadmin"
 	"github.com/iota-uz/iota-sdk/modules/superadmin/presentation/controllers"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/defaults"
 	"github.com/iota-uz/iota-sdk/pkg/itf"
 	"github.com/stretchr/testify/require"
@@ -57,7 +58,7 @@ func createRegularUserForTenants() user.User {
 }
 
 func TestTenantsController_Index(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -75,7 +76,7 @@ func TestTenantsController_Index(t *testing.T) {
 }
 
 func TestTenantsController_Index_HTMX(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -94,7 +95,7 @@ func TestTenantsController_Index_HTMX(t *testing.T) {
 }
 
 func TestTenantsController_Index_WithPagination(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -145,7 +146,7 @@ func TestTenantsController_Index_WithPagination(t *testing.T) {
 }
 
 func TestTenantsController_Index_WithSearch(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -186,7 +187,7 @@ func TestTenantsController_Index_WithSearch(t *testing.T) {
 }
 
 func TestTenantsController_Export(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -206,7 +207,7 @@ func TestTenantsController_Export(t *testing.T) {
 }
 
 func TestTenantsController_Permissions(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	// Test with different user types and permission levels
 	testCases := []struct {
@@ -269,7 +270,7 @@ func TestTenantsController_Permissions(t *testing.T) {
 
 // TestTenantsController_SuperAdminOnly verifies only superadmin users can access all endpoints
 func TestTenantsController_SuperAdminOnly(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	t.Run("Tenants_Index_SuperAdmin_OK", func(t *testing.T) {
 		suite := itf.NewSuiteBuilder(t).
@@ -372,7 +373,7 @@ func TestTenantsController_SuperAdminOnly(t *testing.T) {
 }
 
 func TestTenantsController_Routes(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -406,7 +407,7 @@ func TestTenantsController_Routes(t *testing.T) {
 }
 
 func TestTenantsController_EdgeCases(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -456,7 +457,7 @@ func TestTenantsController_EdgeCases(t *testing.T) {
 }
 
 func TestTenantsController_HTMX(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -475,7 +476,7 @@ func TestTenantsController_HTMX(t *testing.T) {
 }
 
 func TestTenantsController_Index_WithDateRange(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -542,7 +543,7 @@ func TestTenantsController_Index_WithDateRange(t *testing.T) {
 }
 
 func TestTenantsController_Index_SortAscending(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -595,7 +596,7 @@ func TestTenantsController_Index_SortAscending(t *testing.T) {
 }
 
 func TestTenantsController_Index_SortDescending(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -648,7 +649,7 @@ func TestTenantsController_Index_SortDescending(t *testing.T) {
 }
 
 func TestTenantsController_Index_DefaultSort(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -697,7 +698,7 @@ func TestTenantsController_Index_DefaultSort(t *testing.T) {
 }
 
 func TestTenantsController_Index_InvalidSortField(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -750,7 +751,7 @@ func TestTenantsController_Index_InvalidSortField(t *testing.T) {
 }
 
 func TestTenantsController_Index_SortWithDateFilter(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -810,7 +811,7 @@ func TestTenantsController_Index_SortWithDateFilter(t *testing.T) {
 }
 
 func TestTenantsController_Index_SortWithSearch(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -867,7 +868,7 @@ func TestTenantsController_Index_SortWithSearch(t *testing.T) {
 }
 
 func TestTenantsController_Index_SortWithPagination(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -916,7 +917,7 @@ func TestTenantsController_Index_SortWithPagination(t *testing.T) {
 }
 
 func TestTenantsController_Index_DateRangeWithPagination(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -965,7 +966,7 @@ func TestTenantsController_Index_DateRangeWithPagination(t *testing.T) {
 }
 
 func TestTenantsController_TenantUsers(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1002,7 +1003,7 @@ func TestTenantsController_TenantUsers(t *testing.T) {
 }
 
 func TestTenantsController_TenantUsers_HTMX(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1024,7 +1025,7 @@ func TestTenantsController_TenantUsers_HTMX(t *testing.T) {
 }
 
 func TestTenantsController_TenantUsers_Pagination(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1070,7 +1071,7 @@ func TestTenantsController_TenantUsers_Pagination(t *testing.T) {
 }
 
 func TestTenantsController_TenantUsers_Search(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1114,7 +1115,7 @@ func TestTenantsController_TenantUsers_Search(t *testing.T) {
 }
 
 func TestTenantsController_TenantUsers_Sorting(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1161,7 +1162,7 @@ func TestTenantsController_TenantUsers_Sorting(t *testing.T) {
 }
 
 func TestTenantsController_Index_HTMXTargetHandling(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1215,7 +1216,7 @@ func TestTenantsController_Index_HTMXTargetHandling(t *testing.T) {
 }
 
 func TestTenantsController_TenantUsers_HTMXTargetHandling(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1278,7 +1279,7 @@ func TestTenantsController_TenantUsers_HTMXTargetHandling(t *testing.T) {
 
 // TestTenantsController_ResetUserPassword_Success verifies successful password reset
 func TestTenantsController_ResetUserPassword_Success(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1289,11 +1290,12 @@ func TestTenantsController_ResetUserPassword_Success(t *testing.T) {
 	controller := controllers.NewTenantsController(suite.Env().App, userService)
 	suite.Register(controller)
 
-	ctx := suite.Env().Ctx
+	ctx := ctxWithEnglishLocalizer(suite.Env().Ctx, suite.Env().App)
 
 	// Create test tenant
 	tenant, err := itf.CreateTestTenant(ctx, suite.Env().Pool)
 	require.NoError(t, err)
+	tenantCtx := composables.WithTenantID(ctx, tenant.ID)
 
 	// Create test user in that tenant
 	email, _ := internet.NewEmail("testuser@reset.com")
@@ -1306,7 +1308,7 @@ func TestTenantsController_ResetUserPassword_Success(t *testing.T) {
 	)
 	testUser, _ = testUser.SetPassword("oldpassword123")
 
-	createdUser, err := userService.Create(ctx, testUser)
+	createdUser, err := userService.Create(tenantCtx, testUser)
 	require.NoError(t, err)
 
 	// Reset password
@@ -1319,11 +1321,11 @@ func TestTenantsController_ResetUserPassword_Success(t *testing.T) {
 
 	// Verify response
 	jsonAssert := resp.ExpectJSON()
-	jsonAssert.ExpectField("$.success", true)
-	jsonAssert.ExpectField("$.message", "Password reset successfully")
+	jsonAssert.ExpectField("success", true)
+	jsonAssert.ExpectField("message", "Password reset successfully")
 
 	// Verify password was actually changed
-	updatedUser, err := userService.GetByID(ctx, createdUser.ID())
+	updatedUser, err := userService.GetByID(tenantCtx, createdUser.ID())
 	require.NoError(t, err)
 	require.True(t, updatedUser.CheckPassword(newPassword), "New password should work")
 	require.False(t, updatedUser.CheckPassword("oldpassword123"), "Old password should not work")
@@ -1331,7 +1333,7 @@ func TestTenantsController_ResetUserPassword_Success(t *testing.T) {
 
 // TestTenantsController_ResetUserPassword_InvalidTenantID tests malformed tenant UUID
 func TestTenantsController_ResetUserPassword_InvalidTenantID(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1350,7 +1352,7 @@ func TestTenantsController_ResetUserPassword_InvalidTenantID(t *testing.T) {
 
 // TestTenantsController_ResetUserPassword_InvalidUserID tests non-numeric user ID
 func TestTenantsController_ResetUserPassword_InvalidUserID(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1372,7 +1374,7 @@ func TestTenantsController_ResetUserPassword_InvalidUserID(t *testing.T) {
 
 // TestTenantsController_ResetUserPassword_UserNotFound tests non-existent user
 func TestTenantsController_ResetUserPassword_UserNotFound(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1395,7 +1397,7 @@ func TestTenantsController_ResetUserPassword_UserNotFound(t *testing.T) {
 
 // TestTenantsController_ResetUserPassword_WrongTenant tests cross-tenant protection
 func TestTenantsController_ResetUserPassword_WrongTenant(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1406,11 +1408,12 @@ func TestTenantsController_ResetUserPassword_WrongTenant(t *testing.T) {
 	controller := controllers.NewTenantsController(suite.Env().App, userService)
 	suite.Register(controller)
 
-	ctx := suite.Env().Ctx
+	ctx := ctxWithEnglishLocalizer(suite.Env().Ctx, suite.Env().App)
 
 	// Create tenant A
 	tenantA, err := itf.CreateTestTenant(ctx, suite.Env().Pool)
 	require.NoError(t, err)
+	tenantACtx := composables.WithTenantID(ctx, tenantA.ID)
 
 	// Create tenant B
 	tenantB, err := itf.CreateTestTenant(ctx, suite.Env().Pool)
@@ -1421,7 +1424,7 @@ func TestTenantsController_ResetUserPassword_WrongTenant(t *testing.T) {
 	testUser := user.New("Test", "User", email, user.UILanguageEN, user.WithTenantID(tenantA.ID))
 	testUser, _ = testUser.SetPassword("password123")
 
-	createdUser, err := userService.Create(ctx, testUser)
+	createdUser, err := userService.Create(tenantACtx, testUser)
 	require.NoError(t, err)
 
 	// Try to reset password using tenant B's ID (should fail - cross-tenant protection)
@@ -1433,7 +1436,7 @@ func TestTenantsController_ResetUserPassword_WrongTenant(t *testing.T) {
 
 // TestTenantsController_ResetUserPassword_EmptyPassword tests empty password validation
 func TestTenantsController_ResetUserPassword_EmptyPassword(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1455,7 +1458,7 @@ func TestTenantsController_ResetUserPassword_EmptyPassword(t *testing.T) {
 
 // TestTenantsController_ResetUserPassword_PasswordTooShort tests minimum length validation
 func TestTenantsController_ResetUserPassword_PasswordTooShort(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1486,7 +1489,7 @@ func TestTenantsController_ResetUserPassword_PasswordTooShort(t *testing.T) {
 
 // TestTenantsController_ResetUserPassword_Permissions tests that only superadmins can access
 func TestTenantsController_ResetUserPassword_Permissions(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	t.Run("SuperAdmin_Allowed", func(t *testing.T) {
 		suite := itf.NewSuiteBuilder(t).
@@ -1498,15 +1501,16 @@ func TestTenantsController_ResetUserPassword_Permissions(t *testing.T) {
 		controller := controllers.NewTenantsController(suite.Env().App, userService)
 		suite.Register(controller)
 
-		ctx := suite.Env().Ctx
+		ctx := ctxWithEnglishLocalizer(suite.Env().Ctx, suite.Env().App)
 		tenant, err := itf.CreateTestTenant(ctx, suite.Env().Pool)
 		require.NoError(t, err)
+		tenantCtx := composables.WithTenantID(ctx, tenant.ID)
 
 		email, _ := internet.NewEmail("test@example.com")
 		testUser := user.New("Test", "User", email, user.UILanguageEN, user.WithTenantID(tenant.ID))
 		testUser, _ = testUser.SetPassword("oldpass123")
 
-		createdUser, err := userService.Create(ctx, testUser)
+		createdUser, err := userService.Create(tenantCtx, testUser)
 		require.NoError(t, err)
 
 		// Superadmin should be able to reset password
@@ -1538,7 +1542,7 @@ func TestTenantsController_ResetUserPassword_Permissions(t *testing.T) {
 }
 
 func TestTenantsController_ResetUserPassword_PasswordTooLong(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -1574,7 +1578,7 @@ func TestTenantsController_ResetUserPassword_PasswordTooLong(t *testing.T) {
 }
 
 func TestTenantsController_ResetUserPassword_InvalidContentType(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).

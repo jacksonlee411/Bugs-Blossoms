@@ -259,7 +259,7 @@ jobs:
           DB_NAME: iota_erp
           DB_USER: postgres
           DB_PASSWORD: postgres
-        run: go test $(go list ./... | grep -v '^github.com/iota-uz/iota-sdk/modules/finance' | tr '\n' ' ') -coverprofile=coverage.out -covermode=atomic
+        run: ./scripts/run-go-tests.sh -coverprofile=coverage.out -covermode=atomic
 
       - name: Generate coverage report
         env:

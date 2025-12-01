@@ -28,6 +28,11 @@ const (
 	errMsgTransactionNotFound = "Transaction not found or ambiguous"
 )
 
+var (
+	errInvalidDetailsType  = errors.New("invalid details type")
+	errTransactionNotFound = errors.New("transaction not found or ambiguous")
+)
+
 type OctoController struct {
 	app            application.Application
 	billingService *services.BillingService
@@ -84,7 +89,7 @@ func (c *OctoController) Handle(
 	if err != nil {
 		statusCode := http.StatusInternalServerError
 		errMsg := errMsgInternalServerError
-		if err.Error() == errMsgTransactionNotFound {
+		if errors.Is(err, errTransactionNotFound) {
 			statusCode = http.StatusBadRequest
 			errMsg = errMsgTransactionNotFound
 		}
@@ -197,7 +202,7 @@ func (c *OctoController) findTransaction(
 			"octo_payment_uuid":   notification.OctoPaymentUUID,
 			"count":               len(entities),
 		}).Error("Unexpected number of transactions found")
-		return nil, errors.New(errMsgTransactionNotFound)
+		return nil, errTransactionNotFound
 	}
 
 	return entities[0], nil
@@ -213,7 +218,7 @@ func (c *OctoController) updateTransactionFromNotification(
 	octoDetails, ok := entity.Details().(details.OctoDetails)
 	if !ok {
 		logger.Error("Details is not of type OctoDetails")
-		return nil, errors.New(errMsgInvalidDetailsType)
+		return nil, errInvalidDetailsType
 	}
 
 	// Update details with notification data
@@ -317,7 +322,7 @@ func (c *OctoController) sendCallbackResponse(
 	if !ok {
 		logger.Error("Details is not of type OctoDetails in final response")
 		http.Error(w, errMsgInvalidDetailsType, http.StatusInternalServerError)
-		return errors.New(errMsgInvalidDetailsType)
+		return errInvalidDetailsType
 	}
 
 	// Determine final accept status for response
