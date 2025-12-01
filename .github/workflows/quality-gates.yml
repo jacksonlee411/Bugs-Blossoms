@@ -343,7 +343,6 @@ jobs:
             migrate.log
 
   test-e2e:
-    if: ${{ false }} # Temporarily disabled until Playwright issues are resolved
     runs-on: ubuntu-latest
     name: E2E Tests
 
