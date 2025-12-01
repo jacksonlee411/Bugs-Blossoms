@@ -102,11 +102,21 @@ jobs:
 
       - name: Check Go files formatting
         run: |
-          go fmt ./...
-          if [ -n "$(git diff --name-only)" ]; then
-            echo "Error: Some Go files are not properly formatted"
-            git diff
-            exit 1
+          set -euo pipefail
+          packages="$(./scripts/go-active-packages.sh | tr '\n' ' ')"
+          if [ -n "$packages" ]; then
+            go fmt $packages
+          else
+            echo "No active Go packages to format"
+          fi
+          diff_files="$(git diff --name-only)"
+          if [ -n "$diff_files" ]; then
+            filtered="$(echo "$diff_files" | grep -Ev '^modules/(billing|crm|finance)/' || true)"
+            if [ -n "$filtered" ]; then
+              echo "Error: Some Go files are not properly formatted"
+              git diff
+              exit 1
+            fi
           fi
           echo "All Go files are properly formatted"
 
@@ -114,6 +124,9 @@ jobs:
         run: |
           mkdir -p /tmp/formatted
           find modules -name "*.sql" -type f | while read -r sqlfile; do
+            if [[ "$sqlfile" =~ ^modules/(billing|crm|finance)/ ]]; then
+              continue
+            fi
             pg_format "$sqlfile" > "/tmp/formatted/$(basename "$sqlfile")"
             if ! diff -q "$sqlfile" "/tmp/formatted/$(basename "$sqlfile")" > /dev/null; then
               echo "Error: $sqlfile is not properly formatted"
@@ -124,7 +137,14 @@ jobs:
           echo "All SQL files are properly formatted"
 
       - name: Run go vet
-        run: go vet ./...
+        run: |
+          set -euo pipefail
+          packages="$(./scripts/go-active-packages.sh | tr '\n' ' ')"
+          if [ -z "$packages" ]; then
+            echo "No active Go packages to vet"
+            exit 0
+          fi
+          go vet $packages
 
       - name: Generate CSS files
         if: ${{ steps.changed-files.outputs.templ == 'true' }}

@@ -137,3 +137,9 @@ modules/{module}/
 ### HTMX Best Practices
 - Use `htmx.IsHxRequest(r)` to check if a request is from HTMX
 - Use `htmx.SetTrigger(w, "eventName", payload)` for setting HTMX response triggers
+
+## 模块冻结政策（Billing / CRM / Finance）
+
+- `modules/billing`, `modules/crm`, `modules/finance` 已进入长期冻结状态，暂停一切新特性、重构与 Bug 修复；除非产品委员会重新解冻，否则禁止修改这些目录下的任何代码、SQL、模板与资源文件。
+- 质量门禁（`quality-gates` workflow）、本地测试脚本与 `sql` 格式化步骤均已排除上述模块，它们不会参与 `go test`、`go vet`、`golangci-lint`、`pg_format` 等自动化检查。遇到故障也无需修复，保持当前快照即可。
+- 若业务需求确实需要调整，请先更新 dev-plan 并经负责人批准，随后在 AGENTS.md 中撤销冻结声明，再恢复质量门禁与测试范围。
