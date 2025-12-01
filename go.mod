@@ -43,6 +43,7 @@ require (
 	github.com/openai/openai-go v1.3.0
 	github.com/pkg/errors v0.9.1
 	github.com/redis/go-redis/v9 v9.0.4
+	github.com/roblaszczak/go-cleanarch v1.2.1
 	github.com/rs/cors v1.11.1
 	github.com/rubenv/sql-migrate v1.7.0
 	github.com/sashabaranov/go-openai v1.40.1
@@ -64,6 +65,7 @@ require (
 	golang.org/x/oauth2 v0.26.0
 	golang.org/x/text v0.25.0
 	google.golang.org/api v0.209.0
+	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/gorm v1.25.12
 )
 
@@ -151,7 +153,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/grpc v1.71.0 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	nhooyr.io/websocket v1.8.17 // indirect
 	rsc.io/qr v0.2.0 // indirect
 )

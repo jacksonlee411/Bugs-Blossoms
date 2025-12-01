@@ -30,10 +30,12 @@
 - `.github/workflows/quality-gates.yml` runs on every push to `main`/`dev` and on all pull requests. It pins Go 1.24.10, installs templ/Tailwind/golangci-lint/pgformatter, and uploads `coverage.out`, `coverage.html`, and `migrate.log` artifacts.
 - Costly checks are scoped to file changes: `.templ`/Tailwind assets trigger `make generate` + `make css` + `git status`, locale JSON triggers `make check tr`, and migrations/schema SQL trigger PostgreSQL 17 + Redis smoke migrations (`make db migrate up/down` + `make db seed`).
 - Unit/integration tests always run with PostgreSQL 17/Redis containers, ensuring parity between local development and CI.
+- Clean architecture 008 守护：`.gocleanarch.yml` 约束了 modules/*/{domain,services,presentation,infrastructure} 之间的依赖，`make check lint` 和 `quality-gates` 的 lint job 都会运行 go-cleanarch（仅在 Go 代码或该配置文件变更时触发）。
 
 **Before pushing**, run the commands that match your changes so you know `quality-gates` will pass:
 
 - Go code: `go fmt ./... && go vet ./... && make check lint`
+- Clean architecture: `.gocleanarch.yml` 描述了 domain/services/presentation/infrastructure 的依赖图谱，`make check lint` 会自动运行 go-cleanarch（本地与 CI 均复用）。
 - Tests: `make test` (or `go test -v ./...`)
 - Templates/Tailwind assets: `make generate && make css` followed by `git status --short`
 - Locales: `make check tr`

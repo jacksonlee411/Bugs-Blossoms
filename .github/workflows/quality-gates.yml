@@ -36,6 +36,11 @@ jobs:
             schema:
               - 'migrations/**'
               - 'modules/**/infrastructure/persistence/schema/**'
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - '.gocleanarch.yml'
 
       - name: Set up Go
         uses: useblacksmith/setup-go@v6
@@ -125,7 +130,8 @@ jobs:
         if: ${{ steps.changed-files.outputs.templ == 'true' }}
         run: make css
 
-      - name: Run golangci-lint (unused variables/functions)
+      - name: Run golangci-lint (unused variables/functions + go-cleanarch)
+        if: ${{ steps.changed-files.outputs.go == 'true' }}
         run: make check lint
 
   test-unit-integration:
@@ -191,6 +197,11 @@ jobs:
             schema:
               - 'migrations/**'
               - 'modules/**/infrastructure/persistence/schema/**'
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - '.gocleanarch.yml'
 
       - name: Set up Go
         uses: useblacksmith/setup-go@v6

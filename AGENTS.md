@@ -115,6 +115,11 @@ modules/{module}/
   - Locale JSON: `make check tr`
   - Migrations/schema SQL: `make db migrate up && make db seed` (optional `make db migrate down`)
 
+## Architecture Guard
+- `.gocleanarch.yml` 定义了 domain/services/presentation/infrastructure 与 pkg/cmd/shared 层的依赖约束。
+- `make check lint` 会先执行 golangci-lint，再运行 `go run ./cmd/cleanarchguard -config .gocleanarch.yml`。
+- `quality-gates` 的 lint job 在 Go 文件或 `.gocleanarch.yml` 变更时自动触发，同样复用该命令。
+
 ## Code Style Guidelines
 - Use `go fmt` for formatting. Do not indent code manually.
 - Use Go v1.24.10 and follow standard Go idioms
