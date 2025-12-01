@@ -41,6 +41,12 @@ jobs:
               - 'go.mod'
               - 'go.sum'
               - '.gocleanarch.yml'
+            hrm-sqlc:
+              - 'sqlc.yaml'
+              - 'modules/hrm/infrastructure/sqlc/**'
+              - 'modules/hrm/infrastructure/persistence/**/*.sql'
+              - 'scripts/db/export_hrm_schema.sh'
+              - 'docs/dev-records/hrm-sql-inventory.md'
 
       - name: Set up Go
         uses: useblacksmith/setup-go@v6
@@ -135,6 +141,19 @@ jobs:
             fi
           done
           echo "All SQL files are properly formatted"
+
+      - name: Run HRM sqlc generate
+        if: ${{ steps.changed-files.outputs.hrm-sqlc == 'true' }}
+        run: make sqlc-generate
+
+      - name: Ensure sqlc artifacts are committed
+        if: ${{ steps.changed-files.outputs.hrm-sqlc == 'true' }}
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "Detected sqlc artifacts that are not committed"
+            git status --short
+            exit 1
+          fi
 
       - name: Run go vet
         run: |

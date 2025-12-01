@@ -12,6 +12,7 @@ docs:
 
 # Template generation with optional subcommands (generate, watch)
 generate:
+	@$(MAKE) sqlc-generate
 	@if [ "$(word 2,$(MAKECMDGOALS))" = "watch" ]; then \
 		templ generate --watch; \
 	else \
@@ -235,3 +236,8 @@ watch coverage verbose docker score report linux docker-base docker-prod up down
 .PHONY: deps db test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
         down restart logs local stop reset watch coverage verbose docker score report \
         dev fmt lint tr linux docker-base docker-prod run server sdk-tools install help
+# HRM sqlc generation
+sqlc-generate:
+	sqlc generate -f sqlc.yaml
+	gofmt -w modules/hrm/infrastructure/sqlc
+	go run golang.org/x/tools/cmd/goimports@v0.26.0 -w modules/hrm/infrastructure/sqlc

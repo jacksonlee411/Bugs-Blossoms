@@ -1,0 +1,30 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema:
+      - modules/hrm/infrastructure/sqlc/schema.sql
+    queries:
+      - modules/hrm/infrastructure/sqlc/employee
+    gen:
+      go:
+        out: modules/hrm/infrastructure/sqlc/employee
+        package: employee_sqlc
+        sql_package: pgx/v5
+        emit_prepared_queries: true
+        emit_json_tags: true
+        emit_pointers_for_null_types: true
+        emit_empty_slices: true
+  - engine: postgresql
+    schema:
+      - modules/hrm/infrastructure/sqlc/schema.sql
+    queries:
+      - modules/hrm/infrastructure/sqlc/position
+    gen:
+      go:
+        out: modules/hrm/infrastructure/sqlc/position
+        package: position_sqlc
+        sql_package: pgx/v5
+        emit_prepared_queries: true
+        emit_json_tags: true
+        emit_pointers_for_null_types: true
+        emit_empty_slices: true
