@@ -1,0 +1,77 @@
+version: 1
+root: .
+ignore_tests: true
+ignore_packages:
+  # modules/core shared layers/tools
+  - github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts
+  - github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components
+  - github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels
+  - github.com/iota-uz/iota-sdk/modules/core/presentation/mappers
+  - github.com/iota-uz/iota-sdk/modules/core/presentation/assets
+  - github.com/iota-uz/iota-sdk/modules/core/services
+  - github.com/iota-uz/iota-sdk/modules/core/infrastructure/query
+  - github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence
+  - github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence/models
+  # finance exceptions
+  - github.com/iota-uz/iota-sdk/modules/finance/infrastructure/query
+  - github.com/iota-uz/iota-sdk/modules/finance/infrastructure/persistence
+  - github.com/iota-uz/iota-sdk/modules/finance/presentation/viewmodels
+  - github.com/iota-uz/iota-sdk/modules/finance/presentation/mappers
+  - github.com/iota-uz/iota-sdk/modules/finance/presentation/templates/components
+  - github.com/iota-uz/iota-sdk/modules/finance/services
+  # crm adapters
+  - github.com/iota-uz/iota-sdk/modules/crm/infrastructure/persistence
+  - github.com/iota-uz/iota-sdk/modules/crm/infrastructure/cpass-providers
+  # other module-specific adapters
+  - github.com/iota-uz/iota-sdk/modules/warehouse/infrastructure/persistence
+  - github.com/iota-uz/iota-sdk/modules/warehouse/infrastructure/persistence/mappers
+  - github.com/iota-uz/iota-sdk/modules/warehouse/services/positionservice
+  - github.com/iota-uz/iota-sdk/modules/warehouse/services/productservice
+  - github.com/iota-uz/iota-sdk/modules/warehouse/services/inventory_service
+  - github.com/iota-uz/iota-sdk/modules/website/infrastructure/cache
+  - github.com/iota-uz/iota-sdk/modules/website/infrastructure/persistence
+  - github.com/iota-uz/iota-sdk/modules/website/infrastructure/rag
+  - github.com/iota-uz/iota-sdk/modules/bichat/infrastructure/llmproviders
+aliases:
+  domain:
+    - domain
+  application:
+    - services
+  interfaces:
+    - presentation
+  infrastructure:
+    - infrastructure
+shared_packages:
+  - pkg
+  - internal
+  - cmd
+shared_modules:
+  - core
+  - crm
+layers:
+  domain:
+    description: >-
+      模块内的 domain 层包含聚合、实体、值对象与领域事件，只能依赖同模块 domain 层
+      或 pkg/** 这类共享库。
+    allowed_dependencies:
+      - same_module_layers: [domain]
+      - shared_packages: [pkg]
+  services:
+    description: >-
+      services 层充当 Application Layer，可依赖同模块 domain 与 services，以及 pkg/** 提供的工具。
+    allowed_dependencies:
+      - same_module_layers: [domain, services]
+      - shared_packages: [pkg]
+  presentation:
+    description: >-
+      presentation 层对应 interfaces/viewmodels/templ，只能依赖同模块 services 或 pkg/**。
+    allowed_dependencies:
+      - same_module_layers: [services, presentation]
+      - shared_packages: [pkg]
+  infrastructure:
+    description: >-
+      infrastructure 层负责仓储、外部系统适配，可依赖同模块 domain/services，以及 pkg/**、internal/**。
+      它可以跨模块导入其他模块的 presentation（即 interfaces）以挂接实现（与 go-cleanarch 默认为一致）。
+    allowed_dependencies:
+      - same_module_layers: [domain, services, infrastructure]
+      - shared_packages: [pkg, internal]

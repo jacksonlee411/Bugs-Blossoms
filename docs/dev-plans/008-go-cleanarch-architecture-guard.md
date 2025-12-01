@@ -1,6 +1,6 @@
 # DEV-PLAN-008：集成 go-cleanarch 的架构依赖守护
 
-**状态**: 规划中（2025-01-14 11:30）
+**状态**: 已完成（2025-12-01 18:14）
 
 ## 背景
 - R200 文档指出“不要依赖开发者自觉维护模块边界，应在 CI 中引入 go-cleanarch 自动阻断非法依赖”（docs/dev-records/R200r-Go语言ERP系统最佳实践.md:201-205）。
@@ -20,7 +20,7 @@
 - 规则依赖准确包路径划分，初版配置可能产生误报，需与各模块负责人共同校正。
 
 ## 实施步骤
-1. [ ] **规范定义与配置文件**
+1. [x] **规范定义与配置文件**
    - 梳理层级：`cmd`（组装/依赖注入）、`modules/*/domain`（聚合/实体）、`modules/*/infrastructure`、`modules/*/services`、`modules/*/presentation`、`pkg/**`（共享库）。
    - 在根目录创建 `.gocleanarch.yml`：
      - 限制 domain 仅依赖 `pkg` 与同模块 domain；
@@ -29,15 +29,15 @@
      - presentation 仅依赖 services + pkg；
      - 禁止 `modules/{A}` 直接导入 `modules/{B}/internal`，如确需跨模块共享则通过 allowlist 明确列出。
 
-2. [ ] **本地命令集成**
+2. [x] **本地命令集成**
    - 在 `tools.go` 中空白导入 `_ "github.com/roblaszczak/go-cleanarch"` 固定工具版本。
    - 更新 `Makefile` 的 `check lint`（或新增 `check arch`）执行 `go run github.com/roblaszczak/go-cleanarch -config .gocleanarch.yml ./...`，并在 README/AGENTS 说明该命令默认会跑 go-cleanarch。
 
-3. [ ] **CI 集成**
+3. [x] **CI 集成**
    - 修改 `.github/workflows/quality-gates.yml`，在 lint job 中加入 go-cleanarch 步骤，并沿用 changed-files 逻辑，仅在 Go 代码或 `.gocleanarch.yml` 变更时运行。
    - 若检测失败，直接让 job fail，并输出违规 import，确保 PR 无法跳过。
 
-4. [ ] **验证与知识沉淀**
+4. [x] **验证与知识沉淀**
    - 构造演示用非法依赖（如 presentation 直接 import 其他模块 domain）验证报错效果，然后还原改动。
    - 在 `docs/dev-records/` 或 PR 描述中记录验证命令与结果，便于追溯。
    - 在贡献指南、PR 模板或周会纪要中公告 go-cleanarch 已纳入必跑检查。
