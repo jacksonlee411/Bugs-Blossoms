@@ -5,6 +5,7 @@
 ## 背景
 - R200 文档指出“不要依赖开发者自觉维护模块边界，应在 CI 中引入 go-cleanarch 自动阻断非法依赖”（docs/dev-records/R200r-Go语言ERP系统最佳实践.md:201-205）。
 - 仓库已按模块化单体 + DDD 分层组织代码（AGENTS.md:6-96），并通过 README.MD:28-41 所述质量门禁运行 go fmt/vet、lint、测试等常规检查，但尚无自动化工具验证诸如“domain 不依赖 presentation、跨模块禁止导入 internal”等约束。
+- DEV-PLAN-005/005T 已于 2025-12-01 12:41 正式收官，`quality-gates` workflow 与 `scripts/run-go-tests.sh` 统一的本地/CI 流程已经上线，为 go-cleanarch “只在合法依赖通过时合并”提供运行土壤。
 - 当前完全依赖 code review 识别非法 import，随着 finance、warehouse、crm 等模块扩张，边界侵蚀风险持续累积，需要工具化守护。
 
 ## 目标

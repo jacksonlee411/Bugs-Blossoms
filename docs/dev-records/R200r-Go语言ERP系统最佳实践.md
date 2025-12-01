@@ -2,6 +2,8 @@
 
 > 参考来源：/home/shangmeilin/cube-castle/docs/development-plans/200-Go语言ERP系统最佳实践.md
 
+> 更新记录（2025-12-01 12:41）：DEV-PLAN-005/005T 已完成，`quality-gates` workflow、`scripts/run-go-tests.sh` 及相关文档同步到主仓库，为后续落地 R200 所列 go-cleanarch、Atlas、队列/Casbin 等工具链提供统一的门禁与本地复现环境。
+
 
 
 # **基于Go语言实现数据库ERP系统的最佳实践**
