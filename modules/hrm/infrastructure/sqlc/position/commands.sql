@@ -1,6 +1,5 @@
--- name: CreatePosition :one
 INSERT INTO positions (tenant_id, name, description)
-VALUES (sqlc.arg (tenant_id), sqlc.arg (name), sqlc.arg (description))
+    VALUES (sqlc.arg (tenant_id), sqlc.arg (name), sqlc.arg (description))
 RETURNING
     id;
 
