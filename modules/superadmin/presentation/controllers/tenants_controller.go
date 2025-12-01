@@ -434,7 +434,8 @@ func (c *TenantsController) ResetUserPassword(
 	}
 
 	// Fetch user (bypassing normal permission checks for cross-tenant access)
-	existingUser, err := c.userService.GetByID(ctx, uint(userID))
+	tenantCtx := composables.WithTenantID(ctx, tenantID)
+	existingUser, err := c.userService.GetByID(tenantCtx, uint(userID))
 	if err != nil {
 		logger.Errorf("Error fetching user %d: %v", userID, err)
 		http.Error(w, userNotFoundMsg, http.StatusNotFound)
@@ -458,7 +459,7 @@ func (c *TenantsController) ResetUserPassword(
 	}
 
 	// Update user in database
-	_, err = c.userService.Update(ctx, updatedUser)
+	_, err = c.userService.Update(tenantCtx, updatedUser)
 	if err != nil {
 		logger.Errorf("Error updating user %d: %v", userID, err)
 		http.Error(w, "Error updating password", http.StatusInternalServerError)

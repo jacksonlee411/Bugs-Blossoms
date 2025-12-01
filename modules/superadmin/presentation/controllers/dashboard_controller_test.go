@@ -42,7 +42,7 @@ func createRegularUser() user.User {
 }
 
 func TestDashboardController_Index(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	// Create test suite with superadmin module and superadmin user
 	suite := itf.NewSuiteBuilder(t).
@@ -62,7 +62,7 @@ func TestDashboardController_Index(t *testing.T) {
 }
 
 func TestDashboardController_GetMetrics(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -79,7 +79,7 @@ func TestDashboardController_GetMetrics(t *testing.T) {
 }
 
 func TestDashboardController_GetMetrics_WithDateFilter(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -103,7 +103,7 @@ func TestDashboardController_GetMetrics_WithDateFilter(t *testing.T) {
 }
 
 func TestDashboardController_GetMetrics_InvalidDateFormat(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -133,7 +133,7 @@ func TestDashboardController_GetMetrics_InvalidDateFormat(t *testing.T) {
 }
 
 func TestDashboardController_GetMetrics_EdgeCases(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).
@@ -171,7 +171,7 @@ func TestDashboardController_GetMetrics_EdgeCases(t *testing.T) {
 }
 
 func TestDashboardController_Permissions(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	// Test with different user types and permission levels
 	testCases := []struct {
@@ -233,7 +233,7 @@ func TestDashboardController_Permissions(t *testing.T) {
 
 // TestDashboardController_SuperAdminOnly verifies only superadmin users can access all endpoints
 func TestDashboardController_SuperAdminOnly(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	testCases := []struct {
 		name     string
@@ -284,7 +284,7 @@ func TestDashboardController_SuperAdminOnly(t *testing.T) {
 }
 
 func TestDashboardController_Routes(t *testing.T) {
-	t.Parallel()
+	maybeEnableParallel(t)
 
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(append(modules.BuiltInModules, superadmin.NewModule(nil))...).

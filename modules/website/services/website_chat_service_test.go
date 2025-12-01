@@ -1,8 +1,10 @@
 package services_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/country"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/internet"
@@ -87,20 +89,21 @@ func TestWebsiteChatService_CreateThread_ExistingClient(t *testing.T) {
 	tenant, err := composables.UseTenantID(fixtures.Ctx)
 	require.NoError(t, err)
 
-	// Create an existing client first with phone
 	phoneStr := "+12126647668" // Valid US number format
+
+	// Create the initial thread to ensure the client exists in the database
+	firstThread, err := sut.CreateThread(fixtures.Ctx, services.CreateThreadDTO{
+		Phone:   phoneStr,
+		Country: country.UnitedStates,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, firstThread)
+
 	p, err := phone.Parse(phoneStr, country.UnitedStates)
 	require.NoError(t, err)
-
-	existingClient, err := client.New(
-		phoneStr,
-		client.WithPhone(p),
-		client.WithTenantID(tenant),
-	)
+	clientEntity, err := clientRepo.GetByPhone(fixtures.Ctx, p.Value())
 	require.NoError(t, err)
-
-	savedClient, err := clientRepo.Save(fixtures.Ctx, existingClient)
-	require.NoError(t, err)
+	require.Equal(t, tenant, clientEntity.TenantID())
 
 	// Create thread with existing client's phone
 	thread, err := sut.CreateThread(fixtures.Ctx, services.CreateThreadDTO{
@@ -112,7 +115,7 @@ func TestWebsiteChatService_CreateThread_ExistingClient(t *testing.T) {
 
 	chatEntity, err := chatRepo.GetByID(fixtures.Ctx, thread.ChatID())
 	require.NoError(t, err)
-	assert.Equal(t, savedClient.ID(), chatEntity.ClientID())
+	assert.Equal(t, clientEntity.ID(), chatEntity.ClientID())
 }
 
 func TestWebsiteChatService_CreateThread_NewThreadEachTime(t *testing.T) {
@@ -120,25 +123,11 @@ func TestWebsiteChatService_CreateThread_NewThreadEachTime(t *testing.T) {
 	chatRepo := crmPersistence.NewChatRepository()
 	fixtures, sut, clientRepo := setupChatTest(t)
 
-	// Get tenant ID for the client
-	tenant, err := composables.UseTenantID(fixtures.Ctx)
-	require.NoError(t, err)
-
-	// 1. Create a client and get the client ID
+	// 1. Create a client via the service
 	phoneStr := "+12126647669" // Valid US number format
 	p, err := phone.Parse(phoneStr, country.UnitedStates)
 	require.NoError(t, err)
 
-	existingClient, err := client.New(phoneStr,
-		client.WithPhone(p),
-		client.WithTenantID(tenant),
-	)
-	require.NoError(t, err)
-
-	savedClient, err := clientRepo.Save(fixtures.Ctx, existingClient)
-	require.NoError(t, err)
-
-	// 2. Create first thread with the client's phone
 	firstThread, err := sut.CreateThread(fixtures.Ctx, services.CreateThreadDTO{
 		Phone:   phoneStr,
 		Country: country.UnitedStates,
@@ -146,7 +135,10 @@ func TestWebsiteChatService_CreateThread_NewThreadEachTime(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, firstThread)
 
-	// 3. Create a second thread with the same phone
+	clientEntity, err := clientRepo.GetByPhone(fixtures.Ctx, p.Value())
+	require.NoError(t, err)
+
+	// 2. Create first thread with the client's phone
 	secondThread, err := sut.CreateThread(fixtures.Ctx, services.CreateThreadDTO{
 		Phone:   phoneStr,
 		Country: country.UnitedStates,
@@ -154,11 +146,20 @@ func TestWebsiteChatService_CreateThread_NewThreadEachTime(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, secondThread)
 
-	chatEntity, err := chatRepo.GetByID(fixtures.Ctx, secondThread.ChatID())
+	// 3. Create a third thread with the same phone
+	thirdThread, err := sut.CreateThread(fixtures.Ctx, services.CreateThreadDTO{
+		Phone:   phoneStr,
+		Country: country.UnitedStates,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, thirdThread)
+
+	chatEntity, err := chatRepo.GetByID(fixtures.Ctx, thirdThread.ChatID())
 	require.NoError(t, err)
 	// 4. Verify both threads have different IDs but same client ID
-	assert.NotEqual(t, firstThread.ID(), secondThread.ID(), "Creating a thread with the same phone should create a new thread")
-	assert.Equal(t, savedClient.ID(), chatEntity.ClientID(), "Thread should be associated with the correct client")
+	assert.NotEqual(t, firstThread.ID(), secondThread.ID(), "Creating threads with the same phone should create distinct threads")
+	assert.NotEqual(t, secondThread.ID(), thirdThread.ID(), "Each call should create a new thread")
+	assert.Equal(t, clientEntity.ID(), chatEntity.ClientID(), "Thread should be associated with the correct client")
 }
 
 func TestWebsiteChatService_CreateThread_InvalidPhone(t *testing.T) {
@@ -309,14 +310,13 @@ func TestWebsiteChatService_ReplyToThread(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, thread)
 
-	createdUser, err := userRepo.Create(fixtures.Ctx, user.New(
+	createdUser := createUserInTx(t, fixtures.Ctx, userRepo, fixtures.TenantID(), user.New(
 		"Support",
 		"Agent",
 		internet.MustParseEmail("test@gmail.com"),
 		user.UILanguageEN,
 		user.WithTenantID(fixtures.TenantID()),
 	))
-	require.NoError(t, err)
 
 	// Create reply DTO
 	dto := services.ReplyToThreadDTO{
@@ -391,4 +391,23 @@ func TestWebsiteChatService_ReplyToThread_UserNotFound(t *testing.T) {
 	_, err = sut.ReplyToThread(fixtures.Ctx, dto)
 	require.Error(t, err)
 	require.ErrorIs(t, err, corePersistence.ErrUserNotFound)
+}
+
+func createUserInTx(
+	t *testing.T,
+	ctx context.Context,
+	repo user.Repository,
+	tenantID uuid.UUID,
+	entity user.User,
+) user.User {
+	t.Helper()
+
+	var created user.User
+	err := composables.InTx(ctx, func(txCtx context.Context) error {
+		var err error
+		created, err = repo.Create(txCtx, entity)
+		return err
+	})
+	require.NoError(t, err)
+	return created
 }

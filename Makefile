@@ -67,11 +67,11 @@ test:
 		exit 0; \
 	fi
 	@if [ "$(word 2,$(MAKECMDGOALS))" = "watch" ]; then \
-		gow test -v ./...; \
+		GOWORK=off gow test -v $$(./scripts/go-test-packages.sh); \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "coverage" ]; then \
-		go test -v ./... -coverprofile=./coverage/coverage.out; \
+		./scripts/run-go-tests.sh -v -coverprofile=./coverage/coverage.out; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "verbose" ]; then \
-		go test -v ./...; \
+		./scripts/run-go-tests.sh -v; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "docker" ]; then \
 		docker compose -f compose.testing.yml up --build erp_local; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "score" ]; then \
@@ -79,7 +79,7 @@ test:
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "report" ]; then \
 		go tool cover -html=coverage.out -o ./coverage/cover.html; \
 	else \
-		go test ./...; \
+		./scripts/run-go-tests.sh; \
 	fi
 
 # Compile TailwindCSS with optional subcommands (css, watch, dev, clean)

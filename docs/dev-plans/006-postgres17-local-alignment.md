@@ -3,7 +3,7 @@
 **状态**: 已完成（2025-11-30 17:35）
 
 ## 背景
-CI 已经在 `.github/workflows/test.yml` 中使用 PostgreSQL 17，但在计划立项之初，`compose.yml`、`compose.dev.yml`、`compose.testing.yml` 仍固定到 `postgres:15.1`。这导致以下问题：
+CI 已经在 `.github/workflows/quality-gates.yml` 中使用 PostgreSQL 17，但在计划立项之初，`compose.yml`、`compose.dev.yml`、`compose.testing.yml` 仍固定到 `postgres:15.1`。这导致以下问题：
 - 本地回归时无法提前暴露 PostgreSQL 17 的行为差异（数据类型、planner、新关键字等）。
 - CI 排查困难：若 Bug 只在 17 上出现，开发者难以复现。
 - 镜像、备份脚本、文档对版本描述不一致，降低新人上手效率。
@@ -22,7 +22,7 @@ CI 已经在 `.github/workflows/test.yml` 中使用 PostgreSQL 17，但在计划
 ## 实施步骤
 1. [X] **兼容性确认**  
    - 已复查 `go.mod` 中与数据库交互的核心依赖（pgx、sql-migrate、rubenv/sql-migrate、sqlx）均发布于 PostgreSQL 17 之后的版本。  
-   - `.github/workflows/test.yml` 自带的 `test-unit-integration` job 在 PG17 服务上执行 `make db migrate up / make db seed / go test -v ./...`；本地也以 PG17 实例完成 `make db migrate up`/`make db seed`，确认流程可沿用。
+   - `.github/workflows/quality-gates.yml` 自带的 `test-unit-integration` job 在 PG17 服务上执行 `make db migrate up / make db seed / go test -v ./...`；本地也以 PG17 实例完成 `make db migrate up`/`make db seed`，确认流程可沿用。
 
 2. [X] **更新 Compose 镜像**  
    - `compose.yml`、`compose.dev.yml`、`compose.testing.yml` 全部改为 `postgres:17`，并保留原有命令/端口设定。  

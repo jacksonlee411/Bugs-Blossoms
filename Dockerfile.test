@@ -11,4 +11,4 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 
-CMD ["sh", "-c", "go vet ./... && golangci-lint run ./... && go test -v ./..."]
+CMD ["sh", "-c", "go vet ./... && golangci-lint run ./... && ./scripts/run-go-tests.sh -v"]

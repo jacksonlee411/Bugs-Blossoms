@@ -107,6 +107,14 @@ modules/{module}/
 - Apply migrations: `make db migrate up`
 - Default database runtime: PostgreSQL 17 (local compose + CI)
 
+### Quality Gates
+- `.github/workflows/quality-gates.yml` runs on every push to `main`/`dev` and on all PRs. It enforces Go fmt/vet, `make check lint`, unit/integration tests, templ/Tailwind regeneration (with `git status`), locale checks, and PostgreSQL 17 migration smoke tests with `migrate.log` artifacts.
+- Before pushing, run the commands tied to your change scope:
+  - Go code: `go fmt ./... && go vet ./... && make check lint && make test`
+  - `.templ`/Tailwind assets: `make generate && make css` then ensure `git status --short` is clean
+  - Locale JSON: `make check tr`
+  - Migrations/schema SQL: `make db migrate up && make db seed` (optional `make db migrate down`)
+
 ## Code Style Guidelines
 - Use `go fmt` for formatting. Do not indent code manually.
 - Use Go v1.24.10 and follow standard Go idioms

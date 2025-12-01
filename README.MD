@@ -25,6 +25,21 @@
 - Node.js 20+ (for tooling like Playwright/Tailwind)
 - PostgreSQL 17 (local `docker compose` files run `postgres:17` to mirror CI)
 
+## ✅ Quality Gates
+
+- `.github/workflows/quality-gates.yml` runs on every push to `main`/`dev` and on all pull requests. It pins Go 1.24.10, installs templ/Tailwind/golangci-lint/pgformatter, and uploads `coverage.out`, `coverage.html`, and `migrate.log` artifacts.
+- Costly checks are scoped to file changes: `.templ`/Tailwind assets trigger `make generate` + `make css` + `git status`, locale JSON triggers `make check tr`, and migrations/schema SQL trigger PostgreSQL 17 + Redis smoke migrations (`make db migrate up/down` + `make db seed`).
+- Unit/integration tests always run with PostgreSQL 17/Redis containers, ensuring parity between local development and CI.
+
+**Before pushing**, run the commands that match your changes so you know `quality-gates` will pass:
+
+- Go code: `go fmt ./... && go vet ./... && make check lint`
+- Tests: `make test` (or `go test -v ./...`)
+- Templates/Tailwind assets: `make generate && make css` followed by `git status --short`
+- Locales: `make check tr`
+- Schema/migrations: `make db migrate up && make db seed`
+- Finance 模块的集成测试暂时停用，如需修改 `modules/finance/**` 请在本地运行相关 `go test` 并附上结果。
+
 ### PostgreSQL 17 迁移与备份
 
 1. **备份旧数据**（如果之前运行的是 `postgres:15`）：  

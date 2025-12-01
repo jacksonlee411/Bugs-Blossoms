@@ -92,6 +92,14 @@ IOTA SDK is a multi-tenant business management platform providing modular soluti
 - Lint code (check unused variables/functions): `make check lint`
 - Check translation files: `make check tr`
 
+### Quality Gates
+- `.github/workflows/quality-gates.yml` runs on pushes to `main`/`dev` and every PR. It enforces Go fmt/vet/tests, templ/Tailwind regeneration (with `git status`), locale checks, and PostgreSQL 17 migration smoke tests while uploading `migrate.log`.
+- Before sending a PR, mirror the relevant steps locally:
+  - Go code: `go fmt ./... && go vet ./... && make check lint && make test`
+  - `.templ`/Tailwind assets: `make generate && make css` and ensure `git status --short` is empty
+  - Locale JSON: `make check tr`
+  - Migrations/schema SQL: `make db migrate up && make db seed` (optional `make db migrate down`)
+
 ### Other Commands:
 - Generate dependency graph: `make graph`
 - Generate documentation: `make docs`
