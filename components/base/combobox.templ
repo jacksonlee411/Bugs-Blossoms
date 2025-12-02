@@ -140,7 +140,8 @@ templ Combobox(props ComboboxProps) {
 				@input.Text(&input.Props{
 					Placeholder: props.Placeholder,
 					WrapperProps: templ.Attributes{
-						"x-ref": "trigger",
+						"x-ref":  "trigger",
+						"@click": "open = true",
 					},
 					AddonLeft: &input.Addon{
 						Component: SelectedValues(),
@@ -172,6 +173,7 @@ templ Combobox(props ComboboxProps) {
 						"class":    "flex-wrap",
 						"tabindex": "0",
 						"@focus":   "$refs.input.focus()",
+						"@click":   "open = true",
 					},
 					AddonLeft: &input.Addon{
 						Component: SelectedValues(),
