@@ -59,7 +59,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "fixture parity failed: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("fixture parity passed")
+		fmt.Fprintln(os.Stdout, "fixture parity passed")
 		return
 	}
 
@@ -85,13 +85,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	mismatches, total := compareSnapshot(ctx, snapshot, *sampleRatio, *minPerTenant, *maxPerTenant)
+	randomizer := rand.New(rand.NewSource(time.Now().UnixNano()))
+	mismatches, total := compareSnapshot(ctx, snapshot, *sampleRatio, *minPerTenant, *maxPerTenant, randomizer)
 	if *emitMetrics {
-		payload, _ := json.Marshal(map[string]any{
+		payload, err := json.Marshal(map[string]any{
 			"total_checked": total,
 			"mismatches":    len(mismatches),
 		})
-		fmt.Printf("%s\n", payload)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to marshal metrics: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stdout, "%s\n", payload)
 	}
 	if len(mismatches) > 0 {
 		for _, diff := range mismatches {
@@ -99,7 +104,7 @@ func main() {
 		}
 		os.Exit(1)
 	}
-	fmt.Printf("parity ok: checked %d combinations\n", total)
+	fmt.Fprintf(os.Stdout, "parity ok: checked %d combinations\n", total)
 }
 
 func runFixtureParity(path string) error {
@@ -126,7 +131,7 @@ func runFixtureParity(path string) error {
 	return nil
 }
 
-func compareSnapshot(ctx context.Context, snapshot *legacy.Snapshot, ratio float64, minSample, maxSample int) ([]mismatch, int) {
+func compareSnapshot(ctx context.Context, snapshot *legacy.Snapshot, ratio float64, minSample, maxSample int, randomizer *rand.Rand) ([]mismatch, int) {
 	svc := authz.Use()
 	usersByTenant := map[string][]legacy.User{}
 	for _, user := range snapshot.Users {
@@ -139,13 +144,11 @@ func compareSnapshot(ctx context.Context, snapshot *legacy.Snapshot, ratio float
 		total  int
 	)
 
-	rand.Seed(time.Now().UnixNano())
-
 	for _, users := range usersByTenant {
 		if len(users) == 0 {
 			continue
 		}
-		sampled := sampleUsers(users, ratio, minSample, maxSample)
+		sampled := sampleUsers(users, ratio, minSample, maxSample, randomizer)
 		for _, user := range sampled {
 			legacyMap := buildLegacyPermissionSet(user, snapshot)
 			for permID, perm := range snapshot.Permissions {
@@ -186,9 +189,9 @@ func compareSnapshot(ctx context.Context, snapshot *legacy.Snapshot, ratio float
 	return result, total
 }
 
-func sampleUsers(users []legacy.User, ratio float64, minSample, maxSample int) []legacy.User {
+func sampleUsers(users []legacy.User, ratio float64, minSample, maxSample int, randomizer *rand.Rand) []legacy.User {
 	shuffled := append([]legacy.User(nil), users...)
-	rand.Shuffle(len(shuffled), func(i, j int) {
+	randomizer.Shuffle(len(shuffled), func(i, j int) {
 		shuffled[i], shuffled[j] = shuffled[j], shuffled[i]
 	})
 

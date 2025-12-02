@@ -81,7 +81,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to write export: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("exported %d policy lines to %s\n", len(entries), *output)
+	fmt.Fprintf(os.Stdout, "exported %d policy lines to %s\n", len(entries), *output)
 }
 
 func buildPolicyEntries(snapshot *legacy.Snapshot, hashSubjects bool) []policyEntry {
@@ -176,28 +176,50 @@ func buildPolicyEntries(snapshot *legacy.Snapshot, hashSubjects bool) []policyEn
 	return entries
 }
 
-func writeCompressed(path string, entries []policyEntry) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+func writeCompressed(path string, entries []policyEntry) (err error) {
+	if err = os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
 	f, err := os.Create(path)
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
 	gzw := gzip.NewWriter(f)
-	defer gzw.Close()
+	defer func() {
+		if cerr := gzw.Close(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
 	writer := bufio.NewWriter(gzw)
-	defer writer.Flush()
+	defer func() {
+		if cerr := writer.Flush(); err == nil && cerr != nil {
+			err = cerr
+		}
+	}()
 
-	writer.WriteString("# Legacy export generated at ")
-	writer.WriteString(time.Now().UTC().Format(time.RFC3339))
-	writer.WriteString("\n")
+	if _, err = writer.WriteString("# Legacy export generated at "); err != nil {
+		return err
+	}
+	if _, err = writer.WriteString(time.Now().UTC().Format(time.RFC3339)); err != nil {
+		return err
+	}
+	if _, err = writer.WriteString("\n"); err != nil {
+		return err
+	}
 	for _, entry := range entries {
-		writer.WriteString(entry.raw)
-		writer.WriteByte('\n')
+		if _, err = writer.WriteString(entry.raw); err != nil {
+			return err
+		}
+		if err = writer.WriteByte('\n'); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -212,5 +234,5 @@ func reportSummary(entries []policyEntry) {
 			relations++
 		}
 	}
-	fmt.Printf("dry-run summary: %d policy rows (p) and %d role bindings (g)\n", policies, relations)
+	fmt.Fprintf(os.Stdout, "dry-run summary: %d policy rows (p) and %d role bindings (g)\n", policies, relations)
 }

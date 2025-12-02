@@ -3,6 +3,10 @@
 ## Overview
 DO NOT COMMENT EXECESSIVELY. Instead, write clear and concise code that is self-explanatory.
 
+## 项目现状
+- 项目仍处于早期开发阶段，尚未投产，所有特性以快速验证为主。
+- 当前仅由单一开发者负责全栈交付，可在保证质量前提下省略非必要的审批与跨组沟通流程，直接按照本指南自行决策。
+
 ## Module Architecture
 
 Each module follows a strict **Domain-Driven Design (DDD)** pattern with clear layer separation:

@@ -56,7 +56,7 @@ func NewService(cfg Config) (*Service, error) {
 
 // Authorize returns an error if the request is denied.
 func (s *Service) Authorize(ctx context.Context, req Request) error {
-	switch s.flagProvider.Mode() {
+	switch mode := s.flagProvider.Mode(); mode {
 	case ModeDisabled:
 		return nil
 	case ModeShadow:
@@ -74,7 +74,7 @@ func (s *Service) Authorize(ctx context.Context, req Request) error {
 			}).Warn("authz shadow deny")
 		}
 		return nil
-	default:
+	case ModeEnforce:
 		allowed, err := s.Check(ctx, req)
 		if err != nil {
 			return err
@@ -88,6 +88,22 @@ func (s *Service) Authorize(ctx context.Context, req Request) error {
 				"mode":    ModeEnforce,
 			}).Warn("authz denied request")
 			return forbiddenError(req)
+		}
+		return nil
+	default:
+		s.logger.WithContext(ctx).WithField("mode", mode).Warn("authz: unknown flag mode, defaulting to shadow")
+		allowed, err := s.Check(ctx, req)
+		if err != nil {
+			return err
+		}
+		if !allowed {
+			s.logger.WithContext(ctx).WithFields(logrus.Fields{
+				"subject": req.Subject,
+				"domain":  req.Domain,
+				"object":  req.Object,
+				"action":  req.Action,
+				"mode":    ModeShadow,
+			}).Warn("authz shadow deny")
 		}
 		return nil
 	}
@@ -127,16 +143,16 @@ func (s *Service) Enforcer() *casbin.Enforcer {
 var (
 	defaultServiceOnce sync.Once
 	defaultService     *Service
-	defaultErr         error
+	defaultServiceErr  error
 )
 
 // Use returns a singleton Service configured via environment variables.
 func Use() *Service {
 	defaultServiceOnce.Do(func() {
-		defaultService, defaultErr = NewService(DefaultConfig())
+		defaultService, defaultServiceErr = NewService(DefaultConfig())
 	})
-	if defaultErr != nil {
-		panic(defaultErr)
+	if defaultServiceErr != nil {
+		panic(defaultServiceErr)
 	}
 	return defaultService
 }
