@@ -124,10 +124,17 @@ All pushes to `main`/`dev` and every pull request run `.github/workflows/quality
 | `.templ`, `tailwind.config.js`, or `modules/**/presentation/assets/**` | `make generate`, `make css`, `git status --short` | `make generate && make css` then `git status --short` |
 | `modules/**/presentation/locales/**/*.json` | `make check tr` | `make check tr` |
 | `migrations/**` or `modules/**/infrastructure/persistence/schema/**` | PostgreSQL/Redis services + `make db migrate up/down` + `make db seed` (logs stored in `migrate.log`) | `make db migrate up && make db seed` (optionally `make db migrate down` to smoke test) |
+| `sqlc.yaml`, `modules/hrm/infrastructure/sqlc/**`, `modules/hrm/infrastructure/persistence/**/*.sql`, `scripts/db/export_hrm_schema.sh`, `docs/dev-records/hrm-sql-inventory.md` | `make sqlc-generate` + `git status --short` via `hrm-sqlc` filter | `scripts/db/export_hrm_schema.sh` + `make sqlc-generate` + `git status --short` |
 
 > **说明**：Finance 模块（`modules/finance/**`）的自动化测试暂时停用，如修改该模块请自行运行 `go test ./modules/finance/...` 并在 PR 描述中附上结果。
 
 Running the matching commands locally ensures your branch passes the `quality-gates` check before you open a PR.
+
+### HRM sqlc 变更
+
+- HRM 任何 SQL/迁移调整都必须先运行 `scripts/db/export_hrm_schema.sh` 更新 `modules/hrm/infrastructure/sqlc/schema.sql`，随后执行 `make sqlc-generate`（`make generate` 会自动调用），以便重建 `modules/hrm/infrastructure/sqlc/**`。
+- 生成步骤也会在 CI 中通过 `hrm-sqlc` 过滤器自动执行；若还有未提交的生成文件，工作流会失败。
+- 请同步维护 `docs/dev-records/hrm-sql-inventory.md`，让评审能快速定位 SQL 变动。
 
 ## 🧪 Running Tests
 

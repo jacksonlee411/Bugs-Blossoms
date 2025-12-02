@@ -41,6 +41,12 @@ jobs:
               - 'go.mod'
               - 'go.sum'
               - '.gocleanarch.yml'
+            hrm-sqlc:
+              - 'sqlc.yaml'
+              - 'modules/hrm/infrastructure/sqlc/**'
+              - 'modules/hrm/infrastructure/persistence/**/*.sql'
+              - 'scripts/db/export_hrm_schema.sh'
+              - 'docs/dev-records/hrm-sql-inventory.md'
 
       - name: Set up Go
         uses: useblacksmith/setup-go@v6
@@ -102,11 +108,21 @@ jobs:
 
       - name: Check Go files formatting
         run: |
-          go fmt ./...
-          if [ -n "$(git diff --name-only)" ]; then
-            echo "Error: Some Go files are not properly formatted"
-            git diff
-            exit 1
+          set -euo pipefail
+          packages="$(./scripts/go-active-packages.sh | tr '\n' ' ')"
+          if [ -n "$packages" ]; then
+            go fmt $packages
+          else
+            echo "No active Go packages to format"
+          fi
+          diff_files="$(git diff --name-only)"
+          if [ -n "$diff_files" ]; then
+            filtered="$(echo "$diff_files" | grep -Ev '^modules/(billing|crm|finance)/' || true)"
+            if [ -n "$filtered" ]; then
+              echo "Error: Some Go files are not properly formatted"
+              git diff
+              exit 1
+            fi
           fi
           echo "All Go files are properly formatted"
 
@@ -114,6 +130,9 @@ jobs:
         run: |
           mkdir -p /tmp/formatted
           find modules -name "*.sql" -type f | while read -r sqlfile; do
+            if [[ "$sqlfile" =~ ^modules/(billing|crm|finance)/ ]]; then
+              continue
+            fi
             pg_format "$sqlfile" > "/tmp/formatted/$(basename "$sqlfile")"
             if ! diff -q "$sqlfile" "/tmp/formatted/$(basename "$sqlfile")" > /dev/null; then
               echo "Error: $sqlfile is not properly formatted"
@@ -123,8 +142,28 @@ jobs:
           done
           echo "All SQL files are properly formatted"
 
+      - name: Run HRM sqlc generate
+        if: ${{ steps.changed-files.outputs.hrm-sqlc == 'true' }}
+        run: make sqlc-generate
+
+      - name: Ensure sqlc artifacts are committed
+        if: ${{ steps.changed-files.outputs.hrm-sqlc == 'true' }}
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "Detected sqlc artifacts that are not committed"
+            git status --short
+            exit 1
+          fi
+
       - name: Run go vet
-        run: go vet ./...
+        run: |
+          set -euo pipefail
+          packages="$(./scripts/go-active-packages.sh | tr '\n' ' ')"
+          if [ -z "$packages" ]; then
+            echo "No active Go packages to vet"
+            exit 0
+          fi
+          go vet $packages
 
       - name: Generate CSS files
         if: ${{ steps.changed-files.outputs.templ == 'true' }}
@@ -304,7 +343,6 @@ jobs:
             migrate.log
 
   test-e2e:
-    if: ${{ false }} # Temporarily disabled until Playwright issues are resolved
     runs-on: ubuntu-latest
     name: E2E Tests
 

@@ -97,6 +97,12 @@ modules/{module}/
 ## Tool use
 - DO NOT USE `sed` for file manipulation
 
+## HRM sqlc 指南
+- HRM SQL 与 schema 必须通过 `scripts/db/export_hrm_schema.sh` 更新（可设置 `SKIP_MIGRATE=1` 仅导出 schema）。
+- 任意影响 `sqlc.yaml`、`modules/hrm/infrastructure/sqlc/**`、`modules/hrm/infrastructure/persistence/**/*.sql` 或 `docs/dev-records/hrm-sql-inventory.md` 的改动都要运行 `make sqlc-generate`。`make generate` 会自动调用该目标。
+- sqlc 生成的内容全部位于 `modules/hrm/infrastructure/sqlc/**`，生成后必须 `git status --short` 确认无遗留 diff。CI 的 `hrm-sqlc` 过滤器也会执行同样检查。
+- 变更 HRM SQL 时记得同步维护《HRM SQL Inventory》，方便评审追踪迁移进度。
+
 ## Build/Lint/Test Commands
 - After changes to css or .templ files: `templ generate && make css`
 - After changes to Go code: `go vet ./...` (Do NOT run `go build` as it is not needed)
@@ -137,3 +143,9 @@ modules/{module}/
 ### HTMX Best Practices
 - Use `htmx.IsHxRequest(r)` to check if a request is from HTMX
 - Use `htmx.SetTrigger(w, "eventName", payload)` for setting HTMX response triggers
+
+## 模块冻结政策（Billing / CRM / Finance）
+
+- `modules/billing`, `modules/crm`, `modules/finance` 已进入长期冻结状态，暂停一切新特性、重构与 Bug 修复；除非产品委员会重新解冻，否则禁止修改这些目录下的任何代码、SQL、模板与资源文件。
+- 质量门禁（`quality-gates` workflow）、本地测试脚本与 `sql` 格式化步骤均已排除上述模块，它们不会参与 `go test`、`go vet`、`golangci-lint`、`pg_format` 等自动化检查。遇到故障也无需修复，保持当前快照即可。
+- 若业务需求确实需要调整，请先更新 dev-plan 并经负责人批准，随后在 AGENTS.md 中撤销冻结声明，再恢复质量门禁与测试范围。

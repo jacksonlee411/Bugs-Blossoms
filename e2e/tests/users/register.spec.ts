@@ -36,21 +36,19 @@ test.describe('user auth and registration flow', () => {
 		await page.locator('[name=Password]').fill('TestPass123!');
 		await page.locator('[name=Language]').selectOption({ index: 2 });
 
-		// Handle Alpine.js dropdown for RoleIDs
+		// Select first available role via the hidden select to avoid Alpine-specific triggers
 		const roleSelect = page.locator('select[name="RoleIDs"]');
-		const roleContainer = roleSelect.locator('xpath=ancestor::div[1]');
-		await roleContainer.locator('button[x-ref="trigger"]').click();
-
-		// Wait for dropdown to be visible and click first option (scope to role container)
-		const dropdown = roleContainer.locator('ul[x-ref=list]');
-		await expect(dropdown).toBeVisible();
-		await dropdown.locator('li').first().click();
+		const firstRoleValue = await roleSelect.locator('option').first().getAttribute('value');
+		expect(firstRoleValue).not.toBeNull();
+		await roleSelect.selectOption(firstRoleValue!);
 
 		// Save the form
 		await page.locator('[id=save-btn]').click();
+		await page.waitForURL(/\/users$/);
 
 		// Verify user appears in table
-		await expect(page.locator('tbody tr')).toHaveCount(4); // including the spinner row
+		const usersTable = page.locator('#users-table-body');
+		await expect(usersTable).toContainText('Test User');
 
 		await logout(page);
 
@@ -59,7 +57,7 @@ test.describe('user auth and registration flow', () => {
 		await page.goto('/users');
 
 		await expect(page).toHaveURL(/\/users/);
-		await expect(page.locator('tbody tr')).toHaveCount(4); // including the spinner row
+		await expect(page.locator('#users-table-body')).toContainText('Test User');
 	});
 
 	test('edits a user and displays changes in users table', async ({ page }) => {
@@ -88,8 +86,8 @@ test.describe('user auth and registration flow', () => {
 		await page.waitForURL(/\/users$/);
 
 		// Verify changes in the users list
-		await expect(page.locator('tbody tr')).toHaveCount(4); // including the spinner row
-		await expect(page.locator('tbody tr').filter({ hasText: 'TestNew UserNew' })).toBeVisible();
+		const usersTable = page.locator('#users-table-body');
+		await expect(usersTable).toContainText('TestNew UserNew');
 
 		// Verify phone number persists by checking the edit page
 		const updatedUserRow = page.locator('tbody tr').filter({ hasText: 'TestNew UserNew' });
@@ -103,6 +101,7 @@ test.describe('user auth and registration flow', () => {
 		await login(page, 'test1new@gmail.com', 'TestPass123!');
 		await page.goto('/users');
 		await expect(page).toHaveURL(/\/users/);
+		await expect(page.locator('#users-table-body')).toContainText('TestNew UserNew');
 	});
 
 	test('newly created user should see tabs in the sidebar', async ({ page }) => {

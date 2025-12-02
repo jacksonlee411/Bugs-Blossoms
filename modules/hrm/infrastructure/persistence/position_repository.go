@@ -3,13 +3,12 @@ package persistence
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 
 	"github.com/iota-uz/iota-sdk/modules/hrm/domain/entities/position"
-	"github.com/iota-uz/iota-sdk/modules/hrm/infrastructure/persistence/models"
+	positionsqlc "github.com/iota-uz/iota-sdk/modules/hrm/infrastructure/sqlc/position"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
-	"github.com/iota-uz/iota-sdk/pkg/repo"
+
+	"github.com/jackc/pgx/v5"
 )
 
 var (
@@ -22,141 +21,176 @@ func NewPositionRepository() position.Repository {
 	return &GormPositionRepository{}
 }
 
-func (g *GormPositionRepository) GetPaginated(
-	ctx context.Context, params *position.FindParams,
-) ([]*position.Position, error) {
-	tenantID, err := composables.UseTenantID(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get tenant from context: %w", err)
+func (g *GormPositionRepository) GetPaginated(ctx context.Context, params *position.FindParams) ([]*position.Position, error) {
+	if params == nil {
+		params = &position.FindParams{}
 	}
 
-	pool, err := composables.UseTx(ctx)
+	_, pgTenantID, err := tenantIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
-	where, args := []string{"tenant_id = $1"}, []interface{}{tenantID}
+
+	queries, err := g.positionQueries(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if params.ID != 0 {
-		where, args = append(where, fmt.Sprintf("id = $%d", len(args)+1)), append(args, params.ID)
-	}
-
-	rows, err := pool.Query(ctx, `
-		SELECT id, tenant_id, name, description, created_at, updated_at FROM positions
-		WHERE `+strings.Join(where, " AND ")+`
-		`+repo.FormatLimitOffset(params.Limit, params.Offset)+`
-	`, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	positions := make([]*position.Position, 0)
-	for rows.Next() {
-		var p models.Position
-		if err := rows.Scan(
-			&p.ID,
-			&p.TenantID,
-			&p.Name,
-			&p.Description,
-			&p.CreatedAt,
-			&p.UpdatedAt,
-		); err != nil {
+		row, err := queries.GetPositionByID(ctx, positionsqlc.GetPositionByIDParams{
+			ID:       int32(params.ID),
+			TenantID: pgTenantID,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, ErrPositionNotFound
+			}
 			return nil, err
 		}
-		domainPosition, err := toDomainPosition(&p)
+		entity, err := toDomainPositionFromSQLC(row)
 		if err != nil {
 			return nil, err
 		}
-		positions = append(positions, domainPosition)
+		return []*position.Position{entity}, nil
 	}
 
-	if err := rows.Err(); err != nil {
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+	offset := params.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	rows, err := queries.ListPositionsPaginated(ctx, positionsqlc.ListPositionsPaginatedParams{
+		TenantID:  pgTenantID,
+		RowOffset: int32(offset),
+		RowLimit:  int32(limit),
+	})
+	if err != nil {
 		return nil, err
 	}
 
-	return positions, nil
+	return toDomainPositionsFromSQLC(rows)
 }
 
 func (g *GormPositionRepository) Count(ctx context.Context) (int64, error) {
-	tenantID, err := composables.UseTenantID(ctx)
+	_, pgTenantID, err := tenantIDs(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to get tenant from context: %w", err)
+		return 0, err
 	}
 
-	pool, err := composables.UseTx(ctx)
+	queries, err := g.positionQueries(ctx)
 	if err != nil {
 		return 0, err
 	}
-	var count int64
-	if err := pool.QueryRow(ctx, `
-		SELECT COUNT(*) as count FROM positions WHERE tenant_id = $1
-	`, tenantID).Scan(&count); err != nil {
-		return 0, err
-	}
-	return count, nil
+
+	return queries.CountPositions(ctx, pgTenantID)
 }
 
 func (g *GormPositionRepository) GetAll(ctx context.Context) ([]*position.Position, error) {
-	return g.GetPaginated(ctx, &position.FindParams{
-		Limit: 100000,
-	})
-}
-
-func (g *GormPositionRepository) GetByID(ctx context.Context, id int64) (*position.Position, error) {
-	positions, err := g.GetPaginated(ctx, &position.FindParams{
-		ID: id,
-	})
+	_, pgTenantID, err := tenantIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(positions) == 0 {
-		return nil, ErrPositionNotFound
+	queries, err := g.positionQueries(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return positions[0], nil
+
+	rows, err := queries.ListPositionsByTenant(ctx, pgTenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	return toDomainPositionsFromSQLC(rows)
+}
+
+func (g *GormPositionRepository) GetByID(ctx context.Context, id int64) (*position.Position, error) {
+	_, pgTenantID, err := tenantIDs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	queries, err := g.positionQueries(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	row, err := queries.GetPositionByID(ctx, positionsqlc.GetPositionByIDParams{
+		ID:       int32(id),
+		TenantID: pgTenantID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPositionNotFound
+		}
+		return nil, err
+	}
+
+	return toDomainPositionFromSQLC(row)
 }
 
 func (g *GormPositionRepository) Create(ctx context.Context, data *position.Position) error {
-	tx, err := composables.UseTx(ctx)
+	tenantUUID, _, err := tenantIDs(ctx)
 	if err != nil {
 		return err
 	}
 
-	dbRow := toDBPosition(data)
-
-	if err := tx.QueryRow(ctx, `
-		INSERT INTO positions (tenant_id, name, description) VALUES ($1, $2, $3) RETURNING id
-	`, dbRow.TenantID, dbRow.Name, dbRow.Description).Scan(&data.ID); err != nil {
+	queries, err := g.positionQueries(ctx)
+	if err != nil {
 		return err
 	}
+
+	params := buildPositionCreateParams(data, tenantUUID)
+	id, err := queries.CreatePosition(ctx, params)
+	if err != nil {
+		return err
+	}
+
+	data.ID = uint(id)
+	data.TenantID = tenantUUID.String()
 	return nil
 }
 
 func (g *GormPositionRepository) Update(ctx context.Context, data *position.Position) error {
-	tx, err := composables.UseTx(ctx)
+	tenantUUID, _, err := tenantIDs(ctx)
 	if err != nil {
 		return err
 	}
-	dbRow := toDBPosition(data)
 
-	if _, err := tx.Exec(ctx, `
-		UPDATE positions
-		SET name = $1, description = $2
-		WHERE id = $3`,
-		dbRow.Name,
-		dbRow.Description,
-		dbRow.ID,
-	); err != nil {
+	queries, err := g.positionQueries(ctx)
+	if err != nil {
 		return err
 	}
-	return nil
+
+	params := buildPositionUpdateParams(data, tenantUUID)
+	return queries.UpdatePosition(ctx, params)
 }
 
 func (g *GormPositionRepository) Delete(ctx context.Context, id int64) error {
-	tx, err := composables.UseTx(ctx)
+	_, pgTenantID, err := tenantIDs(ctx)
 	if err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM positions WHERE id = $1`, id); err != nil {
+
+	queries, err := g.positionQueries(ctx)
+	if err != nil {
 		return err
 	}
-	return nil
+
+	return queries.DeletePosition(ctx, positionsqlc.DeletePositionParams{
+		ID:       int32(id),
+		TenantID: pgTenantID,
+	})
+}
+
+func (g *GormPositionRepository) positionQueries(ctx context.Context) (*positionsqlc.Queries, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return positionsqlc.New(tx), nil
 }
