@@ -50,3 +50,4 @@ FROM
     positions
 WHERE
     tenant_id = sqlc.arg (tenant_id);
+
