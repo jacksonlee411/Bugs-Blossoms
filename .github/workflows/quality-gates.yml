@@ -499,7 +499,7 @@ jobs:
           DB_USER: postgres
           DB_PASSWORD: postgres
           SID_COOKIE_KEY: sid
-          GO_APP_ENV: production
+          GO_APP_ENV: development
           ENABLE_TEST_ENDPOINTS: true
         run: |
           go run cmd/server/main.go &
