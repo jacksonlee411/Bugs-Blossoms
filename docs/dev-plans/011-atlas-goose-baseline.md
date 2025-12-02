@@ -25,7 +25,7 @@
 1. **[ ] Schema 基线与目录规划**
    - 对齐 HRM 现有表（positions、employees、employee_meta、employee_positions、employee_contacts），以 `modules/hrm/infrastructure/persistence/schema/hrm-schema.sql` 与 `migrations/changes-*.sql` 为依据，梳理字段/索引/约束，记录缺失的声明式信息。
    - 在 `modules/hrm/infrastructure/atlas/` 新建 `schema.hcl`（主入口）与若干 include（按聚合拆分），并将迁移输出目录固定为 `migrations/hrm/`，使用 goose 风格命名 `changes_<unix>.{up,down}.sql`；相关规范同步到 CONTRIBUTING。
-   - M1 阶段将现有 HRM 相关迁移（以 employees/positions 等表为内容的 `migrations/changes-*.sql`）整体搬迁至 `migrations/hrm/` 并更新 goose checksum，非 HRM 迁移保留在原目录；搬迁清单在 `DEV-PLAN-011-HRM-ATLAS-POC.md` 记录，避免遗漏。
+   - M1 阶段将现有 HRM 相关迁移（以 employees/positions 等表为内容的 `migrations/changes-*.sql`）整体搬迁至 `migrations/hrm/`，同步更新 goose checksum 与版本表（例如 `migrations/hrm/goose_db_version.sql`），非 HRM 迁移保留在原目录；搬迁清单在 `DEV-PLAN-011-HRM-ATLAS-POC.md` 记录，避免遗漏。
    - 使用 `atlas migrate import --dir "file://migrations/hrm"` 将现有 goose 历史迁移导入 Atlas 版本存档 (`migrations/hrm/atlas.sum` / `atlaslock.hcl`)，确保 diff 以当前状态为基准。
 2. **[ ] Atlas 配置与工具链**
   - 在仓库根目录新增 `atlas.hcl`，声明 dev/test/ci 三个环境，复用 `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD` 环境变量，指定 `migrations/hrm` 为唯一受控目录，并启用内建 lint（`destructive`, `dependent`, `index-name` 等）。
@@ -33,13 +33,13 @@
   - 文档中记录 CLI 安装顺序：`go install ariga.io/atlas/cmd/atlas@v0.24.5` → `make atlas-install`（确保 CI 使用 `tools.go` 同步版本），并在 `make help` 输出新增命令的作用与依赖。
 3. **[ ] 迁移生成与 goose 串联**
   - 规范“修改 schema → 更新 schema.hcl → 运行 `atlas migrate diff --env dev --dir file://migrations/hrm --to file://modules/hrm/infrastructure/atlas/schema.hcl`”的流程，产出的 up/down SQL 需符合 goose 命名约定，并自动调用 `goose status` 验证迁移链连续性。
-  - 更新现有 `make db migrate up` / `scripts/db/export_hrm_schema.sh` / `make sqlc-generate` 顺序，形成唯一官方指引：`atlas migrate diff`（生成 `migrations/hrm/changes_<unix>.{up,down}.sql`）→ `make db migrate up`（goose 执行新文件）→ `scripts/db/export_hrm_schema.sh` → `make sqlc-generate`，并在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md` 记录验证日志及 `atlas schema inspect` 对比结果。
+  - 更新现有 `make db migrate up` / `scripts/db/export_hrm_schema.sh` / `make sqlc-generate` 顺序，形成唯一官方指引：`atlas migrate diff`（生成 `migrations/hrm/changes_<unix>.{up,down}.sql`）→ `make db migrate up HRM_MIGRATIONS=1`（goose 通过 `-dir migrations/hrm` 执行新文件）→ `scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1` → `make sqlc-generate`，并在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md` 记录验证日志及 `atlas schema inspect` 对比结果。
   - 为回滚场景准备 `atlas migrate hash`（核对 state）+ `goose down -1` 示例，确保开发者能撤销最新 HRM 迁移，并在 README 中标注“生产/测试库均先运行 plan（dry-run）再由 goose apply”。
 4. **[ ] CI Guardrail**
-  - 在 `.github/workflows/quality-gates.yml` 增加 `hrm-atlas` 过滤器（命中 `atlas.hcl`、`modules/hrm/infrastructure/atlas/**`、`migrations/hrm/**`、`scripts/db/export_hrm_schema.sh` 等），触发 `atlas migrate lint --git-base origin/main --env ci`、`make db plan`（连接 CI 内置 Postgres 服务：host `localhost`, port `5432`, user/password `postgres`, db `iota_erp`）、`git status --short` 检查，并缓存 `migrations/hrm/atlas.sum` 以加速重复执行。
-  - 与 `hrm-sqlc` 过滤器联动：若两者同时命中，CI 依次执行 `make db plan` → `make db migrate up`（goose 连接 ci Postgres 并执行空迁移验证）→ `scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1 DB_HOST=localhost DB_PORT=5432` → `make sqlc-generate`，确保 schema 与生成代码保持一致，并在 job 末尾强制 `git diff --exit-code modules/hrm/infrastructure/sqlc/schema.sql`.
+  - 在 `.github/workflows/quality-gates.yml` 增加 `hrm-atlas` 过滤器（命中 `atlas.hcl`、`modules/hrm/infrastructure/atlas/**`、`migrations/hrm/**`、`scripts/db/export_hrm_schema.sh` 等），触发 `atlas migrate lint --git-base origin/main --env ci`、`make db plan HRM_MIGRATIONS=1`（连接 CI Postgres 服务）、`git status --short` 检查，并缓存 `migrations/hrm/atlas.sum` 以加速重复执行；workflow 将新增 `services.postgres`（`image: postgres:17`, env `POSTGRES_DB=iota_erp`, `POSTGRES_PASSWORD=postgres`, ports `5432:5432`），确保命令有数据库可连。
+  - 与 `hrm-sqlc` 过滤器联动：若两者同时命中，CI 依次执行 `make db plan HRM_MIGRATIONS=1` → `make db migrate up HRM_MIGRATIONS=1`（goose 连接 CI Postgres 并执行空迁移验证）→ `scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1 DB_HOST=localhost DB_PORT=5432` → `make sqlc-generate`，确保 schema 与生成代码保持一致，并在 job 末尾强制 `git diff --exit-code modules/hrm/infrastructure/sqlc/schema.sql`.
 5. **[ ] 文档与回滚策略**
-- 更新 README/CONTRIBUTING/AGENTS 中的 HRM 部分，新增“Atlas + goose”章节，模版包括：命令速查、目录结构截图、`atlas migrate diff` → goose apply 的流程、常见错误（hash 不一致、state 漂移）及处理方式。
+- 更新 README/CONTRIBUTING/AGENTS 中的 HRM 部分，新增“Atlas + goose”章节，模版包括：命令速查、目录结构截图、`atlas migrate diff` → `make db migrate up HRM_MIGRATIONS=1` 的流程、常见错误（hash 不一致、state 漂移）及处理方式。
   - 在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md` 记录 PoC：按“时间 → 命令 → 预期 → 实际 → 结果/回滚”模板撰写，并附 `atlas schema inspect`、`goose status` 的关键输出；`docs/dev-records/hrm-sql-inventory.md` 新增“Atlas Schema File”、“Latest HRM Migration”两列，例：`employee -> modules/.../employee.hcl -> changes_1759667232.up.sql`。
 
 ## 里程碑
