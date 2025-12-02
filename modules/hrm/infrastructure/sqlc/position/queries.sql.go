@@ -12,9 +12,12 @@ import (
 )
 
 const countPositions = `-- name: CountPositions :one
-SELECT COUNT(*)
-FROM positions
-WHERE tenant_id = $1
+SELECT
+    COUNT(*)
+FROM
+    positions
+WHERE
+    tenant_id = $1
 `
 
 func (q *Queries) CountPositions(ctx context.Context, tenantID pgtype.UUID) (int64, error) {
@@ -32,9 +35,11 @@ SELECT
     description,
     created_at,
     updated_at
-FROM positions
-WHERE id = $1
-  AND tenant_id = $2
+FROM
+    positions
+WHERE
+    id = $1
+    AND tenant_id = $2
 `
 
 type GetPositionByIDParams struct {
@@ -64,61 +69,16 @@ SELECT
     description,
     created_at,
     updated_at
-FROM positions
-WHERE tenant_id = $1
-ORDER BY id
+FROM
+    positions
+WHERE
+    tenant_id = $1
+ORDER BY
+    id
 `
 
 func (q *Queries) ListPositionsByTenant(ctx context.Context, tenantID pgtype.UUID) ([]Position, error) {
 	rows, err := q.db.Query(ctx, listPositionsByTenant, tenantID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []Position{}
-	for rows.Next() {
-		var i Position
-		if err := rows.Scan(
-			&i.ID,
-			&i.TenantID,
-			&i.Name,
-			&i.Description,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listPositionsPaginated = `-- name: ListPositionsPaginated :many
-SELECT
-    id,
-    tenant_id,
-    name,
-    description,
-    created_at,
-    updated_at
-FROM positions
-WHERE tenant_id = $1
-ORDER BY id
-LIMIT $3
-OFFSET $2
-`
-
-type ListPositionsPaginatedParams struct {
-	TenantID  pgtype.UUID `json:"tenant_id"`
-	RowOffset int32       `json:"row_offset"`
-	RowLimit  int32       `json:"row_limit"`
-}
-
-func (q *Queries) ListPositionsPaginated(ctx context.Context, arg ListPositionsPaginatedParams) ([]Position, error) {
-	rows, err := q.db.Query(ctx, listPositionsPaginated, arg.TenantID, arg.RowOffset, arg.RowLimit)
 	if err != nil {
 		return nil, err
 	}

@@ -12,15 +12,10 @@ import (
 )
 
 const createPosition = `-- name: CreatePosition :one
-INSERT INTO positions (
-    tenant_id,
-    name,
-    description
-) VALUES (
-    $1,
-    $2,
-    $3
-) RETURNING id
+INSERT INTO positions (tenant_id, name, description)
+    VALUES ($1, $2, $3)
+RETURNING
+    id
 `
 
 type CreatePositionParams struct {
@@ -39,7 +34,7 @@ func (q *Queries) CreatePosition(ctx context.Context, arg CreatePositionParams) 
 const deletePosition = `-- name: DeletePosition :exec
 DELETE FROM positions
 WHERE id = $1
-  AND tenant_id = $2
+    AND tenant_id = $2
 `
 
 type DeletePositionParams struct {
@@ -53,12 +48,14 @@ func (q *Queries) DeletePosition(ctx context.Context, arg DeletePositionParams) 
 }
 
 const updatePosition = `-- name: UpdatePosition :exec
-UPDATE positions
+UPDATE
+    positions
 SET
     name = $1,
     description = $2
-WHERE id = $3
-  AND tenant_id = $4
+WHERE
+    id = $3
+    AND tenant_id = $4
 `
 
 type UpdatePositionParams struct {

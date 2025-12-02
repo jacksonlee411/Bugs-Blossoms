@@ -12,9 +12,12 @@ import (
 )
 
 const countEmployees = `-- name: CountEmployees :one
-SELECT COUNT(*)
-FROM employees
-WHERE tenant_id = $1
+SELECT
+    COUNT(*)
+FROM
+    employees
+WHERE
+    tenant_id = $1
 `
 
 func (q *Queries) CountEmployees(ctx context.Context, tenantID pgtype.UUID) (int64, error) {
@@ -48,10 +51,12 @@ SELECT
     em.birth_date,
     em.hire_date,
     em.resignation_date
-FROM employees e
-LEFT JOIN employee_meta em ON e.id = em.employee_id
-WHERE e.id = $1
-  AND e.tenant_id = $2
+FROM
+    employees e
+    LEFT JOIN employee_meta em ON e.id = em.employee_id
+WHERE
+    e.id = $1
+    AND e.tenant_id = $2
 `
 
 type GetEmployeeByIDParams struct {
@@ -138,10 +143,13 @@ SELECT
     em.birth_date,
     em.hire_date,
     em.resignation_date
-FROM employees e
-LEFT JOIN employee_meta em ON e.id = em.employee_id
-WHERE e.tenant_id = $1
-ORDER BY e.id
+FROM
+    employees e
+    LEFT JOIN employee_meta em ON e.id = em.employee_id
+WHERE
+    e.tenant_id = $1
+ORDER BY
+    e.id
 `
 
 type ListEmployeesByTenantRow struct {
@@ -236,12 +244,14 @@ SELECT
     em.birth_date,
     em.hire_date,
     em.resignation_date
-FROM employees e
-LEFT JOIN employee_meta em ON e.id = em.employee_id
-WHERE e.tenant_id = $1
-ORDER BY e.id
-LIMIT $3
-OFFSET $2
+FROM
+    employees e
+    LEFT JOIN employee_meta em ON e.id = em.employee_id
+WHERE
+    e.tenant_id = $1
+ORDER BY
+    e.id
+LIMIT $3 OFFSET $2
 `
 
 type ListEmployeesPaginatedParams struct {

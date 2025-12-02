@@ -12,35 +12,10 @@ import (
 )
 
 const createEmployee = `-- name: CreateEmployee :one
-INSERT INTO employees (
-    tenant_id,
-    first_name,
-    last_name,
-    middle_name,
-    email,
-    phone,
-    salary,
-    salary_currency_id,
-    hourly_rate,
-    coefficient,
-    avatar_id,
-    created_at,
-    updated_at
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9,
-    $10,
-    $11,
-    $12,
-    $13
-) RETURNING id
+INSERT INTO employees (tenant_id, first_name, last_name, middle_name, email, phone, salary, salary_currency_id, hourly_rate, coefficient, avatar_id, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+RETURNING
+    id
 `
 
 type CreateEmployeeParams struct {
@@ -81,27 +56,8 @@ func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) 
 }
 
 const createEmployeeMeta = `-- name: CreateEmployeeMeta :exec
-INSERT INTO employee_meta (
-    employee_id,
-    primary_language,
-    secondary_language,
-    tin,
-    pin,
-    notes,
-    birth_date,
-    hire_date,
-    resignation_date
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4,
-    $5,
-    $6,
-    $7,
-    $8,
-    $9
-)
+INSERT INTO employee_meta (employee_id, primary_language, secondary_language, tin, pin, notes, birth_date, hire_date, resignation_date)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 `
 
 type CreateEmployeeMetaParams struct {
@@ -134,7 +90,7 @@ func (q *Queries) CreateEmployeeMeta(ctx context.Context, arg CreateEmployeeMeta
 const deleteEmployee = `-- name: DeleteEmployee :exec
 DELETE FROM employees
 WHERE id = $1
-  AND tenant_id = $2
+    AND tenant_id = $2
 `
 
 type DeleteEmployeeParams struct {
@@ -158,7 +114,8 @@ func (q *Queries) DeleteEmployeeMeta(ctx context.Context, employeeID int32) erro
 }
 
 const updateEmployee = `-- name: UpdateEmployee :exec
-UPDATE employees
+UPDATE
+    employees
 SET
     first_name = $1,
     last_name = $2,
@@ -171,8 +128,9 @@ SET
     coefficient = $9,
     avatar_id = $10,
     updated_at = $11
-WHERE id = $12
-  AND tenant_id = $13
+WHERE
+    id = $12
+    AND tenant_id = $13
 `
 
 type UpdateEmployeeParams struct {
@@ -211,7 +169,8 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 }
 
 const updateEmployeeMeta = `-- name: UpdateEmployeeMeta :exec
-UPDATE employee_meta
+UPDATE
+    employee_meta
 SET
     primary_language = $1,
     secondary_language = $2,
@@ -221,7 +180,8 @@ SET
     birth_date = $6,
     hire_date = $7,
     resignation_date = $8
-WHERE employee_id = $9
+WHERE
+    employee_id = $9
 `
 
 type UpdateEmployeeMetaParams struct {
