@@ -94,6 +94,13 @@ modules/{module}/
 - Run `go vet ./...` to verify compilation
 - Run `templ generate && make css` if templates were modified
 
+### Casbin / Authorization
+- Update modular policy fragments under `config/access/policies/**`, then run `make authz-pack` to regenerate `config/access/policy.csv`.
+- Run `make authz-test` (compiles `pkg/authz` plus helper packages) before committing any authz-related Go changes.
+- Run `make authz-lint` to execute policy packing and the deterministic parity fixtures (`scripts/authz/verify_parity.go --fixtures ...`). CI hooks onto the same targets.
+- Use `go run ./scripts/authz/export_legacy_policies.go -dsn <dsn> -out <path> -dry-run` for audited exports (requires `ALLOWED_ENV=production_export`).
+- Use `go run ./scripts/authz/verify_parity.go --sample 0.2` for on-demand parity checks against a live database (set `AUTHZ_MODE`/`AUTHZ_FLAG_CONFIG` as needed).
+
 ## Tool use
 - DO NOT USE `sed` for file manipulation
 

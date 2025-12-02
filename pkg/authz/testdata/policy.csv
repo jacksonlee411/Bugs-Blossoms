@@ -1,0 +1,4 @@
+p, role:core.admin, global, core.users, (list|view), allow
+p, role:core.admin, global, core.users, edit, allow
+p, tenant:global:user:anonymous, global, public.status, view, allow
+g, tenant:global:user:f6f8b13e-755f-41e0-af1a-f2671e40c15c, role:core.admin, global
