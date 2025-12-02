@@ -103,6 +103,16 @@ modules/{module}/
 - sqlc 生成的内容全部位于 `modules/hrm/infrastructure/sqlc/**`，生成后必须 `git status --short` 确认无遗留 diff。CI 的 `hrm-sqlc` 过滤器也会执行同样检查。
 - 变更 HRM SQL 时记得同步维护《HRM SQL Inventory》，方便评审追踪迁移进度。
 
+## HRM Atlas + Goose
+- HRM schema 的权威定义位于 `modules/hrm/infrastructure/atlas/schema.hcl`，配套配置在仓库根目录 `atlas.hcl`（`dev/test/ci` 环境复用 `DB_*` 变量）。
+- 生成迁移：`atlas migrate diff --env dev --dir file://migrations/hrm --to file://modules/hrm/infrastructure/atlas/schema.hcl`，Dry-run 可用 `make db plan`。
+- 执行迁移：`make db migrate up HRM_MIGRATIONS=1`（当 `HRM_MIGRATIONS=1` 时会调用 `scripts/db/run_goose.sh`，使用 goose 操作 `migrations/hrm/changes_<unix>.{up,down}.sql`）。
+  - 回滚最新步骤：`GOOSE_STEPS=1 make db migrate down HRM_MIGRATIONS=1`
+  - redo：`GOOSE_STEPS=1 make db migrate redo HRM_MIGRATIONS=1`
+  - 查看链路：`make db migrate status HRM_MIGRATIONS=1`
+- `make db lint` 会运行 `atlas migrate lint --env ci --git-base origin/main`，CI 通过新建的 `hrm-atlas` 过滤器强制该检查。
+- Atlas/Goose 的操作日志请登记在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`。
+
 ## Build/Lint/Test Commands
 - After changes to css or .templ files: `templ generate && make css`
 - After changes to Go code: `go vet ./...` (Do NOT run `go build` as it is not needed)

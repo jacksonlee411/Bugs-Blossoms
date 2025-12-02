@@ -136,6 +136,18 @@ Running the matching commands locally ensures your branch passes the `quality-ga
 - 生成步骤也会在 CI 中通过 `hrm-sqlc` 过滤器自动执行；若还有未提交的生成文件，工作流会失败。
 - 请同步维护 `docs/dev-records/hrm-sql-inventory.md`，让评审能快速定位 SQL 变动。
 
+### HRM Atlas + Goose
+
+- HRM 表结构以 `modules/hrm/infrastructure/atlas/schema.hcl` 为唯一声明式来源，Atlas 配置位于仓库根目录 `atlas.hcl`。
+- 新迁移由 `atlas migrate diff --env dev --dir file://migrations/hrm --to file://modules/hrm/infrastructure/atlas/schema.hcl` 生成；Dry-run 可通过 `make db plan`（内部调用 `atlas migrate diff --dry-run`）。
+- 使用 `HRM_MIGRATIONS=1 make db migrate up` 触发 `scripts/db/run_goose.sh`，Goose 会对 `migrations/hrm/changes_<unix>.{up,down}.sql` 进行 apply/rollback。  
+  - 回滚：`GOOSE_STEPS=1 make db migrate down HRM_MIGRATIONS=1`  
+  - redo：`GOOSE_STEPS=1 make db migrate redo HRM_MIGRATIONS=1`  
+  - 状态：`make db migrate status HRM_MIGRATIONS=1`
+- 迁移执行完毕后必须运行 `scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1 && make sqlc-generate`，保持 schema/sqlc 与数据库一致。
+- `make db lint` 会执行 `atlas migrate lint --env ci --git-base origin/main`，CI 通过新的 `hrm-atlas` 过滤器强制该步骤；任何缺失的迁移或 `atlas.sum`/`schema.hcl` 漂移都会导致 PR 失败。
+- 所有 Atlas / Goose 演练请写入 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`，确保有可追踪的“命令 → 结果”记录。
+
 ## 🧪 Running Tests
 
 ### E2E Testing

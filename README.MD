@@ -144,6 +144,54 @@ CI 中新增的 `hrm-sqlc` 过滤器会在涉及 HRM SQL / schema / sqlc.yaml �
 
 ---
 
+## 🧭 HRM Atlas + Goose 流水线
+
+HRM 聚合已经迁入 `migrations/hrm/`，并由 Atlas 生成 SQL、goose 负责执行。基线产物：
+
+- 目标 schema：`modules/hrm/infrastructure/atlas/schema.hcl`
+- Atlas 配置：根目录 `atlas.hcl`（`dev`/`test`/`ci` 环境复用 `DB_*` 环境变量）
+- 迁移目录：`migrations/hrm/changes_<unix>.{up,down}.sql`
+- 工作日志：`docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`
+
+推荐流程：
+
+1. **安装 Atlas CLI（一次性）**
+   ```bash
+   make atlas-install   # 从 GitHub 构建 atlas v0.38.0 并安装到 $(go env GOPATH)/bin
+   ```
+2. **更新 schema 定义**：编辑 `modules/hrm/infrastructure/atlas/schema.hcl`（或补充 include），确保与 HRM 期望结构一致。
+3. **Dry-run 计划**：
+   ```bash
+   make db plan
+   # 等价于 atlas migrate diff --env dev --dir file://migrations/hrm --to file://modules/hrm/infrastructure/atlas/schema.hcl --dry-run
+   ```
+   该命令会连接本地 Postgres（使用现有 `DB_*` 环境变量）并打印 SQL 计划，不写入磁盘。
+4. **生成迁移**：
+   ```bash
+   atlas migrate diff --env dev \
+     --dir file://migrations/hrm \
+     --to file://modules/hrm/infrastructure/atlas/schema.hcl
+   ```
+   输出文件位于 `migrations/hrm/changes_<unix>.{up,down}.sql`，并自动更新 `migrations/hrm/atlas.sum`。
+5. **应用迁移（goose）**：
+   ```bash
+   make db migrate up HRM_MIGRATIONS=1
+   ```
+   当 `HRM_MIGRATIONS=1` 时，`Makefile` 会调用 `scripts/db/run_goose.sh`，使用 `postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}` 作为 DSN。  
+   - 回滚最近一次：`GOOSE_STEPS=1 make db migrate down HRM_MIGRATIONS=1`  
+   - redo：`GOOSE_STEPS=1 make db migrate redo HRM_MIGRATIONS=1`  
+   - 状态：`make db migrate status HRM_MIGRATIONS=1`
+6. **导出 schema & 重建 sqlc**：
+   ```bash
+   scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1
+   make sqlc-generate
+   ```
+7. **提交前检查**：`make db lint` 会运行 `atlas migrate lint --env ci --git-base origin/main`，确保缺失迁移 / hash 漂移会被阻止。
+
+> 所有 Atlas/Goose 操作请在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md` 补充记录，方便后续审计和回溯。
+
+---
+
 ## 🔐 Super Admin
 
 IOTA SDK includes a separate Super Admin server for managing tenants and platform-wide operations. This deployment is isolated from the main application and requires super admin authentication for all routes.

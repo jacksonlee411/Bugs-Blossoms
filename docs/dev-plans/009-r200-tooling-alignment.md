@@ -35,6 +35,10 @@
    - 任务：设计 outbox schema、插入/轮询逻辑（可先接内存事件总线），在至少一个业务流程（例如 Inventory→Finance）完成端到端验证，并在文档中记录落地指南。
    - 可选方案：`github.com/ThreeDotsLabs/watermill` SQL Outbox 组件（Postgres/MySQL 轮询 + Relay）、Debezium Outbox Event Router（依赖 Kafka Connect WAL/binlog，将 outbox 表自动投递到 Kafka）、`github.com/looplab/eventhorizon` 等事件溯源框架自带的 outbox/relay，或项目内自研轻量实现（遵循 R200 推荐的事务 + relay 模式并补上幂等/重试）。
 
+6. **多租户管理工具链评估**
+   - 目前租户生命周期仅依赖 Super Admin 服务与手写脚本维护，缺少行业成熟方案。调研表明：Keycloak（Realm 隔离、SSO/SCIM、自定义主题）、ORY 组合（Kratos/Hydra/Keto/Oathkeeper，拆分式身份/授权）、BoxyHQ（Jackson + SaaS Starter Kit，面向 B2B 租户入驻/目录同步）是最流行的身份域开源方案；PostgreSQL RLS + Hasura/Supabase、Citus/Vitess 等数据库工具可提供租户级数据隔离与扩缩；Casbin/OpenFGA 等策略引擎可集中管理多租户 RBAC/ABAC。
+   - 任务：在 Super Admin roadmap 中纳入多租户工具链选型，输出对比矩阵（能力、部署复杂度、与 IOTA SDK 集成方式）；优先 PoC 身份域方案（例如以 Keycloak Realm 或 ORY Kratos 托管租户认证/SSO），验证租户自助创建、策略同步与审计；随后评估数据层与策略层方案的落地路径，并在 README/运维手册记录依赖、监控与回滚流程。
+
 ## 风险
 - 同期推进多项工具会增加学习与维护成本，需明确优先级并逐步集成。
 - 引入第三方 CLI（sqlc/atlas/asynq）需在 tools.go 固定版本，避免 CI/本地环境差异。
