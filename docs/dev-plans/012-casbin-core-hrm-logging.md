@@ -59,6 +59,12 @@
    - 在 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md` 记录 PoC：按“时间 → 命令 → 预期 → 实际 → 结果/回滚”模板撰写，并附 `enforcer` 日志或测试截图。
    - 制定后续推广列表（CRM、Warehouse、Projects 等），列出需要满足的前置条件（Core/HRM/Logging 完成、文档稳定、监控到位）。
    - 在 `quality-gates` workflow 新增 Casbin 规则校验（policy 格式/排序、`make authz-test`、`make authz-lint`、policy diff 提示），确保 CI 能阻止策略遗漏。
+   - 具体界面现代化细节：
+     - **角色编辑页（modules/core/.../roles）**：从 `ModulePermissionGroups` 迁移到基于 Casbin policy 的网格，支持筛选 tenant/domain、资源、动作；允许直接添加/移除 `p`/`g` 规则并显示当前 policy diff；对未授权资源展示只读状态。
+     - **用户编辑页（modules/core/.../users）**：在 Permissions 标签中改为展示用户直接策略、继承角色及所属 domain，并提供“添加 domain-scoped role”与“绑定单条 policy”操作；表单提交生成 policy 草稿而非立即写数据库。
+     - **HRM 页面**：列表/表单顶部显示当前用户的 `Employee.*` 权限状态，并在按钮/操作（新增、批量导入、删除）上结合 `authz.Check` 控制可见性，同时提供统一的“无权限”提示组件。
+     - **Logging 页面**：导航入口和页面主体在无 `Logs.View` 权限时展示空态，提供“申请权限”或返回链接，UI 逻辑全部基于 Casbin 判定结果。
+     - UI 需附带“策略来源”面板，展示该页面所需的 policy 条目和当前 subject/domain，方便调试；若判定失败，自动显示受影响的 object/action 及建议策略。
    - 设计 UI→Git 的策略变更闭环：
      - UI 仅支持创建“策略变更草稿”，写入 `policy_change_requests` 表并附上 diff。
      - 后端触发 bot（或 CLI）将 diff 转成 Git branch + PR，并在 PR 中引用原始请求。
