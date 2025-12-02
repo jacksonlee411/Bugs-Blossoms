@@ -9,8 +9,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/modules"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
+	coreSession "github.com/iota-uz/iota-sdk/modules/core/domain/entities/session"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/internet"
 	coreseed "github.com/iota-uz/iota-sdk/modules/core/seed"
+	coreservices "github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/modules/hrm/domain/aggregates/employee"
 	hrmservices "github.com/iota-uz/iota-sdk/modules/hrm/services"
 	"github.com/iota-uz/iota-sdk/modules/website/domain/entities/aichatconfig"
@@ -120,6 +122,23 @@ func Seed() error {
 
 func seedEmployees(ctx context.Context, app application.Application) error {
 	service := app.Service(hrmservices.EmployeeService{}).(*hrmservices.EmployeeService)
+	userService := app.Service(coreservices.UserService{}).(*coreservices.UserService)
+
+	adminUser, err := userService.GetByEmail(ctx, "test@gmail.com")
+	if err != nil {
+		return fmt.Errorf("failed to load default user: %w", err)
+	}
+
+	ctx = composables.WithUser(ctx, adminUser)
+	ctx = composables.WithSession(ctx, &coreSession.Session{
+		Token:     "seed-session",
+		UserID:    adminUser.ID(),
+		TenantID:  adminUser.TenantID(),
+		IP:        "127.0.0.1",
+		UserAgent: "seed",
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+		CreatedAt: time.Now(),
+	})
 
 	employees := []employee.CreateDTO{
 		{
