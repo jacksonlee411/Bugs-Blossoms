@@ -1,6 +1,6 @@
 # DEV-PLAN-010T：HRM 用户注册 E2E 专项
 
-**状态**: 跟踪中（2025-12-02 11:00）
+**状态**: 修复中（2025-12-02 12:45）
 
 ## 背景
 - DEV-PLAN-010 将 HRM 仓储迁移至 sqlc 后，CI 重新启用了 E2E Playwright 测试。
@@ -28,7 +28,11 @@
 3. **校验登录逻辑**：在本地运行 `make e2e test`，如果依然留在 `/login`，检查 `fixtures/auth.ts` 使用的邮箱/密码与 seed 是否匹配。
 4. **复测并记录**：修复完成后 rerun CI，并在本文件追加结论。
 
+## 最新进展（2025-12-02 12:45）
+- `tests/users/register.spec.ts` 现改为直接对 `select[name="RoleIDs"]` 调用 `selectOption`，避免依赖 `button[x-ref="trigger"]` 的 Alpine 内部实现。
+- 新增 `page.waitForURL(/\/users$/)` 等待逻辑，并用 `#users-table-body` 里的实际姓名文本替换硬编码的 `tbody tr` 行数断言，防止因 spinner/分页数量变化导致误报。
+- 修复完成后需运行 `make e2e test` 验证三个场景是否全部通过，随后观察下一次 `Quality Gates` run。若仍失败，记录新的错误快照并回填本节。
+
 ## 角色分工
 - QA/前端：调整 Playwright 脚本 & 页面标记
 - HRM 后端：若登录依赖的权限/角色缺失，负责补种 seed
-
