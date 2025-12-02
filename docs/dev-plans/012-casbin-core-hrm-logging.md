@@ -60,11 +60,27 @@
    - 制定后续推广列表（CRM、Warehouse、Projects 等），列出需要满足的前置条件（Core/HRM/Logging 完成、文档稳定、监控到位）。
    - 在 `quality-gates` workflow 新增 Casbin 规则校验（policy 格式/排序、`make authz-test`、`make authz-lint`、policy diff 提示），确保 CI 能阻止策略遗漏。
    - 具体界面现代化细节：
-     - **角色编辑页（modules/core/.../roles）**：从 `ModulePermissionGroups` 迁移到基于 Casbin policy 的网格，支持筛选 tenant/domain、资源、动作；允许直接添加/移除 `p`/`g` 规则并显示当前 policy diff；对未授权资源展示只读状态。
-     - **用户编辑页（modules/core/.../users）**：在 Permissions 标签中改为展示用户直接策略、继承角色及所属 domain，并提供“添加 domain-scoped role”与“绑定单条 policy”操作；表单提交生成 policy 草稿而非立即写数据库。
-     - **HRM 页面**：列表/表单顶部显示当前用户的 `Employee.*` 权限状态，并在按钮/操作（新增、批量导入、删除）上结合 `authz.Check` 控制可见性，同时提供统一的“无权限”提示组件。
-     - **Logging 页面**：导航入口和页面主体在无 `Logs.View` 权限时展示空态，提供“申请权限”或返回链接，UI 逻辑全部基于 Casbin 判定结果。
-     - UI 需附带“策略来源”面板，展示该页面所需的 policy 条目和当前 subject/domain，方便调试；若判定失败，自动显示受影响的 object/action 及建议策略。
+     - **角色编辑页（modules/core/.../roles）**：
+       - 界面分为“角色元数据”（名称、描述）与“Casbin 绑定”两块。
+       - “Casbin 绑定”改用 policy 网格：列出当前角色对应的 `g, role_slug, subject/domain` 与 `p, role_slug, object, action, domain` 规则。数据来源为新的 `/core/api/roles/:id/policies` API，后端从 `config/access/policy.csv` 解析并附带差异标记。
+       - 支持在 UI 中新增/删除 g/p 规则、按 tenant/domain、资源、动作过滤，同时展示“将生成的 diff”预览；表单提交只写入 `policy_change_requests` 草稿，由 UI→Git 流程生成 PR。
+       - 若当前登录用户对某资源没有 `Roles.Update` 权限，则 Casbin section 以只读标签渲染，并显示“无权限编辑此策略（请求权限）”提示按钮。
+     - **用户编辑页（modules/core/.../users）**：
+       - Permissions 标签拆成三个面板：① 继承角色（source=角色列表）；② 直接策略（列出该用户的 `p` 规则）；③ Domain 赋权（`g` 规则，表示 user ↔ role/domain 绑定）。
+       - 每个面板调用 `/core/api/users/:id/policies` API，返回结构：`directPolicies`, `inheritedPolicies`, `domains`。UI 可筛选 tenant/domain，并提供“添加 domain-scoped role”“添加单条 policy”对话框。
+       - 所有变更（勾选、删除、添加）都会汇总为 diff，并通过“提交策略草稿”按钮写入 `policy_change_requests`；旧的直接写数据库的权限表单被废弃。
+       - 若用户缺少 `Users.UpdatePermissions`，面板自动隐藏操作按钮，只保留只读列表与“请求权限”入口。
+     - **HRM 页面**：
+       - 在列表/表单视图顶部展示 `authz.Check(ctx,"employee",action)` 的实时状态（绿勾=有权，红叉=无权），文案使用 `HRM.Authorization.ActionX` 译文。
+       - 新增/导入/删除按钮在渲染时读取该状态决定是否禁用；禁用时悬浮提示“请申请 Employee.<action> 权限”并提供按钮触发权限申请（写入 `policy_change_requests`，生成描述为“HRM 页面请求权限”）。
+       - Page 403 空态统一引用 `components/authorization/unauthorized.templ`，内部带“返回 HRM 首页”和“申请权限”操作，保证体验一致。
+     - **Logging 页面**：
+       - 侧栏/导航在渲染时调用 `authz.Check(..., Logs.View)`，若失败则隐藏入口；若直接访问 URL，controller 返回 403 并渲染同样的 unauthorized 组件。
+       - 页面顶部挂出“当前策略”徽章（显示 subject/domain），方便管理员确认使用哪个租户域；在无权限时提供“生成权限申请草稿”按钮。
+     - **策略来源面板**：
+       - 每个需要权限的页面都附带一个仅对管理员可见的抽屉组件（`PolicyInspector`），由 `/core/api/authz/debug?subject=&object=&action=&domain=` 提供数据：包含命中的 policy、匹配链路、ABAC 属性。
+       - 当授权失败时，面板自动打开并展示“缺失策略建议”，例如：`p, tenant:123:user:456, hrm.employees, read`；管理员可一键“生成草稿”，跳到 policy 草稿表单。
+       - API 只对拥有 `Authz.Debug` 权限的用户开放，避免普通用户看到完整策略列表。
    - 设计 UI→Git 的策略变更闭环：
      - UI 仅支持创建“策略变更草稿”，写入 `policy_change_requests` 表并附上 diff。
      - 后端触发 bot（或 CLI）将 diff 转成 Git branch + PR，并在 PR 中引用原始请求。
