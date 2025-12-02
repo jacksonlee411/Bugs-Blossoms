@@ -444,7 +444,8 @@ func timeFromDate(d pgtype.Date) (time.Time, error) {
 
 func timePtrFromDate(d pgtype.Date) (*time.Time, error) {
 	if !d.Valid {
-		return nil, nil
+		var unset *time.Time
+		return unset, nil
 	}
 	t, err := timeFromDate(d)
 	if err != nil {
