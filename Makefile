@@ -7,7 +7,7 @@ ATLAS ?= $(ATLAS_BIN_DIR)/atlas
 
 .PHONY: authz-pack
 authz-pack:
-	go run ./scripts/authz/pack_policies.go
+	go run ./scripts/authz/pack
 
 .PHONY: authz-test
 authz-test:
@@ -15,7 +15,7 @@ authz-test:
 
 .PHONY: authz-lint
 authz-lint: authz-pack
-	go run ./scripts/authz/verify_parity.go --fixtures config/access/fixtures/testdata.yaml
+	go run ./scripts/authz/verify --fixtures config/access/fixtures/testdata.yaml
 
 # Install dependencies
 deps:

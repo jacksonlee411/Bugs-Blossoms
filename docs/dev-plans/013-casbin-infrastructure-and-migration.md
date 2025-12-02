@@ -9,7 +9,7 @@
 
 ## 目标
 1. 在仓库根目录交付 `pkg/authz` 包、`config/access/model.conf`、`config/access/policy.csv`，并定义 subject/object/action/domain/ABAC 的统一命名规范。
-2. 编写 `scripts/authz/export_legacy_policies.go`、`scripts/authz/verify_parity.go` 等 CLI，能够从现有数据库导出策略、生成 Casbin policy、比对 `user.Can` 与 `authz.Check` 的判定一致性。
+2. 编写 `scripts/authz/export`、`scripts/authz/verify` 等 CLI，能够从现有数据库导出策略、生成 Casbin policy、比对 `user.Can` 与 `authz.Check` 的判定一致性。
 3. 引入 `AUTHZ_ENFORCE` Feature Flag，支持“旁路模式（仅记录差异）→ 强制模式”切换，配套监控指标与日志格式。
 4. 在 Makefile/quality-gates 中新增 `authz-test`、`authz-lint`、policy diff 检查，任何对 `config/access/**` 或 `scripts/authz/**` 的修改都必须通过 CI 约束。
 5. 更新 README/CONTRIBUTING/AGENTS/dev-records，形成“导出旧策略 → 校验 → 提交 Git → 打开 Feature Flag”的标准流程，并记录回滚方法。
@@ -28,15 +28,15 @@
    - 在 `tools.go` 引入 `github.com/casbin/casbin/v2` 及所需 adapter（file adapter），Makefile 新增 `authz-test`（运行 `go test ./pkg/authz/...` + parity tests）与 `authz-lint`（检查 policy/model 格式、排序、重复项）。
 2. **[x] 策略存储与导出 CLI**
    - 创建 `config/access/model.conf`（RBAC with domains + ABAC 模型）与 `config/access/policies/` 目录：按模块/租户拆分 policy 文件（如 `config/access/policies/core/global.csv`、`hrm/tenant-uuid.csv`），并提供 `make authz-pack` 聚合器生成 `policy.csv`；统一排序规则（subject→object→action→domain）写入 CONTRIBUTING，避免合并冲突。
-   - `scripts/authz/export_legacy_policies.go`：仅允许在公司 bastion/CI runner 上执行（通过 `ALLOWED_ENV=production_export` 校验），使用专用只读服务账号连接数据库、写入加密的 `policy_export_<timestamp>.gz`，默认对用户/租户标识进行 hash 脱敏；脚本输出操作审计（操作者、时间、命令、数据总量）并推送到 `docs/dev-records/DEV-PLAN-013-CASBIN-INFRA.md`。
-   - `scripts/authz/verify_parity.go`：读取拆分后的 policy 文件，加载 Casbin Enforcer，按照“全量 superadmin + 每租户至少 20% 用户（最少 50 个，最多 500 个）+ 覆盖所有模块动作”策略采样；可配置允许的差异阈值（默认 0，除非在配置文件显式豁免），输出 subject/object/action、旧值、新值、建议策略，并支持 `--emit-metrics` 向 Prometheus 发送统计。
+   - `scripts/authz/export`：仅允许在公司 bastion/CI runner 上执行（通过 `ALLOWED_ENV=production_export` 校验），使用专用只读服务账号连接数据库、写入加密的 `policy_export_<timestamp>.gz`，默认对用户/租户标识进行 hash 脱敏；脚本输出操作审计（操作者、时间、命令、数据总量）并推送到 `docs/dev-records/DEV-PLAN-013-CASBIN-INFRA.md`。
+   - `scripts/authz/verify`：读取拆分后的 policy 文件，加载 Casbin Enforcer，按照“全量 superadmin + 每租户至少 20% 用户（最少 50 个，最多 500 个）+ 覆盖所有模块动作”策略采样；可配置允许的差异阈值（默认 0，除非在配置文件显式豁免），输出 subject/object/action、旧值、新值、建议策略，并支持 `--emit-metrics` 向 Prometheus 发送统计。
    - 文档中记录脚本参数、示例命令、输出格式、脱敏配置、审计存档路径，并要求在变更评审前附上 `export` 与 `parity` 的摘要。
 3. **[x] Feature Flag 与监控**
    - 在集中配置服务（或 `config/authz_flags.yaml`）中管理 `AUTHZ_ENFORCE`（`disabled`/`shadow`/`enforce`），所有应用实例通过配置下发或 etcd/consul watcher 保持秒级一致；flag 更新时写入审计日志并触发健康检查，确保实例未停留在旧状态。
    - shadow 模式下记录差异日志（结构化字段：subject/object/action/attrs/legacy_result/casbin_result），差异数据写入集中日志仓库并保留 14 天；同时在 Grafana/Prometheus 上报差异计数、判定耗时、flag 状态分布，设置告警阈值。
    - 定义开启/关闭 Flag 的 runbook：包含配置变更步骤、验证指标、回滚命令、通讯模板，并要求 SRE/产品双签审。
 4. **[x] CI 与质量门禁**
-   - 在 `.github/workflows/quality-gates.yml` 新增 `authz` 过滤器（命中 `pkg/authz/**`、`config/access/**`、`scripts/authz/**`、`Makefile` 中相关 target 时触发），执行：`go test ./pkg/authz/...`、`make authz-lint`、`scripts/authz/verify_parity.go --sample smoke --fixtures config/access/fixtures/testdata.yaml`；CI 环境只使用脱敏的 fixtures，不直接访问生产数据库。
+   - 在 `.github/workflows/quality-gates.yml` 新增 `authz` 过滤器（命中 `pkg/authz/**`、`config/access/**`、`scripts/authz/**`、`Makefile` 中相关 target 时触发），执行：`go test ./pkg/authz/...`、`make authz-lint`、`scripts/authz/verify --sample smoke --fixtures config/access/fixtures/testdata.yaml`；CI 环境只使用脱敏的 fixtures，不直接访问生产数据库。
    - `make generate`/`make check lint` 中加入 policy 格式化（按 subject/object/action/domain 排序）与 `git status` 检查，依赖 `make authz-pack` 聚合后的 `policy.csv` 校验 diff，确保 PR 不遗留未排序或未打包的策略。
    - 为导出脚本提供环境变量模板（`export AUTHZ_EXPORT_DSN=postgres://...`），要求开发者在本地只能连接 sandbox 数据库；生产导出需通过专用 bastion 脚本触发并写入审计。
 5. **[x] 文档、记录与回滚**
@@ -51,7 +51,7 @@
 
 ## 交付物
 - `pkg/authz` 包、`config/access/model.conf`、`config/access/policy.csv`。
-- `scripts/authz/export_legacy_policies.go`、`scripts/authz/verify_parity.go` 及其文档。
+- `scripts/authz/export`、`scripts/authz/verify` 及其文档。
 - `AUTHZ_ENFORCE` Feature Flag 配置、监控仪表盘、差异日志格式定义。
 - Makefile 与 `.github/workflows/quality-gates.yml` 中的 `authz-test`、`authz-lint`、policy diff 检查。
 - README/CONTRIBUTING/AGENTS 更新、`docs/dev-records/DEV-PLAN-013-CASBIN-INFRA.md`（或同等 PoC 记录）。
