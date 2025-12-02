@@ -472,6 +472,11 @@ jobs:
         run: make css
 
       - name: Setup E2E database
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
         run: |
           make e2e reset
 
