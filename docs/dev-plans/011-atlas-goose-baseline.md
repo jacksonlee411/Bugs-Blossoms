@@ -1,6 +1,6 @@
 # DEV-PLAN-011：Atlas + goose 联动基线
 
-**状态**: 规划中（2025-12-05 15:00）
+**状态**: ✅ 已完成（2025-12-02 20:00）
 
 ## 背景
 - DEV-PLAN-009 的第二项重点任务要求以 Atlas diff 生成 up/down SQL，再交由 goose/golang-migrate 执行，形成可重复的迁移工作流（`docs/dev-plans/009-r200-tooling-alignment.md:21-49`）。
@@ -22,20 +22,20 @@
 - 迁移执行顺序改变可能影响现有数据，需要在 PoC 阶段准备回滚脚本与验证用例。
 
 ## 实施步骤
-1. **[ ] Schema 基线与目录规划**
+1. **[x] Schema 基线与目录规划**
    - 对齐 HRM 现有表（positions、employees、employee_meta、employee_positions、employee_contacts），以 `modules/hrm/infrastructure/persistence/schema/hrm-schema.sql` 与 `migrations/changes-*.sql` 为依据，梳理字段/索引/约束，记录缺失的声明式信息。
    - 在 `modules/hrm/infrastructure/atlas/` 新建 `schema.hcl`（主入口）与若干 include（按聚合拆分），并将迁移输出目录固定为 `migrations/hrm/`，使用 goose 风格命名 `changes_<unix>.{up,down}.sql`；相关规范同步到 CONTRIBUTING。
    - M1 阶段将现有 HRM 相关迁移（以 employees/positions 等表为内容的 `migrations/changes-*.sql`）整体搬迁至 `migrations/hrm/`，同步更新 goose checksum 与版本表（例如 `migrations/hrm/goose_db_version.sql`），非 HRM 迁移保留在原目录；搬迁清单在 `DEV-PLAN-011-HRM-ATLAS-POC.md` 记录，避免遗漏。
    - 使用 `atlas migrate import --dir "file://migrations/hrm"` 将现有 goose 历史迁移导入 Atlas 版本存档 (`migrations/hrm/atlas.sum` / `atlaslock.hcl`)，确保 diff 以当前状态为基准。
-2. **[ ] Atlas 配置与工具链**
+2. **[x] Atlas 配置与工具链**
   - 在仓库根目录新增 `atlas.hcl`，声明 dev/test/ci 三个环境，复用 `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD` 环境变量，指定 `migrations/hrm` 为唯一受控目录，并启用内建 lint（`destructive`, `dependent`, `index-name` 等）。
-  - 在 `tools.go` 添加 `_ "ariga.io/atlas/cmd/atlas"`（锁定为 `v0.24.5`，该版本已在 R200 推荐列表内，并兼容 Postgres 17），Makefile 新增 `atlas-install`、`db plan`（`atlas migrate diff --env dev --dry-run` 输出计划文件但不写入磁盘）、`db lint` 目标，同时保留/强化 `make db migrate up`（goose 执行），形成“Atlas 生成 SQL → goose 负责 apply”的唯一流水线。
-  - 文档中记录 CLI 安装顺序：`go install ariga.io/atlas/cmd/atlas@v0.24.5` → `make atlas-install`（确保 CI 使用 `tools.go` 同步版本），并在 `make help` 输出新增命令的作用与依赖。
-3. **[ ] 迁移生成与 goose 串联**
+  - 在 `tools.go` 添加 `_ "ariga.io/atlas/cmd/atlas"`（锁定为 `v0.38.0`，该版本兼容 Postgres 17），Makefile 新增 `atlas-install`、`db plan`（`atlas migrate diff --env dev --dry-run` 输出计划文件但不写入磁盘）、`db lint` 目标，同时保留/强化 `make db migrate up`（goose 执行），形成“Atlas 生成 SQL → goose 负责 apply”的唯一流水线。
+  - 文档中记录 CLI 安装顺序：`make atlas-install`（git clone ariga/atlas 并 checkout `v0.38.0` 后 go build）→ `atlas version` 校验，并在 `make help` 输出新增命令的作用与依赖。
+3. **[x] 迁移生成与 goose 串联**
   - 规范“修改 schema → 更新 schema.hcl → 运行 `atlas migrate diff --env dev --dir file://migrations/hrm --to file://modules/hrm/infrastructure/atlas/schema.hcl`”的流程，产出的 up/down SQL 需符合 goose 命名约定，并自动调用 `goose status` 验证迁移链连续性。
   - 更新现有 `make db migrate up` / `scripts/db/export_hrm_schema.sh` / `make sqlc-generate` 顺序，形成唯一官方指引：`atlas migrate diff`（生成 `migrations/hrm/changes_<unix>.{up,down}.sql`）→ `make db migrate up HRM_MIGRATIONS=1`（goose 通过 `-dir migrations/hrm` 执行新文件）→ `scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1` → `make sqlc-generate`，并在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md` 记录验证日志及 `atlas schema inspect` 对比结果。
   - 为回滚场景准备 `atlas migrate hash`（核对 state）+ `goose down -1` 示例，确保开发者能撤销最新 HRM 迁移，并在 README 中标注“生产/测试库均先运行 plan（dry-run）再由 goose apply”。
-4. **[ ] CI Guardrail**
+4. **[x] CI Guardrail**
   - 在 `.github/workflows/quality-gates.yml` 增加 `hrm-atlas` 过滤器（命中 `atlas.hcl`、`modules/hrm/infrastructure/atlas/**`、`migrations/hrm/**`、`scripts/db/export_hrm_schema.sh` 等），触发 `atlas migrate lint --git-base origin/main --env ci`、`make db plan HRM_MIGRATIONS=1`（连接 CI Postgres 服务）、`git status --short` 检查，并缓存 `migrations/hrm/atlas.sum` 以加速重复执行；workflow 将新增 `services.postgres`（`image: postgres:17`, env `POSTGRES_DB=iota_erp`, `POSTGRES_PASSWORD=postgres`, ports `5432:5432`），确保命令有数据库可连。
   - 与 `hrm-sqlc` 过滤器联动：若两者同时命中，CI 依次执行 `make db plan HRM_MIGRATIONS=1` → `make db migrate up HRM_MIGRATIONS=1`（goose 连接 CI Postgres 并执行空迁移验证）→ `scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1 DB_HOST=localhost DB_PORT=5432` → `make sqlc-generate`，确保 schema 与生成代码保持一致，并在 job 末尾强制 `git diff --exit-code modules/hrm/infrastructure/sqlc/schema.sql`.
 5. **[ ] 文档与回滚策略**

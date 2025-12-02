@@ -49,13 +49,6 @@ ALTER TABLE counterparty
     ADD UNIQUE (tenant_id, tin);
 
 -- Change ADD_COLUMN: tenant_id
-ALTER TABLE positions
-    ADD COLUMN tenant_id UUID NOT NULL REFERENCES tenants (id) ON DELETE CASCADE DEFAULT '00000000-0000-0000-0000-000000000001';
-
-ALTER TABLE positions
-    ADD UNIQUE (tenant_id, name);
-
--- Change ADD_COLUMN: tenant_id
 ALTER TABLE transactions
     ADD COLUMN tenant_id UUID NOT NULL REFERENCES tenants (id) ON DELETE CASCADE DEFAULT '00000000-0000-0000-0000-000000000001';
 
@@ -191,19 +184,6 @@ ALTER TABLE dialogues
     ADD COLUMN tenant_id UUID NOT NULL REFERENCES tenants (id) ON DELETE CASCADE DEFAULT '00000000-0000-0000-0000-000000000001';
 
 -- Change ADD_COLUMN: tenant_id
-ALTER TABLE employees
-    ADD COLUMN tenant_id UUID NOT NULL REFERENCES tenants (id) ON DELETE CASCADE DEFAULT '00000000-0000-0000-0000-000000000001';
-
-ALTER TABLE employees
-    DROP CONSTRAINT IF EXISTS employees_email_key;
-
-ALTER TABLE employees
-    ADD UNIQUE (tenant_id, email);
-
-ALTER TABLE employees
-    ADD UNIQUE (tenant_id, phone);
-
--- Change ADD_COLUMN: tenant_id
 ALTER TABLE inventory_check_results
     ADD COLUMN tenant_id UUID NOT NULL REFERENCES tenants (id) ON DELETE CASCADE DEFAULT '00000000-0000-0000-0000-000000000001';
 
@@ -230,9 +210,6 @@ CREATE INDEX counterparty_tenant_id_idx ON counterparty (tenant_id);
 -- Change CREATE_INDEX: action_logs_tenant_id_idx
 CREATE INDEX action_logs_tenant_id_idx ON action_logs (tenant_id);
 
--- Change CREATE_INDEX: employees_tenant_id_idx
-CREATE INDEX employees_tenant_id_idx ON employees (tenant_id);
-
 -- Change CREATE_INDEX: warehouse_units_tenant_id_idx
 CREATE INDEX warehouse_units_tenant_id_idx ON warehouse_units (tenant_id);
 
@@ -245,9 +222,6 @@ CREATE INDEX users_tenant_id_idx ON users (tenant_id);
 -- Change CREATE_INDEX: inventory_checks_tenant_id_idx
 CREATE INDEX inventory_checks_tenant_id_idx ON inventory_checks (tenant_id);
 
--- Change CREATE_INDEX: employees_first_name_idx
-CREATE INDEX employees_first_name_idx ON employees (first_name);
-
 -- Change CREATE_INDEX: inventory_tenant_id_idx
 CREATE INDEX inventory_tenant_id_idx ON inventory (tenant_id);
 
@@ -256,9 +230,6 @@ CREATE INDEX authentication_logs_tenant_id_idx ON authentication_logs (tenant_id
 
 -- Change CREATE_INDEX: dialogues_tenant_id_idx
 CREATE INDEX dialogues_tenant_id_idx ON dialogues (tenant_id);
-
--- Change CREATE_INDEX: employees_email_idx
-CREATE INDEX employees_email_idx ON employees (email);
 
 -- Change CREATE_INDEX: inventory_check_results_tenant_id_idx
 CREATE INDEX inventory_check_results_tenant_id_idx ON inventory_check_results (tenant_id);
@@ -278,9 +249,6 @@ CREATE INDEX transactions_tenant_id_idx ON transactions (tenant_id);
 -- Change CREATE_INDEX: idx_message_templates_tenant_id
 CREATE INDEX idx_message_templates_tenant_id ON message_templates (tenant_id);
 
--- Change CREATE_INDEX: positions_tenant_id_idx
-CREATE INDEX positions_tenant_id_idx ON positions (tenant_id);
-
 -- Change CREATE_INDEX: warehouse_orders_tenant_id_idx
 CREATE INDEX warehouse_orders_tenant_id_idx ON warehouse_orders (tenant_id);
 
@@ -292,9 +260,6 @@ CREATE INDEX idx_chats_tenant_id ON chats (tenant_id);
 
 -- Change CREATE_INDEX: expense_categories_tenant_id_idx
 CREATE INDEX expense_categories_tenant_id_idx ON expense_categories (tenant_id);
-
--- Change CREATE_INDEX: employees_phone_idx
-CREATE INDEX employees_phone_idx ON employees (phone);
 
 -- Change CREATE_INDEX: roles_tenant_id_idx
 CREATE INDEX roles_tenant_id_idx ON roles (tenant_id);
@@ -311,13 +276,7 @@ CREATE INDEX money_accounts_tenant_id_idx ON money_accounts (tenant_id);
 -- Change CREATE_INDEX: idx_clients_tenant_id
 CREATE INDEX idx_clients_tenant_id ON clients (tenant_id);
 
--- Change CREATE_INDEX: employees_last_name_idx
-CREATE INDEX employees_last_name_idx ON employees (last_name);
-
 -- +migrate Down
--- Undo CREATE_INDEX: employees_last_name_idx
-DROP INDEX employees_last_name_idx;
-
 -- Undo CREATE_INDEX: idx_clients_tenant_id
 DROP INDEX idx_clients_tenant_id;
 
@@ -333,9 +292,6 @@ DROP INDEX uploads_tenant_id_idx;
 -- Undo CREATE_INDEX: roles_tenant_id_idx
 DROP INDEX roles_tenant_id_idx;
 
--- Undo CREATE_INDEX: employees_phone_idx
-DROP INDEX employees_phone_idx;
-
 -- Undo CREATE_INDEX: expense_categories_tenant_id_idx
 DROP INDEX expense_categories_tenant_id_idx;
 
@@ -347,9 +303,6 @@ DROP INDEX permissions_tenant_id_idx;
 
 -- Undo CREATE_INDEX: warehouse_orders_tenant_id_idx
 DROP INDEX warehouse_orders_tenant_id_idx;
-
--- Undo CREATE_INDEX: positions_tenant_id_idx
-DROP INDEX positions_tenant_id_idx;
 
 -- Undo CREATE_INDEX: idx_message_templates_tenant_id
 DROP INDEX idx_message_templates_tenant_id;
@@ -369,9 +322,6 @@ DROP INDEX sessions_tenant_id_idx;
 -- Undo CREATE_INDEX: inventory_check_results_tenant_id_idx
 DROP INDEX inventory_check_results_tenant_id_idx;
 
--- Undo CREATE_INDEX: employees_email_idx
-DROP INDEX employees_email_idx;
-
 -- Undo CREATE_INDEX: dialogues_tenant_id_idx
 DROP INDEX dialogues_tenant_id_idx;
 
@@ -380,9 +330,6 @@ DROP INDEX authentication_logs_tenant_id_idx;
 
 -- Undo CREATE_INDEX: inventory_tenant_id_idx
 DROP INDEX inventory_tenant_id_idx;
-
--- Undo CREATE_INDEX: employees_first_name_idx
-DROP INDEX employees_first_name_idx;
 
 -- Undo CREATE_INDEX: inventory_checks_tenant_id_idx
 DROP INDEX inventory_checks_tenant_id_idx;
@@ -395,9 +342,6 @@ DROP INDEX warehouse_positions_tenant_id_idx;
 
 -- Undo CREATE_INDEX: warehouse_units_tenant_id_idx
 DROP INDEX warehouse_units_tenant_id_idx;
-
--- Undo CREATE_INDEX: employees_tenant_id_idx
-DROP INDEX employees_tenant_id_idx;
 
 -- Undo CREATE_INDEX: action_logs_tenant_id_idx
 DROP INDEX action_logs_tenant_id_idx;
@@ -425,19 +369,6 @@ ALTER TABLE action_logs
 -- Undo ADD_COLUMN: tenant_id
 ALTER TABLE inventory_check_results
     DROP COLUMN IF EXISTS tenant_id;
-
-ALTER TABLE employees
-    DROP CONSTRAINT IF EXISTS employees_tenant_id_phone_key;
-
-ALTER TABLE employees
-    DROP CONSTRAINT IF EXISTS employees_tenant_id_email_key;
-
--- Undo ADD_COLUMN: tenant_id
-ALTER TABLE employees
-    DROP COLUMN IF EXISTS tenant_id;
-
-ALTER TABLE employees
-    ADD CONSTRAINT employees_email_key UNIQUE (email);
 
 -- Undo ADD_COLUMN: tenant_id
 ALTER TABLE dialogues
@@ -574,13 +505,6 @@ ALTER TABLE passports
 ALTER TABLE transactions
     DROP COLUMN IF EXISTS tenant_id;
 
-ALTER TABLE positions
-    DROP CONSTRAINT IF EXISTS positions_tenant_id_name_key;
-
--- Undo ADD_COLUMN: tenant_id
-ALTER TABLE positions
-    DROP COLUMN IF EXISTS tenant_id;
-
 ALTER TABLE counterparty
     DROP CONSTRAINT IF EXISTS counterparty_tenant_id_tin_key;
 
@@ -619,4 +543,3 @@ ALTER TABLE prompts
 
 -- Undo CREATE_TABLE: tenants
 DROP TABLE IF EXISTS tenants CASCADE;
-

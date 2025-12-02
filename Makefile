@@ -1,10 +1,22 @@
 # Variables
 TAILWIND_INPUT := modules/core/presentation/assets/css/main.css
 TAILWIND_OUTPUT := modules/core/presentation/assets/css/main.min.css
+ATLAS_BIN_DIR ?= $(shell go env GOPATH)/bin
+ATLAS_VERSION ?= v0.38.0
+ATLAS ?= $(ATLAS_BIN_DIR)/atlas
 
 # Install dependencies
 deps:
 	go get ./...
+
+.PHONY: atlas-install
+atlas-install:
+	mkdir -p $(ATLAS_BIN_DIR)
+	rm -rf /tmp/atlas-src-install
+	git clone https://github.com/ariga/atlas.git /tmp/atlas-src-install
+	cd /tmp/atlas-src-install && git checkout tags/$(ATLAS_VERSION)
+	cd /tmp/atlas-src-install/cmd/atlas && GOWORK=off go mod tidy
+	cd /tmp/atlas-src-install/cmd/atlas && GOWORK=off go build -o $(ATLAS_BIN_DIR)/atlas .
 
 # Generate code documentation
 docs:
@@ -51,7 +63,18 @@ db:
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "seed" ]; then \
 		go run cmd/command/main.go seed; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "migrate" ]; then \
-		go run cmd/command/main.go migrate $(word 3,$(MAKECMDGOALS)); \
+		if [ "${HRM_MIGRATIONS}" = "1" ]; then \
+			./scripts/db/run_goose.sh $(word 3,$(MAKECMDGOALS)); \
+		else \
+			go run cmd/command/main.go migrate $(word 3,$(MAKECMDGOALS)); \
+		fi; \
+	elif [ "$(word 2,$(MAKECMDGOALS))" = "plan" ]; then \
+		DB_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"; \
+		DEV_DB_NAME="${ATLAS_DEV_DB_NAME:-$(DB_NAME)}"; \
+		DEV_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$$DEV_DB_NAME?sslmode=disable"; \
+		$(ATLAS) schema diff --from $$DB_URL --to file://modules/hrm/infrastructure/atlas/schema.hcl --dev-url $$DEV_URL --format '{{ sql . }}'; \
+	elif [ "$(word 2,$(MAKECMDGOALS))" = "lint" ]; then \
+		$(ATLAS) migrate lint --env ci --git-base origin/main; \
 	else \
 		echo "Usage: make db [local|stop|clean|reset|seed|migrate]"; \
 		echo "  local   - Start local PostgreSQL database"; \
@@ -59,7 +82,9 @@ db:
 		echo "  clean   - Remove postgres-data directory"; \
 		echo "  reset   - Stop, clean, and restart local database"; \
 		echo "  seed    - Seed database with test data"; \
-		echo "  migrate - Run database migrations (up/down/redo/collect)"; \
+		echo "  migrate - Run database migrations (up/down/redo/status)"; \
+		echo "  plan    - Dry-run Atlas diff for HRM schema"; \
+		echo "  lint    - Run Atlas lint (ci env)"; \
 	fi
 
 # Run tests with optional subcommands (test, watch, coverage, verbose, package, docker)

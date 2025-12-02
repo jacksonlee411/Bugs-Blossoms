@@ -50,15 +50,6 @@ CREATE TABLE warehouse_units (
 	updated_at  TIMESTAMPTZ DEFAULT now()
 );
 
--- Change CREATE_TABLE: positions
-CREATE TABLE positions (
-	id          SERIAL8 PRIMARY KEY,
-	name        VARCHAR(255) NOT NULL,
-	description TEXT,
-	created_at  TIMESTAMPTZ DEFAULT now(),
-	updated_at  TIMESTAMPTZ DEFAULT now()
-);
-
 -- Change CREATE_TABLE: permissions
 CREATE TABLE permissions (
 	id          UUID DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
@@ -133,24 +124,6 @@ CREATE TABLE warehouse_positions (
   CONSTRAINT warehouse_positions_barcode_key UNIQUE (barcode)
 );
 
--- Change CREATE_TABLE: employees
-CREATE TABLE employees (
-	id                 SERIAL8 PRIMARY KEY,
-	first_name         VARCHAR(255) NOT NULL,
-	last_name          VARCHAR(255) NOT NULL,
-	middle_name        VARCHAR(255),
-	email              VARCHAR(255) NOT NULL,
-	phone              VARCHAR(255),
-	salary             DECIMAL(9,2) NOT NULL,
-	salary_currency_id VARCHAR(3) REFERENCES currencies (code) ON DELETE SET NULL,
-	hourly_rate        DECIMAL(9,2) NOT NULL,
-	coefficient        FLOAT8 NOT NULL,
-	avatar_id          INT8 REFERENCES uploads (id) ON DELETE SET NULL,
-	created_at         TIMESTAMPTZ DEFAULT now(),
-	updated_at         TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT employees_email_key UNIQUE (email)
-);
-
 -- Change CREATE_TABLE: warehouse_position_images
 CREATE TABLE warehouse_position_images (
 	warehouse_position_id INT8 NOT NULL REFERENCES warehouse_positions (id) ON DELETE CASCADE,
@@ -196,16 +169,6 @@ CREATE TABLE action_logs (
 	created_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Change CREATE_TABLE: employee_contacts
-CREATE TABLE employee_contacts (
-	id          SERIAL8 PRIMARY KEY,
-	employee_id INT8 NOT NULL REFERENCES employees (id) ON DELETE CASCADE,
-	type        VARCHAR(255) NOT NULL,
-	value       VARCHAR(255) NOT NULL,
-	created_at  TIMESTAMPTZ DEFAULT now(),
-	updated_at  TIMESTAMPTZ DEFAULT now()
-);
-
 -- Change CREATE_TABLE: companies
 CREATE TABLE companies (
 	id         SERIAL8 PRIMARY KEY,
@@ -216,19 +179,6 @@ CREATE TABLE companies (
 	logo_id    INT8 REFERENCES uploads (id) ON DELETE SET NULL,
 	created_at TIMESTAMPTZ DEFAULT now(),
 	updated_at TIMESTAMPTZ DEFAULT now()
-);
-
--- Change CREATE_TABLE: employee_meta
-CREATE TABLE employee_meta (
-	employee_id        INT8 NOT NULL PRIMARY KEY REFERENCES employees (id) ON DELETE CASCADE,
-	primary_language   VARCHAR(255),
-	secondary_language VARCHAR(255),
-	tin                VARCHAR(255),
-	pin                VARCHAR(255),
-	notes              TEXT,
-	birth_date         DATE,
-	hire_date          DATE,
-	resignation_date   DATE
 );
 
 -- Change CREATE_TABLE: warehouse_products
@@ -354,13 +304,6 @@ CREATE TABLE chats (
 	created_at      TIMESTAMP(3) DEFAULT now() NOT NULL,
 	client_id       INT8 NOT NULL REFERENCES clients (id) ON DELETE RESTRICT ON UPDATE CASCADE,
 	last_message_at TIMESTAMP(3) DEFAULT now()
-);
-
--- Change CREATE_TABLE: employee_positions
-CREATE TABLE employee_positions (
-	employee_id INT8 NOT NULL REFERENCES employees (id) ON DELETE CASCADE,
-	position_id INT8 NOT NULL REFERENCES positions (id) ON DELETE CASCADE,
-	PRIMARY KEY (employee_id, position_id)
 );
 
 -- Change CREATE_TABLE: inventory_check_results
@@ -623,9 +566,6 @@ DROP TABLE IF EXISTS warehouse_order_items CASCADE;
 -- Undo CREATE_TABLE: inventory_check_results
 DROP TABLE IF EXISTS inventory_check_results CASCADE;
 
--- Undo CREATE_TABLE: employee_positions
-DROP TABLE IF EXISTS employee_positions CASCADE;
-
 -- Undo CREATE_TABLE: chats
 DROP TABLE IF EXISTS chats CASCADE;
 
@@ -662,14 +602,8 @@ DROP TABLE IF EXISTS authentication_logs CASCADE;
 -- Undo CREATE_TABLE: warehouse_products
 DROP TABLE IF EXISTS warehouse_products CASCADE;
 
--- Undo CREATE_TABLE: employee_meta
-DROP TABLE IF EXISTS employee_meta CASCADE;
-
 -- Undo CREATE_TABLE: companies
 DROP TABLE IF EXISTS companies CASCADE;
-
--- Undo CREATE_TABLE: employee_contacts
-DROP TABLE IF EXISTS employee_contacts CASCADE;
 
 -- Undo CREATE_TABLE: action_logs
 DROP TABLE IF EXISTS action_logs CASCADE;
@@ -682,9 +616,6 @@ DROP TABLE IF EXISTS users CASCADE;
 
 -- Undo CREATE_TABLE: warehouse_position_images
 DROP TABLE IF EXISTS warehouse_position_images CASCADE;
-
--- Undo CREATE_TABLE: employees
-DROP TABLE IF EXISTS employees CASCADE;
 
 -- Undo CREATE_TABLE: warehouse_positions
 DROP TABLE IF EXISTS warehouse_positions CASCADE;
@@ -710,9 +641,6 @@ DROP TABLE IF EXISTS roles CASCADE;
 -- Undo CREATE_TABLE: permissions
 DROP TABLE IF EXISTS permissions CASCADE;
 
--- Undo CREATE_TABLE: positions
-DROP TABLE IF EXISTS positions CASCADE;
-
 -- Undo CREATE_TABLE: warehouse_units
 DROP TABLE IF EXISTS warehouse_units CASCADE;
 
@@ -724,4 +652,3 @@ DROP TABLE IF EXISTS clients CASCADE;
 
 -- Undo CREATE_TABLE: uploads
 DROP TABLE IF EXISTS uploads CASCADE;
-
