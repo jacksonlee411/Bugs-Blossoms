@@ -12,6 +12,7 @@ uploads
 modules/core/presentation/assets/css/main.min.css
 bin/
 logs/
+downloaded/
 
 go.work*
 
