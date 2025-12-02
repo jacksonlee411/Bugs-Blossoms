@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/iota-uz/iota-sdk/modules"
 	"github.com/iota-uz/iota-sdk/pkg/commands/common"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Create drops and creates an empty e2e database
@@ -96,6 +98,7 @@ func Migrate() error {
 	if err := os.Chdir(projectRoot); err != nil {
 		return fmt.Errorf("failed to change to project root: %w", err)
 	}
+	hrmSchemaPath := filepath.Join(projectRoot, "modules", "hrm", "infrastructure", "persistence", "schema", "hrm-schema.sql")
 
 	// Set environment variable for e2e database
 	_ = os.Setenv("DB_NAME", E2E_DB_NAME)
@@ -116,6 +119,10 @@ func Migrate() error {
 	migrations := app.Migrations()
 	if err := migrations.Run(); err != nil {
 		return fmt.Errorf("failed to apply migrations: %w", err)
+	}
+
+	if err := ensureHRMSchema(context.Background(), pool, hrmSchemaPath); err != nil {
+		return fmt.Errorf("failed to ensure HRM schema: %w", err)
 	}
 
 	conf.Logger().Info("Applied migrations to e2e database")
@@ -263,4 +270,57 @@ func TruncateAllTables() error {
 	}
 
 	return nil
+}
+
+func ensureHRMSchema(ctx context.Context, pool *pgxpool.Pool, schemaPath string) error {
+	const tableName = "employees"
+	exists, err := tableExists(ctx, pool, tableName)
+	if err != nil {
+		return fmt.Errorf("failed to verify HRM schema presence: %w", err)
+	}
+	if exists {
+		return nil
+	}
+
+	contents, err := os.ReadFile(schemaPath)
+	if err != nil {
+		return fmt.Errorf("failed to read HRM schema file: %w", err)
+	}
+
+	statements := splitSQLStatements(string(contents))
+	for _, stmt := range statements {
+		if _, err := pool.Exec(ctx, stmt); err != nil {
+			return fmt.Errorf("failed to execute HRM schema statement: %w", err)
+		}
+	}
+
+	configuration.Use().Logger().Info("HRM schema created for e2e database")
+	return nil
+}
+
+func tableExists(ctx context.Context, pool *pgxpool.Pool, table string) (bool, error) {
+	const query = `
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.tables
+			WHERE table_schema = 'public' AND table_name = $1
+		)`
+	var exists bool
+	if err := pool.QueryRow(ctx, query, table).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func splitSQLStatements(script string) []string {
+	raw := strings.Split(script, ";")
+	statements := make([]string, 0, len(raw))
+	for _, stmt := range raw {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" || strings.HasPrefix(stmt, "--") {
+			continue
+		}
+		statements = append(statements, stmt)
+	}
+	return statements
 }
