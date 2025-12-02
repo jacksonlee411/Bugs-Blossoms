@@ -1,3 +1,4 @@
+-- name: ListPositionsPaginated :many
 SELECT
     id,
     tenant_id,
@@ -49,4 +50,3 @@ FROM
     positions
 WHERE
     tenant_id = sqlc.arg (tenant_id);
-

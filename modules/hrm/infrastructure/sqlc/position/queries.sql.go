@@ -103,3 +103,53 @@ func (q *Queries) ListPositionsByTenant(ctx context.Context, tenantID pgtype.UUI
 	}
 	return items, nil
 }
+
+const listPositionsPaginated = `-- name: ListPositionsPaginated :many
+SELECT
+    id,
+    tenant_id,
+    name,
+    description,
+    created_at,
+    updated_at
+FROM
+    positions
+WHERE
+    tenant_id = $1
+ORDER BY
+    id
+LIMIT $3 OFFSET $2
+`
+
+type ListPositionsPaginatedParams struct {
+	TenantID  pgtype.UUID `json:"tenant_id"`
+	RowOffset int32       `json:"row_offset"`
+	RowLimit  int32       `json:"row_limit"`
+}
+
+func (q *Queries) ListPositionsPaginated(ctx context.Context, arg ListPositionsPaginatedParams) ([]Position, error) {
+	rows, err := q.db.Query(ctx, listPositionsPaginated, arg.TenantID, arg.RowOffset, arg.RowLimit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Position{}
+	for rows.Next() {
+		var i Position
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
