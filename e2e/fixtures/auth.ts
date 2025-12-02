@@ -13,14 +13,16 @@ import { Page } from '@playwright/test';
  */
 export async function login(page: Page, email: string, password: string) {
 	await page.goto('/login');
-	await page.fill('[type=email]', email);
-	await page.fill('[type=password]', password);
+	await page.getByLabel('Email').fill(email);
+	await page.getByLabel('Password').fill(password);
 
 	// Wait for navigation BEFORE clicking submit (Playwright best practice)
 	// This prevents race conditions where navigation completes before waitForURL is called
 	await Promise.all([
-		page.waitForURL(url => !url.pathname.includes('/login')),
-		page.click('[type=submit]')
+		page.waitForURL(url => !url.pathname.includes('/login'), {
+			timeout: 15_000,
+		}),
+		page.getByRole('button', { name: /log in/i }).click(),
 	]);
 }
 

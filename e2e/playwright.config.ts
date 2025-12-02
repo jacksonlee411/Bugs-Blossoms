@@ -75,6 +75,7 @@ export function getEnvironmentInfo() {
 
 // Load environment configuration
 const envConfig = loadEnvironmentConfig();
+const workerCount = parseInt(process.env.PLAYWRIGHT_WORKERS || '1', 10);
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -86,10 +87,10 @@ export default defineConfig({
 	timeout: 60 * 1000,
 
 	// Test execution settings
-	fullyParallel: true,
+	fullyParallel: false,
 	forbidOnly: !!process.env.CI,
 	retries: process.env.CI ? 2 : 0,
-	workers: process.env.CI ? 1 : undefined,
+	workers: workerCount,
 
 	// Reporter configuration
 	reporter: 'html',

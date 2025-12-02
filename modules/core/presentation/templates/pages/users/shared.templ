@@ -27,21 +27,23 @@ func isRoleSelected(id string, roles []*viewmodels.Role) bool {
 
 templ RoleSelect(props *RoleSelectProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	@base.Combobox(base.ComboboxProps{
-		Label:       pageCtx.T("Users.Single.RoleIDs"),
-		Placeholder: pageCtx.T("Users.Single.SelectRole"),
-		Multiple:    true,
-		Name:        props.Name,
-		Form:        props.Form,
-	}) {
-		for _, role := range props.Roles {
-			if isRoleSelected(role.ID, props.Selected) {
-				<option value={ role.ID } selected>{ role.Name }</option>
-			} else {
-				<option value={ role.ID }>{ role.Name }</option>
+	<div data-testid="role-combobox">
+		@base.Combobox(base.ComboboxProps{
+			Label:       pageCtx.T("Users.Single.RoleIDs"),
+			Placeholder: pageCtx.T("Users.Single.SelectRole"),
+			Multiple:    true,
+			Name:        props.Name,
+			Form:        props.Form,
+		}) {
+			for _, role := range props.Roles {
+				if isRoleSelected(role.ID, props.Selected) {
+					<option value={ role.ID } selected>{ role.Name }</option>
+				} else {
+					<option value={ role.ID }>{ role.Name }</option>
+				}
 			}
 		}
-	}
+	</div>
 }
 
 type SharedProps struct {

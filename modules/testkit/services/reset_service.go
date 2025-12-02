@@ -19,9 +19,21 @@ func NewResetService(app application.Application) *ResetService {
 	}
 }
 
+const testkitResetLockID int64 = 991337531
+
 func (s *ResetService) TruncateAllTables(ctx context.Context) error {
 	logger := composables.UseLogger(ctx)
 	db := s.app.DB()
+
+	// Ensure only one reset runs at a time to avoid clobbering in parallel E2E workers
+	if _, err := db.Exec(ctx, "SELECT pg_advisory_lock($1)", testkitResetLockID); err != nil {
+		return fmt.Errorf("failed to acquire advisory lock: %w", err)
+	}
+	defer func() {
+		if _, err := db.Exec(ctx, "SELECT pg_advisory_unlock($1)", testkitResetLockID); err != nil {
+			logger.WithError(err).Error("failed to release advisory lock")
+		}
+	}()
 
 	// Get all table names except migration-related tables
 	query := `
@@ -69,15 +81,17 @@ func (s *ResetService) TruncateAllTables(ctx context.Context) error {
 		return fmt.Errorf("failed to disable foreign key checks: %w", err)
 	}
 
-	// Truncate all tables
-	for _, table := range tables {
-		query := fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", table)
-		if _, err := tx.Exec(ctx, query); err != nil {
-			logger.WithError(err).WithField("table", table).Error("Failed to truncate table")
-			return fmt.Errorf("failed to truncate table %s: %w", table, err)
-		}
-		logger.WithField("table", table).Debug("Truncated table")
+	// Prepare single TRUNCATE statement to avoid sequential locking deadlocks
+	quoted := make([]string, len(tables))
+	for i, table := range tables {
+		quoted[i] = fmt.Sprintf(`"%s"`, table)
 	}
+	truncateQuery := fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE;", strings.Join(quoted, ", "))
+	if _, err := tx.Exec(ctx, truncateQuery); err != nil {
+		logger.WithError(err).Error("Failed to truncate tables")
+		return fmt.Errorf("failed to truncate tables: %w", err)
+	}
+	logger.WithField("tables", strings.Join(tables, ", ")).Debug("Truncated tables")
 
 	// Re-enable foreign key checks
 	if _, err := tx.Exec(ctx, "SET session_replication_role = DEFAULT;"); err != nil {
@@ -90,7 +104,6 @@ func (s *ResetService) TruncateAllTables(ctx context.Context) error {
 	}
 
 	logger.WithField("tableCount", len(tables)).Info("Successfully truncated all tables")
-	logger.WithField("tables", strings.Join(tables, ", ")).Debug("Truncated tables")
 
 	return nil
 }
