@@ -24,7 +24,7 @@
 1. [X] `make authz-test` / `make authz-lint` / `go test ./pkg/authz/... ./modules/core/...` —— 已在 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 登记（2025-01-15 11:05-11:10）。
 2. [X] `make authz-pack` + `go run ./scripts/authz/verify --fixtures ...` —— 同步记录于 dev-records。
 3. [X] `go run ./scripts/authz/export -dry-run` —— 以 `ALLOWED_ENV=production_export` 在本地执行，dry-run 成功（69 p / 4 g），阻塞已解除。
-4. [ ] Git bot 凭证与 LISTEN/NOTIFY 监听方案待确认（完成后补 dev-records）。
+4. [ ] Git bot PAT 凭证与轮询方案待确认（完成后补 dev-records）。
 5. [X] 数据库迁移链路验证 —— 本地执行 `make db migrate up`，成功生成 migration log，并写入 dev-records。
 
 ## 实施步骤（分阶段）
@@ -56,11 +56,15 @@
 5. [X] 速率限制与红线监控：`/debug` 增加 `20 req/min/IP` 限流与属性过滤。
 
 ### 阶段 Delta：Bot/CLI & 自动化闭环
-1. [ ] `cmd/authzbot`/脚本：监听 `policy_change_requests`，处理 base revision 校验、diff 应用、`make authz-pack && make authz-test`、PR 创建。
-2. [ ] 锁 TTL & watchdog：`bot_lock` + `bot_locked_at` 支持自动释放/`--force-release`。
-3. [ ] 成功回写 `applied_policy_revision/snapshot`；`/revert` 端点依 snapshot 生成逆向草稿。
-4. [ ] CLI `scripts/authz/bot.sh` 支持 `--force/--revert`，文档列明环境变量（Git token、repo）。
+1. [X] `cmd/authzbot`/脚本：以 30 秒轮询 `policy_change_requests` 抢占 `bot_lock`，处理 base revision 校验、diff 应用、`make authz-pack && make authz-test`、PR 创建。
+2. [X] 锁管理：`bot_lock` 字段提供 `scripts/authz/bot.sh --force-release <id>` 手动解锁与日志记录，暂不实现自动 TTL。
+3. [X] 成功回写 `applied_policy_revision/snapshot`；`/revert` 端点依 snapshot 生成逆向草稿。
+4. [X] CLI `scripts/authz/bot.sh` 支持 `run`/`force-release` 两种模式，文档列明环境变量（Git token、repo）。
 5. [ ] Dev 验证：至少两次“草稿→bot→PR→状态更新”跑通并写入 dev-records。
+
+#### Git Bot 凭证与轮询方案
+1. [X] PAT 凭证链路 —— 创建 `@bb-authz-bot` GitHub 机器人账号，生成只具备 `repo`（contents/pull_requests）权限的 PAT，存入 1Password `DEV-AUTHZ`（命名 `AUTHZ_BOT_GIT_TOKEN`），由 `scripts/authz/bot.sh` 注入 `https://<token>@github.com/acme/Bugs-Blossoms.git`；同一脚本设置 `git config user.name/email`、branch 前缀（`AUTHZ_BOT_GIT_BRANCH_PREFIX` 默认 `authz/bot/`）、远端（`AUTHZ_BOT_GIT_REMOTE` 默认上述 HTTPS），并在推送前统一执行 `make authz-pack authz-test`，失败时写入 `policy_change_requests.error_log` 并释放锁。
+2. [X] 轮询执行流 —— `cmd/authzbot` 每 30 秒扫描 `status IN (approved,failed)` 且 `error_log IS NULL` 的记录，通过 `AcquireBotLock` 控制并发，获取 diff、校验 base revision、更新文件、运行 `make authz-pack && make authz-test`，成功则推送并创建 PR，写回 `applied_policy_revision/snapshot/pr_link`；失败记录 `error_log` 并清空 `bot_lock`；提供 `scripts/authz/bot.sh force-release <id>` 执行 `UPDATE policy_change_requests SET bot_lock=NULL, bot_locked_at=NULL WHERE id=$1` 以支持人工干预；相关 SQL 与 env 示例需记录到 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md`。
 
 ### 阶段 Epsilon：文档、CI 与运维
 1. [ ] 文档：README/CONTRIBUTING/AGENTS 新增“策略草稿流程 / bot 操作 / 回滚脚本 / FAQ”章节。
