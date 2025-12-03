@@ -37,7 +37,7 @@
 ## 实施步骤（分阶段）
 
 ### 阶段 Alpha：Schema & Repository 就绪
-- Goose/Atlas migration：在共享目录（如 `migrations/shared`）创建 `policy_change_requests`，字段包含 `id UUID PK`, `status`, `requester_id`, `approver_id`, `tenant_id`, `subject`, `domain`, `action`, `object`, `reason`, `diff JSONB`, `base_policy_revision TEXT`, `applied_policy_revision TEXT`, `applied_policy_snapshot JSONB`, `pr_link`, `bot_job_id`, `bot_lock`, `bot_attempts`, `error_log`, `created_at`, `updated_at`, `reviewed_at`。索引 `(status, updated_at)`、`(tenant_id, status)`、`(bot_lock)`。
+- Goose/Atlas migration：在共享目录（如 `migrations/shared`）创建 `policy_change_requests`，字段包含 `id UUID PK`, `status`, `requester_id`, `approver_id`, `tenant_id`, `subject`, `domain`, `action`, `object`, `reason`, `diff JSONB`, `base_policy_revision TEXT`, `applied_policy_revision TEXT`, `applied_policy_snapshot JSONB`, `pr_link`, `bot_job_id`, `bot_lock`, `bot_locked_at TIMESTAMPTZ`, `bot_attempts`, `error_log`, `created_at`, `updated_at`, `reviewed_at`。索引 `(status, updated_at)`、`(tenant_id, status)`、`(bot_lock)`。
 - `pkg/authz/persistence`：新增 repository（分页、过滤、锁定、状态更新、审计写入）与 mapper，避免依赖 Core 模块。
 - 单元测试：覆盖 CRUD、锁定、审计字段。运行 `go test ./pkg/authz/persistence` 验证。
 - 风险缓解：明确迁移脚本的回滚命令；若数据库环境不允许写操作，提供 `SKIP_MIGRATE=1` 导出 schema 步骤。
