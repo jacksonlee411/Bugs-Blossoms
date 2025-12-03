@@ -100,6 +100,9 @@ func buildModulePermissionSets() []rbac.PermissionSet {
 		core.manageSet("Group", corePerms.GroupCreate, corePerms.GroupRead, corePerms.GroupUpdate, corePerms.GroupDelete),
 		core.viewSet("Upload", corePerms.UploadRead),
 		core.manageSet("Upload", corePerms.UploadCreate, corePerms.UploadRead, corePerms.UploadUpdate, corePerms.UploadDelete),
+		core.viewSet("AuthzRequests", corePerms.AuthzRequestsRead),
+		core.manageSet("AuthzRequests", corePerms.AuthzRequestsWrite, corePerms.AuthzRequestsRead, corePerms.AuthzRequestsReview, corePerms.AuthzRequestsDelete),
+		core.viewSet("AuthzDebug", corePerms.AuthzDebug),
 	)
 
 	// Finance module

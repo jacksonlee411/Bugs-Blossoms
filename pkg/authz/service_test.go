@@ -61,3 +61,14 @@ func TestServiceAuthorizeShadowMode(t *testing.T) {
 	)
 	require.NoError(t, svc.Authorize(context.Background(), req))
 }
+
+func TestServiceMode(t *testing.T) {
+	root := filepath.Join("testdata")
+	svc, err := NewService(Config{
+		ModelPath:    filepath.Join(root, "model.conf"),
+		PolicyPath:   filepath.Join(root, "policy.csv"),
+		FlagProvider: staticFlagProvider{mode: ModeDisabled},
+	})
+	require.NoError(t, err)
+	require.Equal(t, ModeDisabled, svc.Mode())
+}

@@ -1,6 +1,6 @@
 # DEV-PLAN-015A：Casbin 策略平台（API、数据模型与 Bot 工作流）
 
-**状态**: 草拟中（2025-01-15 10:30）
+**状态**: 进行中（2025-12-03 12:20）
 
 ## 背景
 - DEV-PLAN-013/014 已在 Core/HRM/Logging 引入 `pkg/authz` 与 Feature Flag，但仍缺少官方策略变更通道；管理员只能手工修改 `config/access/policy.csv`，缺乏审计与回滚。
@@ -21,72 +21,46 @@
 5. 更新 README/AGENTS/docs，列出 API 契约、命令示例、SLA 及 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 的记录模板。
 
 ## 前置依赖验证
-- **命令可用性**：在 `feature/dev-plan-015` 分支运行并记录以下命令的结果（时间、操作者、输出摘要）：
-  - `make authz-test`, `make authz-lint`, `go test ./pkg/authz/...`、`go test ./modules/core/...`.
-  - `scripts/authz/export`、`scripts/authz/verify`。
-  - `make authz-pack`（需确认生成 `config/access/policy.csv` 和 `policy.csv.rev` 所需脚本已经就绪）。
-- **环境准备**：
-  - 数据库：确保 Goose/Atlas 可以创建共享表（本地/CI 均需记录一次成功执行）。
-  - Git 凭证：为 bot/CLI 预置读写凭证（写入 `.env.example` 模板并在 `dev-records` 记录存放方式）。
-  - 监听机制：确认数据库支持 LISTEN/NOTIFY 或准备轮询方案。
-- **记录方式**：
-  - 在 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 新增 “前置依赖验证” 表格，字段含 `日期/命令/环境/结果/备注`。
-  - 每次验证更新本章节，注明最新执行者和结果（例如：“2025-01-16 @alice：make authz-test ✅”）。
-- 所有前置项均成功并有记录后，方可进入阶段 Alpha；否则需补齐依赖或开出阻塞项。
+1. [X] `make authz-test` / `make authz-lint` / `go test ./pkg/authz/... ./modules/core/...` —— 已在 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 登记（2025-01-15 11:05-11:10）。
+2. [X] `make authz-pack` + `go run ./scripts/authz/verify --fixtures ...` —— 同步记录于 dev-records。
+3. [X] `go run ./scripts/authz/export -dry-run` —— 以 `ALLOWED_ENV=production_export` 在本地执行，dry-run 成功（69 p / 4 g），阻塞已解除。
+4. [ ] Git bot 凭证与 LISTEN/NOTIFY 监听方案待确认（完成后补 dev-records）。
+5. [X] 数据库迁移链路验证 —— 本地执行 `make db migrate up`，成功生成 migration log，并写入 dev-records。
 
 ## 实施步骤（分阶段）
 
 ### 阶段 Alpha：Schema & Repository 就绪
-- Goose/Atlas migration：在共享目录（如 `migrations/shared`）创建 `policy_change_requests`，字段包含 `id UUID PK`, `status`, `requester_id`, `approver_id`, `tenant_id`, `subject`, `domain`, `action`, `object`, `reason`, `diff JSONB`, `base_policy_revision TEXT`, `applied_policy_revision TEXT`, `applied_policy_snapshot JSONB`, `pr_link`, `bot_job_id`, `bot_lock`, `bot_locked_at TIMESTAMPTZ`, `bot_attempts`, `error_log`, `created_at`, `updated_at`, `reviewed_at`。索引 `(status, updated_at)`、`(tenant_id, status)`、`(bot_lock)`。
-- `pkg/authz/persistence`：新增 repository（分页、过滤、锁定、状态更新、审计写入）与 mapper，避免依赖 Core 模块。
-- 单元测试：覆盖 CRUD、锁定、审计字段。运行 `go test ./pkg/authz/persistence` 验证。
-- 风险缓解：明确迁移脚本的回滚命令；若数据库环境不允许写操作，提供 `SKIP_MIGRATE=1` 导出 schema 步骤。
+1. [X] 迁移：`migrations/changes-1762000001.sql` 创建 `policy_change_requests` 表及索引（含 `bot_locked_at`、`base/applied_revision` 等），已通过 `make db migrate up`。
+2. [X] Repository：在 `pkg/authz/persistence` 新增实体与仓储，提供 CRUD/分页/状态更新/锁管理，避免对 Core 模块的耦合。
+3. [X] 单元测试：`go test ./pkg/authz/persistence` 通过，覆盖锁竞争、bot metadata、审批流转。
+4. [X] 风险缓解：记录回滚命令与 `SKIP_MIGRATE=1` 导出说明（文中描述），并在 dev-records 标记迁移执行结果。
 
 ### 阶段 Beta：服务层与 REST API
-- `PolicyDraftService`：
-  - 定义 `DraftChange`、`PolicyDraft` 结构；实现 diff 校验、幂等 `SubmitDraft`、审批流转、base_revision 冲突检测、审计事件。
-  - 支持多租户过滤，普通用户只能访问自己草稿。
-- `base_policy_revision` 生成与同步：
-  - `make authz-pack` 在生成 `config/access/policy.csv` 后，同步生成 `config/access/policy.csv.rev`（内容含 Git commit hash、生成时间、文件 hash）。
-  - `pkg/authz` 新增 `version.Provider`，负责读取最新 `policy.csv.rev`；`PolicyDraftService` 在提交草稿时调用 provider，将 revision 写入 `base_policy_revision`。
-  - Bot 在执行前同样通过 provider（或直接读取 Git HEAD）获取当前 revision，比对 `base_policy_revision`；不一致则返回 `409 Conflict` 并提示用户重新同步。
-  - README/AGENTS 记录“如何查看/刷新 revision”，避免多人同时操作时产生误差。
-- REST API（`/core/api/authz`）：根据权限矩阵实现 `GET/POST /requests`, `GET /requests/{id}`, `GET /policies`, `POST /requests/{id}/approve|reject|cancel|trigger-bot|revert`, `GET /debug`。
-- 鉴权：`Authz.Request`、`Authz.Manage`、`Authz.BotOperator`、`Authz.Debug`；在 controller 层添加中间件日志，记录 subject/object/action/domain。
-- README/AGENTS：新增“API 契约 + curl 示例 + 错误码”章节；标明常见失败原因（权限不足、base_revision 冲突、bot_lock 占用等）。
-- 测试：`go test ./modules/core/services -run PolicyDraft`、`go test ./modules/core/presentation/controllers -run Authz`。
-- 风险缓解：对暴力/高频调用设置速率限制（Nginx/Go middleware），防止滥用。
+1. [X] `PolicyDraftService`：定义 `DraftChange`/`PolicyDraft`，实现 diff 校验、幂等提交、审批流转、多租户过滤及审计事件。
+2. [X] `base_policy_revision` provider：`make authz-pack` 生成 `policy.csv.rev`，`pkg/authz/version.Provider` 提供读取；README 记录操作方法。
+3. [X] REST API：`/core/api/authz/policies|requests|debug` 及 `POST /requests/{id}/approve|reject|cancel|trigger-bot|revert`，附权限矩阵与速率限制。
+4. [X] 测试与文档：补 `go test ./modules/core/services -run PolicyDraft` / `controllers -run Authz`，并在 README/AGENTS 提供 curl 示例与错误码说明。
+   - 成果：Core 模块注册 `PolicyDraftService` + `AuthzAPIController`，新增 `Authz.*` 权限与多语言翻译，`config/access/policy.csv.rev` 纳入版本控制，`make authz-pack` 自动生成 revision 元数据；服务层/控制器均已有单元测试并归档调用示例。
 
 ### 阶段 Gamma：Authz.Debug 与观测
-- `pkg/authz` 增加 `Inspector`：输出命中的 rule id、policyType、domain、ABAC 属性、评估耗时。
-- `/core/api/authz/debug` 将 Inspector 数据封装成响应；对 `Authz.Debug` 用户开放，并记录审计日志。
-- 监控：为 API 增加 Prometheus/Tally 指标（调用数、latency、错误率）；log 中包含 request id、subject 等。
-- `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md` 与 `DEV-PLAN-015-CASBIN-UI.md` 各记录一次 debug 调用示例（命令、输出摘要、结论）。
-- 风险缓解：为 debug 接口设置速率限制、红线监控，防止泄露策略信息给非管理员。
+1. [ ] `pkg/authz` Inspector 输出 rule 链路、ABAC、latency。
+2. [ ] `/core/api/authz/debug` 返回 Inspector 数据，并记录审计日志。
+3. [ ] 监控：注册 Prometheus/Tally 指标，日志包含 request id/subject。
+4. [ ] dev-records：在 DEV-PLAN-012/015 文档中添加一次实际调用记录。
+5. [ ] 速率限制与红线监控，防止敏感策略泄露。
 
 ### 阶段 Delta：Bot/CLI & 自动化闭环
-- `cmd/authzbot`（或 `scripts/authz/bot`）：
-  - 监听数据库（轮询或 LISTEN/NOTIFY），以 `SELECT ... FOR UPDATE`/`UPDATE ... WHERE bot_lock IS NULL RETURNING *` 占锁。
-  - 在执行前验证 `current_policy_revision == base_policy_revision`，否则标记冲突。
-  - 步骤：checkout 分支 → 应用 diff → 运行 `make authz-pack && make authz-test` → 创建 PR → 写入 `pr_link`/`status=merged`。
-  - 失败处理：更新 `error_log`、`bot_attempts`，超阈值转 `failed`；`trigger-bot` 仅在 `bot_lock` 释放后可重试。
-  - 回写：成功合并后记录 `applied_policy_revision`（PR merge commit）及 `applied_policy_snapshot`（最终 policy 行，用于 revert）。
-  - 锁 TTL：`bot_lock` 字段记录占用者与时间戳，watchdog（cron 或 bot 内定时任务）每 5 分钟扫描超过 10 分钟且 `bot_attempts` 未变化的记录，自动清理锁、标记 `failed_timeout` 并写审计日志；管理员可通过 CLI `--force-release` 手动释放。
-- CLI：`scripts/authz/bot.sh run --request <id>`，支持 `--force`（忽略锁，仅管理员）与 `--revert`；文档列出环境变量（Git token、repo、工作目录）。
-- API：`POST /requests/{id}/trigger-bot`、`/revert` 调用 bot；返回当前锁状态/排队信息。
-  - Revert：`/revert` 端点读取 `applied_policy_revision` + `applied_policy_snapshot`，与当前策略做差，生成逆向 diff 并创建新的 `policy_change_requests` 记录，同时引用原 request/pr link；若 snapshot 不存在则拒绝 revert 并提示手工处理。
-- 验收：在 dev 环境跑通“草稿→bot→PR→状态更新”至少 2 次；失败日志可追溯。
-- 风险缓解：在 bot 期间生成审计记录，避免 PR 未完成时 UI 误判；对 Git 操作设置超时和回滚机制。
+1. [ ] `cmd/authzbot`/脚本：监听 `policy_change_requests`，处理 base revision 校验、diff 应用、`make authz-pack && make authz-test`、PR 创建。
+2. [ ] 锁 TTL & watchdog：`bot_lock` + `bot_locked_at` 支持自动释放/`--force-release`。
+3. [ ] 成功回写 `applied_policy_revision/snapshot`；`/revert` 端点依 snapshot 生成逆向草稿。
+4. [ ] CLI `scripts/authz/bot.sh` 支持 `--force/--revert`，文档列明环境变量（Git token、repo）。
+5. [ ] Dev 验证：至少两次“草稿→bot→PR→状态更新”跑通并写入 dev-records。
 
 ### 阶段 Epsilon：文档、CI 与运维
-- 文档：README/CONTRIBUTING/AGENTS 更新“策略草稿流程”“bot 操作”“回滚脚本”“常见 FAQ”；附命令示例、SLA、角色职责。
-- dev-records：`DEV-PLAN-015-CASBIN-UI.md` 提供记录模板（`request_id/pr_link/status/operator/log摘`），每次变更需填写。
-- CI：在 `quality-gates`/Makefile 中添加命令链：
-  - `make authz-test authz-lint`
-  - `go test ./pkg/authz/... ./modules/core/services ./modules/core/presentation/controllers`
-  - 若触达模板/样式，执行 `templ generate && make css`；触达 locales 时运行 `make check tr`
-  - 确保 `git status --short` 在生成命令后干净。
-- 风险缓解：在 CI 中缓存工具依赖、缩短 bot 脚本执行时间；在 doc 中注明如何在故障时手动运行 bot 或 revert。
+1. [ ] 文档：README/CONTRIBUTING/AGENTS 新增“策略草稿流程 / bot 操作 / 回滚脚本 / FAQ”章节。
+2. [ ] dev-records：维护 `request_id/pr_link/status/operator/log摘` 模板，每次 bot 运行都补齐。
+3. [ ] CI：更新 `quality-gates`，对 authz 相关改动自动跑 `make authz-test authz-lint`、`go test ./pkg/authz/... ./modules/core/services ./modules/core/presentation/controllers`，若涉及模板/locale 同步跑 `templ generate && make css` / `make check tr`。
+4. [ ] 运维：新增“手动 bot / revert”指南与缓存策略，减少 CI 耗时；确保 `git status --short` 在生成命令后干净。
 
 ## 里程碑
 - **M1**：`policy_change_requests` 表、repository、service、`POST/GET /requests` API 可用，具备最小草稿创建/查询能力。

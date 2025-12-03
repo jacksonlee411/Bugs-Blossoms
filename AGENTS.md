@@ -100,6 +100,9 @@ modules/{module}/
 
 ### Casbin / Authorization
 - Update modular policy fragments under `config/access/policies/**`, then run `make authz-pack` to regenerate `config/access/policy.csv`.
+- `make authz-pack` 同时会生成/刷新 `config/access/policy.csv.rev`，`pkg/authz/version.Provider` 依赖该文件提供 base revision；不要手动编辑。
+- Core 模块暴露 `/core/api/authz/**` API：`GET /policies`、`GET /requests`、`POST /requests` 及 `POST /requests/{id}/approve|reject|cancel|trigger-bot|revert`，调用前确保用户拥有 `Authz.*` 权限；若收到 `AUTHZ_INVALID_REQUEST`，请检查请求体的 `base_revision` 是否落后 `config/access/policy.csv.rev`。
+  - 示例：`curl -b sid=<sid> -X POST /core/api/authz/requests -d '{"object":"core.users","action":"read","diff":[...]}' -H 'Content-Type: application/json'`.
 - Run `make authz-test` (compiles `pkg/authz` plus helper packages) before committing any authz-related Go changes.
 - Run `make authz-lint` to execute policy packing and the deterministic parity fixtures (`scripts/authz/verify --fixtures ...`). CI hooks onto the same targets.
 - Use `go run ./scripts/authz/export -dsn <dsn> -out <path> -dry-run` for audited exports (requires `ALLOWED_ENV=production_export`).

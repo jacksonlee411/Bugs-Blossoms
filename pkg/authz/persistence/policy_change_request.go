@@ -17,6 +17,7 @@ const (
 	PolicyChangeStatusRejected      PolicyChangeStatus = "rejected"
 	PolicyChangeStatusMerged        PolicyChangeStatus = "merged"
 	PolicyChangeStatusFailed        PolicyChangeStatus = "failed"
+	PolicyChangeStatusCanceled      PolicyChangeStatus = "canceled"
 )
 
 // PolicyChangeRequest models the persistence layer representation of a request.

@@ -361,6 +361,7 @@ func scanPolicyChangeRequest(row pgx.Row) (*PolicyChangeRequest, error) {
 		botLockedAt sql.NullTime
 		errorLog    sql.NullString
 		reviewedAt  sql.NullTime
+		reason      sql.NullString
 	)
 
 	err := row.Scan(
@@ -373,7 +374,7 @@ func scanPolicyChangeRequest(row pgx.Row) (*PolicyChangeRequest, error) {
 		&req.Domain,
 		&req.Action,
 		&req.Object,
-		&req.Reason,
+		&reason,
 		&req.Diff,
 		&req.BasePolicyRevision,
 		&appliedRev,
@@ -393,6 +394,7 @@ func scanPolicyChangeRequest(row pgx.Row) (*PolicyChangeRequest, error) {
 	}
 
 	req.ApproverID = uuidFromNullString(approver)
+	req.Reason = reason.String
 	req.AppliedPolicyRevision = stringFromNull(appliedRev)
 	if len(appliedSnap) > 0 {
 		req.AppliedPolicySnapshot = json.RawMessage(appliedSnap)

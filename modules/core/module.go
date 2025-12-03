@@ -8,6 +8,10 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/spotlight"
 
 	icons "github.com/iota-uz/icons/phosphor"
+	authzPersistence "github.com/iota-uz/iota-sdk/pkg/authz/persistence"
+	authzVersion "github.com/iota-uz/iota-sdk/pkg/authz/version"
+	"github.com/iota-uz/iota-sdk/pkg/configuration"
+
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/query"
 	"github.com/iota-uz/iota-sdk/modules/core/interfaces/graph"
@@ -43,6 +47,7 @@ type Module struct {
 }
 
 func (m *Module) Register(app application.Application) error {
+	cfg := configuration.Use()
 	app.Migrations().RegisterSchema(&MigrationFiles)
 	app.RegisterLocaleFiles(&LocaleFiles)
 	fsStorage, err := persistence.NewFSStorage()
@@ -57,6 +62,7 @@ func (m *Module) Register(app application.Application) error {
 	roleRepo := persistence.NewRoleRepository()
 	tenantRepo := persistence.NewTenantRepository()
 	permRepo := persistence.NewPermissionRepository()
+	policyRepo := authzPersistence.NewPolicyChangeRequestRepository()
 
 	// Create query repositories
 	userQueryRepo := query.NewPgUserQueryRepository()
@@ -69,6 +75,8 @@ func (m *Module) Register(app application.Application) error {
 	// Create services
 	tenantService := services.NewTenantService(tenantRepo)
 	uploadService := services.NewUploadService(uploadRepo, fsStorage, app.EventPublisher())
+	revisionProvider := authzVersion.NewFileProvider(cfg.Authz.PolicyPath + ".rev")
+	policyService := services.NewPolicyDraftService(policyRepo, revisionProvider, cfg.Authz.PolicyPath, app.EventPublisher())
 
 	app.RegisterServices(
 		uploadService,
@@ -86,6 +94,7 @@ func (m *Module) Register(app application.Application) error {
 		tenantService,
 		services.NewPermissionService(permRepo, app.EventPublisher()),
 		services.NewGroupService(persistence.NewGroupRepository(userRepo, roleRepo), app.EventPublisher()),
+		policyService,
 	)
 
 	// handlers.RegisterUserHandler(app)
@@ -113,6 +122,7 @@ func (m *Module) Register(app application.Application) error {
 		controllers.NewCrudShowcaseController(app),
 		controllers.NewWebSocketController(app),
 		controllers.NewSettingsController(app),
+		controllers.NewAuthzAPIController(app),
 	)
 	app.RegisterHashFsAssets(assets.HashFS)
 	app.RegisterGraphSchema(application.GraphSchema{
