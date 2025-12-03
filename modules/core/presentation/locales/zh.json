@@ -87,7 +87,8 @@
     "user": "用户",
     "role": "角色",
     "group": "组",
-    "upload": "上传"
+    "upload": "上传",
+    "authorization": "授权"
   },
   "Permissions": {
     "User": {
@@ -123,6 +124,15 @@
       "Read": "查看上传",
       "Update": "更新上传",
       "Delete": "删除上传"
+    },
+    "Authz": {
+      "Requests": {
+        "Write": "创建策略变更申请",
+        "Read": "查看策略变更申请",
+        "Review": "审核策略变更申请",
+        "Delete": "取消策略变更申请"
+      },
+      "Debug": "使用授权调试工具"
     },
     "Authorization": {
       "Create": "创建策略变更草稿",

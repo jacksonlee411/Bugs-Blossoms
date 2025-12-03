@@ -87,7 +87,8 @@
     "user": "Users",
     "role": "Roles",
     "group": "Groups",
-    "upload": "Uploads"
+    "upload": "Uploads",
+    "authorization": "Authorization"
   },
   "Permissions": {
     "User": {
@@ -123,6 +124,15 @@
       "Read": "View uploads",
       "Update": "Update uploads",
       "Delete": "Delete uploads"
+    },
+    "Authz": {
+      "Requests": {
+        "Write": "Create policy change requests",
+        "Read": "View policy change requests",
+        "Review": "Review policy change requests",
+        "Delete": "Cancel policy change requests"
+      },
+      "Debug": "Use Authz debug tools"
     },
     "Authorization": {
       "Create": "Create policy drafts",

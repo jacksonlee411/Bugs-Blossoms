@@ -87,7 +87,8 @@
     "user": "Foydalanuvchilar",
     "role": "Rollar",
     "group": "Guruhlar",
-    "upload": "Yuklashlar"
+    "upload": "Yuklashlar",
+    "authorization": "Avtorizatsiya"
   },
   "Permissions": {
     "User": {
@@ -123,6 +124,15 @@
       "Read": "Yuklashlarni ko'rish",
       "Update": "Yuklashni tahrirlash",
       "Delete": "Yuklashni o'chirish"
+    },
+    "Authz": {
+      "Requests": {
+        "Write": "Siyosat o'zgarishi so'rovlarini yaratish",
+        "Read": "Siyosat so'rovlarini ko'rish",
+        "Review": "Siyosat so'rovlarini ko'rib chiqish",
+        "Delete": "Siyosat so'rovlarini bekor qilish"
+      },
+      "Debug": "Authz diagnostika vositalaridan foydalanish"
     },
     "Authorization": {
       "Create": "Siyosat o'zgarish loyihasini yaratish",
