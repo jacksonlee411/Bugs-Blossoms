@@ -40,6 +40,12 @@ func (r *tokenRefresher) refreshTokenLocked(ctx context.Context) (string, error)
 		return "", errors.New("context cannot be nil")
 	}
 
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	default:
+	}
+
 	var lastErr error
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		if attempt > 0 {
