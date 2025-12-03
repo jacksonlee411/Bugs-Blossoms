@@ -1,57 +1,40 @@
-# DEV-PLAN-015：Casbin 策略管理与 UI 工作流
+# DEV-PLAN-015：Casbin 策略管理与 UI 工作流（母计划）
 
-**状态**: 草拟中（2025-01-15 10:15）
+**状态**: 拆分中（2025-01-15 10:35）
 
-## 背景
-- DEV-PLAN-013/014 分别交付基础设施与模块改造，但若缺乏官方 UI/流程来查看、编辑、审批 Casbin policy，将迫使管理员直接修改 Git 文件，易导致操作门槛高、配置漂移、缺乏审计。
-- 现有 Core 模块的角色/用户界面基于旧的 permission set，无法展示 subject/domain/action，也不支持 policy diff、策略来源追踪。
-- HRM 与 Logging 页面在未授权时只展示 403，无法帮助用户快速申请权限，也没有“策略来源面板”辅助排查问题。
-- 因此需要单独的计划来构建 Casbin policy 管理 UI、对应 API、以及 UI→Git 草稿→PR→部署的自动化闭环。
+## 拆分背景
+- 原 DEV-PLAN-015 同时涵盖策略草稿 API/bot 与角色、用户、业务页面等 UI 流程，导致与 DEV-PLAN-014（模块授权改造）存在交叉依赖：014 需要 API/组件才能交付良好体验，而 015 需要 014 的授权底座验证 UI 功能。
+- 为降低耦合、允许 014 先行接入授权逻辑，现将 015 分解为两个子计划：
+  - **DEV-PLAN-015A：Casbin 策略平台（API、数据模型与 Bot 工作流）** – 提供 `policy_change_requests` 表、REST API、Authz.Debug、PolicyDraftService、UI→Git bot/CLI 以及配套文档、SLA。
+  - **DEV-PLAN-015B：Casbin 策略 UI 与授权体验** – 构建角色/用户策略管理界面、业务页面 Unauthorized 组件、PolicyInspector、权限申请入口与多语言文案。
+- 本母计划保留高层目标与依赖关系，用于跟踪两个子计划的整体验收。
 
 ## 目标
-1. 提供面向角色/用户/租户的 Casbin 策略查看与编辑 UI，支持 domain 过滤、直接策略与继承策略展示。
-2. 设计并实现 policy 草稿表、审批 API、bot/CLI，确保所有 UI 变更都会转换为 Git PR 并经 CI 校验后上线。
-3. 更新 HRM、Logging 等业务页面的授权提示，让用户在无权限时能看到所需策略、触发申请流程。
-4. 为管理员提供 `PolicyInspector` 抽屉/面板，实时展示当前 subject/object/action 的匹配链路与缺失策略建议。
-5. 补充操作文档、培训材料、dev-records，确保产品/研发/运营团队理解 UI 功能与限制。
+1. 确保 015A/015B 输出覆盖原计划的五大目标（策略展示/编辑、草稿审批、业务授权提示、PolicyInspector、文档培训）。
+2. 澄清与 DEV-PLAN-014 的关系：014 可先在 `AUTHZ_ENFORCE` 下完成模块级授权，再根据 015A/015B 的交付节奏逐步启用 UI/申请流程。
+3. 提供统一进度视图，确保 015A 完成后即可解锁 014 的依赖，015B 在 014 验真后完善体验。
 
-## 风险
-- 若 UI 与 Git policy 不一致（例如缓存延迟），可能导致用户认为已批准的策略未生效，需要清晰的状态反馈。
-- 暴露策略细节给非管理员会导致安全风险；需要严格的鉴权与审计。
-- bot/CLI 若失败或 Git PR 未及时合并，会阻塞业务变更，需要应急处理流程。
-- PolicyInspector 调试接口若性能不佳，可能对热点页面造成额外负担。
-- 多语言翻译、可用性设计工作量大，需协调设计/前端资源。
+## 子计划概览
+| 子计划 | 关键交付 | 依赖 | 状态 |
+| --- | --- | --- | --- |
+| [DEV-PLAN-015A](015A-casbin-policy-platform.md) | `policy_change_requests`、REST API、Authz.Debug、PolicyDraftService、bot/CLI、README/AGENTS 更新 | 013 输出的 `pkg/authz`、Feature Flag、数据库迁移、Git bot 凭证 | 草拟 |
+| [DEV-PLAN-015B](015B-casbin-policy-ui-and-experience.md) | 角色/用户策略 UI、Unauthorized 组件、PolicyInspector、HRM/Logging 体验、翻译/文档 | 015A API、014 模块授权、`authz.ViewState` 注入 | 草拟 |
 
-## 实施步骤
-1. **[ ] API & 数据模型**
-   - 设计 `policy_change_requests` 表结构（status、diff、requester、approver、related_subject/domain 等）。
-   - 提供 REST API：列出策略、预览 diff、提交草稿、审批/拒绝、触发 bot；API 权限由 Casbin `Authz.Manage` 控制。
-   - 新增只读调试 API：`/core/api/authz/debug?subject=&object=&action=&domain=`，返回命中的 rule、ABAC 属性、缺失建议；仅对具备 `Authz.Debug` 的用户开放。
-2. **[ ] 角色管理 UI**
-   - 更新 `modules/core/.../roles` 页面：角色元数据保留，权限区域替换为 Casbin policy 网格（数据来自 API）。
-   - 支持 tenant/domain 过滤、添加/删除 `p`/`g` 规则、查看 diff；提交操作调用“创建草稿”API，提示用户到 PR 查看进度。
-   - 提供只读模式（无 `Roles.Update` 时），显示“申请权限”按钮，可直接生成草稿请求。
-3. **[ ] 用户管理 UI**
-   - `modules/core/.../users` 的 Permissions 标签改为三分区（继承角色、直接策略、domain 绑定），与 API 数据结构一致。
-   - 提供“添加 domain-scoped role”“添加单条策略”“从角色继承”对话框，所有操作生成 policy diff 草稿。
-   - 列表中显示策略生效状态（Awaiting PR、Pending Deploy、Active），并链接到相应 PR/变更记录。
-4. **[ ] 业务界面改造**
-   - HRM、Logging 等页面在 403/未授权时渲染统一 `UnauthorizedComponent`：展示缺失策略、申请按钮、参考文档。
-   - `PolicyInspector` 抽屉在管理员开启时显示当前 subject/object/action/domain、命中规则、ABAC 属性；支持“一键生成申请”。
-   - 将“申请权限”按钮与 policy 草稿 API 连接，自动填入 object/action/domain、原因、来源页面。
-5. **[ ] UI→Git 工作流**
-   - 构建 bot/CLI：监听草稿状态变化，读取 diff，生成 Git 分支 + PR（自动更新 `config/access/policy.csv`），并将 PR 链接写回草稿记录。
-   - CI 成功后 bot 更新草稿状态为 `Merged`，并通知申请人；失败则回写日志供 UI 展示。
-   - 提供“生成 Revert PR”操作，用于快速回滚策略。
-   - 文档中记录 SLA、审批人、异常处理流程。
+## 与 DEV-PLAN-014 的依赖解决方式
+- 014 需要的策略申请入口、PolicyInspector、统一 Unauthorized 组件由 015B 提供；在 015B 交付前，014 可先使用占位提示，并通过 015A 的 API 提供最小可用流程（例如直接跳转草稿列表）。
+- 015A 完成后即可为 014 提供 `policy_change_requests` 和 `/core/api/authz/debug` 等接口，支撑灰度和排查需求。
+- 015B 在实现 UI 时以 015A 提供的契约为准，同时复用 014 已建立的 `authz.Authorize` 与 `AUTHZ_ENFORCE` 环境，避免重复建设。
 
 ## 里程碑
-- M1：API/数据模型上线，角色与用户页面可以以只读方式展示 Casbin 策略。
-- M2：角色/用户 UI 支持提交草稿并与 bot 生成 PR，PolicyInspector/Unauthorized 组件可用。
-- M3：UI→Git 闭环稳定运行 2 周，培训材料与文档完成，HRM/Logging 页面可发起权限申请。
+- **M1（015A 完成）**：数据库/服务/API/bot 在 dev 环境跑通；README/AGENTS/record 文档更新；014 可直接调用 API。
+- **M2（015B 完成）**：角色/用户 UI、Unauthorized/PolicyInspector、HRM/Logging 体验上线；UI→Git 闭环实测稳定。
+- **M3（母计划收官）**：014 的 Core/HRM/Logging 授权改造与 015A/015B 的能力相互验证通过，docs/dev-records 更新完毕，授权申请流程在 UI 中稳定运行 ≥2 周。
 
 ## 交付物
-- `policy_change_requests` 数据模型、API、Authz.Debug 端点。
-- 更新后的角色/用户页面、Unauthorized 组件、PolicyInspector 抽屉、权限申请对话框。
-- bot/CLI 源码（或配置）、CI 集成脚本。
-- README/CONTRIBUTING/AGENTS/培训材料更新、`docs/dev-records/DEV-PLAN-015-CASBIN-UI.md`。
+- DEV-PLAN-015A 与 015B 文档、代码、脚本、模板、bot、翻译与记录。
+- 本母计划的依赖追踪表、进度记录，以及与 DEV-PLAN-014 的同步说明。
+
+## 验收标准
+- 015A/015B 各自的验收标准全部满足（详见子计划文件）。
+- 014 在启用 `AUTHZ_ENFORCE` enforce 模式时，能通过 015A API 获取策略调试信息，并在 UI 中使用 015B 的组件触发草稿。
+- dev-records 中至少包含一次“014 启用 + 015A API + 015B UI”联调记录，证明依赖解决方案有效。
