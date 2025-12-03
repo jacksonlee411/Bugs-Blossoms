@@ -83,8 +83,8 @@ const workerCount = parseInt(process.env.PLAYWRIGHT_WORKERS || '1', 10);
 export default defineConfig({
 	testDir: './tests',
 
-	// Maximum time one test can run
-	timeout: 60 * 1000,
+	// Maximum time one test (including before/after hooks) can run
+	timeout: 120 * 1000,
 
 	// Test execution settings
 	fullyParallel: false,

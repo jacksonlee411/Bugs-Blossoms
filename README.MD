@@ -42,6 +42,47 @@
 - Schema/migrations: `make db migrate up && make db seed`
 - Finance 模块的集成测试暂时停用，如需修改 `modules/finance/**` 请在本地运行相关 `go test` 并附上结果。
 
+## 🔐 Authz Policy Draft API
+
+- 修改 `config/access/policies/**` 后运行 `make authz-pack`，它会同时重建聚合策略 `config/access/policy.csv` 以及 `config/access/policy.csv.rev`（供 `pkg/authz/version` 读取 base revision）。
+- Core 模块注册了 `PolicyDraftService` 与 `/core/api/authz/**` 控制器，可用来创建/审批/调试策略草稿；所有端点都需要对应的 `Authz.*` 权限。
+- 常用端点：
+  - `GET /core/api/authz/policies` —— 返回当前聚合策略列表（仅 `Authz.Debug` 可见）。
+  - `POST /core/api/authz/requests` —— 创建策略草稿；`POST /requests/{id}/approve|reject|cancel|trigger-bot|revert` 负责生命周期操作。
+  - `GET /core/api/authz/debug?subject=...&object=...&action=...` —— 调试接口，仅 `Authz.Debug` 可见，支持 `attr.<key>=<value>` 注入 ABAC 属性，并带有 `20 req/min/IP` 速率限制；响应包含 `allowed`、`mode`、`latency_ms`、`trace.matched_policy` 以及回显的 request/attributes。
+
+示例：
+
+```bash
+REVISION=$(jq -r .revision config/access/policy.csv.rev)
+curl -X POST http://localhost:3200/core/api/authz/requests \
+  -H "Content-Type: application/json" \
+  -b sid=<session_cookie> \
+  -d '{
+    "object": "core.users",
+    "action": "read",
+    "reason": "Grant reporting access",
+    "base_revision": "'"$REVISION"'",
+    "diff": [{"op":"add","path":"/p/-","value":["role:reporting","core.users","read","global","allow"]}]
+  }'
+```
+
+Authz.Debug 示例（携带 request id 方便审计）：
+
+```bash
+curl "http://localhost:3200/core/api/authz/debug?subject=role:core.superadmin&domain=global&object=core.users&action=list&attr.ip=10.0.0.1" \
+  -H "X-Request-Id: authz-debug-sample" \
+  -b sid=<session_cookie>
+# => {
+#   "allowed": true,
+#   "mode": "enforce",
+#   "latency_ms": 3,
+#   "request": {...},
+#   "attributes": {"ip":"10.0.0.1"},
+#   "trace": {"matched_policy":["role:core.superadmin","*","*","*","allow"]}
+# }
+```
+
 ### PostgreSQL 17 迁移与备份
 
 1. **备份旧数据**（如果之前运行的是 `postgres:15`）：  

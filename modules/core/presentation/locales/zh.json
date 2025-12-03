@@ -87,7 +87,8 @@
     "user": "用户",
     "role": "角色",
     "group": "组",
-    "upload": "上传"
+    "upload": "上传",
+    "authorization": "授权"
   },
   "Permissions": {
     "User": {
@@ -123,6 +124,21 @@
       "Read": "查看上传",
       "Update": "更新上传",
       "Delete": "删除上传"
+    },
+    "Authz": {
+      "Requests": {
+        "Write": "创建策略变更申请",
+        "Read": "查看策略变更申请",
+        "Review": "审核策略变更申请",
+        "Delete": "取消策略变更申请"
+      },
+      "Debug": "使用授权调试工具"
+    },
+    "Authorization": {
+      "Create": "创建策略变更草稿",
+      "Read": "查看策略草稿",
+      "Update": "审批策略草稿",
+      "Delete": "取消策略草稿"
     }
   },
   "NavigationLinks": {
@@ -451,6 +467,18 @@
       "UploadManage": {
         "Label": "管理上传",
         "_Description": "完整的文件上传管理"
+      },
+      "AuthzRequestsView": {
+        "Label": "查看策略草稿",
+        "_Description": "仅查看策略变更草稿/申请"
+      },
+      "AuthzRequestsManage": {
+        "Label": "管理策略草稿",
+        "_Description": "创建、审批、驳回或取消策略草稿"
+      },
+      "AuthzDebugView": {
+        "Label": "Authz 调试",
+        "_Description": "访问策略列表和授权调试接口"
       }
     },
     "Finance": {

@@ -87,7 +87,8 @@
     "user": "Users",
     "role": "Roles",
     "group": "Groups",
-    "upload": "Uploads"
+    "upload": "Uploads",
+    "authorization": "Authorization"
   },
   "Permissions": {
     "User": {
@@ -123,6 +124,21 @@
       "Read": "View uploads",
       "Update": "Update uploads",
       "Delete": "Delete uploads"
+    },
+    "Authz": {
+      "Requests": {
+        "Write": "Create policy change requests",
+        "Read": "View policy change requests",
+        "Review": "Review policy change requests",
+        "Delete": "Cancel policy change requests"
+      },
+      "Debug": "Use Authz debug tools"
+    },
+    "Authorization": {
+      "Create": "Create policy drafts",
+      "Read": "View policy drafts",
+      "Update": "Review policy drafts",
+      "Delete": "Cancel policy drafts"
     }
   },
   "NavigationLinks": {
@@ -448,6 +464,18 @@
       "UploadManage": {
         "Label": "Manage Uploads",
         "_Description": "Full file upload management"
+      },
+      "AuthzRequestsView": {
+        "Label": "View Authz Requests",
+        "_Description": "View policy change drafts and requests"
+      },
+      "AuthzRequestsManage": {
+        "Label": "Manage Authz Requests",
+        "_Description": "Create, approve, reject, or cancel policy change drafts"
+      },
+      "AuthzDebugView": {
+        "Label": "Authz Debug",
+        "_Description": "Access policy listings and authorization debug tools"
       }
     },
     "Finance": {

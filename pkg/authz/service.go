@@ -140,6 +140,14 @@ func (s *Service) Enforcer() *casbin.Enforcer {
 	return s.enforcer
 }
 
+// Mode returns the current enforcement mode.
+func (s *Service) Mode() Mode {
+	if s == nil || s.flagProvider == nil {
+		return ModeShadow
+	}
+	return s.flagProvider.Mode()
+}
+
 var (
 	defaultServiceOnce sync.Once
 	defaultService     *Service

@@ -56,6 +56,17 @@ func NewRequest(subject, domain, object, action string, opts ...RequestOption) R
 	return req
 }
 
+func cloneAttributes(attrs Attributes) Attributes {
+	if len(attrs) == 0 {
+		return nil
+	}
+	copied := make(Attributes, len(attrs))
+	for key, value := range attrs {
+		copied[key] = value
+	}
+	return copied
+}
+
 // SubjectForUser builds a subject identifier in the form tenant:{tenantID}:user:{userID}.
 func SubjectForUser(tenantID, userID uuid.UUID) string {
 	userPart := "anonymous"

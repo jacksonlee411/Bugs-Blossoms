@@ -11,6 +11,7 @@ const (
 	ResourceRole   permission.Resource = "role"
 	ResourceGroup  permission.Resource = "group"
 	ResourceUpload permission.Resource = "upload"
+	ResourceAuthz  permission.Resource = "authorization"
 )
 
 var (
@@ -126,6 +127,41 @@ var (
 		Action:   permission.ActionDelete,
 		Modifier: permission.ModifierAll,
 	}
+	AuthzRequestsWrite = &permission.Permission{
+		ID:       uuid.MustParse("0f65fd1a-0edb-4c38-ae4f-6b4ef95c5e6f"),
+		Name:     "Authz.Requests.Write",
+		Resource: ResourceAuthz,
+		Action:   permission.ActionCreate,
+		Modifier: permission.ModifierAll,
+	}
+	AuthzRequestsRead = &permission.Permission{
+		ID:       uuid.MustParse("3ea1a6dd-7b73-4397-9a07-6e4220348452"),
+		Name:     "Authz.Requests.Read",
+		Resource: ResourceAuthz,
+		Action:   permission.ActionRead,
+		Modifier: permission.ModifierAll,
+	}
+	AuthzRequestsReview = &permission.Permission{
+		ID:       uuid.MustParse("738cb963-78dd-42fe-b9ee-97f1dbe6cfe5"),
+		Name:     "Authz.Requests.Review",
+		Resource: ResourceAuthz,
+		Action:   permission.ActionUpdate,
+		Modifier: permission.ModifierAll,
+	}
+	AuthzRequestsDelete = &permission.Permission{
+		ID:       uuid.MustParse("8c8a4b94-16df-4bd9-b88c-fc1f30f51e78"),
+		Name:     "Authz.Requests.Delete",
+		Resource: ResourceAuthz,
+		Action:   permission.ActionDelete,
+		Modifier: permission.ModifierAll,
+	}
+	AuthzDebug = &permission.Permission{
+		ID:       uuid.MustParse("cd5f48da-cc30-4ca7-b6f8-21016fe03186"),
+		Name:     "Authz.Debug",
+		Resource: ResourceAuthz,
+		Action:   permission.ActionRead,
+		Modifier: permission.ModifierAll,
+	}
 )
 
 var Permissions = []*permission.Permission{
@@ -145,4 +181,9 @@ var Permissions = []*permission.Permission{
 	UploadRead,
 	UploadUpdate,
 	UploadDelete,
+	AuthzRequestsWrite,
+	AuthzRequestsRead,
+	AuthzRequestsReview,
+	AuthzRequestsDelete,
+	AuthzDebug,
 }

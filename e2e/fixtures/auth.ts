@@ -2,7 +2,7 @@
  * Authentication fixtures for Playwright tests
  */
 
-import { Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
 
 /**
  * Login helper function
@@ -18,11 +18,13 @@ export async function login(page: Page, email: string, password: string) {
 
 	// Wait for navigation BEFORE clicking submit (Playwright best practice)
 	// This prevents race conditions where navigation completes before waitForURL is called
+	const submitButton = page.locator('form button[type="submit"]');
+	await expect(submitButton).toHaveText(/log in/i);
 	await Promise.all([
 		page.waitForURL(url => !url.pathname.includes('/login'), {
 			timeout: 15_000,
 		}),
-		page.getByRole('button', { name: /log in/i }).click(),
+		submitButton.click(),
 	]);
 }
 

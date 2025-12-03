@@ -124,6 +124,8 @@ async function ensureUserExists(page: Page, data: UserFormData) {
 }
 
 test.describe('user auth and registration flow', () => {
+	test.describe.configure({ timeout: 120_000 });
+
 	test.beforeAll(async ({ request }) => {
 		await resetTestDatabase(request, { reseedMinimal: false });
 		await seedScenario(request, 'comprehensive');

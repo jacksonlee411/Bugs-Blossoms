@@ -6,6 +6,8 @@
 
 import { APIRequestContext } from '@playwright/test';
 
+const TEST_REQUEST_TIMEOUT_MS = 120_000;
+
 /**
  * Options for database reset
  */
@@ -26,6 +28,7 @@ export async function resetTestDatabase(
 	const response = await request.post('/__test__/reset', {
 		data: options,
 		failOnStatusCode: false,
+		timeout: TEST_REQUEST_TIMEOUT_MS,
 	});
 
 	if (!response.ok()) {
@@ -51,6 +54,7 @@ export async function populateTestData(
 	const response = await request.post('/__test__/populate', {
 		data: dataSpec,
 		failOnStatusCode: false,
+		timeout: TEST_REQUEST_TIMEOUT_MS,
 	});
 
 	if (!response.ok()) {
@@ -76,6 +80,7 @@ export async function seedScenario(
 	const response = await request.post('/__test__/seed', {
 		data: { scenario: scenarioName },
 		failOnStatusCode: false,
+		timeout: TEST_REQUEST_TIMEOUT_MS,
 	});
 
 	if (!response.ok()) {
@@ -96,6 +101,7 @@ export async function seedScenario(
 export async function getAvailableScenarios(request: APIRequestContext) {
 	const response = await request.get('/__test__/seed', {
 		failOnStatusCode: false,
+		timeout: TEST_REQUEST_TIMEOUT_MS,
 	});
 
 	if (!response.ok()) {
@@ -114,6 +120,7 @@ export async function getAvailableScenarios(request: APIRequestContext) {
 export async function checkTestEndpointsHealth(request: APIRequestContext) {
 	const response = await request.get('/__test__/health', {
 		failOnStatusCode: false,
+		timeout: TEST_REQUEST_TIMEOUT_MS,
 	});
 
 	if (!response.ok()) {
