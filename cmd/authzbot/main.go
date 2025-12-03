@@ -28,13 +28,13 @@ func main() {
 	)
 	flag.Parse()
 
-    conf := configuration.Use()
-    baseLogger := conf.Logger()
+	conf := configuration.Use()
+	baseLogger := conf.Logger()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-    pool, err := pgxpool.New(ctx, conf.Database.Opts)
+	pool, err := pgxpool.New(ctx, conf.Database.Opts)
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
 	}
@@ -42,19 +42,19 @@ func main() {
 
 	repo := authzPersistence.NewPolicyChangeRequestRepository()
 
-    if id := strings.TrimSpace(*forceRelease); id != "" {
-        handleForceRelease(ctx, baseLogger, pool, repo, id)
-        return
-    }
+	if id := strings.TrimSpace(*forceRelease); id != "" {
+		handleForceRelease(ctx, baseLogger, pool, repo, id)
+		return
+	}
 
-    cfg, err := buildBotConfig()
+	cfg, err := buildBotConfig()
 	if err != nil {
 		log.Fatalf("configuration error: %v", err)
 	}
 	cfg.RunOnce = *runOnce
 
 	provider := authzVersion.NewFileProvider(cfg.RevisionPath)
-    bot := NewBot(cfg, repo, pool, provider, baseLogger)
+	bot := NewBot(cfg, repo, pool, provider, baseLogger)
 
 	if err := bot.Run(composables.WithPool(ctx, pool)); err != nil {
 		log.Fatalf("bot terminated: %v", err)
