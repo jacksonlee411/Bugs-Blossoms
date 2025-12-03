@@ -37,8 +37,8 @@
      - object：`module.resource`（例如 `core.users`、`hrm.employees`、`logging.logs`），action 采用 CRUD/自定义动词。
      - domain：与 tenant ID 一致，可选 `global` 用于跨租户操作；ABAC 属性包括 `tenant_id`、`role_slugs`、`ownership` 等，文档化后所有模块复用。
    - 实现旧权限导出与校验 CLI：
-     - `scripts/authz/export_legacy_policies.go` 读取角色/用户映射与 `permission.Permission` 列表，生成 Casbin policy 行并写入 `config/access/policy.csv`。
-     - `scripts/authz/verify_parity.go` 使用同一批租户/用户调用 `user.Can` 与 `authz.Check`，确保迁移前后判定一致；校验失败阻断切换。
+     - `scripts/authz/export` 读取角色/用户映射与 `permission.Permission` 列表，生成 Casbin policy 行并写入 `config/access/policy.csv`。
+     - `scripts/authz/verify` 使用同一批租户/用户调用 `user.Can` 与 `authz.Check`，确保迁移前后判定一致；校验失败阻断切换。
      - 文档化回滚路径（重新导出旧版本或 `git revert`，并提供 sample 命令）。
    - 选择持久化方式：PoC 及近期阶段使用 Git 管理的 `config/access/model.conf` + `policy.csv`（file adapter），预留 tenant/domain hook；回滚通过 `git revert`/release patch 完成，并在文档中记录“生产环境快速恢复”流程。
    - 在 `tools.go` / `go.mod` 引入 `github.com/casbin/casbin/v2` 及所需 adapter；在 `Makefile`/CI 增加 `authz-test`、`authz-lint` 等任务（检查 model/policy 语法、排序、重复项），确保 policy diff 被纳入 PR。

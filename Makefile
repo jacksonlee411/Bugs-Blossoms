@@ -5,6 +5,18 @@ ATLAS_BIN_DIR ?= $(shell go env GOPATH)/bin
 ATLAS_VERSION ?= v0.38.0
 ATLAS ?= $(ATLAS_BIN_DIR)/atlas
 
+.PHONY: authz-pack
+authz-pack:
+	go run ./scripts/authz/pack
+
+.PHONY: authz-test
+authz-test:
+	go test ./pkg/authz ./scripts/authz/internal/...
+
+.PHONY: authz-lint
+authz-lint: authz-pack
+	go run ./scripts/authz/verify --fixtures config/access/fixtures/testdata.yaml
+
 # Install dependencies
 deps:
 	go get ./...

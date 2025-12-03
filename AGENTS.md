@@ -3,6 +3,10 @@
 ## Overview
 DO NOT COMMENT EXECESSIVELY. Instead, write clear and concise code that is self-explanatory.
 
+## 项目现状
+- 项目仍处于早期开发阶段，尚未投产，所有特性以快速验证为主。
+- 当前仅由单一开发者负责全栈交付，可在保证质量前提下省略非必要的审批与跨组沟通流程，直接按照本指南自行决策。
+
 ## Module Architecture
 
 Each module follows a strict **Domain-Driven Design (DDD)** pattern with clear layer separation:
@@ -93,6 +97,13 @@ modules/{module}/
 ### 8. Verification
 - Run `go vet ./...` to verify compilation
 - Run `templ generate && make css` if templates were modified
+
+### Casbin / Authorization
+- Update modular policy fragments under `config/access/policies/**`, then run `make authz-pack` to regenerate `config/access/policy.csv`.
+- Run `make authz-test` (compiles `pkg/authz` plus helper packages) before committing any authz-related Go changes.
+- Run `make authz-lint` to execute policy packing and the deterministic parity fixtures (`scripts/authz/verify --fixtures ...`). CI hooks onto the same targets.
+- Use `go run ./scripts/authz/export -dsn <dsn> -out <path> -dry-run` for audited exports (requires `ALLOWED_ENV=production_export`).
+- Use `go run ./scripts/authz/verify --sample 0.2` for on-demand parity checks against a live database (set `AUTHZ_MODE`/`AUTHZ_FLAG_CONFIG` as needed).
 
 ## Tool use
 - DO NOT USE `sed` for file manipulation

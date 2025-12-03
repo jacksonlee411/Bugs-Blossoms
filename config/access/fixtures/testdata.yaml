@@ -1,0 +1,12 @@
+- subject: role:core.superadmin
+  domain: global
+  object: core.users
+  action: list
+  legacy: true
+  note: superadmin baseline
+- subject: tenant:global:user:test
+  domain: global
+  object: core.users
+  action: edit
+  legacy: false
+  note: anonymous user lacks edit

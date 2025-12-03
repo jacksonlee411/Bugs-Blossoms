@@ -141,6 +141,15 @@ func (r *RateLimitOptions) Validate() error {
 	return nil
 }
 
+type AuthzOptions struct {
+	ModelPath      string `env:"AUTHZ_MODEL_PATH" envDefault:"config/access/model.conf"`
+	PolicyPath     string `env:"AUTHZ_POLICY_PATH" envDefault:"config/access/policy.csv"`
+	PolicyDir      string `env:"AUTHZ_POLICY_DIR" envDefault:"config/access/policies"`
+	FlagConfigPath string `env:"AUTHZ_FLAG_CONFIG" envDefault:"config/access/authz_flags.yaml"`
+	FixturesPath   string `env:"AUTHZ_FIXTURES_PATH" envDefault:"config/access/fixtures"`
+	Mode           string `env:"AUTHZ_MODE" envDefault:"shadow"`
+}
+
 type Configuration struct {
 	Database      DatabaseOptions
 	Google        GoogleOptions
@@ -152,6 +161,7 @@ type Configuration struct {
 	Octo          OctoOptions
 	Stripe        StripeOptions
 	RateLimit     RateLimitOptions
+	Authz         AuthzOptions
 
 	RedisURL         string        `env:"REDIS_URL" envDefault:"localhost:6379"`
 	MigrationsDir    string        `env:"MIGRATIONS_DIR" envDefault:"migrations"`
