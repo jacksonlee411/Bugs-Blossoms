@@ -60,7 +60,7 @@
 2. [X] 锁管理：`bot_lock` 字段提供 `scripts/authz/bot.sh --force-release <id>` 手动解锁与日志记录，暂不实现自动 TTL。
 3. [X] 成功回写 `applied_policy_revision/snapshot`；`/revert` 端点依 snapshot 生成逆向草稿。
 4. [X] CLI `scripts/authz/bot.sh` 支持 `run`/`force-release` 两种模式，文档列明环境变量（Git token、repo）。
-5. [ ] Dev 验证：至少两次“草稿→bot→PR→状态更新”跑通并写入 dev-records。
+5. [X] Dev 验证：至少两次“草稿→bot→PR→状态更新”跑通并写入 dev-records。
 
 #### Git Bot 凭证与轮询方案
 1. [X] PAT 凭证链路 —— 创建 `@bb-authz-bot` GitHub 机器人账号，生成只具备 `repo`（contents/pull_requests）权限的 PAT，存入 1Password `DEV-AUTHZ`（命名 `AUTHZ_BOT_GIT_TOKEN`），由 `scripts/authz/bot.sh` 注入 `https://<token>@github.com/acme/Bugs-Blossoms.git`；同一脚本设置 `git config user.name/email`、branch 前缀（`AUTHZ_BOT_GIT_BRANCH_PREFIX` 默认 `authz/bot/`）、远端（`AUTHZ_BOT_GIT_REMOTE` 默认上述 HTTPS），并在推送前统一执行 `make authz-pack authz-test`，失败时写入 `policy_change_requests.error_log` 并释放锁。
