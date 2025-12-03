@@ -49,7 +49,7 @@
 - 常用端点：
   - `GET /core/api/authz/policies` —— 返回当前聚合策略列表（仅 `Authz.Debug` 可见）。
   - `POST /core/api/authz/requests` —— 创建策略草稿；`POST /requests/{id}/approve|reject|cancel|trigger-bot|revert` 负责生命周期操作。
-  - `GET /core/api/authz/debug?subject=...&object=...&action=...` —— 调试接口，仅 `Authz.Debug` 可见，支持 `attr.<key>=<value>` 注入 ABAC 属性，并带有 `20 req/min/IP` 速率限制；响应包含 `allowed`、`mode`、`latency_ms`、`trace.matched_policy` 以及回显的 request/attributes。
+- `GET /core/api/authz/debug?subject=...&object=...&action=...` —— 调试接口，仅 `Authz.Debug` 可见，支持 `attr.<key>=<value>` 注入 ABAC 属性，并带有 `20 req/min/IP` 速率限制；响应包含 `allowed`、`mode`、`latency_ms`、`trace.matched_policy` 以及回显的 request/attributes。
 
 示例：
 
@@ -82,6 +82,16 @@ curl "http://localhost:3200/core/api/authz/debug?subject=role:core.superadmin&do
 #   "trace": {"matched_policy":["role:core.superadmin","*","*","*","allow"]}
 # }
 ```
+
+### Authz Bot & PR 流程
+
+- Bot 可通过 `scripts/authz/bot.sh run [--once]` 启动；需要以下环境变量：
+  - `AUTHZ_BOT_GITHUB_TOKEN`：具备 `repo` 权限的 PAT，用于创建/更新 PR。
+  - 可选 `AUTHZ_BOT_GIT_TOKEN`：若本地 remote 仍为 SSH，可临时注入 HTTPS 令牌。
+  - `AUTHZ_BOT_GIT_REMOTE`/`AUTHZ_BOT_GIT_BRANCH_PREFIX`/`AUTHZ_BOT_GIT_AUTHOR`（如需覆盖默认值）。
+- 流程：审批通过的草稿 → 运行 bot → bot 应用 diff、执行 `make authz-pack && make authz-test`、推送分支并调用 GitHub API 开 PR → `PolicyDraftService` 回写 `applied_policy_revision/snapshot/pr_link`，请求状态变为 `merged`。
+- 如需强制释放锁，可执行 `scripts/authz/bot.sh force-release <request-id>`，它会清空 `policy_change_requests.bot_lock/bot_locked_at`，便于重试。
+- 回滚：调用 `/core/api/authz/requests/{id}/revert` 生成新草稿，或手动 revert bot 创建的 PR，再由 bot 重跑一次。
 
 ### PostgreSQL 17 迁移与备份
 

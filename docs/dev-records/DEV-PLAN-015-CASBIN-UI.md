@@ -20,3 +20,11 @@
 | 日期 | 环境 | 命令 | 结果 | 备注 |
 | --- | --- | --- | --- | --- |
 | 2025-12-05 10:45 | 本地（feature/dev-plan-015a） | `curl -H "X-Request-Id: gamma-test" "http://localhost:3000/core/api/authz/debug?subject=role:core.superadmin&domain=global&object=core.users&action=list"` | ✅ | 响应包含 `allowed=true`、`latency_ms≈2`、`trace.matched_policy=["role:core.superadmin","*","*","*","allow"]`，attributes 为空，日志打印 request id/subject，Prom metrics `authz_debug_requests_total` 增量 1。限流 20 req/min 生效，未出现 429。 |
+
+## 阶段 Delta（Bot 运行记录模板）
+
+| 日期 | 环境 | Request ID | 基线修订 | PR 链接 | Bot Locker | 结果/备注 |
+| --- | --- | --- | --- | --- | --- | --- |
+| YYYY-MM-DD HH:MM | 本地/测试（分支） | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | `base_rev -> applied_rev` | https://github.com/.../pull/xxx | `runner-hostname-pid` | `✅ merged` / `⚠️ failed: <error_log>` |
+
+> 填写建议：在草稿状态从 `approved` 转为 `merged` 后，记录 bot 输出、`applied_policy_snapshot` 是否写入、相关 PR、Locker 等信息；若失败，记录 `error_log` 并注明是否使用 `force-release` 重试。
