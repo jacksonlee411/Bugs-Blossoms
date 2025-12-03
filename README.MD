@@ -92,6 +92,7 @@ curl "http://localhost:3200/core/api/authz/debug?subject=role:core.superadmin&do
 - 流程：审批通过的草稿 → 运行 bot → bot 应用 diff、执行 `make authz-pack && make authz-test`、推送分支并调用 GitHub API 开 PR → `PolicyDraftService` 回写 `applied_policy_revision/snapshot/pr_link`，请求状态变为 `merged`。
 - 如需强制释放锁，可执行 `scripts/authz/bot.sh force-release <request-id>`，它会清空 `policy_change_requests.bot_lock/bot_locked_at`，便于重试。
 - 回滚：调用 `/core/api/authz/requests/{id}/revert` 生成新草稿，或手动 revert bot 创建的 PR，再由 bot 重跑一次。
+- 更多手动/应急步骤、缓存策略与回滚说明请参见 `docs/runbooks/AUTHZ-BOT.md`。
 
 ### PostgreSQL 17 迁移与备份
 

@@ -68,6 +68,13 @@ jobs:
               - 'scripts/db/run_goose.sh'
               - 'scripts/db/export_hrm_schema.sh'
               - 'docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md'
+            authz:
+              - 'pkg/authz/**'
+              - 'cmd/authzbot/**'
+              - 'scripts/authz/**'
+              - 'config/access/**'
+              - 'modules/core/services/**'
+              - 'modules/core/presentation/controllers/**'
 
       - name: Set up Go
         uses: useblacksmith/setup-go@v6
@@ -198,6 +205,20 @@ jobs:
       - name: Run golangci-lint (unused variables/functions + go-cleanarch)
         if: ${{ steps.changed-files.outputs.go == 'true' }}
         run: make check lint
+
+      - name: Run authz suites
+        if: ${{ steps.changed-files.outputs.authz == 'true' }}
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: iota_erp
+        run: |
+          make authz-test
+          make authz-lint
+          go test ./cmd/authzbot
+          go test ./modules/core/services ./modules/core/presentation/controllers
 
       - name: Run HRM Atlas plan
         if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
