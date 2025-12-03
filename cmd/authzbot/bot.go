@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -46,8 +47,9 @@ type Bot struct {
 	git             *gitRunner
 }
 
-const (
-	defaultGitHubAPI = "https://api.github.com"
+var (
+	defaultGitHubAPI  = "https://api.github.com"
+	errNoPendingDraft = errors.New("authzbot: no pending drafts")
 )
 
 // NewBot wires the dependencies together.
@@ -91,11 +93,11 @@ func (b *Bot) iteration(ctx context.Context) error {
 	ctx = composables.WithPool(ctx, b.pool)
 	req, err := b.nextCandidate(ctx)
 	if err != nil {
+		if errors.Is(err, errNoPendingDraft) {
+			b.logger.Debug("no pending drafts found")
+			return nil
+		}
 		return err
-	}
-	if req == nil {
-		b.logger.Debug("no pending drafts found")
-		return nil
 	}
 
 	if err := b.process(ctx, req); err != nil {
@@ -127,7 +129,7 @@ func (b *Bot) nextCandidate(ctx context.Context) (*authzPersistence.PolicyChange
 		}
 		return &req, nil
 	}
-	return nil, nil
+	return nil, errNoPendingDraft
 }
 
 func (b *Bot) process(ctx context.Context, req *authzPersistence.PolicyChangeRequest) error {

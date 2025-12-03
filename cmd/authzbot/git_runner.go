@@ -124,7 +124,10 @@ func (g *gitRunner) createPR(ctx context.Context, branch, title, body string) (s
 		"base":  g.baseBranch,
 		"body":  body,
 	}
-	data, _ := json.Marshal(payload)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return "", err
+	}
 	url := fmt.Sprintf("%s/repos/%s/%s/pulls", g.apiURL, g.repoOwner, g.repoName)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
@@ -136,14 +139,17 @@ func (g *gitRunner) createPR(ctx context.Context, branch, title, body string) (s
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusUnprocessableEntity {
 		if existing, err := g.findExistingPR(ctx, branch); err == nil && existing != "" {
 			return existing, nil
 		}
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		bodyBytes, _ := io.ReadAll(resp.Body)
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		if readErr != nil {
+			return "", fmt.Errorf("create PR failed (read body): %w", readErr)
+		}
 		return "", fmt.Errorf("create PR failed: %s", strings.TrimSpace(string(bodyBytes)))
 	}
 	var result struct {
@@ -170,7 +176,7 @@ func (g *gitRunner) findExistingPR(ctx context.Context, branch string) (string, 
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("find PR status %s", resp.Status)
 	}
