@@ -7,6 +7,12 @@
 - 当前模块仍依赖 `user.Can`、模板内联权限判断与松散的导航控制；未授权用户依旧可以访问大量页面并执行危险操作。
 - 产品侧要求在最短周期内让核心模块具备统一的 Casbin 授权能力，并提供分批灰度、回滚剧本，避免一次性切换导致大面积停机。
 
+## 前置依赖
+- DEV-PLAN-012/013 交付的 `pkg/authz`、`config/access/{model.conf,policy.csv}`、`scripts/authz/export`、`scripts/authz/verify` 以及 `make authz-test`/`make authz-lint` 需保持可用；项目尚未投产，可在单机验证。
+- 若缺少最新旧权限映射，可临时运行 `scripts/authz/export`/`verify` 生成，无需审批。
+- README/CONTRIBUTING/AGENTS 必须包含 Casbin 运维指引；若缺少，则在本计划中直接补齐。
+- **验收方法**：每次进入模块改造前运行 `make authz-test authz-lint && go test ./pkg/authz/...`，并在个人笔记或 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md` 简要记录结果（无需截图）。
+
 ## 目标
 1. Core 模块（用户、角色、组、上传）全部控制器、服务、导航组件改用 `pkg/authz`，并补齐授权失败/成功路径的单元测试。
 2. HRM 模块（员工列表/详情/创建/编辑/删除、批量导入）引入 `Employee.*` 权限校验，包括 controller、service、Quick Links、导航及 e2e 覆盖。
@@ -35,15 +41,21 @@
 3. **[ ] Logging 模块改造**
    - 在 controller middleware 中统一调用 `authz.Authorize(..., Logs.View)`，所有 API/页面复用该逻辑。
    - 记录未授权访问到审计日志（subject/object/action/domain/tenant/IP），满足合规要求。
-   - 模板与导航入口只有在授权成功时才渲染，未授权时显示空态描述与“申请权限”链接（由 DEV-PLAN-015 提供 UI）。
-4. **[ ] 公共层更新**
+   - 模板与导航入口只有在授权成功时才渲染，未授权时显示空态描述与“申请权限”提示；在 DEV-PLAN-015 UI 完成前，本计划提供最小版 Unauthorized 组件。
+4. **[ ] 公共层与 UI 更新**
    - 去除模板中的 `user.Can`，新增 `authz.ViewState` 结构，通过 controller 注入模板。
    - 在 `pkg/middleware/sidebar`、`pkg/types/navigation` 中按照 Casbin 判定过滤导航项。
-   - 提供统一的 `UnauthorizedComponent` 模板，供 Core/HRM/Logging 复用。
-5. **[ ] 分批灰度与回滚**
-   - 拟定“模块 × 租户”灰度矩阵：例如先在 internal tenant 对 Core 强制启用，再推广到 beta 租户，完成后切 HRM、Logging。
-   - 使用 `AUTHZ_ENFORCE` 控制器或租户配置表实现按租户开关，并在 `docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md` 记录启停日志。
-   - 准备回滚脚本：关闭 flag、恢复 `user.Can` 逻辑（保留在代码中但受 flag 控制）、恢复旧导航渲染。
+   - **最小 UI 套件（聚焦可用性）**：
+     - `components/authorization/unauthorized.templ`：展示 403 文案与“申请权限”按钮；按钮用 HTMX 调用 `/core/api/authz/requests` 写入 `policy_change_requests`。
+     - PolicyInspector 抽屉：调用 `/core/api/authz/debug`，以简洁列表展示命中 policy、ABAC 属性与建议策略，方便开发排查。
+     - 权限申请 helper：结合 `authz.ViewState` 自动生成描述（如“Request Employee.Update”），提交后给出 toast，暂不触发 Git PR。
+   - README/CONTRIBUTING/AGENTS 补充 controller 注入、模板使用、申请 API 示例即可，不必附截图。
+   - `docs/dev-records` 中如需记录，只保留关键命令与结论，避免过度截图。
+5. **[ ] 分批灰度、Parity 与回滚**
+   - 仍按“模块 × 租户”规划启停，但早期可在本地/单租户验证通过后直接切换，不必维护复杂矩阵。
+   - 启用 `AUTHZ_ENFORCE` 前后各运行一次 `go run scripts/authz/verify/main.go --tenant <id>`；若出现 diff，立即排查修复，无需产出正式报告。
+   - 由于缺乏真实流量，监控以自测为主：关注关键流程是否出现 403/500，日志是否异常即可。
+   - 回滚采用“关闭 feature flag + git revert”即可；必要时运行 `scripts/authz/export` 生成旧策略。整理为简短操作说明（命令示例 + 检查点），无需额外脚本。
 
 ## 里程碑
 - M1：Core 模块全部控制器/服务切换到 `authz`，测试通过，模板不再直接依赖 `user.Can`。
@@ -52,5 +64,6 @@
 
 ## 交付物
 - Core/HRM/Logging 模块中的授权改造代码、测试、模板更新。
-- 统一的导航/Unauthorized 组件、`authz.ViewState` 辅助结构。
-- 分批灰度计划、`docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md`、回滚 runbook。
+- 统一的导航/Unauthorized/PolicyInspector 组件、`authz.ViewState` 辅助结构，以及最小权限申请流程（HTMX + API）。
+- README/CONTRIBUTING/AGENTS 更新、`docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`（readiness/parity 记录）、`docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md`（启停日志与问题排查）、简化版回滚说明。
+- 精简版分批灰度计划、`go run scripts/authz/verify` 的差异日志、feature flag 操作示例。
