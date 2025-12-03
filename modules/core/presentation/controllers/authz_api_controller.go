@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -65,7 +67,14 @@ func (c *AuthzAPIController) Register(r *mux.Router) {
 	router.HandleFunc("/requests/{id}/cancel", di.H(c.cancelRequest)).Methods(http.MethodPost)
 	router.HandleFunc("/requests/{id}/trigger-bot", di.H(c.triggerBot)).Methods(http.MethodPost)
 	router.HandleFunc("/requests/{id}/revert", di.H(c.revertRequest)).Methods(http.MethodPost)
-	router.HandleFunc("/debug", di.H(c.debugRequest)).Methods(http.MethodGet)
+	router.Handle(
+		"/debug",
+		middleware.RateLimit(middleware.RateLimitConfig{
+			RequestsPerPeriod: 20,
+			Period:            time.Minute,
+			KeyFunc:           middleware.EndpointKeyFunc("core.api.authz.debug"),
+		})(di.H(c.debugRequest)),
+	).Methods(http.MethodGet)
 }
 
 func (c *AuthzAPIController) listPolicies(
@@ -306,22 +315,51 @@ func (c *AuthzAPIController) debugRequest(
 		return
 	}
 
-	req := authz.NewRequest(subject, domain, object, action)
+	attrs := parseDebugAttributes(query)
+	opts := []authz.RequestOption{}
+	if len(attrs) > 0 {
+		opts = append(opts, authz.WithAttributes(attrs))
+	}
+	req := authz.NewRequest(subject, domain, object, action, opts...)
 	svc := authz.Use()
-	allowed, err := svc.Check(r.Context(), req)
+	result, err := svc.Inspect(r.Context(), req)
 	if err != nil {
 		logger.WithError(err).Error("authz api: debug check failed")
 		writeJSONError(w, http.StatusInternalServerError, "AUTHZ_DEBUG_ERROR", "failed to evaluate request")
 		return
 	}
+	tenantID := tenantIDFromContext(r)
+	logFields := logrus.Fields{
+		"request_id": requestIDFromHeader(r),
+		"subject":    result.OriginalRequest.Subject,
+		"domain":     result.OriginalRequest.Domain,
+		"object":     result.OriginalRequest.Object,
+		"action":     result.OriginalRequest.Action,
+		"tenant_id":  tenantID.String(),
+		"allowed":    result.Allowed,
+		"latency_ms": result.Latency.Microseconds() / 1_000,
+	}
+	if len(result.Trace) > 0 {
+		logFields["matched_policy"] = result.Trace
+	}
+	if len(result.OriginalRequest.Attributes) > 0 {
+		logFields["attributes"] = result.OriginalRequest.Attributes
+	}
+	logger.WithFields(logFields).Info("authz debug evaluated request")
+
 	writeJSON(w, http.StatusOK, dtos.DebugResponse{
-		Allowed: allowed,
-		Mode:    string(svc.Mode()),
+		Allowed:       result.Allowed,
+		Mode:          string(result.Mode),
+		LatencyMillis: result.Latency.Milliseconds(),
 		Request: dtos.DebugRequestDTO{
-			Subject: subject,
-			Domain:  domain,
-			Object:  object,
-			Action:  action,
+			Subject: result.OriginalRequest.Subject,
+			Domain:  result.OriginalRequest.Domain,
+			Object:  result.OriginalRequest.Object,
+			Action:  result.OriginalRequest.Action,
+		},
+		Attributes: result.OriginalRequest.Attributes,
+		Trace: dtos.DebugTraceDTO{
+			MatchedPolicy: result.Trace,
 		},
 	})
 }
@@ -407,6 +445,32 @@ func parseListParams(r *http.Request) (services.ListPolicyDraftsParams, error) {
 		params.Statuses = append(params.Statuses, authzPersistence.PolicyChangeStatus(status))
 	}
 	return params, nil
+}
+
+func parseDebugAttributes(values url.Values) authz.Attributes {
+	attrs := authz.Attributes{}
+	const prefix = "attr."
+	for key, vals := range values {
+		if !strings.HasPrefix(key, prefix) {
+			continue
+		}
+		attrKey := strings.TrimSpace(strings.TrimPrefix(key, prefix))
+		if attrKey == "" || len(vals) == 0 {
+			continue
+		}
+		attrs[attrKey] = vals[len(vals)-1]
+	}
+	if len(attrs) == 0 {
+		return nil
+	}
+	return attrs
+}
+
+func requestIDFromHeader(r *http.Request) string {
+	if id := r.Header.Get("X-Request-Id"); id != "" {
+		return id
+	}
+	return r.Header.Get("X-Request-ID")
 }
 
 func parseUUID(raw string) (uuid.UUID, error) {

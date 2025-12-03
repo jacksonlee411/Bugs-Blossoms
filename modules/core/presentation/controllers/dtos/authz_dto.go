@@ -68,11 +68,19 @@ type PolicyEntryResponse struct {
 	Effect  string `json:"effect"`
 }
 
-// DebugResponse provides a minimal Authz.Debug output.
+// DebugResponse provides a detailed Authz.Debug output.
 type DebugResponse struct {
-	Allowed bool            `json:"allowed"`
-	Mode    string          `json:"mode"`
-	Request DebugRequestDTO `json:"request"`
+	Allowed       bool            `json:"allowed"`
+	Mode          string          `json:"mode"`
+	LatencyMillis int64           `json:"latency_ms"`
+	Request       DebugRequestDTO `json:"request"`
+	Attributes    map[string]any  `json:"attributes,omitempty"`
+	Trace         DebugTraceDTO   `json:"trace"`
+}
+
+// DebugTraceDTO contains rule chain information for Authz.Debug.
+type DebugTraceDTO struct {
+	MatchedPolicy []string `json:"matched_policy,omitempty"`
 }
 
 // DebugRequestDTO echoes the evaluated request payload.

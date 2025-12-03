@@ -49,7 +49,7 @@
 - 常用端点：
   - `GET /core/api/authz/policies` —— 返回当前聚合策略列表（仅 `Authz.Debug` 可见）。
   - `POST /core/api/authz/requests` —— 创建策略草稿；`POST /requests/{id}/approve|reject|cancel|trigger-bot|revert` 负责生命周期操作。
-  - `GET /core/api/authz/debug?subject=...&object=...&action=...` —— 轻量级 Authz.Debug。
+  - `GET /core/api/authz/debug?subject=...&object=...&action=...` —— 调试接口，仅 `Authz.Debug` 可见，支持 `attr.<key>=<value>` 注入 ABAC 属性，并带有 `20 req/min/IP` 速率限制；响应包含 `allowed`、`mode`、`latency_ms`、`trace.matched_policy` 以及回显的 request/attributes。
 
 示例：
 
@@ -65,6 +65,22 @@ curl -X POST http://localhost:3200/core/api/authz/requests \
     "base_revision": "'"$REVISION"'",
     "diff": [{"op":"add","path":"/p/-","value":["role:reporting","core.users","read","global","allow"]}]
   }'
+```
+
+Authz.Debug 示例（携带 request id 方便审计）：
+
+```bash
+curl "http://localhost:3200/core/api/authz/debug?subject=role:core.superadmin&domain=global&object=core.users&action=list&attr.ip=10.0.0.1" \
+  -H "X-Request-Id: authz-debug-sample" \
+  -b sid=<session_cookie>
+# => {
+#   "allowed": true,
+#   "mode": "enforce",
+#   "latency_ms": 3,
+#   "request": {...},
+#   "attributes": {"ip":"10.0.0.1"},
+#   "trace": {"matched_policy":["role:core.superadmin","*","*","*","allow"]}
+# }
 ```
 
 ### PostgreSQL 17 迁移与备份

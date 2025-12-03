@@ -56,6 +56,23 @@ func TestAuthzAPIController_CreateApprove(t *testing.T) {
 		Status(http.StatusOK)
 }
 
+func TestAuthzAPIController_Debug(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(permissions.AuthzDebug)
+	suite.AsUser(user)
+
+	resp := suite.GET("/core/api/authz/debug?subject=role:core.superadmin&domain=global&object=core.users&action=list").
+		Expect(t).
+		Status(http.StatusOK)
+
+	var payload dtos.DebugResponse
+	require.NoError(t, json.Unmarshal([]byte(resp.Body()), &payload))
+	require.True(t, payload.Allowed)
+	require.NotEmpty(t, payload.Trace.MatchedPolicy)
+	require.GreaterOrEqual(t, payload.LatencyMillis, int64(0))
+	require.Equal(t, "role:core.superadmin", payload.Request.Subject)
+}
+
 func setupAuthzAPISuite(t *testing.T) *itf.Suite {
 	t.Helper()
 	suite := itf.HTTP(t, core.NewModule(&core.ModuleOptions{

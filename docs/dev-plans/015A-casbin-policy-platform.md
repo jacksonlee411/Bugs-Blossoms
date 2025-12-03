@@ -49,11 +49,11 @@
 - `E2E Tests` pipeline 近期的红灯来自 `/__test__/reset` 超时与 `Resources.authorization` / `Permissions.Authz.*` 缺失翻译，现已通过延长 Playwright API/beforeAll 超时、补齐全部 locale 键值并在本地复跑 `pnpm exec playwright test tests/users/register.spec.ts` 验证；GitHub Actions 已重新变绿。
 
 ### 阶段 Gamma：Authz.Debug 与观测
-1. [ ] `pkg/authz` Inspector 输出 rule 链路、ABAC、latency。
-2. [ ] `/core/api/authz/debug` 返回 Inspector 数据，并记录审计日志。
-3. [ ] 监控：注册 Prometheus/Tally 指标，日志包含 request id/subject。
-4. [ ] dev-records：在 DEV-PLAN-012/015 文档中添加一次实际调用记录。
-5. [ ] 速率限制与红线监控，防止敏感策略泄露。
+1. [X] `pkg/authz` Inspector 输出 rule 链路、ABAC、latency，并封装 `Inspect` 结果。
+2. [X] `/core/api/authz/debug` 返回 Inspector 数据、ABAC 属性与 latency，并写入审计日志。
+3. [X] 监控：注册 Prometheus 指标 `authz_debug_requests_total/latency_seconds`，日志包含 request id/subject。
+4. [X] dev-records：在 DEV-PLAN-012/015 文档中添加一次实际调用记录。
+5. [X] 速率限制与红线监控：`/debug` 增加 `20 req/min/IP` 限流与属性过滤。
 
 ### 阶段 Delta：Bot/CLI & 自动化闭环
 1. [ ] `cmd/authzbot`/脚本：监听 `policy_change_requests`，处理 base revision 校验、diff 应用、`make authz-pack && make authz-test`、PR 创建。
