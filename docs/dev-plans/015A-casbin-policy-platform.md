@@ -67,8 +67,8 @@
 2. [X] 轮询执行流 —— `cmd/authzbot` 每 30 秒扫描 `status IN (approved,failed)` 且 `error_log IS NULL` 的记录，通过 `AcquireBotLock` 控制并发，获取 diff、校验 base revision、更新文件、运行 `make authz-pack && make authz-test`，成功则推送并创建 PR，写回 `applied_policy_revision/snapshot/pr_link`；失败记录 `error_log` 并清空 `bot_lock`；提供 `scripts/authz/bot.sh force-release <id>` 执行 `UPDATE policy_change_requests SET bot_lock=NULL, bot_locked_at=NULL WHERE id=$1` 以支持人工干预；相关 SQL 与 env 示例需记录到 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md`。
 
 ### 阶段 Epsilon：文档、CI 与运维
-1. [ ] 文档：README/CONTRIBUTING/AGENTS 新增“策略草稿流程 / bot 操作 / 回滚脚本 / FAQ”章节。
-2. [ ] dev-records：维护 `request_id/pr_link/status/operator/log摘` 模板，每次 bot 运行都补齐。
+1. [X] 文档：README/CONTRIBUTING/AGENTS 新增“策略草稿流程 / bot 操作 / 回滚脚本 / FAQ”章节。
+2. [X] dev-records：维护 `request_id/pr_link/status/operator/log摘` 模板，每次 bot 运行都补齐。
 3. [ ] CI：更新 `quality-gates`，对 authz 相关改动自动跑 `make authz-test authz-lint`、`go test ./pkg/authz/... ./modules/core/services ./modules/core/presentation/controllers`，若涉及模板/locale 同步跑 `templ generate && make css` / `make check tr`。
 4. [ ] 运维：新增“手动 bot / revert”指南与缓存策略，减少 CI 耗时；确保 `git status --short` 在生成命令后干净。
 
