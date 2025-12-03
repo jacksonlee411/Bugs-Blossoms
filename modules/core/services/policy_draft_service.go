@@ -337,7 +337,10 @@ func (s *PolicyDraftService) Cancel(
 	case authzPersistence.PolicyChangeStatusDraft,
 		authzPersistence.PolicyChangeStatusPendingReview,
 		authzPersistence.PolicyChangeStatusApproved:
-	default:
+	case authzPersistence.PolicyChangeStatusRejected,
+		authzPersistence.PolicyChangeStatusMerged,
+		authzPersistence.PolicyChangeStatusFailed,
+		authzPersistence.PolicyChangeStatusCanceled:
 		return PolicyDraft{}, ErrInvalidStatusTransition
 	}
 	params := authzPersistence.UpdateStatusParams{
@@ -504,12 +507,12 @@ func normalizeDiff(data json.RawMessage) (json.RawMessage, error) {
 	return json.RawMessage(buf.Bytes()), nil
 }
 
-func clampLimit(limit, def, max int) int {
+func clampLimit(limit, def, maxAllowed int) int {
 	switch {
 	case limit <= 0:
 		return def
-	case limit > max:
-		return max
+	case limit > maxAllowed:
+		return maxAllowed
 	default:
 		return limit
 	}

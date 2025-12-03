@@ -40,7 +40,7 @@ func TestAuthzAPIController_CreateApprove(t *testing.T) {
 
 	var created dtos.PolicyDraftResponse
 	require.NoError(t, json.Unmarshal([]byte(resp.Body()), &created))
-	require.NotEqual(t, created.ID.String(), "")
+	require.NotEmpty(t, created.ID)
 
 	suite.POST(fmt.Sprintf("/core/api/authz/requests/%s/approve", created.ID)).
 		Expect(t).
@@ -57,6 +57,7 @@ func TestAuthzAPIController_CreateApprove(t *testing.T) {
 }
 
 func setupAuthzAPISuite(t *testing.T) *itf.Suite {
+	t.Helper()
 	suite := itf.HTTP(t, core.NewModule(&core.ModuleOptions{
 		PermissionSchema: defaults.PermissionSchema(),
 	}))
