@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"math"
 	"math/rand"
 	"os"
@@ -56,10 +58,10 @@ func main() {
 
 	if fixtures := strings.TrimSpace(*fixturesPath); fixtures != "" {
 		if err := runFixtureParity(fixtures); err != nil {
-			fmt.Fprintf(os.Stderr, "fixture parity failed: %v\n", err)
+			safePrintf(os.Stderr, "stderr", "fixture parity failed: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Fprintln(os.Stdout, "fixture parity passed")
+		safePrintf(os.Stdout, "stdout", "fixture parity passed\n")
 		return
 	}
 
@@ -73,7 +75,7 @@ func main() {
 
 	pool, err := pgxpool.New(ctx, *dsn)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to connect database: %v\n", err)
+		safePrintf(os.Stderr, "stderr", "failed to connect database: %v\n", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
@@ -81,7 +83,7 @@ func main() {
 
 	snapshot, err := legacy.LoadSnapshot(ctx, pool)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load snapshot: %v\n", err)
+		safePrintf(os.Stderr, "stderr", "failed to load snapshot: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -93,18 +95,18 @@ func main() {
 			"mismatches":    len(mismatches),
 		})
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to marshal metrics: %v\n", err)
+			safePrintf(os.Stderr, "stderr", "failed to marshal metrics: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Fprintf(os.Stdout, "%s\n", payload)
+		safePrintf(os.Stdout, "stdout", "%s\n", payload)
 	}
 	if len(mismatches) > 0 {
 		for _, diff := range mismatches {
-			fmt.Fprintf(os.Stderr, "mismatch: %+v\n", diff)
+			safePrintf(os.Stderr, "stderr", "mismatch: %+v\n", diff)
 		}
 		os.Exit(1)
 	}
-	fmt.Fprintf(os.Stdout, "parity ok: checked %d combinations\n", total)
+	safePrintf(os.Stdout, "stdout", "parity ok: checked %d combinations\n", total)
 }
 
 func runFixtureParity(path string) error {
@@ -209,6 +211,12 @@ func sampleUsers(users []legacy.User, ratio float64, minSample, maxSample int, r
 		count = 1
 	}
 	return shuffled[:count]
+}
+
+func safePrintf(w io.Writer, target, format string, args ...any) {
+	if _, err := fmt.Fprintf(w, format, args...); err != nil {
+		log.Printf("failed to write %s: %v", target, err)
+	}
 }
 
 func buildLegacyPermissionSet(user legacy.User, snapshot *legacy.Snapshot) map[uuid.UUID]bool {

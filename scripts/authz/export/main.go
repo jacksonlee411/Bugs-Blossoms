@@ -6,6 +6,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"sort"
@@ -39,7 +41,7 @@ func main() {
 	flag.Parse()
 
 	if env := os.Getenv("ALLOWED_ENV"); env != *requiredEnv {
-		fmt.Fprintf(os.Stderr, "export blocked: ALLOWED_ENV=%s (expected %s)\n", env, *requiredEnv)
+		safePrintf(os.Stderr, "stderr", "export blocked: ALLOWED_ENV=%s (expected %s)\n", env, *requiredEnv)
 		os.Exit(1)
 	}
 
@@ -49,7 +51,7 @@ func main() {
 	}
 	if *output == "" {
 		if err := os.MkdirAll("tmp", 0o755); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create tmp directory: %v\n", err)
+			safePrintf(os.Stderr, "stderr", "failed to create tmp directory: %v\n", err)
 			os.Exit(1)
 		}
 		*output = filepath.Join("tmp", fmt.Sprintf("policy_export_%d.csv.gz", time.Now().Unix()))
@@ -60,7 +62,7 @@ func main() {
 
 	pool, err := pgxpool.New(ctx, *dsn)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to connect database: %v\n", err)
+		safePrintf(os.Stderr, "stderr", "failed to connect database: %v\n", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
@@ -68,7 +70,7 @@ func main() {
 
 	snapshot, err := legacy.LoadSnapshot(ctx, pool)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to load snapshot: %v\n", err)
+		safePrintf(os.Stderr, "stderr", "failed to load snapshot: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -78,10 +80,10 @@ func main() {
 		return
 	}
 	if err := writeCompressed(*output, entries); err != nil {
-		fmt.Fprintf(os.Stderr, "failed to write export: %v\n", err)
+		safePrintf(os.Stderr, "stderr", "failed to write export: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Fprintf(os.Stdout, "exported %d policy lines to %s\n", len(entries), *output)
+	safePrintf(os.Stdout, "stdout", "exported %d policy lines to %s\n", len(entries), *output)
 }
 
 func buildPolicyEntries(snapshot *legacy.Snapshot, hashSubjects bool) []policyEntry {
@@ -234,5 +236,11 @@ func reportSummary(entries []policyEntry) {
 			relations++
 		}
 	}
-	fmt.Fprintf(os.Stdout, "dry-run summary: %d policy rows (p) and %d role bindings (g)\n", policies, relations)
+	safePrintf(os.Stdout, "stdout", "dry-run summary: %d policy rows (p) and %d role bindings (g)\n", policies, relations)
+}
+
+func safePrintf(w io.Writer, target, format string, args ...any) {
+	if _, err := fmt.Fprintf(w, format, args...); err != nil {
+		log.Printf("failed to write %s: %v", target, err)
+	}
 }

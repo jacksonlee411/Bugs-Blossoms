@@ -143,16 +143,16 @@ func (s *Service) Enforcer() *casbin.Enforcer {
 var (
 	defaultServiceOnce sync.Once
 	defaultService     *Service
-	defaultServiceErr  error
+	errDefaultService  error
 )
 
 // Use returns a singleton Service configured via environment variables.
 func Use() *Service {
 	defaultServiceOnce.Do(func() {
-		defaultService, defaultServiceErr = NewService(DefaultConfig())
+		defaultService, errDefaultService = NewService(DefaultConfig())
 	})
-	if defaultServiceErr != nil {
-		panic(defaultServiceErr)
+	if errDefaultService != nil {
+		panic(errDefaultService)
 	}
 	return defaultService
 }
