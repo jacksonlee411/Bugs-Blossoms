@@ -13,8 +13,8 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
-	"github.com/iota-uz/iota-sdk/pkg/defaults"
 	authzVersion "github.com/iota-uz/iota-sdk/pkg/authz/version"
+	"github.com/iota-uz/iota-sdk/pkg/defaults"
 	"github.com/iota-uz/iota-sdk/pkg/itf"
 )
 

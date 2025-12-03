@@ -22,7 +22,7 @@ export async function login(page: Page, email: string, password: string) {
 		page.waitForURL(url => !url.pathname.includes('/login'), {
 			timeout: 15_000,
 		}),
-		page.getByRole('button', { name: /log in/i }).click(),
+		page.getByRole('button', { name: /^log in$/i }).click(),
 	]);
 }
 

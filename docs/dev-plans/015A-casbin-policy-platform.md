@@ -42,6 +42,12 @@
 4. [X] 测试与文档：补 `go test ./modules/core/services -run PolicyDraft` / `controllers -run Authz`，并在 README/AGENTS 提供 curl 示例与错误码说明。
    - 成果：Core 模块注册 `PolicyDraftService` + `AuthzAPIController`，新增 `Authz.*` 权限与多语言翻译，`config/access/policy.csv.rev` 纳入版本控制，`make authz-pack` 自动生成 revision 元数据；服务层/控制器均已有单元测试并归档调用示例。
 
+## 最新进展（2025-12-03）
+
+- 阶段 Beta 的服务层与 REST API 已并入 `feature/dev-plan-015a` 分支，`AuthzAPIController`、`PolicyDraftService` 相关 gofmt 已同步，`Code Quality & Formatting` 作业不再报错。
+- 由于新增 “Log in with Google” 按钮，Playwright 登录脚本曾点击错误按钮导致 `/users` 用例停留在登录页，现已改为精准匹配 “Log in” 提交按钮修复 `tests/users/register.spec.ts`。
+- 本地验证登录脚本修复后重新触发 E2E 之前，仍需关注 `E2E Tests` 作业回归结果，如有需要可在本地执行 `npx playwright test tests/users/register.spec.ts`.
+
 ### 阶段 Gamma：Authz.Debug 与观测
 1. [ ] `pkg/authz` Inspector 输出 rule 链路、ABAC、latency。
 2. [ ] `/core/api/authz/debug` 返回 Inspector 数据，并记录审计日志。

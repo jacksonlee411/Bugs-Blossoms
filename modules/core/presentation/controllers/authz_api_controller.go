@@ -15,9 +15,9 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	permissionEntity "github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
+	"github.com/iota-uz/iota-sdk/pkg/application"
 	authz "github.com/iota-uz/iota-sdk/pkg/authz"
 	authzPersistence "github.com/iota-uz/iota-sdk/pkg/authz/persistence"
-	"github.com/iota-uz/iota-sdk/pkg/application"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/di"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"

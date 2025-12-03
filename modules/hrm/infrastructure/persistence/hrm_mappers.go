@@ -186,14 +186,14 @@ func toDomainEmployeeFromRow(row employeeRowData) (employee.Employee, error) {
 		return nil, err
 	}
 
-	hireDate, err := timeFromDate(row.HireDate)
-	if err != nil {
-		return nil, err
+	var hireDate time.Time
+	if row.HireDate.Valid {
+		hireDate, err = timeFromDate(row.HireDate)
+		if err != nil {
+			return nil, err
+		}
 	}
-	birthDate, err := timeFromDate(row.BirthDate)
-	if err != nil {
-		return nil, err
-	}
+
 	createdAt, err := timeFromTimestamptz(row.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -202,13 +202,28 @@ func toDomainEmployeeFromRow(row employeeRowData) (employee.Employee, error) {
 	if err != nil {
 		return nil, err
 	}
+	avatarID := uintFromInt32Ptr(row.AvatarID)
+	language := employee.NewLanguage(stringValue(row.PrimaryLanguage), stringValue(row.SecondaryLanguage))
+
 	resignationDate, err := timePtrFromDate(row.ResignationDate)
 	if err != nil {
 		return nil, err
 	}
+	opts := []employee.Option{
+		employee.WithAvatarID(avatarID),
+		employee.WithResignationDate(resignationDate),
+		employee.WithNotes(stringValue(row.Notes)),
+		employee.WithCreatedAt(createdAt),
+		employee.WithUpdatedAt(updatedAt),
+	}
 
-	avatarID := uintFromInt32Ptr(row.AvatarID)
-	language := employee.NewLanguage(stringValue(row.PrimaryLanguage), stringValue(row.SecondaryLanguage))
+	if row.BirthDate.Valid {
+		birthDate, err := timeFromDate(row.BirthDate)
+		if err != nil {
+			return nil, err
+		}
+		opts = append(opts, employee.WithBirthDate(birthDate))
+	}
 
 	entity := employee.NewWithID(
 		uint(row.ID),
@@ -223,12 +238,7 @@ func toDomainEmployeeFromRow(row employeeRowData) (employee.Employee, error) {
 		pin,
 		language,
 		hireDate,
-		employee.WithAvatarID(avatarID),
-		employee.WithBirthDate(birthDate),
-		employee.WithResignationDate(resignationDate),
-		employee.WithNotes(stringValue(row.Notes)),
-		employee.WithCreatedAt(createdAt),
-		employee.WithUpdatedAt(updatedAt),
+		opts...,
 	)
 
 	return entity, nil
@@ -434,7 +444,7 @@ func dateFromPointer(t *time.Time) pgtype.Date {
 
 func timeFromDate(d pgtype.Date) (time.Time, error) {
 	if !d.Valid {
-		return time.Time{}, errors.New("date is invalid")
+		return time.Time{}, nil
 	}
 	if d.InfinityModifier != pgtype.Finite {
 		return time.Time{}, fmt.Errorf("unsupported date infinity modifier: %v", d.InfinityModifier)
