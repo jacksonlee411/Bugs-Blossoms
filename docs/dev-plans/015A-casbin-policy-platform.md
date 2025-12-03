@@ -46,7 +46,7 @@
 
 - 阶段 Beta 的服务层与 REST API 已并入 `feature/dev-plan-015a` 分支，`AuthzAPIController`、`PolicyDraftService` 相关 gofmt 已同步，`Code Quality & Formatting` 作业不再报错。
 - 由于新增 “Log in with Google” 按钮，Playwright 登录脚本曾点击错误按钮导致 `/users` 用例停留在登录页，现已改为精准匹配 “Log in” 提交按钮修复 `tests/users/register.spec.ts`。
-- 本地验证登录脚本修复后重新触发 E2E 之前，仍需关注 `E2E Tests` 作业回归结果，如有需要可在本地执行 `npx playwright test tests/users/register.spec.ts`.
+- `E2E Tests` pipeline 近期的红灯来自 `/__test__/reset` 超时与 `Resources.authorization` / `Permissions.Authz.*` 缺失翻译，现已通过延长 Playwright API/beforeAll 超时、补齐全部 locale 键值并在本地复跑 `pnpm exec playwright test tests/users/register.spec.ts` 验证；GitHub Actions 已重新变绿。
 
 ### 阶段 Gamma：Authz.Debug 与观测
 1. [ ] `pkg/authz` Inspector 输出 rule 链路、ABAC、latency。
