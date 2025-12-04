@@ -5,6 +5,13 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 CMD=${1:-run}
 shift || true
 
+if [[ -f "$ROOT_DIR/.env.local" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env.local"
+  set +a
+fi
+
 run_bot() {
   local remote=${AUTHZ_BOT_GIT_REMOTE:-origin}
   local original_url

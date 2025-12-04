@@ -85,7 +85,7 @@ curl "http://localhost:3200/core/api/authz/debug?subject=role:core.superadmin&do
 
 ### Authz Bot & PR 流程
 
-- Bot 可通过 `scripts/authz/bot.sh run [--once]` 启动；需要以下环境变量：
+- Bot 可通过 `scripts/authz/bot.sh run [--once]` 启动；需要以下环境变量（脚本会自动加载仓库根目录的 `.env.local`，推荐在其中设置）：
   - `AUTHZ_BOT_GITHUB_TOKEN`：具备 `repo` 权限的 PAT，用于创建/更新 PR。
   - 可选 `AUTHZ_BOT_GIT_TOKEN`：若本地 remote 仍为 SSH，可临时注入 HTTPS 令牌。
   - `AUTHZ_BOT_GIT_REMOTE`/`AUTHZ_BOT_GIT_BRANCH_PREFIX`/`AUTHZ_BOT_GIT_AUTHOR`（如需覆盖默认值）。
