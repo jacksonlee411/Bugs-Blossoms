@@ -218,7 +218,8 @@ jobs:
           make authz-test
           make authz-lint
           go test ./cmd/authzbot
-          go test ./modules/core/services ./modules/core/presentation/controllers
+          go test ./modules/core/services
+          go test ./modules/core/presentation/controllers
 
       - name: Run HRM Atlas plan
         if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
