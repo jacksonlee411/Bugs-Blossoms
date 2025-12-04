@@ -35,7 +35,7 @@ func TestTokenRefresher_RefreshToken_TimeoutContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 
-	time.Sleep(2 * time.Millisecond)
+	<-ctx.Done()
 
 	refresher := &tokenRefresher{}
 
@@ -73,7 +73,7 @@ func TestTokenRefresher_RefreshTokenLocked_TimeoutContext(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 	defer cancel()
 
-	time.Sleep(2 * time.Millisecond)
+	<-ctx.Done()
 
 	refresher := &tokenRefresher{}
 
