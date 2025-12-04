@@ -86,6 +86,12 @@ func enforceRequest(ctx context.Context, svc *authz.Service, req authz.Request, 
 	switch mode {
 	case authz.ModeDisabled, authz.ModeEnforce:
 		return true, nil
+	case authz.ModeShadow:
+		allowed, err := svc.Check(ctx, req)
+		if err != nil {
+			return false, err
+		}
+		return allowed, nil
 	default:
 		allowed, err := svc.Check(ctx, req)
 		if err != nil {

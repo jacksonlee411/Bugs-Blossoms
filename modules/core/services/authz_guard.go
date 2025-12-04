@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -12,7 +13,13 @@ import (
 
 func authorizeCore(ctx context.Context, object, action string, opts ...authz.RequestOption) error {
 	currentUser, err := composables.UseUser(ctx)
-	if err != nil || currentUser == nil {
+	if err != nil {
+		if errors.Is(err, composables.ErrNoUserFound) {
+			return nil
+		}
+		return err
+	}
+	if currentUser == nil {
 		return nil
 	}
 	tenantID, err := composables.UseTenantID(ctx)
