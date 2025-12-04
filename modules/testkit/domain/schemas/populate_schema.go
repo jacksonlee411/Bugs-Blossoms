@@ -33,6 +33,7 @@ type UserSpec struct {
 	Permissions []string `json:"permissions,omitempty"`
 	Language    string   `json:"language,omitempty"`
 	Ref         string   `json:"_ref,omitempty"`
+	CasbinRoles []string `json:"casbinRoles,omitempty"`
 }
 
 type FinanceSpec struct {
