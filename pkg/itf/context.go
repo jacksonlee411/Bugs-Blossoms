@@ -181,7 +181,7 @@ var (
 func acquireSuiteSlot(tb testing.TB) func() {
 	tb.Helper()
 	suiteLimiterOnce.Do(func() {
-		limit := 6
+		limit := 3
 		if val := os.Getenv("ITF_MAX_SUITES"); val != "" {
 			if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
 				limit = parsed
