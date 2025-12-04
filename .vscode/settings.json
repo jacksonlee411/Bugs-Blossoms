@@ -1,0 +1,19 @@
+{
+  "sqltools.connections": [
+    {
+      "name": "IOTA ERP (Docker Compose)",
+      "driver": "PostgreSQL",
+      "previewLimit": 100,
+      "server": "localhost",
+      "port": 5438,
+      "database": "iota_erp",
+      "username": "postgres",
+      "password": "postgres",
+      "connectionTimeout": 30,
+      "pgOptions": {
+        "ssl": false
+      }
+    }
+  ],
+  "sqltools.useNodeRuntime": true
+}
