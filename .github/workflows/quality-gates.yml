@@ -24,6 +24,7 @@ jobs:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: iota_erp
+          POSTGRES_INITDB_ARGS: -c max_connections=400
         options: >-
           --health-cmd="pg_isready -U postgres -d iota_erp"
           --health-interval=10s
