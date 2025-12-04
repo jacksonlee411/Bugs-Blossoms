@@ -1,6 +1,6 @@
 # DEV-PLAN-015A：Casbin 策略平台（API、数据模型与 Bot 工作流）
 
-**状态**: 进行中（2025-12-03 12:20）
+**状态**: 已完成（2025-12-04 08:18）
 
 ## 背景
 - DEV-PLAN-013/014 已在 Core/HRM/Logging 引入 `pkg/authz` 与 Feature Flag，但仍缺少官方策略变更通道；管理员只能手工修改 `config/access/policy.csv`，缺乏审计与回滚。
@@ -24,7 +24,7 @@
 1. [X] `make authz-test` / `make authz-lint` / `go test ./pkg/authz/... ./modules/core/...` —— 已在 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 登记（2025-01-15 11:05-11:10）。
 2. [X] `make authz-pack` + `go run ./scripts/authz/verify --fixtures ...` —— 同步记录于 dev-records。
 3. [X] `go run ./scripts/authz/export -dry-run` —— 以 `ALLOWED_ENV=production_export` 在本地执行，dry-run 成功（69 p / 4 g），阻塞已解除。
-4. [ ] Git bot PAT 凭证与轮询方案待确认（完成后补 dev-records）。
+4. [X] Git bot PAT 凭证与轮询方案：`scripts/authz/bot.sh` 自动加载 `.env.local` 中的 `AUTHZ_BOT_GIT_TOKEN`，已在 dev-records 记录凭证接入与两次端到端验证。
 5. [X] 数据库迁移链路验证 —— 本地执行 `make db migrate up`，成功生成 migration log，并写入 dev-records。
 
 ## 实施步骤（分阶段）
@@ -69,8 +69,8 @@
 ### 阶段 Epsilon：文档、CI 与运维
 1. [X] 文档：README/CONTRIBUTING/AGENTS 新增“策略草稿流程 / bot 操作 / 回滚脚本 / FAQ”章节。
 2. [X] dev-records：维护 `request_id/pr_link/status/operator/log摘` 模板，每次 bot 运行都补齐。
-3. [ ] CI：更新 `quality-gates`，对 authz 相关改动自动跑 `make authz-test authz-lint`、`go test ./pkg/authz/... ./modules/core/services ./modules/core/presentation/controllers`，若涉及模板/locale 同步跑 `templ generate && make css` / `make check tr`。
-4. [ ] 运维：新增“手动 bot / revert”指南与缓存策略，减少 CI 耗时；确保 `git status --short` 在生成命令后干净。
+3. [X] CI：更新 `quality-gates`，对 authz 相关改动自动跑 `make authz-test authz-lint`、`go test ./pkg/authz/... ./modules/core/services ./modules/core/presentation/controllers`，若涉及模板/locale 同步跑 `templ generate && make css` / `make check tr`。
+4. [X] 运维：新增“手动 bot / revert”指南与缓存策略，减少 CI 耗时；确保 `git status --short` 在生成命令后干净。
 
 ## 里程碑
 - **M1**：`policy_change_requests` 表、repository、service、`POST/GET /requests` API 可用，具备最小草稿创建/查询能力。
