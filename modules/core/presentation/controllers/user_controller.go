@@ -13,6 +13,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/gorilla/mux"
 	"github.com/iota-uz/iota-sdk/components/base"
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
@@ -161,6 +162,34 @@ func legacyUserPermission(action string) *permission.Permission {
 	}
 }
 
+func ensureUsersPageCapabilities(r *http.Request, object string, actions ...string) {
+	if len(actions) == 0 {
+		return
+	}
+
+	state := authz.ViewStateFromContext(r.Context())
+	if state == nil {
+		return
+	}
+
+	currentUser, err := composables.UseUser(r.Context())
+	if err != nil || currentUser == nil {
+		return
+	}
+
+	tenantID := tenantIDFromContext(r)
+	logger := composables.UseLogger(r.Context())
+
+	for _, action := range actions {
+		if action == "" {
+			continue
+		}
+		if _, _, err := authzutil.CheckCapability(r.Context(), state, tenantID, currentUser, object, action); err != nil {
+			logger.WithError(err).WithField("capability", action).Warn("failed to evaluate users capability")
+		}
+	}
+}
+
 type UsersControllerOptions struct {
 	BasePath         string
 	PermissionSchema *rbac.PermissionSchema
@@ -229,6 +258,8 @@ func (c *UsersController) Users(
 	if !ensureUsersAuthz(w, r, "list") {
 		return
 	}
+
+	ensureUsersPageCapabilities(r, usersAuthzObject, "create")
 
 	params := composables.UsePaginated(r)
 	groupIDs := r.URL.Query()["groupID"]
