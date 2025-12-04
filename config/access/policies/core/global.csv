@@ -1,1 +1,2 @@
+p, role:bot-dev-2, core.users, list, global, allow
 p, role:core.superadmin, *, *, *, allow

@@ -17,7 +17,7 @@
 ## 子计划概览
 | 子计划 | 关键交付 | 依赖 | 状态 |
 | --- | --- | --- | --- |
-| [DEV-PLAN-015A](015A-casbin-policy-platform.md) | `policy_change_requests`、REST API、Authz.Debug、PolicyDraftService、bot/CLI、README/AGENTS 更新 | 013 输出的 `pkg/authz`、Feature Flag、数据库迁移、Git bot 凭证 | 草拟 |
+| [DEV-PLAN-015A](015A-casbin-policy-platform.md) | `policy_change_requests`、REST API、Authz.Debug、PolicyDraftService、bot/CLI、README/AGENTS 更新 | 013 输出的 `pkg/authz`、Feature Flag、数据库迁移、Git bot 凭证 | ✅ 已完成（2025-12-04 08:18） |
 | [DEV-PLAN-015B](015B-casbin-policy-ui-and-experience.md) | 角色/用户策略 UI、Unauthorized 组件、PolicyInspector、HRM/Logging 体验、翻译/文档 | 015A API、014 模块授权、`authz.ViewState` 注入 | 草拟 |
 
 ## 与 DEV-PLAN-014 的依赖解决方式

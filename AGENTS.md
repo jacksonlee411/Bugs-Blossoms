@@ -108,6 +108,7 @@ modules/{module}/
 - Run `make authz-lint` to execute policy packing and the deterministic parity fixtures (`scripts/authz/verify --fixtures ...`). CI hooks onto the same targets.
 - Use `go run ./scripts/authz/export -dsn <dsn> -out <path> -dry-run` for audited exports (requires `ALLOWED_ENV=production_export`).
 - Use `go run ./scripts/authz/verify --sample 0.2` for on-demand parity checks against a live database (set `AUTHZ_MODE`/`AUTHZ_FLAG_CONFIG` as needed).
+- Authz Bot：使用 `scripts/authz/bot.sh run [--once]` 消化 `policy_change_requests`，需要注入 `AUTHZ_BOT_GITHUB_TOKEN`（PR 用 PAT）及可选 `AUTHZ_BOT_GIT_TOKEN`（推送用 PAT）；如遇死锁，执行 `scripts/authz/bot.sh force-release <request-id>` 清空 `bot_lock` 后重试。
 
 ## Tool use
 - DO NOT USE `sed` for file manipulation

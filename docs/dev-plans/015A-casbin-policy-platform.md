@@ -1,6 +1,6 @@
 # DEV-PLAN-015A：Casbin 策略平台（API、数据模型与 Bot 工作流）
 
-**状态**: 进行中（2025-12-03 12:20）
+**状态**: 已完成（2025-12-04 08:18）
 
 ## 背景
 - DEV-PLAN-013/014 已在 Core/HRM/Logging 引入 `pkg/authz` 与 Feature Flag，但仍缺少官方策略变更通道；管理员只能手工修改 `config/access/policy.csv`，缺乏审计与回滚。
@@ -24,7 +24,7 @@
 1. [X] `make authz-test` / `make authz-lint` / `go test ./pkg/authz/... ./modules/core/...` —— 已在 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 登记（2025-01-15 11:05-11:10）。
 2. [X] `make authz-pack` + `go run ./scripts/authz/verify --fixtures ...` —— 同步记录于 dev-records。
 3. [X] `go run ./scripts/authz/export -dry-run` —— 以 `ALLOWED_ENV=production_export` 在本地执行，dry-run 成功（69 p / 4 g），阻塞已解除。
-4. [ ] Git bot PAT 凭证与轮询方案待确认（完成后补 dev-records）。
+4. [X] Git bot PAT 凭证与轮询方案：`scripts/authz/bot.sh` 自动加载 `.env.local` 中的 `AUTHZ_BOT_GIT_TOKEN`，已在 dev-records 记录凭证接入与两次端到端验证。
 5. [X] 数据库迁移链路验证 —— 本地执行 `make db migrate up`，成功生成 migration log，并写入 dev-records。
 
 ## 实施步骤（分阶段）
@@ -60,17 +60,17 @@
 2. [X] 锁管理：`bot_lock` 字段提供 `scripts/authz/bot.sh --force-release <id>` 手动解锁与日志记录，暂不实现自动 TTL。
 3. [X] 成功回写 `applied_policy_revision/snapshot`；`/revert` 端点依 snapshot 生成逆向草稿。
 4. [X] CLI `scripts/authz/bot.sh` 支持 `run`/`force-release` 两种模式，文档列明环境变量（Git token、repo）。
-5. [ ] Dev 验证：至少两次“草稿→bot→PR→状态更新”跑通并写入 dev-records。
+5. [X] Dev 验证：至少两次“草稿→bot→PR→状态更新”跑通并写入 dev-records。
 
 #### Git Bot 凭证与轮询方案
 1. [X] PAT 凭证链路 —— 创建 `@bb-authz-bot` GitHub 机器人账号，生成只具备 `repo`（contents/pull_requests）权限的 PAT，存入 1Password `DEV-AUTHZ`（命名 `AUTHZ_BOT_GIT_TOKEN`），由 `scripts/authz/bot.sh` 注入 `https://<token>@github.com/acme/Bugs-Blossoms.git`；同一脚本设置 `git config user.name/email`、branch 前缀（`AUTHZ_BOT_GIT_BRANCH_PREFIX` 默认 `authz/bot/`）、远端（`AUTHZ_BOT_GIT_REMOTE` 默认上述 HTTPS），并在推送前统一执行 `make authz-pack authz-test`，失败时写入 `policy_change_requests.error_log` 并释放锁。
 2. [X] 轮询执行流 —— `cmd/authzbot` 每 30 秒扫描 `status IN (approved,failed)` 且 `error_log IS NULL` 的记录，通过 `AcquireBotLock` 控制并发，获取 diff、校验 base revision、更新文件、运行 `make authz-pack && make authz-test`，成功则推送并创建 PR，写回 `applied_policy_revision/snapshot/pr_link`；失败记录 `error_log` 并清空 `bot_lock`；提供 `scripts/authz/bot.sh force-release <id>` 执行 `UPDATE policy_change_requests SET bot_lock=NULL, bot_locked_at=NULL WHERE id=$1` 以支持人工干预；相关 SQL 与 env 示例需记录到 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md`。
 
 ### 阶段 Epsilon：文档、CI 与运维
-1. [ ] 文档：README/CONTRIBUTING/AGENTS 新增“策略草稿流程 / bot 操作 / 回滚脚本 / FAQ”章节。
-2. [ ] dev-records：维护 `request_id/pr_link/status/operator/log摘` 模板，每次 bot 运行都补齐。
-3. [ ] CI：更新 `quality-gates`，对 authz 相关改动自动跑 `make authz-test authz-lint`、`go test ./pkg/authz/... ./modules/core/services ./modules/core/presentation/controllers`，若涉及模板/locale 同步跑 `templ generate && make css` / `make check tr`。
-4. [ ] 运维：新增“手动 bot / revert”指南与缓存策略，减少 CI 耗时；确保 `git status --short` 在生成命令后干净。
+1. [X] 文档：README/CONTRIBUTING/AGENTS 新增“策略草稿流程 / bot 操作 / 回滚脚本 / FAQ”章节。
+2. [X] dev-records：维护 `request_id/pr_link/status/operator/log摘` 模板，每次 bot 运行都补齐。
+3. [X] CI：更新 `quality-gates`，对 authz 相关改动自动跑 `make authz-test authz-lint`、`go test ./pkg/authz/... ./modules/core/services ./modules/core/presentation/controllers`，若涉及模板/locale 同步跑 `templ generate && make css` / `make check tr`。
+4. [X] 运维：新增“手动 bot / revert”指南与缓存策略，减少 CI 耗时；确保 `git status --short` 在生成命令后干净。
 
 ## 里程碑
 - **M1**：`policy_change_requests` 表、repository、service、`POST/GET /requests` API 可用，具备最小草稿创建/查询能力。

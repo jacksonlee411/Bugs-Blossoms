@@ -20,3 +20,12 @@
 | 日期 | 环境 | 命令 | 结果 | 备注 |
 | --- | --- | --- | --- | --- |
 | 2025-12-05 10:45 | 本地（feature/dev-plan-015a） | `curl -H "X-Request-Id: gamma-test" "http://localhost:3000/core/api/authz/debug?subject=role:core.superadmin&domain=global&object=core.users&action=list"` | ✅ | 响应包含 `allowed=true`、`latency_ms≈2`、`trace.matched_policy=["role:core.superadmin","*","*","*","allow"]`，attributes 为空，日志打印 request id/subject，Prom metrics `authz_debug_requests_total` 增量 1。限流 20 req/min 生效，未出现 429。 |
+
+## 阶段 Delta（Bot 运行记录模板）
+
+| 日期 | 环境 | Request ID | 基线修订 | PR 链接 | Bot Locker | 结果/备注 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2025-12-04 07:40 | 本地（feature/dev-plan-015a） | `c0c6cd84-4e00-4c35-ac24-359b3f8477de` | `ec522ef3… → 7dc0adfc…` | https://github.com/jacksonlee411/Bugs-Blossoms/pull/11 | `DESKTOP-S9U9E9K-54966-1764805201` | ✅ merged；bot 首次运行即完成，回写 snapshot/PR link 成功 |
+| 2025-12-04 07:44 | 本地（feature/dev-plan-015a） | `c256f1a3-83cd-480d-867e-f5d18c0168f0` | `ec522ef3… → 8f25298b…` | https://github.com/jacksonlee411/Bugs-Blossoms/pull/12 | `DESKTOP-S9U9E9K-58601-1764805469` | ✅ merged；首次推送因 HTTPS token 解析报错被标记失败，执行 `scripts/authz/bot.sh force-release` 后重试成功 |
+
+> 填写建议：在草稿状态从 `approved` 转为 `merged` 后，记录 bot 输出、`applied_policy_snapshot` 是否写入、相关 PR、Locker 等信息；若失败，记录 `error_log` 并注明是否使用 `force-release` 重试。
