@@ -2,9 +2,6 @@ package itf
 
 import (
 	"context"
-	"os"
-	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/google/uuid"
@@ -60,7 +57,6 @@ func (tc *TestContext) WithDBName(tb testing.TB, name string) *TestContext {
 // Build creates the test context with all dependencies
 func (tc *TestContext) Build(tb testing.TB) *TestEnvironment {
 	tb.Helper()
-	releaseSlot := acquireSuiteSlot(tb)
 
 	// Set default db name if not set
 	if tc.dbName == "" {
@@ -101,7 +97,6 @@ func (tc *TestContext) Build(tb testing.TB) *TestEnvironment {
 			tb.Logf("Warning: failed to rollback transaction: %v", err)
 		}
 		tc.pool.Close()
-		releaseSlot()
 	})
 
 	return &TestEnvironment{
@@ -171,27 +166,4 @@ func (te *TestEnvironment) TenantID() uuid.UUID {
 // WithTx returns a new context with the test transaction
 func (te *TestEnvironment) WithTx(ctx context.Context) context.Context {
 	return composables.WithTx(ctx, te.Tx)
-}
-
-var (
-	suiteLimiterOnce sync.Once
-	suiteLimiter     chan struct{}
-)
-
-func acquireSuiteSlot(tb testing.TB) func() {
-	tb.Helper()
-	suiteLimiterOnce.Do(func() {
-		limit := 3
-		if val := os.Getenv("ITF_MAX_SUITES"); val != "" {
-			if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
-				limit = parsed
-			}
-		}
-		suiteLimiter = make(chan struct{}, limit)
-	})
-
-	suiteLimiter <- struct{}{}
-	return func() {
-		<-suiteLimiter
-	}
 }
