@@ -37,7 +37,9 @@
 - Core 模块在 shadow → enforce 切换期间的命令、diff、回滚操作完整记录在 `docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md`。
 - 形成面向 HRM/Logging 的复用清单（服务授权 checklist、模板接入步骤、灰度流程），支撑主计划后续阶段。
 
-## 后续节点
-- M1：完成服务层授权补齐 + 单测，通过 readiness 记录。
-- M2：模板/UI 全量换用 `pageCtx.CanAuthz` + Unauthorized 组件。
-- M3：完成 shadow → enforce 灰度及回滚演练，沉淀 checklist，准备 HRM/Logging 复用。
+## 与 014 主计划的衔接节点
+- **M1（Core Ready）**：完成服务层 & API 授权补齐、关键单测与 readiness 记录，014 主计划对应“Core controller/service 完成”检查点，可通知 HRM/Logging 复刻代码层逻辑。
+- **M2（UI Ready）**：模板/UI 全量换用 `pageCtx.CanAuthz` + Unauthorized 组件，所有入口能力可控；014 主计划可在此阶段同步 UI 资产（Unauthorized 组件、`pageCtx.CanAuthz` 用例）。
+- **M3（灰度 Ready）**：完成 shadow → enforce 灰度、回滚演练、rolling log，并输出可复用 checklist，此时即可移除 Core 中 `user.Can` fallback 并通知主计划“Core 模板可直接复用”，HRM/Logging 启动时以该结果为基线。
+
+> 示例：Excel 导出 job 将使用 subject `system:core.job` + object `core.exports` + action `export`，在 `docs/dev-records` 记录该策略与使用方式，供 HRM/Logging 借鉴系统 subject 写法。
