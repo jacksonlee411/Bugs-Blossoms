@@ -54,7 +54,7 @@ func NewPool(dbOpts string) *pgxpool.Pool {
 		panic(err)
 	}
 
-	maxConns := int32(1)
+	maxConns := int32(4)
 	if val := os.Getenv("ITF_MAX_CONNS"); val != "" {
 		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
 			maxConns = int32(parsed)
