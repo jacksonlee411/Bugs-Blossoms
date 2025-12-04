@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -52,8 +54,14 @@ func NewPool(dbOpts string) *pgxpool.Pool {
 		panic(err)
 	}
 
-	// With increased PostgreSQL max_connections (500), we can use reasonable limits
-	config.MaxConns = 4
+	maxConns := int32(2)
+	if val := os.Getenv("ITF_MAX_CONNS"); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil && parsed > 0 {
+			maxConns = int32(parsed)
+		}
+	}
+
+	config.MaxConns = maxConns
 	config.MinConns = 1
 	config.MaxConnLifetime = time.Minute * 5
 	config.MaxConnIdleTime = time.Second * 30
