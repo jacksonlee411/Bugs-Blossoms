@@ -12,6 +12,8 @@ type NavigationItem struct {
 	Children    []NavigationItem
 	Icon        templ.Component
 	Permissions []*permission.Permission
+	AuthzObject string
+	AuthzAction string
 }
 
 func (n NavigationItem) HasPermission(user user.User) bool {

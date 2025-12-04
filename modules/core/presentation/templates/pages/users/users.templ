@@ -254,12 +254,14 @@ templ UsersContent(props *IndexPageProps) {
 			</div>
 			<div class="hidden md:flex gap-3">
 				@filters.CreatedAt()
-				@button.Primary(button.Props{
-					Size: button.SizeNormal,
-					Href: "/users/new",
-					Icon: icons.PlusCircle(icons.Props{Size: "18"}),
-				}) {
-					{ pageCtx.T("Users.List.New") }
+				if pageCtx.CanAuthz("core.users", "create") {
+					@button.Primary(button.Props{
+						Size: button.SizeNormal,
+						Href: "/users/new",
+						Icon: icons.PlusCircle(icons.Props{Size: "18"}),
+					}) {
+						{ pageCtx.T("Users.List.New") }
+					}
 				}
 			</div>
 		</form>
@@ -293,11 +295,13 @@ templ Index(props *IndexPageProps) {
 							"@click": "$dispatch('open-user-filters')",
 						},
 					})
-					@button.Primary(button.Props{
-						Size: button.SizeNormal,
-						Href: "/users/new",
-						Icon: icons.PlusCircle(icons.Props{Size: "18"}),
-					})
+					if pageCtx.CanAuthz("core.users", "create") {
+						@button.Primary(button.Props{
+							Size: button.SizeNormal,
+							Href: "/users/new",
+							Icon: icons.PlusCircle(icons.Props{Size: "18"}),
+						})
+					}
 				</div>
 			</div>
 			<div class="mt-5 flex space-x-5">

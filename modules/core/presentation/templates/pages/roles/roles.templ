@@ -102,12 +102,14 @@ templ RolesContent(props *IndexPageProps) {
 						"value": props.Search,
 					},
 				})
-				@button.Primary(button.Props{
-					Size: button.SizeNormal,
-					Href: "/roles/new",
-					Icon: icons.PlusCircle(icons.Props{Size: "18"}),
-				}) {
-					{ pageCtx.T("Roles.List.New") }
+				if pageCtx.CanAuthz("core.roles", "create") {
+					@button.Primary(button.Props{
+						Size: button.SizeNormal,
+						Href: "/roles/new",
+						Icon: icons.PlusCircle(icons.Props{Size: "18"}),
+					}) {
+						{ pageCtx.T("Roles.List.New") }
+					}
 				}
 			</form>
 			@RolesTable(props)

@@ -113,14 +113,14 @@ func TestUsersController_Delete_Permissions(t *testing.T) {
 		{
 			name:           "No_Permission",
 			permissions:    []*permission.Permission{}, // No permissions
-			expectedStatus: 500,
-			expectedBody:   "forbidden",
+			expectedStatus: 403,
+			expectedBody:   "Forbidden",
 		},
 		{
 			name:           "Read_Only",
 			permissions:    []*permission.Permission{permissions.UserRead}, // Only read permission
-			expectedStatus: 500,
-			expectedBody:   "forbidden",
+			expectedStatus: 403,
+			expectedBody:   "Forbidden",
 		},
 		{
 			name:           "With_Delete_Permission",

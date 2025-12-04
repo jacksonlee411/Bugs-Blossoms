@@ -28,6 +28,7 @@ func WithPageContext() mux.MiddlewareFunc {
 					Localizer: localizer,
 					Locale:    locale,
 				}
+				pageCtx.SetAuthzState(composables.UseAuthzViewState(r.Context()))
 				next.ServeHTTP(w, r.WithContext(composables.WithPageCtx(r.Context(), pageCtx)))
 			},
 		)

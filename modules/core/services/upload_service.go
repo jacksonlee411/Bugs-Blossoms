@@ -6,13 +6,20 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/upload"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/eventbus"
 )
+
+var uploadsAuthzObject = authz.ObjectName("core", "uploads")
 
 type UploadService struct {
 	repo      upload.Repository
 	storage   upload.Storage
 	publisher eventbus.EventBus
+}
+
+func authorizeUploads(ctx context.Context, action string) error {
+	return authorizeCore(ctx, uploadsAuthzObject, action)
 }
 
 func NewUploadService(
@@ -28,30 +35,51 @@ func NewUploadService(
 }
 
 func (s *UploadService) GetByID(ctx context.Context, id uint) (upload.Upload, error) {
+	if err := authorizeUploads(ctx, "view"); err != nil {
+		return nil, err
+	}
 	return s.repo.GetByID(ctx, id)
 }
 
 func (s *UploadService) Exists(ctx context.Context, id uint) (bool, error) {
+	if err := authorizeUploads(ctx, "view"); err != nil {
+		return false, err
+	}
 	return s.repo.Exists(ctx, id)
 }
 
 func (s *UploadService) GetByHash(ctx context.Context, hash string) (upload.Upload, error) {
+	if err := authorizeUploads(ctx, "view"); err != nil {
+		return nil, err
+	}
 	return s.repo.GetByHash(ctx, hash)
 }
 
 func (s *UploadService) GetBySlug(ctx context.Context, slug string) (upload.Upload, error) {
+	if err := authorizeUploads(ctx, "view"); err != nil {
+		return nil, err
+	}
 	return s.repo.GetBySlug(ctx, slug)
 }
 
 func (s *UploadService) GetAll(ctx context.Context) ([]upload.Upload, error) {
+	if err := authorizeUploads(ctx, "list"); err != nil {
+		return nil, err
+	}
 	return s.repo.GetAll(ctx)
 }
 
 func (s *UploadService) GetPaginated(ctx context.Context, params *upload.FindParams) ([]upload.Upload, error) {
+	if err := authorizeUploads(ctx, "list"); err != nil {
+		return nil, err
+	}
 	return s.repo.GetPaginated(ctx, params)
 }
 
 func (s *UploadService) Create(ctx context.Context, data *upload.CreateDTO) (upload.Upload, error) {
+	if err := authorizeUploads(ctx, "create"); err != nil {
+		return nil, err
+	}
 	entity, bytes, err := data.ToEntity()
 	if err != nil {
 		return nil, err
@@ -120,6 +148,9 @@ func (s *UploadService) Create(ctx context.Context, data *upload.CreateDTO) (upl
 }
 
 func (s *UploadService) CreateMany(ctx context.Context, data []*upload.CreateDTO) ([]upload.Upload, error) {
+	if err := authorizeUploads(ctx, "create"); err != nil {
+		return nil, err
+	}
 	entities := make([]upload.Upload, 0, len(data))
 	for _, d := range data {
 		entity, err := s.Create(ctx, d)
@@ -132,6 +163,9 @@ func (s *UploadService) CreateMany(ctx context.Context, data []*upload.CreateDTO
 }
 
 func (s *UploadService) Delete(ctx context.Context, id uint) (upload.Upload, error) {
+	if err := authorizeUploads(ctx, "delete"); err != nil {
+		return nil, err
+	}
 	entity, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err

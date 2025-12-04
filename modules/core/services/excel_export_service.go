@@ -9,6 +9,7 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/exportconfig"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/upload"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/excel"
 )
 
@@ -16,6 +17,12 @@ import (
 type ExcelExportService struct {
 	db            *pgxpool.Pool
 	uploadService *UploadService
+}
+
+var exportsAuthzObject = authz.ObjectName("core", "exports")
+
+func authorizeExports(ctx context.Context, action string) error {
+	return authorizeCore(ctx, exportsAuthzObject, action)
 }
 
 // NewExcelExportService creates a new Excel export service
@@ -28,6 +35,9 @@ func NewExcelExportService(db *pgxpool.Pool, uploadService *UploadService) *Exce
 
 // ExportFromQuery exports SQL query results to Excel and saves as upload
 func (s *ExcelExportService) ExportFromQuery(ctx context.Context, query exportconfig.Query, config exportconfig.ExportConfig) (upload.Upload, error) {
+	if err := authorizeExports(ctx, "export"); err != nil {
+		return nil, err
+	}
 	// Create pgx data source
 	datasource := excel.NewPgxDataSource(s.db, query.SQL(), query.Args()...)
 	if config.Filename() != "" {
@@ -70,6 +80,9 @@ func (s *ExcelExportService) ExportFromDataSource(
 	datasource excel.DataSource,
 	config exportconfig.ExportConfig,
 ) (upload.Upload, error) {
+	if err := authorizeExports(ctx, "export"); err != nil {
+		return nil, err
+	}
 	// Create Excel exporter
 	exporter := excel.NewExcelExporter(config.ExportOptions(), config.StyleOptions())
 

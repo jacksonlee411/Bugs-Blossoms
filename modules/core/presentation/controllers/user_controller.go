@@ -17,12 +17,14 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/query"
+	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/mappers"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/users"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/di"
@@ -138,6 +140,27 @@ type UsersController struct {
 	permissionSchema *rbac.PermissionSchema
 }
 
+var usersAuthzObject = authz.ObjectName("core", "users")
+
+func ensureUsersAuthz(w http.ResponseWriter, r *http.Request, action string) bool {
+	return ensureAuthz(w, r, usersAuthzObject, action, legacyUserPermission(action))
+}
+
+func legacyUserPermission(action string) *permission.Permission {
+	switch action {
+	case "list", "view":
+		return permissions.UserRead
+	case "create":
+		return permissions.UserCreate
+	case "update":
+		return permissions.UserUpdate
+	case "delete":
+		return permissions.UserDelete
+	default:
+		return nil
+	}
+}
+
 type UsersControllerOptions struct {
 	BasePath         string
 	PermissionSchema *rbac.PermissionSchema
@@ -203,6 +226,10 @@ func (c *UsersController) Users(
 	groupQueryService *services.GroupQueryService,
 	roleQueryService *services.RoleQueryService,
 ) {
+	if !ensureUsersAuthz(w, r, "list") {
+		return
+	}
+
 	params := composables.UsePaginated(r)
 	groupIDs := r.URL.Query()["groupID"]
 	roleIDs := r.URL.Query()["roleID"]
@@ -331,6 +358,10 @@ func (c *UsersController) GetEdit(
 	roleService *services.RoleService,
 	groupQueryService *services.GroupQueryService,
 ) {
+	if !ensureUsersAuthz(w, r, "view") {
+		return
+	}
+
 	id, err := shared.ParseID(r)
 	if err != nil {
 		logger.Errorf("Error parsing user ID: %v", err)
@@ -393,6 +424,10 @@ func (c *UsersController) GetNew(
 	roleService *services.RoleService,
 	groupQueryService *services.GroupQueryService,
 ) {
+	if !ensureUsersAuthz(w, r, "create") {
+		return
+	}
+
 	roles, err := roleService.GetAll(r.Context())
 	if err != nil {
 		logger.Errorf("Error retrieving roles: %v", err)
@@ -431,6 +466,10 @@ func (c *UsersController) Create(
 	roleService *services.RoleService,
 	groupQueryService *services.GroupQueryService,
 ) {
+	if !ensureUsersAuthz(w, r, "create") {
+		return
+	}
+
 	respondWithForm := func(errors map[string]string, dto *dtos.CreateUserDTO) {
 		ctx := r.Context()
 
@@ -532,6 +571,10 @@ func (c *UsersController) Update(
 	groupQueryService *services.GroupQueryService,
 	permissionService *services.PermissionService,
 ) {
+	if !ensureUsersAuthz(w, r, "update") {
+		return
+	}
+
 	ctx := r.Context()
 
 	id, err := shared.ParseID(r)
@@ -693,6 +736,10 @@ func (c *UsersController) Delete(
 	logger *logrus.Entry,
 	userService *services.UserService,
 ) {
+	if !ensureUsersAuthz(w, r, "delete") {
+		return
+	}
+
 	id, err := shared.ParseID(r)
 	if err != nil {
 		logger.Errorf("Error parsing user ID: %v", err)

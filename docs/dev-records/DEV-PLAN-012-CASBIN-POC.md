@@ -1,0 +1,10 @@
+# DEV-PLAN-012：Casbin 改造 Readiness 记录
+
+该记录用于 DEV-PLAN-014 启动任一模块改造前的“authz readiness”回溯。每次进入 Core/HRM/Logging 改动前，请按计划执行 `make authz-test authz-lint && go test ./pkg/authz/...`，并将命令、期望与结果补充到下表。
+
+| 时间 (UTC) | 命令 | 预期 | 实际 | 结果 |
+|------------|------|------|------|------|
+| 2025-01-15 14:45 | `make authz-test` | readiness 检查：`pkg/authz` + `scripts/authz/internal/...` 测试需通过 | 所有用例通过（分支 `feature/dev-plan-014`） | ✅ |
+| 2025-01-15 14:45 | `make authz-lint` | readiness 检查：打包策略并使用 fixtures 执行 parity 验证 | `authz-pack` 成功生成聚合文件，fixture parity 通过 | ✅ |
+
+> 提示：若命令失败，请先记录“❌ + 原因/堆栈”，完成修复后再追加新的“✅”行，确保整个 014 改造期间具备可追踪的 readiness 审计链路。

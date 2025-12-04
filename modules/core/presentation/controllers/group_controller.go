@@ -12,13 +12,16 @@ import (
 	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/group"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
+	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/query"
+	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/mappers"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/groups"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/di"
@@ -131,6 +134,27 @@ type GroupsController struct {
 	realtime *GroupRealtimeUpdates
 }
 
+var groupsAuthzObject = authz.ObjectName("core", "groups")
+
+func ensureGroupsAuthz(w http.ResponseWriter, r *http.Request, action string) bool {
+	return ensureAuthz(w, r, groupsAuthzObject, action, legacyGroupPermission(action))
+}
+
+func legacyGroupPermission(action string) *permission.Permission {
+	switch action {
+	case "list", "view":
+		return permissions.GroupRead
+	case "create":
+		return permissions.GroupCreate
+	case "update":
+		return permissions.GroupUpdate
+	case "delete":
+		return permissions.GroupDelete
+	default:
+		return nil
+	}
+}
+
 func NewGroupsController(app application.Application) application.Controller {
 	groupService := app.Service(services.GroupService{}).(*services.GroupService)
 	basePath := "/groups"
@@ -176,6 +200,9 @@ func (c *GroupsController) Groups(
 	logger *logrus.Entry,
 	groupQueryService *services.GroupQueryService,
 ) {
+	if !ensureGroupsAuthz(w, r, "list") {
+		return
+	}
 	params := composables.UsePaginated(r)
 	search := r.URL.Query().Get("name")
 
@@ -487,16 +514,22 @@ func (c *GroupsController) Update(
 func (c *GroupsController) Delete(
 	r *http.Request,
 	w http.ResponseWriter,
+	logger *logrus.Entry,
 	groupService *services.GroupService,
 ) {
+	if !ensureGroupsAuthz(w, r, "delete") {
+		return
+	}
 	idStr := mux.Vars(r)["id"]
 	id, err := uuid.Parse(idStr)
 	if err != nil {
+		logger.Errorf("Error parsing group ID: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	if err := groupService.Delete(r.Context(), id); err != nil {
+		logger.Errorf("Error deleting group: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
