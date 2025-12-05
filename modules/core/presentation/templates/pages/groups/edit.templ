@@ -19,18 +19,20 @@ templ EditForm(props *EditFormProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ canUpdate := pageCtx.CanAuthz("core.groups", "update") && props.Group.CanUpdate }}
 	{{ canDelete := pageCtx.CanAuthz("core.groups", "delete") && props.Group.CanDelete }}
-	{{ deleteAttrs := templ.Attributes{
-		"type": "submit",
-		"id":   "delete-group-btn",
-	} }}
+	{{deleteAttrs := templ.Attributes{
+	"type": "submit",
+	"id":   "delete-group-btn",
+}
+	}}
 	if !pageCtx.CanAuthz("core.groups", "delete") {
 		deleteAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
 	}
-	{{ saveAttrs := templ.Attributes{
-		"name":  "_action",
-		"value": "save",
-		"id":    "save-btn",
-	} }}
+	{{saveAttrs := templ.Attributes{
+	"name":  "_action",
+	"value": "save",
+	"id":    "save-btn",
+}
+	}}
 	if !canUpdate {
 		saveAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
 	}

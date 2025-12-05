@@ -23,11 +23,15 @@ func WithAuthzMode(t *testing.T, mode authz.Mode) {
 	original, err := os.ReadFile(flagPath)
 	require.NoError(t, err)
 
+	tmpDir := t.TempDir()
+	tmpFlagPath := filepath.Join(tmpDir, "authz_flags.yaml")
+	require.NoError(t, os.WriteFile(tmpFlagPath, original, 0o644))
+	t.Setenv("AUTHZ_FLAG_CONFIG", tmpFlagPath)
+
 	newContent := []byte(fmt.Sprintf("mode: %s\n", mode))
-	require.NoError(t, os.WriteFile(flagPath, newContent, 0o644))
+	require.NoError(t, os.WriteFile(tmpFlagPath, newContent, 0o644))
 
 	t.Cleanup(func() {
-		require.NoError(t, os.WriteFile(flagPath, original, 0o644))
 		authzFlagMu.Unlock()
 	})
 }
