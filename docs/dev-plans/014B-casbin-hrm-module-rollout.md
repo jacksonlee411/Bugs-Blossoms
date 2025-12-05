@@ -53,7 +53,7 @@
 - [x] 在 `modules/hrm/services` 创建 `authorizeHRM` helper，行为与 `authorizeCore` 相同；所有写操作（Create/Update/Delete、批量导入、事件消费）进入 Repository 前必须调用，必要时传入 `authz.Attributes`（例如导入批次 ID）。
 - [x] EmployeeService：Create/Update/Delete 加 guard，`Count/GetPaginated` 可选 shadow 只读；触发 `employee.NewCreatedEvent` 等事件前若授权失败需返回 `authz.ErrForbidden`。
 - [x] PositionService 以及未来 HRM 服务的 Create/Update/Delete 同样复用 capability（建议 `hrm.positions:{create|update|delete}`），通过表驱动测试验证拒绝时不会触发仓储/事件。
-- [ ] 若存在批处理或 future job（导入 CSV、同步第三方数据、工资计算等），需定义 system subject（例如 `system:hrm.job`），并在 docs/dev-records 中登记策略写法。
+- [x] 若存在批处理或 future job（导入 CSV、同步第三方数据、工资计算等），需定义 system subject（例如 `system:hrm.job`），并在 docs/dev-records 中登记策略写法。（当前无批处理需求，标记为 N/A）
 - [x] 为每个操作新增/更新单测：使用 testify + mock repository，模拟上下文无用户/无权限/有权限；拒绝时断言仓储未被调用。
 
 ### 3. Presentation / 模板 / 本地化
