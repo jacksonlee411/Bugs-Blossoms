@@ -6,6 +6,7 @@ DO NOT COMMENT EXECESSIVELY. Instead, write clear and concise code that is self-
 ## 项目现状
 - 项目仍处于早期开发阶段，尚未投产，所有特性以快速验证为主。
 - 当前仅由单一开发者负责全栈交付，可在保证质量前提下省略非必要的审批与跨组沟通流程，直接按照本指南自行决策。
+- 当前阶段不考虑灰度与回滚，直接按已测试通过的 enforce 路径上线；若未来需灰度，再在 dev-plan 中单独补充。
 
 ## Module Architecture
 
