@@ -1,6 +1,6 @@
 # DEV-PLAN-014B：HRM 模块 Casbin 改造细化计划
 
-**状态**: 草拟中（2025-12-05 11:20）
+**状态**: 进行中（2025-12-05 18:30）
 
 ## 背景
 - DEV-PLAN-014 主计划要求 HRM 模块与 Core/Logging 一起完成 Casbin 授权改造，并通过 `AUTHZ_ENFORCE` 灰度。Core 已在 DEV-PLAN-014A 中完成服务层兜底、模板注入等基础工作，HRM 需要在此基线之上复制能力。
@@ -72,7 +72,7 @@
 - [ ] M3：扩充 `e2e/tests/employees/employees.spec.ts`、在 `pkg/commands/e2e/seed.go` 增加缺权账号并对齐策略。
 - [x] M2：`make authz-test authz-lint && go test ./pkg/authz/... ./modules/hrm/...` 结果记录到 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
 - [ ] M3：`docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md` 记录 shadow/enforce 切换命令与 diff。
-- [ ] CI/Actions：PR #92 lint/action 失败待排查（本地因 sandbox 无法直接访问日志；需在远端查看具体错误后补充修复）。
+- [x] CI/Actions：PR #92 lint/action 失败已排查。问题一：templ fmt 生成物未提交（已在 d3e36640/010489ae 修复）；问题二：golangci-lint nilnil 检查指向 HRM service mocks 返回 nil 值+nil err（已在 a63c3b99/da9bb6f6 修复）。已触发 run #96 复验。
 
 ### 6. 灰度与回滚
 - [ ] M1：开发阶段默认直接 enforce，必要时用 `AUTHZ_ENFORCE=0` 做一次 shadow 对比。
