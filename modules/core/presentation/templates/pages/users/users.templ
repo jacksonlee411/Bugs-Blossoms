@@ -49,6 +49,14 @@ templ UserRow(user *viewmodels.User, rowProps *base.TableRowProps) {
 		pageCtx := composables.UsePageCtx(ctx)
 		rowProps.Attrs["id"] = fmt.Sprintf("user-%s", user.ID)
 		rowProps.Attrs["class"] = "hide-on-load"
+		canEdit := pageCtx.CanAuthz("core.users", "update") && user.CanUpdate
+		editAttrs := templ.Attributes{
+			"class": "btn-fixed",
+		}
+		if !pageCtx.CanAuthz("core.users", "update") {
+			editAttrs["data-authz-disabled"] = "true"
+			editAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
+		}
 	}}
 	@base.TableRow(*rowProps) {
 		@base.TableCell(base.TableCellProps{}) {
@@ -80,9 +88,10 @@ templ UserRow(user *viewmodels.User, rowProps *base.TableRowProps) {
 			@button.Secondary(button.Props{
 				Fixed:    true,
 				Size:     button.SizeSM,
-				Disabled: !user.CanUpdate,
+				Disabled: !canEdit,
 				Class:    "btn-fixed",
 				Href:     fmt.Sprintf("/users/%s", user.ID),
+				Attrs:    editAttrs,
 			}) {
 				@icons.PencilSimple(icons.Props{Size: "20"})
 			}

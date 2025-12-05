@@ -8,6 +8,8 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers"
+	"github.com/iota-uz/iota-sdk/modules/core/testhelpers"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/itf"
 	"github.com/iota-uz/iota-sdk/pkg/rbac"
 )
@@ -114,13 +116,13 @@ func TestUsersController_Delete_Permissions(t *testing.T) {
 			name:           "No_Permission",
 			permissions:    []*permission.Permission{}, // No permissions
 			expectedStatus: 403,
-			expectedBody:   "Forbidden",
+			expectedBody:   "Permission required",
 		},
 		{
 			name:           "Read_Only",
 			permissions:    []*permission.Permission{permissions.UserRead}, // Only read permission
 			expectedStatus: 403,
-			expectedBody:   "Forbidden",
+			expectedBody:   "Permission required",
 		},
 		{
 			name:           "With_Delete_Permission",
@@ -187,4 +189,25 @@ func TestUsersController_Delete_EdgeCases(t *testing.T) {
 	)
 
 	suite.RunCases(cases)
+}
+
+func TestUsersController_Delete_EnforceModeDenied(t *testing.T) {
+	testhelpers.WithAuthzMode(t, authz.ModeEnforce)
+
+	suite := itf.NewSuiteBuilder(t).
+		WithModules(modules.BuiltInModules...).
+		AsUser(permissions.UserDelete, permissions.UserRead).
+		Build()
+
+	controller := controllers.NewUsersController(suite.Env().App, &controllers.UsersControllerOptions{
+		BasePath:         "/users",
+		PermissionSchema: &rbac.PermissionSchema{},
+	})
+	suite.Register(controller)
+
+	nonExistentID := uint(99999)
+	suite.DELETE(fmt.Sprintf("/users/%d", nonExistentID)).
+		Assert(t).
+		ExpectStatus(403).
+		ExpectBodyContains("Permission required")
 }

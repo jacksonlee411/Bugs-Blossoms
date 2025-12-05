@@ -12,11 +12,14 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
 	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
+	"github.com/iota-uz/iota-sdk/modules/core/testhelpers"
 	"github.com/iota-uz/iota-sdk/modules/core/validators"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/eventbus"
 	"github.com/iota-uz/iota-sdk/pkg/intl"
 	"github.com/iota-uz/iota-sdk/pkg/itf"
+	"github.com/iota-uz/iota-sdk/pkg/serrors"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -205,6 +208,77 @@ func TestUserService_Delete_SelfDeletionPrevention(t *testing.T) {
 		_, err = userService.Delete(ctx, createdSystemUser.ID())
 		require.Error(t, err)
 		assert.Equal(t, composables.ErrForbidden, err, "System user deletion should return ErrForbidden")
+	})
+}
+
+func TestUserService_Delete_AuthorizationModes(t *testing.T) {
+	t.Run("ShadowModeAllowsLegacyPermission", func(t *testing.T) {
+		testhelpers.WithAuthzMode(t, authz.ModeShadow)
+
+		f := setupTestWithPermissions(t, permissions.UserDelete)
+		ctx := intl.WithLocalizer(f.Ctx, i18n.NewLocalizer(f.App.Bundle(), "en"))
+
+		uploadRepository := persistence.NewUploadRepository()
+		userRepository := persistence.NewUserRepository(uploadRepository)
+		userValidator := validators.NewUserValidator(userRepository)
+		eventBus := eventbus.NewEventPublisher(logrus.New())
+		userService := services.NewUserService(userRepository, userValidator, eventBus)
+
+		tenantID, err := composables.UseTenantID(ctx)
+		require.NoError(t, err)
+
+		emailDeletable, err := internet.NewEmail("shadow-legacy-delete@test.com")
+		require.NoError(t, err)
+		deletable := user.New("Shadow", "Legacy", emailDeletable, user.UILanguageEN, user.WithTenantID(tenantID))
+
+		emailKeeper, err := internet.NewEmail("shadow-legacy-keeper@test.com")
+		require.NoError(t, err)
+		keeper := user.New("Shadow", "Keeper", emailKeeper, user.UILanguageEN, user.WithTenantID(tenantID))
+
+		createdDeletable, err := createUserInTx(ctx, userRepository, deletable)
+		require.NoError(t, err)
+		_, err = createUserInTx(ctx, userRepository, keeper)
+		require.NoError(t, err)
+
+		deletedUser, err := userService.Delete(ctx, createdDeletable.ID())
+		require.NoError(t, err)
+		require.NotNil(t, deletedUser)
+	})
+
+	t.Run("EnforceModeDeniesWithoutCasbinPolicy", func(t *testing.T) {
+		testhelpers.WithAuthzMode(t, authz.ModeEnforce)
+
+		f := setupTestWithPermissions(t, permissions.UserDelete)
+		ctx := intl.WithLocalizer(f.Ctx, i18n.NewLocalizer(f.App.Bundle(), "en"))
+
+		uploadRepository := persistence.NewUploadRepository()
+		userRepository := persistence.NewUserRepository(uploadRepository)
+		userValidator := validators.NewUserValidator(userRepository)
+		eventBus := eventbus.NewEventPublisher(logrus.New())
+		userService := services.NewUserService(userRepository, userValidator, eventBus)
+
+		tenantID, err := composables.UseTenantID(ctx)
+		require.NoError(t, err)
+
+		emailDeletable, err := internet.NewEmail("enforce-deny-delete@test.com")
+		require.NoError(t, err)
+		deletable := user.New("Enforce", "Denied", emailDeletable, user.UILanguageEN, user.WithTenantID(tenantID))
+
+		emailKeeper, err := internet.NewEmail("enforce-deny-keeper@test.com")
+		require.NoError(t, err)
+		keeper := user.New("Enforce", "Keeper", emailKeeper, user.UILanguageEN, user.WithTenantID(tenantID))
+
+		createdDeletable, err := createUserInTx(ctx, userRepository, deletable)
+		require.NoError(t, err)
+		_, err = createUserInTx(ctx, userRepository, keeper)
+		require.NoError(t, err)
+
+		_, err = userService.Delete(ctx, createdDeletable.ID())
+		require.Error(t, err)
+
+		var authzErr *serrors.BaseError
+		require.ErrorAs(t, err, &authzErr)
+		assert.Equal(t, "AUTHZ_FORBIDDEN", authzErr.Code)
 	})
 }
 

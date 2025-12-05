@@ -114,6 +114,8 @@ func (c *RolesController) List(
 		return
 	}
 
+	ensurePageCapabilities(r, rolesAuthzObject, "create", "update", "delete")
+
 	params := composables.UsePaginated(r)
 	search := r.URL.Query().Get("name")
 
@@ -169,6 +171,8 @@ func (c *RolesController) GetEdit(
 	if !ensureRolesAuthz(w, r, "view") {
 		return
 	}
+
+	ensurePageCapabilities(r, rolesAuthzObject, "update", "delete")
 	id, err := shared.ParseID(r)
 	if err != nil {
 		logger.Errorf("Error parsing role ID: %v", err)
@@ -278,6 +282,8 @@ func (c *RolesController) GetNew(
 	if !ensureRolesAuthz(w, r, "create") {
 		return
 	}
+
+	ensurePageCapabilities(r, rolesAuthzObject, "create")
 	props := &roles.CreateFormProps{
 		Role:                   &viewmodels.Role{},
 		ModulePermissionGroups: c.modulePermissionGroups(),

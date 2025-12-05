@@ -6,5 +6,7 @@
 |------------|------|------|------|------|
 | 2025-01-15 14:45 | `make authz-test` | readiness 检查：`pkg/authz` + `scripts/authz/internal/...` 测试需通过 | 所有用例通过（分支 `feature/dev-plan-014`） | ✅ |
 | 2025-01-15 14:45 | `make authz-lint` | readiness 检查：打包策略并使用 fixtures 执行 parity 验证 | `authz-pack` 成功生成聚合文件，fixture parity 通过 | ✅ |
+| 2025-12-05 00:14 | `make authz-test` | readiness 检查：`pkg/authz` + `scripts/authz/internal/...` 用例需通过 | 所有 authz 相关单测通过（Core UI 授权改造前置检查） | ✅ |
+| 2025-12-05 00:14 | `make authz-lint` | readiness 检查：策略打包 + fixture parity 需通过 | `authz-pack` 生成最新策略，`scripts/authz/verify --fixtures` 零 diff | ✅ |
 
 > 提示：若命令失败，请先记录“❌ + 原因/堆栈”，完成修复后再追加新的“✅”行，确保整个 014 改造期间具备可追踪的 readiness 审计链路。

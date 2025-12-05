@@ -203,6 +203,9 @@ func (c *GroupsController) Groups(
 	if !ensureGroupsAuthz(w, r, "list") {
 		return
 	}
+
+	ensurePageCapabilities(r, groupsAuthzObject, "create", "update", "delete", "view")
+
 	params := composables.UsePaginated(r)
 	search := r.URL.Query().Get("name")
 
@@ -278,6 +281,12 @@ func (c *GroupsController) GetEdit(
 	groupQueryService *services.GroupQueryService,
 	roleService *services.RoleService,
 ) {
+	if !ensureGroupsAuthz(w, r, "view") {
+		return
+	}
+
+	ensurePageCapabilities(r, groupsAuthzObject, "update", "delete")
+
 	idStr := mux.Vars(r)["id"]
 
 	roles, err := roleService.GetAll(r.Context())
@@ -330,6 +339,12 @@ func (c *GroupsController) GetNew(
 	logger *logrus.Entry,
 	roleService *services.RoleService,
 ) {
+	if !ensureGroupsAuthz(w, r, "create") {
+		return
+	}
+
+	ensurePageCapabilities(r, groupsAuthzObject, "create")
+
 	roles, err := roleService.GetAll(r.Context())
 	if err != nil {
 		logger.Errorf("Error retrieving roles: %v", err)

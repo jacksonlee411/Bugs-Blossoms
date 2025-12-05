@@ -12,6 +12,22 @@ import (
 )
 
 func authorizeCore(ctx context.Context, object, action string, opts ...authz.RequestOption) error {
+	tenantID, err := composables.UseTenantID(ctx)
+	if err != nil {
+		tenantID = uuid.Nil
+	}
+
+	if subject, ok := authzutil.SystemSubjectFromContext(ctx); ok {
+		req := authz.NewRequest(
+			subject,
+			authz.DomainFromTenant(tenantID),
+			object,
+			authz.NormalizeAction(action),
+			opts...,
+		)
+		return authz.Use().Authorize(ctx, req)
+	}
+
 	currentUser, err := composables.UseUser(ctx)
 	if err != nil {
 		if errors.Is(err, composables.ErrNoUserFound) {
@@ -21,10 +37,6 @@ func authorizeCore(ctx context.Context, object, action string, opts ...authz.Req
 	}
 	if currentUser == nil {
 		return nil
-	}
-	tenantID, err := composables.UseTenantID(ctx)
-	if err != nil {
-		tenantID = uuid.Nil
 	}
 
 	req := authz.NewRequest(

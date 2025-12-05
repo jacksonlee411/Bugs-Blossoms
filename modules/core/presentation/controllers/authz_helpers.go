@@ -2,18 +2,22 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/a-h/templ"
 	"github.com/google/uuid"
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
+	"github.com/iota-uz/iota-sdk/pkg/serrors"
 )
 
 func ensureAuthz(
@@ -107,6 +111,18 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 		w.Header().Set("HX-Retarget", "body")
 		w.Header().Set("HX-Reswap", "innerHTML")
 	}
+	if pageCtx, ok := composables.TryUsePageCtx(r.Context()); ok {
+		props := &components.UnauthorizedProps{
+			Object:    object,
+			Action:    action,
+			Operation: fmt.Sprintf("%s %s", object, action),
+			State:     pageCtx.AuthzState(),
+			Request:   "/core/api/authz/requests",
+		}
+		w.WriteHeader(http.StatusForbidden)
+		templ.Handler(components.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
 	http.Error(w, msg, http.StatusForbidden)
 }
 
@@ -156,4 +172,43 @@ func recordForbiddenCapability(state *authz.ViewState, r *http.Request, object, 
 		Object: object,
 		Action: authz.NormalizeAction(action),
 	})
+}
+
+func ensurePageCapabilities(r *http.Request, object string, actions ...string) {
+	if len(actions) == 0 || strings.TrimSpace(object) == "" {
+		return
+	}
+
+	state := authz.ViewStateFromContext(r.Context())
+	if state == nil {
+		return
+	}
+
+	currentUser, err := composables.UseUser(r.Context())
+	if err != nil || currentUser == nil {
+		return
+	}
+
+	tenantID := tenantIDFromContext(r)
+	logger := composables.UseLogger(r.Context())
+
+	for _, action := range actions {
+		if strings.TrimSpace(action) == "" {
+			continue
+		}
+		if _, _, err := authzutil.CheckCapability(r.Context(), state, tenantID, currentUser, object, action); err != nil {
+			logger.WithError(err).WithField("capability", action).Warn("failed to evaluate capability")
+		}
+	}
+}
+
+func isAuthzForbidden(err error) bool {
+	if err == nil {
+		return false
+	}
+	var authzErr *serrors.BaseError
+	if !errors.As(err, &authzErr) {
+		return false
+	}
+	return strings.EqualFold(authzErr.Code, "AUTHZ_FORBIDDEN")
 }

@@ -16,17 +16,29 @@ func NewUserQueryService(repo query.UserQueryRepository) *UserQueryService {
 }
 
 func (s *UserQueryService) FindUsers(ctx context.Context, params *query.FindParams) ([]*viewmodels.User, int, error) {
+	if err := authorizeUsers(ctx, "list"); err != nil {
+		return nil, 0, err
+	}
 	return s.repo.FindUsers(ctx, params)
 }
 
 func (s *UserQueryService) FindUserByID(ctx context.Context, userID int) (*viewmodels.User, error) {
+	if err := authorizeUsers(ctx, "view"); err != nil {
+		return nil, err
+	}
 	return s.repo.FindUserByID(ctx, userID)
 }
 
 func (s *UserQueryService) SearchUsers(ctx context.Context, params *query.FindParams) ([]*viewmodels.User, int, error) {
+	if err := authorizeUsers(ctx, "list"); err != nil {
+		return nil, 0, err
+	}
 	return s.repo.SearchUsers(ctx, params)
 }
 
 func (s *UserQueryService) FindUsersWithRoles(ctx context.Context, params *query.FindParams) ([]*viewmodels.User, int, error) {
+	if err := authorizeUsers(ctx, "list"); err != nil {
+		return nil, 0, err
+	}
 	return s.repo.FindUsersWithRoles(ctx, params)
 }

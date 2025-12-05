@@ -400,6 +400,16 @@
       "UserNotFound": "Foydalanuvchi topilmadi"
     }
   },
+  "Authz": {
+    "Unauthorized": {
+      "Title": "Ruxsat talab qilinadi",
+      "_Description": "{{.Operation}} bajarish uchun ruxsatingiz yo'q. Ruxsat so'rang yoki administratorga murojaat qiling.",
+      "MissingPolicies": "Yetishmayotgan siyosatlar",
+      "Apply": "Ruxsat so'rash",
+      "ApplyDescription": "/core/api/authz/requests manziliga tavsiya etilgan siyosat bilan so'rov yuboring.",
+      "ApplyHint": "Bu amal uchun ruxsatingiz yo'q"
+    }
+  },
   "Home": {
     "Meta": {
       "Title": "Bosh sahifa"
