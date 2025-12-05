@@ -24,12 +24,12 @@
 - 持续 Workday 对齐，但每阶段可独立上线，确保 HRM/Authz/Finance 等依赖至少获得稳定的组织主数据引用与事件。
 
 ## 范围
-- **组织单元（Org Unit）**：公司、事业部、部门、项目团队、自定义群组。
-- **层级关系**：多棵树 + 侧向链接（矩阵汇报、共享服务线）。
+- **主数据最小集（Phase 0/1）**：单一 Supervisory 树，必备属性（code、name、parent、effective window、tenant），强制去重名/无重叠/租户隔离性能；父子校验、审计、冻结窗口为硬约束。
+- **扩展层级**：多棵树（Company/Cost/Custom）在后续阶段逐步放量，默认不影响主 Supervisory 约束；矩阵/侧向链接仅在 Phase 2+ 开启且首版只读占位。
 - **时间维度**：组织、层级、分配、权限继承的有效期字段与校验。
-- **流程引擎对接**：与现有审批/工作流复用同一 `pkg/workflow`（若缺失则提供最小审批服务）。
-- **权限钩子**：组织层级变化触发 `pkg/authz` policy 生成建议。
-- **阶段化限制**：Phase 0/1 仅交付单一 Supervisory 树及基本 CRUD/有效期校验，矩阵/侧向链接在 Phase 2 以后开放，默认只读不影响主链；多层级（Company/Cost/Custom）逐步放量。
+- **流程引擎对接**：与现有审批/工作流复用同一 `pkg/workflow`（若缺失则提供最小审批服务）；下游审批编排属于后置集成，不阻塞主数据上线。
+- **权限钩子**：组织层级变化触发 `pkg/authz` policy 生成建议，按阶段纳入 CI（见里程碑）。
+- **主数据治理**：编码规则（唯一/长度/前缀）、命名规范、必填属性/字典校验、发布模式（API + 事件 + 批量导入）、冲突处理与审核责任写入文档；Org 为组织层级 SOR，Position/编制留在后续 DEV-PLAN-021，Cost Center/Finance 仅消费事件/视图（冻结期不改 schema）。
 - **非目标**：不实现薪酬预算、绩效考核，不做编制/空岗管理，只预留事件。
 
 ## Workday 能力对齐
@@ -135,11 +135,12 @@
   - Security Inspector：类似 Workday 的 domain/group 视图，显示节点继承、override、缺口策略。
 
 ## 集成与依赖
-- **HRM 员工**：新增 `employee.OrgAssignments` 视图模型，表单需选中所属节点，默认 `effective_start = hire_date`。
-- **Authz/Casbin**：组织节点作为 `object` 维度之一，`pkg/authz` 增加 `OrgScope` 属性用于 ABAC。
-- **Workflow**：若现有 `pkg/workflow` 未覆盖，将在本计划 M1 同步补齐最小审批引擎或复用外部服务。
+- **SOR 边界**：Org 模块为组织层级 SOR；HRM/Position 为人/岗位 SOR，Position 编制/空岗在 DEV-PLAN-021；Finance 为 Cost Center/Company 财务口径 SOR（冻结期间不改 schema）。
+- **HRM 员工**：新增 `employee.OrgAssignments` 视图模型，表单需选中所属节点，默认 `effective_start = hire_date`；与 HRM 的回写/订阅规则按 SOR 边界文档执行。
+- **Authz/Casbin**：组织节点作为 `object` 维度之一，`pkg/authz` 增加 `OrgScope` 属性用于 ABAC；授权策略生成/pack/test 随阶段推进。
+- **Workflow**：若现有 `pkg/workflow` 未覆盖，将在本计划 M1 同步补齐最小审批引擎或复用外部服务；审批编排属后置集成包，不阻塞主数据上线。
 - **Position/Compensation**：HRM Position/JobProfile/Comp 模块必须引用 Supervisory org，OrgAssignmentService 提供钩子确保职位移动时同步预算/薪酬计划。
-- **Finance/Projects/Procurement**：Cost Center 与 Company 层级需要与 finance 模块共享，事件 `OrgCostCenterChanged` 触发总账/项目的成本归集更新；因 `modules/finance` 处于冻结，短期仅输出事件与只读视图，不改动冻结模块代码，待解除冻结后再落地消费/表结构变更并在 dev-plan 记录。
+- **Finance/Projects/Procurement**：Cost Center 与 Company 层级事件 `OrgCostCenterChanged` 触发总账/项目的成本归集；冻结期仅发布事件与只读视图，解除冻结后再落地消费/表结构改动并在 dev-plan 记录。
 - **缓存**：树结构在 Redis/内存缓存，Key 含层级类型 + effective date（按日）。变更事件触发缓存失效。
 - **Reporting/Analytics**：提供 `org_reporting` 视图供 BI 工具使用，支持任意时间点快照，与 Workday Custom Reporting 对齐。
 
@@ -153,19 +154,19 @@
    - 补充 `config/access/policies/**` 片段并执行 `make authz-pack`、`make authz-test`，生成/校验 `policy.csv/.rev`，确保 OrgScope 权限链路纳入 CI。
 3. **M3（Phase 3）：Lifecycle & BP/安全域绑定**（3 周）
    - 实现 change request 仓储、并行版本合并、BP route preview、security domain 映射；`POST/GET /org/change-requests`，`/simulate`，`/approve|reject|schedule|cancel`。
-   - Retro API 定义与冲突策略，事件链 `OrgChanged`、`OrgAssignmentChanged`、`SecurityPolicyChanged`。
+   - Retro API 定义与冲突策略，事件链 `OrgChanged`、`OrgAssignmentChanged`、`SecurityPolicyChanged`；审批/下游消费作为独立集成包，可与主数据解耦发布。
 4. **M4（Phase 4）：Assignments & Impact UI**（2 周）
-   - 完成员工/职位/成本中心分配批量接口、Impact Simulation、树+时间轴 UI、Security Inspector、BP route 预览、多语言。
+   - 完成员工/职位/成本中心分配批量接口、Impact Simulation、树+时间轴 UI、Security Inspector、BP route 预览、多语言；发布口径说明（员工数、FTE、岗位数、成本额、审批链）。
    - 发布 Workday 场景（mass move、future-dated、retro correction）演示脚本。
 5. **M5：优化、验证与培训**（1-2 周）
    - 性能测试（1k 节点、10k 员工，查询延迟 < 200ms）、缓存策略、BI 导出、文档/培训、Workday parity checklist 签署。
 
 ## 验收标准
-- Phase 0/1：单树 CRUD + 有效期/去重名/无重叠 + 租户隔离查询性能达标（1k 节点 <200ms），审计和冻结窗口生效。
+- Phase 0/1：单树 CRUD + 有效期/去重名/无重叠 + 租户隔离查询性能达标（1k 节点 <200ms），审计和冻结窗口生效；主数据治理（编码/命名/必填/发布模式/SOR 边界）落地。
 - Phase 2：多层级读写稳定，矩阵/侧向链接仅只读占位，不影响主链；并行版本骨架可保存对比。
-- Phase 3：Lifecycle/Retro/BP/安全域链路闭环，可生成/合并并行版本并通过 `make authz-pack`/`make authz-test`。
+- Phase 3：Lifecycle/Retro/BP/安全域链路闭环，可生成/合并并行版本并通过 `make authz-pack`/`make authz-test`；审批/下游消费可独立发版。
 - Phase 4：Impact/UI 输出的口径明确（员工数、FTE、岗位数、成本额、审批链），与数据源/滞后性说明一致，典型 Workday 场景（Future-dated、Mass reorg、Retro、Parallel merge）可生成报告。
-- HRM/Position/Finance 集成：员工/职位/成本中心分配更新与事件链打通；Finance 端在冻结期仅消费事件/视图，无侵入改动。
+- HRM/Position/Finance 集成：员工/职位/成本中心分配更新与事件链打通；Finance 端在冻结期仅消费事件/视图，无侵入改动，解冻后按 SOR 规则回写。
 - 文档完整：模块 README、API 参考、口径说明、操作手册、dev-record、Workday parity checklist。
 
 ## 风险与缓解
