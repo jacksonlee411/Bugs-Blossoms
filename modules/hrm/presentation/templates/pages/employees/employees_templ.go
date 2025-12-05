@@ -23,7 +23,6 @@ type IndexPageProps struct {
 	Employees []*viewmodels.Employee
 	NewURL    string
 	CanCreate bool
-	CanUpdate bool
 }
 
 func EmployeesTable(props *IndexPageProps) templ.Component {
@@ -97,7 +96,7 @@ func EmployeesTable(props *IndexPageProps) templ.Component {
 							var templ_7745c5c3_Var5 string
 							templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(employee.FirstName)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 40, Col: 26}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 39, Col: 26}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 							if templ_7745c5c3_Err != nil {
@@ -110,7 +109,7 @@ func EmployeesTable(props *IndexPageProps) templ.Component {
 							var templ_7745c5c3_Var6 string
 							templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(employee.LastName)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 41, Col: 25}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 40, Col: 25}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 							if templ_7745c5c3_Err != nil {
@@ -141,7 +140,7 @@ func EmployeesTable(props *IndexPageProps) templ.Component {
 							var templ_7745c5c3_Var8 string
 							templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(employee.Email)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 44, Col: 22}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 43, Col: 22}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 							if templ_7745c5c3_Err != nil {
@@ -176,7 +175,7 @@ func EmployeesTable(props *IndexPageProps) templ.Component {
 							var templ_7745c5c3_Var10 string
 							templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("format('%s')", employee.UpdatedAt))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 48, Col: 69}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 47, Col: 69}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 							if templ_7745c5c3_Err != nil {
@@ -208,7 +207,7 @@ func EmployeesTable(props *IndexPageProps) templ.Component {
 								}()
 							}
 							ctx = templ.InitializeContext(ctx)
-							if props.CanUpdate {
+							if employee.CanUpdate {
 								templ_7745c5c3_Var12 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 									templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 									templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -297,7 +296,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("NavigationLinks.Employees"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 73, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 72, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -384,7 +383,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 				var templ_7745c5c3_Var18 string
 				templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Employees.List.New"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 117, Col: 39}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 116, Col: 39}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 				if templ_7745c5c3_Err != nil {
@@ -394,7 +393,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ApplyHint"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 119, Col: 49}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 118, Col: 49}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {

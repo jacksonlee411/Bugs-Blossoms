@@ -59,7 +59,7 @@
 ### 3. Presentation / 模板 / 本地化
 - [x] 在 `modules/hrm/presentation/templates/pages/employees/*.templ` 去除 `user.Can`，全部改为 `if pageCtx.CanAuthz("hrm.employees", "create") { ... }`。按钮/链接（新建、保存、删除、批量操作）全部受控。
 - [x] 提供临时 Unauthorized 组件（可直接借用 Core 的 403 文案），props 接收 `pageCtx.AuthzState().MissingPolicies`，展示“申请权限”按钮跳转 `/core/api/authz/requests`，为 015B 升级留钩子。
-- [ ] 更新 viewmodels/mappers 以携带 `CanEdit`, `CanDelete` 等布尔字段，避免模板内直接发起权限判断。
+- [x] 更新 viewmodels/mappers 以携带 `CanEdit`, `CanDelete` 等布尔字段，避免模板内直接发起权限判断。
 - [x] `modules/hrm/presentation/locales/{en,ru,uz}.json` 增加 Casbin 相关文案（Denied 标题、申请按钮、调试提示）；完成后运行 `make check tr`。
 
 ### 4. 导航 & Quick Links
@@ -70,7 +70,7 @@
 ### 5. 测试、E2E 与记录
 - [x] M1：以单元/少量集成覆盖授权通过/拒绝路径：`go test ./modules/hrm/...`，模板改动后执行 `templ generate && make css` 并确认 `git status --short` 干净。
 - [ ] M3：扩充 `e2e/tests/employees/employees.spec.ts`、在 `pkg/commands/e2e/seed.go` 增加缺权账号并对齐策略。
-- [ ] M2：`make authz-test authz-lint && go test ./pkg/authz/... ./modules/hrm/...` 结果记录到 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
+- [x] M2：`make authz-test authz-lint && go test ./pkg/authz/... ./modules/hrm/...` 结果记录到 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
 - [ ] M3：`docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md` 记录 shadow/enforce 切换命令与 diff。
 
 ### 6. 灰度与回滚
@@ -80,7 +80,7 @@
 
 ### 7. Policy 维护（新增）
 - [ ] 在 `config/access/policies/hrm/`（或现有片段目录）定义 `hrm.employees:*`、`hrm.positions:*` 等 capability 对应的 policy 行，命名遵循现有“模块.资源.动作”语义。
-- [ ] M2：执行最小 `make authz-pack` 产出供其他模块/脚本复用，可不提交产物，但需确认无报错；如提交，PR 贴关键 diff。
+- [x] M2：执行最小 `make authz-pack` 产出供其他模块/脚本复用，可不提交产物，但需确认无报错；如提交，PR 贴关键 diff。
 - [ ] M3：正式 `make authz-pack` 并提交产物；若 E2E/演示租户需要快速赋权，补充 `scripts/authz/verify`/`go test ./pkg/authz/...` 中的 fixture，避免策略 drift。
 
 ## 与 015B 的接口契约

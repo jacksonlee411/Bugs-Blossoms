@@ -15,7 +15,6 @@ type IndexPageProps struct {
 	Employees []*viewmodels.Employee
 	NewURL    string
 	CanCreate bool
-	CanUpdate bool
 }
 
 templ EmployeesTable(props *IndexPageProps) {
@@ -49,7 +48,7 @@ templ EmployeesTable(props *IndexPageProps) {
 						</div>
 					}
 					@base.TableCell(base.TableCellProps{}) {
-						if props.CanUpdate {
+						if employee.CanUpdate {
 							@button.Secondary(button.Props{
 								Fixed: true,
 								Size:  button.SizeSM,

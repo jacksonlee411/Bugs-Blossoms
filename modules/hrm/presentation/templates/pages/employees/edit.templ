@@ -18,8 +18,6 @@ type EditPageProps struct {
 	Errors    map[string]string
 	SaveURL   string
 	DeleteURL string
-	CanUpdate bool
-	CanDelete bool
 }
 
 templ EditForm(props *EditPageProps) {
@@ -30,8 +28,8 @@ templ EditForm(props *EditPageProps) {
 	}
 	}}
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	{{ canUpdate := pageCtx.CanAuthz("hrm.employees", "update") && props.CanUpdate }}
-	{{ canDelete := pageCtx.CanAuthz("hrm.employees", "delete") && props.CanDelete }}
+	{{ canUpdate := props.Employee.CanUpdate }}
+	{{ canDelete := props.Employee.CanDelete }}
 	<div class="flex flex-col justify-between h-full" id="edit-content">
 		<div class="m-6">
 			@tab.Root(tab.Props{

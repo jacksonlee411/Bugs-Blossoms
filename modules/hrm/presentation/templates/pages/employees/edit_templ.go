@@ -26,8 +26,6 @@ type EditPageProps struct {
 	Errors    map[string]string
 	SaveURL   string
 	DeleteURL string
-	CanUpdate bool
-	CanDelete bool
 }
 
 func EditForm(props *EditPageProps) templ.Component {
@@ -57,8 +55,8 @@ func EditForm(props *EditPageProps) templ.Component {
 			Errors:   props.Errors,
 		}
 		pageCtx := composables.UsePageCtx(ctx)
-		canUpdate := pageCtx.CanAuthz("hrm.employees", "update") && props.CanUpdate
-		canDelete := pageCtx.CanAuthz("hrm.employees", "delete") && props.CanDelete
+		canUpdate := props.Employee.CanUpdate
+		canDelete := props.Employee.CanDelete
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"flex flex-col justify-between h-full\" id=\"edit-content\"><div class=\"m-6\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -102,7 +100,7 @@ func EditForm(props *EditPageProps) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Employees.Tabs.Public"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 42, Col: 42}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 40, Col: 42}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -133,7 +131,7 @@ func EditForm(props *EditPageProps) templ.Component {
 					var templ_7745c5c3_Var7 string
 					templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Employees.Tabs.Private"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 45, Col: 43}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 43, Col: 43}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 					if templ_7745c5c3_Err != nil {
@@ -518,7 +516,7 @@ func EditForm(props *EditPageProps) templ.Component {
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(props.DeleteURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 198, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 196, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
@@ -543,7 +541,7 @@ func EditForm(props *EditPageProps) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Delete"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 209, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 207, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -580,7 +578,7 @@ func EditForm(props *EditPageProps) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(props.SaveURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 225, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 223, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -605,7 +603,7 @@ func EditForm(props *EditPageProps) templ.Component {
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Save"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 234, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/edit.templ`, Line: 232, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {

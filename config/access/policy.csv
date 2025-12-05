@@ -3,3 +3,4 @@ g, tenant:00000000-0000-0000-0000-000000000001:user:4e309650-6f57-59ed-887b-7be0
 g, tenant:00000000-0000-0000-0000-000000000001:user:f26094f2-121c-5d07-aff3-32959c3e09d6, role:core.superadmin, 00000000-0000-0000-0000-000000000001
 p, role:bot-dev-2, core.users, list, global, allow
 p, role:core.superadmin, *, *, *, allow
+p, role:core.superadmin, hrm.employees, *, global, allow
