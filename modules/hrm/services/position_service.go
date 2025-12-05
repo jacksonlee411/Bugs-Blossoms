@@ -38,6 +38,9 @@ func (s *PositionService) GetPaginated(
 }
 
 func (s *PositionService) Create(ctx context.Context, data *position.Position) error {
+	if err := authorizeHRM(ctx, PositionsAuthzObject, "create"); err != nil {
+		return err
+	}
 	if err := s.repo.Create(ctx, data); err != nil {
 		return err
 	}
@@ -46,6 +49,9 @@ func (s *PositionService) Create(ctx context.Context, data *position.Position) e
 }
 
 func (s *PositionService) Update(ctx context.Context, data *position.Position) error {
+	if err := authorizeHRM(ctx, PositionsAuthzObject, "update"); err != nil {
+		return err
+	}
 	if err := s.repo.Update(ctx, data); err != nil {
 		return err
 	}
@@ -54,6 +60,9 @@ func (s *PositionService) Update(ctx context.Context, data *position.Position) e
 }
 
 func (s *PositionService) Delete(ctx context.Context, id int64) error {
+	if err := authorizeHRM(ctx, PositionsAuthzObject, "delete"); err != nil {
+		return err
+	}
 	if err := s.repo.Delete(ctx, id); err != nil {
 		return err
 	}

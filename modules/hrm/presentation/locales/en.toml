@@ -2,6 +2,14 @@
   HRM = "HRM"
   Employees = "Employees"
 
+[Authz.Unauthorized]
+  Title = "Permission required"
+  _Description = "You do not have permission to {{.Operation}}. Request access or contact an administrator."
+  MissingPolicies = "Missing policies"
+  Apply = "Request access"
+  ApplyDescription = "Submit a policy change request via /core/api/authz/requests with the suggested policy diff."
+  ApplyHint = "You do not have permission to perform this action"
+
 [Resources]
   employee = "Employees"
 
@@ -85,4 +93,3 @@
     [Employees.Private.Pin]
       Label = "Pin (Personal Identification Number)"
       Placeholder = "123456789192121"
-
