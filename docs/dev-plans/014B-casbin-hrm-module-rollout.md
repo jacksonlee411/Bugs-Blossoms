@@ -65,11 +65,11 @@
 ### 4. 导航 & Quick Links
 - [x] `modules/hrm/links.go`：为 `HRMLink`/`EmployeesLink` 补充 `AuthzObject`（`"hrm.employees"`）和动作（`"list"`/`"view"`），并清理 `Permissions` 字段；若新增 Position/Dashboard，再按同样模式扩展。
 - [x] `modules/hrm/module.go` Quick Link 通过 `.RequireAuthz("hrm.employees", "create")`，未授权用户不再看到“新建员工”入口，保留 `.RequirePermissions` 作为 shadow fallback。
-- [ ] 若 HRM 未来新增 Dashboard/Reports，需在本计划输出的 checklist 中说明如何声明 `AuthzObject` 以及 Quick Link/Navigation 的层级策略。
+- [x] 若 HRM 未来新增 Dashboard/Reports，需在本计划输出的 checklist 中说明如何声明 `AuthzObject` 以及 Quick Link/Navigation 的层级策略：建议使用对象前缀 `hrm.dashboard`/`hrm.reports`，导航父项沿用 HRM，子项声明 `AuthzAction`=`list|view`，Quick Link 通过 `.RequireAuthz` 对应能力，禁用 legacy `Permissions`。
 
 ### 5. 测试、E2E 与记录
 - [x] M1：以单元/少量集成覆盖授权通过/拒绝路径：`go test ./modules/hrm/...`，模板改动后执行 `templ generate && make css` 并确认 `git status --short` 干净。
-- [ ] M3：扩充 `e2e/tests/employees/employees.spec.ts`、在 `pkg/commands/e2e/seed.go` 增加缺权账号并对齐策略。
+- [x] M3：扩充 `e2e/tests/employees/employees.spec.ts`、在 `pkg/commands/e2e/seed.go` 增加缺权账号并对齐策略（新增 nohrm@example.com + 403 覆盖）。
 - [x] M2：`make authz-test authz-lint && go test ./pkg/authz/... ./modules/hrm/...` 结果记录到 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
 - [ ] M3：`docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md` 记录 shadow/enforce 切换命令与 diff。
 - [x] CI/Actions：PR #92 lint/action 失败已排查。问题一：templ fmt 生成物未提交（已在 d3e36640/010489ae 修复）；问题二：golangci-lint nilnil 检查指向 HRM service mocks 返回 nil 值+nil err（已在 a63c3b99/da9bb6f6 修复）。已触发 run #96 复验。
@@ -80,8 +80,8 @@
 - [ ] 回滚简化：关闭 flag 或 revert 授权提交；若已进入 M3，再补充 `policy.csv` 恢复步骤与记录。
 
 ### 7. Policy 维护（新增）
-- [ ] 在 `config/access/policies/hrm/`（或现有片段目录）定义 `hrm.employees:*`、`hrm.positions:*` 等 capability 对应的 policy 行，命名遵循现有“模块.资源.动作”语义。
-- [x] M2：执行最小 `make authz-pack` 产出供其他模块/脚本复用，可不提交产物，但需确认无报错；如提交，PR 贴关键 diff。
+- [x] 在 `config/access/policies/hrm/`（或现有片段目录）定义 `hrm.employees:*`、`hrm.positions:*` 等 capability 对应的 policy 行，命名遵循现有“模块.资源.动作”语义（新增 hrm/positions.csv）。
+- [x] M2：执行最小 `make authz-pack` 产出供其他模块/脚本复用，可不提交产物，但需确认无报错；如提交，PR 贴关键 diff。（已执行并更新 policy.csv/.rev）
 - [ ] M3：正式 `make authz-pack` 并提交产物；若 E2E/演示租户需要快速赋权，补充 `scripts/authz/verify`/`go test ./pkg/authz/...` 中的 fixture，避免策略 drift。
 
 ## 与 015B 的接口契约
