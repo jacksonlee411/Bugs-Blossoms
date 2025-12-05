@@ -107,8 +107,8 @@ func enforceRequest(ctx context.Context, svc *authz.Service, req authz.Request, 
 func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, action string) {
 	msg := fmt.Sprintf("Forbidden: %s %s. 如需申请权限，请访问 /core/api/authz/requests。", object, action)
 	if htmx.IsHxRequest(r) {
-		w.Header().Set("HX-Retarget", "body")
-		w.Header().Set("HX-Reswap", "innerHTML")
+		w.Header().Set("Hx-Retarget", "body")
+		w.Header().Set("Hx-Reswap", "innerHTML")
 	}
 	if pageCtx, ok := composables.TryUsePageCtx(r.Context()); ok {
 		props := &corecomponents.UnauthorizedProps{
