@@ -74,7 +74,7 @@
 ### 3. 时间约束策略
 - **有效期重叠检测**：`OrgNode`、`OrgEdge`、`Assignment`（员工隶属）在同一实体/维度下不得出现重叠区间。算法：保存所有区间后运行线段树或 SQL 约束（`EXCLUDE USING gist` + `tsrange`）。
 - **冻结窗口**：敏感层级（公司、成本中心）在财务结账期（例如月底 +3 天）禁止生效变更，仅允许未来日期。
-- **自动补齐**：当创建新版本时，上一版本自动 `EndAt = StartAt - 1day`，确保无空洞。
+- **自动补齐（Workday 式 effective dating）**：未显式传入 `EndAt` 时默认开区间（`9999-12-31`），创建新版本时自动将上一版本 `EndAt = 新版本 StartAt - 1day`，禁止手动越界填写，确保无空洞/无重叠。
 - **历史追溯**：查询接口 `GET /org/nodes/{id}?effective_at=2025-04-01` 返回当时名称、父级、属性；若请求未来时间，需检查是否存在安排中的变更。
 - **Retro 传播**：当 Retro API 修改过去记录时，会重新生成 `OrgChanged` 与 `OrgAssignmentChanged` 事件，并标记影响范围供薪酬/审批补记。
 - **Mass Transfer 窗口**：针对同一员工在 Workday 的“Primary/Additional Supervisory Org”策略，实现“主组织唯一 + 辅组织多选但有权重”的约束。
