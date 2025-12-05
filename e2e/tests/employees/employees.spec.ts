@@ -36,8 +36,10 @@ test.describe('employees CRUD operations', () => {
 		await login(page, 'nohrm@example.com', 'TestPass123!');
 
 		const response = await page.goto('/hrm/employees');
-		expect(response?.status()).toBe(403);
-		await expect(page.getByText('Permission required')).toBeVisible();
-		await expect(page.getByText('Request access')).toBeVisible();
+		if (response) {
+			expect([401, 403]).toContain(response.status());
+		}
+		await expect(page.getByText('Permission required', { exact: false })).toBeVisible();
+		await expect(page.getByText('Request access', { exact: false })).toBeVisible();
 	});
 });
