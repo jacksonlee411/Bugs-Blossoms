@@ -7,16 +7,22 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/group"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
-	"github.com/iota-uz/iota-sdk/modules/core/permissions"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/eventbus"
 )
+
+var groupsAuthzObject = authz.ObjectName("core", "groups")
 
 // GroupService TODO: refactor it
 // GroupService provides operations for managing groups
 type GroupService struct {
 	repo      group.Repository
 	publisher eventbus.EventBus
+}
+
+func authorizeGroups(ctx context.Context, action string) error {
+	return authorizeCore(ctx, groupsAuthzObject, action)
 }
 
 // NewGroupService creates a new group service instance
@@ -29,12 +35,15 @@ func NewGroupService(repo group.Repository, publisher eventbus.EventBus) *GroupS
 
 // Count returns the total number of groups
 func (s *GroupService) Count(ctx context.Context, params *group.FindParams) (int64, error) {
+	if err := authorizeGroups(ctx, "list"); err != nil {
+		return 0, err
+	}
 	return s.repo.Count(ctx, params)
 }
 
 // GetPaginated returns a paginated list of groups
 func (s *GroupService) GetPaginated(ctx context.Context, params *group.FindParams) ([]group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupRead); err != nil {
+	if err := authorizeGroups(ctx, "list"); err != nil {
 		return nil, err
 	}
 	return s.repo.GetPaginated(ctx, params)
@@ -42,7 +51,7 @@ func (s *GroupService) GetPaginated(ctx context.Context, params *group.FindParam
 
 // GetPaginatedWithTotal returns a paginated list of groups with total count
 func (s *GroupService) GetPaginatedWithTotal(ctx context.Context, params *group.FindParams) ([]group.Group, int64, error) {
-	if err := composables.CanUser(ctx, permissions.GroupRead); err != nil {
+	if err := authorizeGroups(ctx, "list"); err != nil {
 		return nil, 0, err
 	}
 	groups, err := s.repo.GetPaginated(ctx, params)
@@ -60,7 +69,7 @@ func (s *GroupService) GetPaginatedWithTotal(ctx context.Context, params *group.
 
 // GetByID returns a group by its ID
 func (s *GroupService) GetByID(ctx context.Context, id uuid.UUID) (group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupRead); err != nil {
+	if err := authorizeGroups(ctx, "view"); err != nil {
 		return nil, err
 	}
 	return s.repo.GetByID(ctx, id)
@@ -68,7 +77,7 @@ func (s *GroupService) GetByID(ctx context.Context, id uuid.UUID) (group.Group, 
 
 // GetAll returns all groups
 func (s *GroupService) GetAll(ctx context.Context) ([]group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupRead); err != nil {
+	if err := authorizeGroups(ctx, "list"); err != nil {
 		return nil, err
 	}
 	return s.repo.GetPaginated(ctx, &group.FindParams{
@@ -78,7 +87,7 @@ func (s *GroupService) GetAll(ctx context.Context) ([]group.Group, error) {
 
 // Create creates a new group
 func (s *GroupService) Create(ctx context.Context, g group.Group) (group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupCreate); err != nil {
+	if err := authorizeGroups(ctx, "create"); err != nil {
 		return nil, err
 	}
 
@@ -104,7 +113,7 @@ func (s *GroupService) Create(ctx context.Context, g group.Group) (group.Group, 
 
 // Update updates an existing group
 func (s *GroupService) Update(ctx context.Context, g group.Group) (group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupUpdate); err != nil {
+	if err := authorizeGroups(ctx, "update"); err != nil {
 		return nil, err
 	}
 
@@ -142,7 +151,7 @@ func (s *GroupService) Update(ctx context.Context, g group.Group) (group.Group, 
 
 // Delete removes a group by its ID
 func (s *GroupService) Delete(ctx context.Context, id uuid.UUID) error {
-	if err := composables.CanUser(ctx, permissions.GroupDelete); err != nil {
+	if err := authorizeGroups(ctx, "delete"); err != nil {
 		return err
 	}
 
@@ -182,7 +191,7 @@ func (s *GroupService) Delete(ctx context.Context, id uuid.UUID) error {
 
 // AddUser adds a user to a group
 func (s *GroupService) AddUser(ctx context.Context, groupID uuid.UUID, userToAdd user.User) (group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupUpdate); err != nil {
+	if err := authorizeGroups(ctx, "update"); err != nil {
 		return nil, err
 	}
 
@@ -215,7 +224,7 @@ func (s *GroupService) AddUser(ctx context.Context, groupID uuid.UUID, userToAdd
 
 // RemoveUser removes a user from a group
 func (s *GroupService) RemoveUser(ctx context.Context, groupID uuid.UUID, userToRemove user.User) (group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupUpdate); err != nil {
+	if err := authorizeGroups(ctx, "update"); err != nil {
 		return nil, err
 	}
 
@@ -248,7 +257,7 @@ func (s *GroupService) RemoveUser(ctx context.Context, groupID uuid.UUID, userTo
 
 // AssignRole assigns a role to a group
 func (s *GroupService) AssignRole(ctx context.Context, groupID uuid.UUID, roleToAssign role.Role) (group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupUpdate); err != nil {
+	if err := authorizeGroups(ctx, "update"); err != nil {
 		return nil, err
 	}
 
@@ -283,7 +292,7 @@ func (s *GroupService) AssignRole(ctx context.Context, groupID uuid.UUID, roleTo
 
 // RemoveRole removes a role from a group
 func (s *GroupService) RemoveRole(ctx context.Context, groupID uuid.UUID, roleToRemove role.Role) (group.Group, error) {
-	if err := composables.CanUser(ctx, permissions.GroupUpdate); err != nil {
+	if err := authorizeGroups(ctx, "update"); err != nil {
 		return nil, err
 	}
 

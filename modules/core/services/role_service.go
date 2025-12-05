@@ -3,16 +3,22 @@ package services
 import (
 	"context"
 
-	"github.com/iota-uz/iota-sdk/modules/core/permissions"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/pkg/eventbus"
 )
 
+var rolesAuthzObject = authz.ObjectName("core", "roles")
+
 type RoleService struct {
 	repo      role.Repository
 	publisher eventbus.EventBus
+}
+
+func authorizeRoles(ctx context.Context, action string) error {
+	return authorizeCore(ctx, rolesAuthzObject, action)
 }
 
 func NewRoleService(repo role.Repository, publisher eventbus.EventBus) *RoleService {
@@ -23,23 +29,35 @@ func NewRoleService(repo role.Repository, publisher eventbus.EventBus) *RoleServ
 }
 
 func (s *RoleService) Count(ctx context.Context, params *role.FindParams) (int64, error) {
+	if err := authorizeRoles(ctx, "list"); err != nil {
+		return 0, err
+	}
 	return s.repo.Count(ctx, params)
 }
 
 func (s *RoleService) GetAll(ctx context.Context) ([]role.Role, error) {
+	if err := authorizeRoles(ctx, "list"); err != nil {
+		return nil, err
+	}
 	return s.repo.GetAll(ctx)
 }
 
 func (s *RoleService) GetByID(ctx context.Context, id uint) (role.Role, error) {
+	if err := authorizeRoles(ctx, "view"); err != nil {
+		return nil, err
+	}
 	return s.repo.GetByID(ctx, id)
 }
 
 func (s *RoleService) GetPaginated(ctx context.Context, params *role.FindParams) ([]role.Role, error) {
+	if err := authorizeRoles(ctx, "list"); err != nil {
+		return nil, err
+	}
 	return s.repo.GetPaginated(ctx, params)
 }
 
 func (s *RoleService) Create(ctx context.Context, data role.Role) (role.Role, error) {
-	err := composables.CanUser(ctx, permissions.RoleCreate)
+	err := authorizeRoles(ctx, "create")
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +87,7 @@ func (s *RoleService) Create(ctx context.Context, data role.Role) (role.Role, er
 }
 
 func (s *RoleService) Update(ctx context.Context, data role.Role) error {
-	err := composables.CanUser(ctx, permissions.RoleUpdate)
+	err := authorizeRoles(ctx, "update")
 	if err != nil {
 		return err
 	}
@@ -104,7 +122,7 @@ func (s *RoleService) Update(ctx context.Context, data role.Role) error {
 }
 
 func (s *RoleService) Delete(ctx context.Context, id uint) error {
-	err := composables.CanUser(ctx, permissions.RoleDelete)
+	err := authorizeRoles(ctx, "delete")
 	if err != nil {
 		return err
 	}

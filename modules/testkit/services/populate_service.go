@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
@@ -13,6 +14,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
 	"github.com/iota-uz/iota-sdk/modules/testkit/domain/schemas"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/defaults"
 	"github.com/iota-uz/iota-sdk/pkg/repo"
@@ -224,6 +226,9 @@ func (s *PopulateService) createUsers(ctx context.Context, users []schemas.UserS
 					"ref":   userSpec.Ref,
 				},
 			)
+			if len(userSpec.CasbinRoles) > 0 {
+				s.assignCasbinRoles(ctx, tenantID, existingUser, userSpec.CasbinRoles)
+			}
 			continue
 		}
 
@@ -290,9 +295,32 @@ func (s *PopulateService) createUsers(ctx context.Context, users []schemas.UserS
 				"ref":   userSpec.Ref,
 			},
 		)
+
+		if len(userSpec.CasbinRoles) > 0 {
+			s.assignCasbinRoles(ctx, tenantID, createdUser, userSpec.CasbinRoles)
+		}
 	}
 
 	return nil
+}
+
+func (s *PopulateService) assignCasbinRoles(ctx context.Context, tenantID uuid.UUID, u user.User, roles []string) {
+	if u == nil || len(roles) == 0 {
+		return
+	}
+	logger := composables.UseLogger(ctx)
+	enforcer := authz.Use().Enforcer()
+	subject := authzutil.SubjectForUser(tenantID, u)
+	domain := authz.DomainFromTenant(tenantID)
+	for _, roleName := range roles {
+		if roleName == "" {
+			continue
+		}
+		roleSubject := authz.SubjectForRole(roleName)
+		if _, err := enforcer.AddGroupingPolicy(subject, roleSubject, domain); err != nil {
+			logger.WithError(err).Warnf("failed to assign casbin role %s to user %d", roleName, u.ID())
+		}
+	}
 }
 
 func (s *PopulateService) createFinanceData(ctx context.Context, finance *schemas.FinanceSpec) error {

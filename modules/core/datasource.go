@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	icons "github.com/iota-uz/icons/phosphor"
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence/models"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/spotlight"
@@ -20,6 +22,10 @@ func (d *dataSource) Find(ctx context.Context, q string) []spotlight.Item {
 	logger := composables.UseLogger(ctx)
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
+		return []spotlight.Item{}
+	}
+
+	if !d.canSearchUsers(ctx) {
 		return []spotlight.Item{}
 	}
 
@@ -84,4 +90,22 @@ func (d *dataSource) Find(ctx context.Context, q string) []spotlight.Item {
 		))
 	}
 	return items
+}
+
+func (d *dataSource) canSearchUsers(ctx context.Context) bool {
+	u, err := composables.UseUser(ctx)
+	if err != nil || u == nil {
+		return false
+	}
+	tenantID, err := composables.UseTenantID(ctx)
+	if err != nil {
+		tenantID = uuid.Nil
+	}
+	ctxWithState, state := authzutil.EnsureViewState(ctx, tenantID, u)
+	allowed, decided, checkErr := authzutil.CheckCapability(ctxWithState, state, tenantID, u, UsersLink.AuthzObject, "view")
+	if checkErr != nil {
+		composables.UseLogger(ctx).WithError(checkErr).Warn("spotlight: failed to evaluate users capability")
+		return false
+	}
+	return decided && allowed
 }

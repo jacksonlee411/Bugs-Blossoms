@@ -17,12 +17,14 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/query"
+	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/mappers"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/users"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/di"
@@ -138,6 +140,27 @@ type UsersController struct {
 	permissionSchema *rbac.PermissionSchema
 }
 
+var usersAuthzObject = authz.ObjectName("core", "users")
+
+func ensureUsersAuthz(w http.ResponseWriter, r *http.Request, action string) bool {
+	return ensureAuthz(w, r, usersAuthzObject, action, legacyUserPermission(action))
+}
+
+func legacyUserPermission(action string) *permission.Permission {
+	switch action {
+	case "list", "view":
+		return permissions.UserRead
+	case "create":
+		return permissions.UserCreate
+	case "update":
+		return permissions.UserUpdate
+	case "delete":
+		return permissions.UserDelete
+	default:
+		return nil
+	}
+}
+
 type UsersControllerOptions struct {
 	BasePath         string
 	PermissionSchema *rbac.PermissionSchema
@@ -203,6 +226,16 @@ func (c *UsersController) Users(
 	groupQueryService *services.GroupQueryService,
 	roleQueryService *services.RoleQueryService,
 ) {
+	if !ensureUsersAuthz(w, r, "list") {
+		return
+	}
+
+	ensurePageCapabilities(r, usersAuthzObject, "create", "update")
+	ensurePageCapabilities(r, groupsAuthzObject, "list")
+	ensurePageCapabilities(r, rolesAuthzObject, "list")
+
+	pageCtx, _ := composables.TryUsePageCtx(r.Context())
+
 	params := composables.UsePaginated(r)
 	groupIDs := r.URL.Query()["groupID"]
 	roleIDs := r.URL.Query()["roleID"]
@@ -273,35 +306,52 @@ func (c *UsersController) Users(
 		return
 	}
 
-	// Get all groups for the sidebar using query service
-	groupParams := &query.GroupFindParams{
-		Limit:  100, // Get a reasonable number for sidebar display
-		Offset: 0,
-		SortBy: query.SortBy{
-			Fields: []repo.SortByField[query.Field]{
-				{Field: query.GroupFieldName, Ascending: true},
+	var groups []*viewmodels.Group
+	canListGroups := pageCtx != nil && pageCtx.CanAuthz(groupsAuthzObject, "list")
+	if canListGroups {
+		groupParams := &query.GroupFindParams{
+			Limit:  100,
+			Offset: 0,
+			SortBy: query.SortBy{
+				Fields: []repo.SortByField[query.Field]{
+					{Field: query.GroupFieldName, Ascending: true},
+				},
 			},
-		},
-		Filters: []query.GroupFilter{},
-	}
-	groups, _, err := groupQueryService.FindGroups(r.Context(), groupParams)
-	if err != nil {
-		logger.Errorf("Error retrieving groups: %v", err)
-		http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
-		return
+			Filters: []query.GroupFilter{},
+		}
+		var grpErr error
+		groups, _, grpErr = groupQueryService.FindGroups(r.Context(), groupParams)
+		if grpErr != nil {
+			if isAuthzForbidden(grpErr) {
+				logger.WithError(grpErr).Warn("group filters unauthorized, hiding sidebar data")
+				groups = []*viewmodels.Group{}
+			} else {
+				logger.Errorf("Error retrieving groups: %v", grpErr)
+				http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
+				return
+			}
+		}
 	}
 
-	// Get all roles with user counts for the sidebar
-	roleViewModels, err := roleQueryService.GetRolesWithCounts(r.Context())
-	if err != nil {
-		logger.Errorf("Error retrieving roles: %v", err)
-		http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
-		return
+	var roleViewModels []*viewmodels.Role
+	canListRoles := pageCtx != nil && pageCtx.CanAuthz(rolesAuthzObject, "list")
+	if canListRoles {
+		roleViewModels, err = roleQueryService.GetRolesWithCounts(r.Context())
+		if err != nil {
+			if isAuthzForbidden(err) {
+				logger.WithError(err).Warn("role filters unauthorized, hiding sidebar data")
+				roleViewModels = []*viewmodels.Role{}
+			} else {
+				logger.Errorf("Error retrieving roles: %v", err)
+				http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
+				return
+			}
+		}
 	}
 
 	props := &users.IndexPageProps{
 		Users:   us,             // Already viewmodels from query service
-		Groups:  groups,         // Already viewmodels from query service
+		Groups:  groups,         // Already viewmodels from query service (when authorized)
 		Roles:   roleViewModels, // Mapped from domain roles
 		Page:    params.Page,
 		PerPage: params.Limit,
@@ -331,6 +381,14 @@ func (c *UsersController) GetEdit(
 	roleService *services.RoleService,
 	groupQueryService *services.GroupQueryService,
 ) {
+	if !ensureUsersAuthz(w, r, "view") {
+		return
+	}
+
+	ensurePageCapabilities(r, usersAuthzObject, "update", "delete")
+	ensurePageCapabilities(r, rolesAuthzObject, "list")
+	ensurePageCapabilities(r, groupsAuthzObject, "list")
+
 	id, err := shared.ParseID(r)
 	if err != nil {
 		logger.Errorf("Error parsing user ID: %v", err)
@@ -338,24 +396,30 @@ func (c *UsersController) GetEdit(
 		return
 	}
 
-	roles, err := roleService.GetAll(r.Context())
-	if err != nil {
-		logger.Errorf("Error retrieving roles: %v", err)
-		http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
-		return
+	var roles []role.Role
+	if canAuthzCapability(r.Context(), rolesAuthzObject, "list") {
+		roles, err = roleService.GetAll(r.Context())
+		if err != nil {
+			logger.Errorf("Error retrieving roles: %v", err)
+			http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
+			return
+		}
 	}
 
-	// Use GroupQueryService to fetch all groups
-	groupParams := &query.GroupFindParams{
-		Limit:   1000, // Large limit to fetch all groups
-		Offset:  0,
-		Filters: []query.GroupFilter{},
-	}
-	groups, _, err := groupQueryService.FindGroups(r.Context(), groupParams)
-	if err != nil {
-		logger.Errorf("Error retrieving groups: %v", err)
-		http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
-		return
+	var groups []*viewmodels.Group
+	if canAuthzCapability(r.Context(), groupsAuthzObject, "list") {
+		groupParams := &query.GroupFindParams{
+			Limit:   1000,
+			Offset:  0,
+			Filters: []query.GroupFilter{},
+		}
+		var grpErr error
+		groups, _, grpErr = groupQueryService.FindGroups(r.Context(), groupParams)
+		if grpErr != nil {
+			logger.Errorf("Error retrieving groups: %v", grpErr)
+			http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	us, err := userService.GetByID(r.Context(), id)
@@ -393,24 +457,39 @@ func (c *UsersController) GetNew(
 	roleService *services.RoleService,
 	groupQueryService *services.GroupQueryService,
 ) {
-	roles, err := roleService.GetAll(r.Context())
-	if err != nil {
-		logger.Errorf("Error retrieving roles: %v", err)
-		http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
+	if !ensureUsersAuthz(w, r, "create") {
 		return
 	}
 
-	// Use GroupQueryService to fetch all groups
-	groupParams := &query.GroupFindParams{
-		Limit:   1000, // Large limit to fetch all groups
-		Offset:  0,
-		Filters: []query.GroupFilter{},
+	ensurePageCapabilities(r, usersAuthzObject, "create")
+	ensurePageCapabilities(r, rolesAuthzObject, "list")
+	ensurePageCapabilities(r, groupsAuthzObject, "list")
+
+	var roles []role.Role
+	var err error
+	if canAuthzCapability(r.Context(), rolesAuthzObject, "list") {
+		roles, err = roleService.GetAll(r.Context())
+		if err != nil {
+			logger.Errorf("Error retrieving roles: %v", err)
+			http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
+			return
+		}
 	}
-	groups, _, err := groupQueryService.FindGroups(r.Context(), groupParams)
-	if err != nil {
-		logger.Errorf("Error retrieving groups: %v", err)
-		http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
-		return
+
+	var groups []*viewmodels.Group
+	if canAuthzCapability(r.Context(), groupsAuthzObject, "list") {
+		groupParams := &query.GroupFindParams{
+			Limit:   1000,
+			Offset:  0,
+			Filters: []query.GroupFilter{},
+		}
+		var grpErr error
+		groups, _, grpErr = groupQueryService.FindGroups(r.Context(), groupParams)
+		if grpErr != nil {
+			logger.Errorf("Error retrieving groups: %v", grpErr)
+			http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	props := &users.CreateFormProps{
@@ -431,27 +510,42 @@ func (c *UsersController) Create(
 	roleService *services.RoleService,
 	groupQueryService *services.GroupQueryService,
 ) {
+	if !ensureUsersAuthz(w, r, "create") {
+		return
+	}
+
+	ensurePageCapabilities(r, usersAuthzObject, "create")
+	ensurePageCapabilities(r, rolesAuthzObject, "list")
+	ensurePageCapabilities(r, groupsAuthzObject, "list")
+
 	respondWithForm := func(errors map[string]string, dto *dtos.CreateUserDTO) {
 		ctx := r.Context()
 
-		roles, err := roleService.GetAll(ctx)
-		if err != nil {
-			logger.Errorf("Error retrieving roles: %v", err)
-			http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
-			return
+		var roles []role.Role
+		var err error
+		if canAuthzCapability(ctx, rolesAuthzObject, "list") {
+			roles, err = roleService.GetAll(ctx)
+			if err != nil {
+				logger.Errorf("Error retrieving roles: %v", err)
+				http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
+				return
+			}
 		}
 
-		// Use GroupQueryService to fetch all groups
-		groupParams := &query.GroupFindParams{
-			Limit:   1000, // Large limit to fetch all groups
-			Offset:  0,
-			Filters: []query.GroupFilter{},
-		}
-		groups, _, err := groupQueryService.FindGroups(ctx, groupParams)
-		if err != nil {
-			logger.Errorf("Error retrieving groups: %v", err)
-			http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
-			return
+		var groups []*viewmodels.Group
+		if canAuthzCapability(ctx, groupsAuthzObject, "list") {
+			groupParams := &query.GroupFindParams{
+				Limit:   1000,
+				Offset:  0,
+				Filters: []query.GroupFilter{},
+			}
+			var grpErr error
+			groups, _, grpErr = groupQueryService.FindGroups(ctx, groupParams)
+			if grpErr != nil {
+				logger.Errorf("Error retrieving groups: %v", grpErr)
+				http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		var selectedRoles []*viewmodels.Role
@@ -532,6 +626,14 @@ func (c *UsersController) Update(
 	groupQueryService *services.GroupQueryService,
 	permissionService *services.PermissionService,
 ) {
+	if !ensureUsersAuthz(w, r, "update") {
+		return
+	}
+
+	ensurePageCapabilities(r, usersAuthzObject, "update", "delete")
+	ensurePageCapabilities(r, rolesAuthzObject, "list")
+	ensurePageCapabilities(r, groupsAuthzObject, "list")
+
 	ctx := r.Context()
 
 	id, err := shared.ParseID(r)
@@ -562,11 +664,14 @@ func (c *UsersController) Update(
 			return
 		}
 
-		roles, err := roleService.GetAll(ctx)
-		if err != nil {
-			logger.Errorf("Error retrieving roles: %v", err)
-			http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
-			return
+		var roles []role.Role
+		if canAuthzCapability(ctx, rolesAuthzObject, "list") {
+			roles, err = roleService.GetAll(ctx)
+			if err != nil {
+				logger.Errorf("Error retrieving roles: %v", err)
+				http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		var selectedRoles []*viewmodels.Role
@@ -576,17 +681,20 @@ func (c *UsersController) Update(
 			}
 		}
 
-		// Use GroupQueryService to fetch all groups
-		groupParams := &query.GroupFindParams{
-			Limit:   1000, // Large limit to fetch all groups
-			Offset:  0,
-			Filters: []query.GroupFilter{},
-		}
-		groups, _, err := groupQueryService.FindGroups(ctx, groupParams)
-		if err != nil {
-			logger.Errorf("Error retrieving groups: %v", err)
-			http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
-			return
+		var groups []*viewmodels.Group
+		if canAuthzCapability(ctx, groupsAuthzObject, "list") {
+			groupParams := &query.GroupFindParams{
+				Limit:   1000,
+				Offset:  0,
+				Filters: []query.GroupFilter{},
+			}
+			var grpErr error
+			groups, _, grpErr = groupQueryService.FindGroups(ctx, groupParams)
+			if grpErr != nil {
+				logger.Errorf("Error retrieving groups: %v", grpErr)
+				http.Error(w, "Error retrieving groups", http.StatusInternalServerError)
+				return
+			}
 		}
 
 		canDelete, err := userService.CanUserBeDeleted(ctx, id)
@@ -693,6 +801,10 @@ func (c *UsersController) Delete(
 	logger *logrus.Entry,
 	userService *services.UserService,
 ) {
+	if !ensureUsersAuthz(w, r, "delete") {
+		return
+	}
+
 	id, err := shared.ParseID(r)
 	if err != nil {
 		logger.Errorf("Error parsing user ID: %v", err)
@@ -706,4 +818,12 @@ func (c *UsersController) Delete(
 		return
 	}
 	shared.Redirect(w, r, c.basePath)
+}
+
+func canAuthzCapability(ctx context.Context, object, action string) bool {
+	pageCtx, ok := composables.TryUsePageCtx(ctx)
+	if !ok || pageCtx == nil {
+		return false
+	}
+	return pageCtx.CanAuthz(object, action)
 }

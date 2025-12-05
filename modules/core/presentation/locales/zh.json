@@ -403,6 +403,16 @@
       "UserNotFound": "未找到用户"
     }
   },
+  "Authz": {
+    "Unauthorized": {
+      "Title": "需要权限",
+      "_Description": "您没有执行“{{.Operation}}”的权限。请发送权限申请或联系管理员。",
+      "MissingPolicies": "缺失的策略",
+      "Apply": "申请权限",
+      "ApplyDescription": "携带建议的策略变更调用 /core/api/authz/requests 接口提交申请。",
+      "ApplyHint": "您没有执行此操作的权限"
+    }
+  },
   "Home": {
     "Meta": {
       "Title": "首页"

@@ -536,30 +536,38 @@ func parsePolicyEntry(line string) (PolicyEntry, error) {
 		record[i] = strings.TrimSpace(record[i])
 	}
 	entry := PolicyEntry{}
-	switch len(record) {
-	case 0:
+	if len(record) == 0 {
 		return entry, errors.New("empty policy row")
-	case 5:
-		entry = PolicyEntry{
-			Type:    record[0],
-			Subject: record[1],
-			Domain:  record[2],
-			Object:  record[3],
-			Action:  record[4],
-			Effect:  "allow",
+	}
+	get := func(idx int) string {
+		if idx < 0 || idx >= len(record) {
+			return ""
+		}
+		return record[idx]
+	}
+	entry = PolicyEntry{
+		Type:    get(0),
+		Subject: get(1),
+		Domain:  get(2),
+		Object:  get(3),
+		Action:  get(4),
+		Effect:  "allow",
+	}
+	if eff := get(5); eff != "" {
+		entry.Effect = eff
+	}
+	switch entry.Type {
+	case "g", "g2":
+		entry.Object = get(2)
+		if domain := get(3); domain != "" {
+			entry.Domain = domain
+		}
+		if entry.Action == "" {
+			entry.Action = "*"
 		}
 	default:
-		entry = PolicyEntry{
-			Type:    record[0],
-			Subject: record[1],
-			Domain:  record[2],
-			Object:  record[3],
-			Action:  record[4],
-		}
-		if len(record) > 5 {
-			entry.Effect = record[5]
-		} else {
-			entry.Effect = "allow"
+		if entry.Action == "" {
+			entry.Action = "*"
 		}
 	}
 	return entry, nil

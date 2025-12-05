@@ -1,0 +1,111 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/iota-uz/iota-sdk/pkg/authz"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type UnauthorizedProps struct {
+	State     *authz.ViewState
+	Object    string
+	Action    string
+	Operation string
+	Request   string
+}
+
+func normalizePolicies(state *authz.ViewState, object, action string) []authz.MissingPolicy {
+	if state == nil {
+		return nil
+	}
+	if strings.TrimSpace(object) == "" && strings.TrimSpace(action) == "" {
+		return state.MissingPolicies
+	}
+	normalizedObject := strings.ToLower(strings.TrimSpace(object))
+	normalizedAction := authz.NormalizeAction(action)
+
+	matched := make([]authz.MissingPolicy, 0, len(state.MissingPolicies))
+	for _, policy := range state.MissingPolicies {
+		if normalizedObject != "" && !strings.EqualFold(policy.Object, normalizedObject) {
+			continue
+		}
+		if normalizedAction != "*" && policy.Action != normalizedAction {
+			continue
+		}
+		matched = append(matched, policy)
+	}
+	if len(matched) == 0 {
+		return state.MissingPolicies
+	}
+	return matched
+}
+
+templ Unauthorized(props *UnauthorizedProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ state := props.State }}
+	if state == nil {
+		state = pageCtx.AuthzState()
+	}
+	{{ requestURL := strings.TrimSpace(props.Request) }}
+	if requestURL == "" {
+		requestURL = "/core/api/authz/requests"
+	}
+	{{ safeRequestURL := templ.URL(requestURL) }}
+	{{ operation := strings.TrimSpace(props.Operation) }}
+	if operation == "" {
+		operation = strings.TrimSpace(fmt.Sprintf("%s %s", props.Object, props.Action))
+		if operation == "" {
+			operation = pageCtx.T("Actions")
+		}
+	}
+	{{ policies := normalizePolicies(state, props.Object, props.Action) }}
+	<section class="rounded-lg border border-primary bg-surface-600/80 p-6 text-left shadow">
+		<div class="space-y-2">
+			<h2 class="text-lg font-semibold text-white">
+				{ pageCtx.T("Authz.Unauthorized.Title") }
+			</h2>
+			<p class="text-sm text-surface-100">
+				{ pageCtx.T("Authz.Unauthorized._Description", map[string]interface{}{"Operation": operation}) }
+			</p>
+		</div>
+		if len(policies) > 0 {
+			<div class="mt-4 space-y-3">
+				<h3 class="text-xs font-semibold uppercase tracking-wide text-surface-200">
+					{ pageCtx.T("Authz.Unauthorized.MissingPolicies") }
+				</h3>
+				<ul class="space-y-2">
+					for _, policy := range policies {
+						<li class="rounded-md border border-surface-400/60 bg-surface-500/50 p-3 text-xs font-mono text-surface-50">
+							{ fmt.Sprintf("%s → %s / %s", policy.Domain, policy.Object, policy.Action) }
+							{{ suggestions := state.SuggestDiff(policy) }}
+							if len(suggestions) > 0 {
+								<div class="mt-2 rounded bg-surface-400/40 p-2 text-[11px] text-surface-50">
+									for _, suggestion := range suggestions {
+										<div>
+											{ fmt.Sprintf("%s %s %s %s", suggestion.Effect, suggestion.Subject, suggestion.Object, suggestion.Action) }
+										</div>
+									}
+								</div>
+							}
+						</li>
+					}
+				</ul>
+			</div>
+		}
+		<div class="mt-4 space-y-2">
+			<p class="text-xs text-surface-200">
+				{ pageCtx.T("Authz.Unauthorized.ApplyDescription") }
+			</p>
+			<a
+				class="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+				href={ safeRequestURL }
+				target="_blank"
+				rel="noreferrer"
+			>
+				{ pageCtx.T("Authz.Unauthorized.Apply") }
+			</a>
+		</div>
+	</section>
+}

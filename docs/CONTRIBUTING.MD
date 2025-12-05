@@ -148,6 +148,17 @@ Running the matching commands locally ensures your branch passes the `quality-ga
 - `make db lint` 会执行 `atlas migrate lint --env ci --git-base origin/main`，CI 通过新的 `hrm-atlas` 过滤器强制该步骤；任何缺失的迁移或 `atlas.sum`/`schema.hcl` 漂移都会导致 PR 失败。
 - 所有 Atlas / Goose 演练请写入 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`，确保有可追踪的“命令 → 结果”记录。
 
+## 🔐 Casbin 授权与策略草稿流程
+
+Casbin 相关改动遵循 DEV-PLAN-012/013/015A 的统一流程，详细操作示例见 README 的“Authz Policy Draft API / Authz Bot”章节与 AGENTS.md 的 “Casbin / Authorization” 段。以下为贡献者在提交 PR 前必须完成的要点：
+
+1. **策略文件改动**：修改 `config/access/policies/**` 后运行 `make authz-pack` 生成聚合版 `config/access/policy.csv` 与 `config/access/policy.csv.rev`；随后执行 `make authz-test` 与 `make authz-lint`，确保 `pkg/authz`、`scripts/authz/internal/...` 测试通过且 `scripts/authz/verify --fixtures ...` 的 parity 校验无差异。
+2. **API / Bot 使用**：策略草稿、审批与调试必须经由 `/core/api/authz/**`（例：`POST /requests`、`/requests/{id}/approve`、`GET /debug`）。若需要自动化处理草稿，请使用 `scripts/authz/bot.sh run [--once]`，并按 README 指南配置 `AUTHZ_BOT_GITHUB_TOKEN` 等变量；发生死锁时可执行 `scripts/authz/bot.sh force-release <request_id>`。
+3. **受控导出 / 校验**：如需对照旧权限，使用 `go run ./scripts/authz/export -dsn <dsn> -out <path> -dry-run`（需 `ALLOWED_ENV=production_export`）与 `go run ./scripts/authz/verify --sample 0.2`。生产级 DSN 必须在受管环境运行，切勿在公共环境暴露真实数据。
+4. **记录要求**：每次为 DEV-PLAN-014 启动 Core/HRM/Logging 改造前，务必把 readiness 命令结果登记至 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`；启停 `AUTHZ_ENFORCE` 时同步更新 `docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md`，记录命令、租户、观测指标与回滚结果，方便后续审计。
+
+完成上述步骤后再提交 PR，可显著降低策略回归风险，也方便合作者复现你的改动。
+
 ## 🧪 Running Tests
 
 ### E2E Testing

@@ -400,6 +400,16 @@
       "UserNotFound": "User not found"
     }
   },
+  "Authz": {
+    "Unauthorized": {
+      "Title": "Permission required",
+      "_Description": "You do not have permission to {{.Operation}}. Request access or contact an administrator.",
+      "MissingPolicies": "Missing policies",
+      "Apply": "Request access",
+      "ApplyDescription": "Submit a policy change request via /core/api/authz/requests with the suggested policy diff.",
+      "ApplyHint": "You do not have permission to perform this action"
+    }
+  },
   "Home": {
     "Meta": {
       "Title": "Home"

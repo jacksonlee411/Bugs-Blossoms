@@ -5,10 +5,16 @@ import (
 	"errors"
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
-	"github.com/iota-uz/iota-sdk/modules/core/permissions"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/eventbus"
 )
+
+var usersAuthzObject = authz.ObjectName("core", "users")
+
+func authorizeUsers(ctx context.Context, action string) error {
+	return authorizeCore(ctx, usersAuthzObject, action)
+}
 
 type UserService struct {
 	repo      user.Repository
@@ -37,21 +43,21 @@ func (s *UserService) GetAll(ctx context.Context) ([]user.User, error) {
 }
 
 func (s *UserService) GetByID(ctx context.Context, id uint) (user.User, error) {
-	if err := composables.CanUser(ctx, permissions.UserRead); err != nil {
+	if err := authorizeUsers(ctx, "view"); err != nil {
 		return nil, err
 	}
 	return s.repo.GetByID(ctx, id)
 }
 
 func (s *UserService) GetPaginated(ctx context.Context, params *user.FindParams) ([]user.User, error) {
-	if err := composables.CanUser(ctx, permissions.UserRead); err != nil {
+	if err := authorizeUsers(ctx, "list"); err != nil {
 		return nil, err
 	}
 	return s.repo.GetPaginated(ctx, params)
 }
 
 func (s *UserService) GetPaginatedWithTotal(ctx context.Context, params *user.FindParams) ([]user.User, int64, error) {
-	if err := composables.CanUser(ctx, permissions.UserRead); err != nil {
+	if err := authorizeUsers(ctx, "list"); err != nil {
 		return nil, 0, err
 	}
 	us, err := s.repo.GetPaginated(ctx, params)
@@ -66,7 +72,7 @@ func (s *UserService) GetPaginatedWithTotal(ctx context.Context, params *user.Fi
 }
 
 func (s *UserService) Create(ctx context.Context, data user.User) (user.User, error) {
-	if err := composables.CanUser(ctx, permissions.UserCreate); err != nil {
+	if err := authorizeUsers(ctx, "create"); err != nil {
 		return nil, err
 	}
 
@@ -106,7 +112,7 @@ func (s *UserService) UpdateLastLogin(ctx context.Context, id uint) error {
 }
 
 func (s *UserService) Update(ctx context.Context, data user.User) (user.User, error) {
-	err := composables.CanUser(ctx, permissions.UserUpdate)
+	err := authorizeUsers(ctx, "update")
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +172,7 @@ func (s *UserService) CanUserBeDeleted(ctx context.Context, userID uint) (bool, 
 }
 
 func (s *UserService) Delete(ctx context.Context, id uint) (user.User, error) {
-	err := composables.CanUser(ctx, permissions.UserDelete)
+	err := authorizeUsers(ctx, "delete")
 	if err != nil {
 		return nil, err
 	}

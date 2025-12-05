@@ -16,5 +16,8 @@ func NewRoleQueryService(repo query.RoleQueryRepository) *RoleQueryService {
 }
 
 func (s *RoleQueryService) GetRolesWithCounts(ctx context.Context) ([]*viewmodels.Role, error) {
+	if err := authorizeRoles(ctx, "list"); err != nil {
+		return nil, err
+	}
 	return s.repo.FindRolesWithCounts(ctx)
 }

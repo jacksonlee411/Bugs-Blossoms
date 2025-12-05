@@ -134,13 +134,22 @@ func (m *Module) Register(app application.Application) error {
 	app.Spotlight().Register(&dataSource{})
 	app.QuickLinks().Add(
 		spotlight.NewQuickLink(DashboardLink.Icon, DashboardLink.Name, DashboardLink.Href),
-		spotlight.NewQuickLink(UsersLink.Icon, UsersLink.Name, UsersLink.Href),
-		spotlight.NewQuickLink(GroupsLink.Icon, GroupsLink.Name, GroupsLink.Href),
+		spotlight.NewQuickLink(UsersLink.Icon, UsersLink.Name, UsersLink.Href).
+			RequireAuthz(UsersLink.AuthzObject, UsersLink.AuthzAction),
+		spotlight.NewQuickLink(RolesLink.Icon, RolesLink.Name, RolesLink.Href).
+			RequireAuthz(RolesLink.AuthzObject, RolesLink.AuthzAction),
+		spotlight.NewQuickLink(GroupsLink.Icon, GroupsLink.Name, GroupsLink.Href).
+			RequireAuthz(GroupsLink.AuthzObject, GroupsLink.AuthzAction),
 		spotlight.NewQuickLink(
 			icons.PlusCircle(icons.Props{Size: "24"}),
 			"Users.List.New",
 			"/users/new",
-		),
+		).RequireAuthz(UsersLink.AuthzObject, "create"),
+		spotlight.NewQuickLink(
+			icons.PlusCircle(icons.Props{Size: "24"}),
+			"Groups.List.New",
+			"/groups/new",
+		).RequireAuthz(GroupsLink.AuthzObject, "create"),
 	)
 	return nil
 }

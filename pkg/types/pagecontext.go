@@ -1,10 +1,14 @@
 package types
 
 import (
+	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/iota-uz/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
+
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 )
 
 // PageContextProvider is an interface for managing page-level localization and metadata.
@@ -69,6 +73,15 @@ type PageContextProvider interface {
 
 	// GetLocalizer returns the *i18n.Localizer for the current page context.
 	GetLocalizer() *i18n.Localizer
+
+	// AuthzState returns the authorization view state bound to the request, if any.
+	AuthzState() *authz.ViewState
+
+	// SetAuthzState binds the provided authz view state to the page context.
+	SetAuthzState(state *authz.ViewState)
+
+	// CanAuthz reports whether the authz view state allows the given object/action capability.
+	CanAuthz(object, action string) bool
 }
 
 // PageContext provides localization and page metadata for template rendering.
@@ -80,10 +93,11 @@ type PageContextProvider interface {
 //
 // See PageContextProvider documentation for extension examples.
 type PageContext struct {
-	Locale    language.Tag
-	URL       *url.URL
-	Localizer *i18n.Localizer
-	prefix    string
+	Locale     language.Tag
+	URL        *url.URL
+	Localizer  *i18n.Localizer
+	prefix     string
+	authzState *authz.ViewState
 }
 
 // Verify PageContext implements PageContextProvider interface at compile time.
@@ -132,10 +146,11 @@ func (p *PageContext) TSafe(k string, args ...map[string]interface{}) string {
 // All translation calls on the returned context will be prefixed with the given namespace.
 func (p *PageContext) Namespace(prefix string) PageContextProvider {
 	return &PageContext{
-		Locale:    p.Locale,
-		URL:       p.URL,
-		Localizer: p.Localizer,
-		prefix:    prefix,
+		Locale:     p.Locale,
+		URL:        p.URL,
+		Localizer:  p.Localizer,
+		prefix:     prefix,
+		authzState: p.authzState,
 	}
 }
 
@@ -286,4 +301,27 @@ func (p *PageContext) GetURL() *url.URL {
 // GetLocalizer returns the *i18n.Localizer for the current page context.
 func (p *PageContext) GetLocalizer() *i18n.Localizer {
 	return p.Localizer
+}
+
+func (p *PageContext) AuthzState() *authz.ViewState {
+	return p.authzState
+}
+
+func (p *PageContext) SetAuthzState(state *authz.ViewState) {
+	p.authzState = state
+}
+
+func (p *PageContext) CanAuthz(object, action string) bool {
+	if p.authzState == nil {
+		return false
+	}
+	return p.authzState.Capability(capabilityKey(object, action))
+}
+
+func capabilityKey(object, action string) string {
+	object = strings.ToLower(strings.TrimSpace(object))
+	if object == "" {
+		object = "global.resource"
+	}
+	return fmt.Sprintf("%s.%s", object, authz.NormalizeAction(action))
 }

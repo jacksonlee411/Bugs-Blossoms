@@ -154,6 +154,13 @@ var (
 	errDefaultService  error
 )
 
+// Reset clears the default service singleton; intended for tests.
+func Reset() {
+	defaultServiceOnce = sync.Once{}
+	defaultService = nil
+	errDefaultService = nil
+}
+
 // Use returns a singleton Service configured via environment variables.
 func Use() *Service {
 	defaultServiceOnce.Do(func() {

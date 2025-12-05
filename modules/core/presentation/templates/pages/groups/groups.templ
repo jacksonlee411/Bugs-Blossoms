@@ -39,11 +39,17 @@ templ GroupCreatedEvent(group *viewmodels.Group, rowProps *base.TableRowProps) {
 
 templ GroupRow(group *viewmodels.Group, rowProps *base.TableRowProps) {
 	{{
+		pageCtx := composables.UsePageCtx(ctx)
 		rowProps.Attrs["id"] = fmt.Sprintf("group-%s", group.ID)
-		rowProps.Attrs["hx-get"] = fmt.Sprintf("/groups/%s", group.ID)
-		rowProps.Attrs["hx-target"] = "body"
-		rowProps.Attrs["hx-swap"] = "beforeend"
 		rowProps.Attrs["class"] = "cursor-pointer hover:bg-surface-600"
+		if pageCtx.CanAuthz("core.groups", "view") {
+			rowProps.Attrs["hx-get"] = fmt.Sprintf("/groups/%s", group.ID)
+			rowProps.Attrs["hx-target"] = "body"
+			rowProps.Attrs["hx-swap"] = "beforeend"
+		} else {
+			rowProps.Attrs["data-authz-disabled"] = "true"
+			rowProps.Attrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
+		}
 	}}
 	@base.TableRow(*rowProps) {
 		@base.TableCell(base.TableCellProps{}) {
@@ -133,15 +139,17 @@ templ GroupsContent(props *IndexPageProps) {
 						"@click": "$dispatch('open-group-filters')",
 					},
 				})
-				@button.Primary(button.Props{
-					Size: button.SizeNormal,
-					Icon: icons.PlusCircle(icons.Props{Size: "18"}),
-					Attrs: templ.Attributes{
-						"type":   "button",
-						"x-data": "",
-						"@click": "$dispatch('new-group')",
-					},
-				})
+				if pageCtx.CanAuthz("core.groups", "create") {
+					@button.Primary(button.Props{
+						Size: button.SizeNormal,
+						Icon: icons.PlusCircle(icons.Props{Size: "18"}),
+						Attrs: templ.Attributes{
+							"type":   "button",
+							"x-data": "",
+							"@click": "$dispatch('new-group')",
+						},
+					})
+				}
 			</div>
 		</div>
 		<div class="mt-5 bg-surface-600 border border-primary rounded-lg">
@@ -167,16 +175,18 @@ templ GroupsContent(props *IndexPageProps) {
 				</div>
 				<div class="hidden md:flex gap-3">
 					@filters.CreatedAt()
-					@button.Primary(button.Props{
-						Size: button.SizeNormal,
-						Icon: icons.PlusCircle(icons.Props{Size: "18"}),
-						Attrs: templ.Attributes{
-							"type":   "button",
-							"x-data": "",
-							"@click": "$dispatch('new-group')",
-						},
-					}) {
-						{ pageCtx.T("Groups.List.New") }
+					if pageCtx.CanAuthz("core.groups", "create") {
+						@button.Primary(button.Props{
+							Size: button.SizeNormal,
+							Icon: icons.PlusCircle(icons.Props{Size: "18"}),
+							Attrs: templ.Attributes{
+								"type":   "button",
+								"x-data": "",
+								"@click": "$dispatch('new-group')",
+							},
+						}) {
+							{ pageCtx.T("Groups.List.New") }
+						}
 					}
 				</div>
 			</form>

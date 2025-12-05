@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -93,15 +92,23 @@ func UseUserAgent(ctx context.Context) (string, bool) {
 // UsePageCtx returns the page context from the context.
 // If the page context is not found, function will panic.
 func UsePageCtx(ctx context.Context) types.PageContextProvider {
+	if pageCtx, ok := TryUsePageCtx(ctx); ok {
+		return pageCtx
+	}
+	panic("page context not found")
+}
+
+// TryUsePageCtx attempts to fetch the page context without panicking.
+func TryUsePageCtx(ctx context.Context) (types.PageContextProvider, bool) {
 	pageCtx := ctx.Value(constants.PageContext)
 	if pageCtx == nil {
-		panic("page context not found")
+		return nil, false
 	}
 	v, ok := pageCtx.(types.PageContextProvider)
 	if !ok {
-		panic(fmt.Sprintf("page context is not of type PageContextProvider: %T", pageCtx))
+		return nil, false
 	}
-	return v
+	return v, true
 }
 
 // WithPageCtx returns a new context with the page context.

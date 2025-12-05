@@ -12,10 +12,13 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/iota-uz/iota-sdk/components"
+	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/upload"
+	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/mappers"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/mapping"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
@@ -26,6 +29,27 @@ type UploadController struct {
 	uploadService *services.UploadService
 	basePath      string
 }
+
+func ensureUploadsAuthz(w http.ResponseWriter, r *http.Request, action string) bool {
+	return ensureAuthz(w, r, uploadsAuthzObject, action, legacyUploadPermission(action))
+}
+
+func legacyUploadPermission(action string) *permission.Permission {
+	switch action {
+	case "list", "view":
+		return permissions.UploadRead
+	case "create":
+		return permissions.UploadCreate
+	case "update":
+		return permissions.UploadUpdate
+	case "delete":
+		return permissions.UploadDelete
+	default:
+		return nil
+	}
+}
+
+var uploadsAuthzObject = authz.ObjectName("core", "uploads")
 
 func NewUploadController(app application.Application) application.Controller {
 	return &UploadController{
@@ -42,7 +66,11 @@ func (c *UploadController) Key() string {
 func (c *UploadController) Register(r *mux.Router) {
 	conf := configuration.Use()
 	router := r.PathPrefix(c.basePath).Subrouter()
-	router.Use(middleware.Authorize())
+	router.Use(
+		middleware.Authorize(),
+		middleware.RequireAuthorization(),
+		middleware.ProvideUser(),
+	)
 	router.Use(middleware.ProvideLocalizer(c.app))
 	router.Use(middleware.WithTransaction())
 	router.HandleFunc("", c.Create).Methods(http.MethodPost)
@@ -57,6 +85,9 @@ func (c *UploadController) Register(r *mux.Router) {
 }
 
 func (c *UploadController) Create(w http.ResponseWriter, r *http.Request) {
+	if !ensureUploadsAuthz(w, r, "create") {
+		return
+	}
 	conf := configuration.Use()
 	if err := r.ParseMultipartForm(conf.MaxUploadMemory); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)

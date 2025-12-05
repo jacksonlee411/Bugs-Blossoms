@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +13,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	permissionEntity "github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	"github.com/iota-uz/iota-sdk/pkg/application"
@@ -176,7 +175,7 @@ func (c *AuthzAPIController) createRequest(
 		return
 	}
 	tenantID := tenantIDFromContext(r)
-	requesterID := normalizedUserUUID(tenantID, currentUser)
+	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	params := services.CreatePolicyDraftParams{
 		RequesterID:  requesterID,
 		Object:       payload.Object,
@@ -277,7 +276,7 @@ func (c *AuthzAPIController) revertRequest(
 		return
 	}
 	tenantID := tenantIDFromContext(r)
-	requesterID := normalizedUserUUID(tenantID, currentUser)
+	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	draft, err := svc.Revert(r.Context(), tenantID, id, requesterID)
 	if err != nil {
 		c.respondServiceError(w, err)
@@ -381,7 +380,7 @@ func (c *AuthzAPIController) reviewRequest(
 		return
 	}
 	tenantID := tenantIDFromContext(r)
-	approverID := normalizedUserUUID(tenantID, currentUser)
+	approverID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	draft, err := reviewFunc(r.Context(), tenantID, id, approverID)
 	if err != nil {
 		c.respondServiceError(w, err)
@@ -447,25 +446,6 @@ func parseListParams(r *http.Request) (services.ListPolicyDraftsParams, error) {
 	return params, nil
 }
 
-func parseDebugAttributes(values url.Values) authz.Attributes {
-	attrs := authz.Attributes{}
-	const prefix = "attr."
-	for key, vals := range values {
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-		attrKey := strings.TrimSpace(strings.TrimPrefix(key, prefix))
-		if attrKey == "" || len(vals) == 0 {
-			continue
-		}
-		attrs[attrKey] = vals[len(vals)-1]
-	}
-	if len(attrs) == 0 {
-		return nil
-	}
-	return attrs
-}
-
 func requestIDFromHeader(r *http.Request) string {
 	if id := r.Header.Get("X-Request-Id"); id != "" {
 		return id
@@ -475,31 +455,4 @@ func requestIDFromHeader(r *http.Request) string {
 
 func parseUUID(raw string) (uuid.UUID, error) {
 	return uuid.Parse(strings.TrimSpace(raw))
-}
-
-func tenantIDFromContext(r *http.Request) uuid.UUID {
-	tenantID, err := composables.UseTenantID(r.Context())
-	if err != nil {
-		return uuid.Nil
-	}
-	return tenantID
-}
-
-func authzDomainFromContext(r *http.Request) string {
-	tenantID, err := composables.UseTenantID(r.Context())
-	if err != nil {
-		return "global"
-	}
-	return authz.DomainFromTenant(tenantID)
-}
-
-func authzSubjectForUser(tenantID uuid.UUID, u user.User) string {
-	return authz.SubjectForUser(tenantID, normalizedUserUUID(tenantID, u))
-}
-
-var userNamespace = uuid.MustParse("7f1d14be-672e-49c7-91ad-e50eb1d35815")
-
-func normalizedUserUUID(tenantID uuid.UUID, u user.User) uuid.UUID {
-	payload := fmt.Sprintf("%s:%d", tenantID.String(), u.ID())
-	return uuid.NewSHA1(userNamespace, []byte(payload))
 }

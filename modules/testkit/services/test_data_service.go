@@ -97,6 +97,9 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 						LastName:  "User",
 						Language:  "en",
 						Ref:       "testUser",
+						CasbinRoles: []string{
+							"core.superadmin",
+						},
 					},
 				},
 			},
@@ -123,6 +126,9 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 						LastName:  "User",
 						Language:  "en",
 						Ref:       "testUser",
+						CasbinRoles: []string{
+							"core.superadmin",
+						},
 					},
 				},
 				Finance: &schemas.FinanceSpec{
@@ -209,6 +215,9 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 						LastName:  "User",
 						Language:  "en",
 						Ref:       "testUser",
+						CasbinRoles: []string{
+							"core.superadmin",
+						},
 					},
 				},
 				Warehouse: &schemas.WarehouseSpec{
@@ -263,6 +272,9 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 						LastName:  "User",
 						Language:  "en",
 						Ref:       "testUser",
+						CasbinRoles: []string{
+							"core.superadmin",
+						},
 					},
 					{
 						Email:     "manager@test.com",
@@ -271,6 +283,9 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 						LastName:  "User",
 						Language:  "en",
 						Ref:       "managerUser",
+						CasbinRoles: []string{
+							"core.superadmin",
+						},
 					},
 				},
 				Finance: &schemas.FinanceSpec{

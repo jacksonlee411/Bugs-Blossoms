@@ -5,12 +5,14 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
+	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/mappers"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/roles"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/di"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
@@ -29,6 +31,27 @@ type RolesController struct {
 	app              application.Application
 	basePath         string
 	permissionSchema *rbac.PermissionSchema
+}
+
+var rolesAuthzObject = authz.ObjectName("core", "roles")
+
+func ensureRolesAuthz(w http.ResponseWriter, r *http.Request, action string) bool {
+	return ensureAuthz(w, r, rolesAuthzObject, action, legacyRolePermission(action))
+}
+
+func legacyRolePermission(action string) *permission.Permission {
+	switch action {
+	case "list", "view":
+		return permissions.RoleRead
+	case "create":
+		return permissions.RoleCreate
+	case "update":
+		return permissions.RoleUpdate
+	case "delete":
+		return permissions.RoleDelete
+	default:
+		return nil
+	}
 }
 
 type RolesControllerOptions struct {
@@ -87,6 +110,12 @@ func (c *RolesController) List(
 	logger *logrus.Entry,
 	roleService *services.RoleService,
 ) {
+	if !ensureRolesAuthz(w, r, "list") {
+		return
+	}
+
+	ensurePageCapabilities(r, rolesAuthzObject, "create", "update", "delete")
+
 	params := composables.UsePaginated(r)
 	search := r.URL.Query().Get("name")
 
@@ -139,6 +168,11 @@ func (c *RolesController) GetEdit(
 	logger *logrus.Entry,
 	roleService *services.RoleService,
 ) {
+	if !ensureRolesAuthz(w, r, "view") {
+		return
+	}
+
+	ensurePageCapabilities(r, rolesAuthzObject, "update", "delete")
 	id, err := shared.ParseID(r)
 	if err != nil {
 		logger.Errorf("Error parsing role ID: %v", err)
@@ -166,6 +200,9 @@ func (c *RolesController) Delete(
 	logger *logrus.Entry,
 	roleService *services.RoleService,
 ) {
+	if !ensureRolesAuthz(w, r, "delete") {
+		return
+	}
 	id, err := shared.ParseID(r)
 	if err != nil {
 		logger.Errorf("Error parsing role ID: %v", err)
@@ -187,6 +224,9 @@ func (c *RolesController) Update(
 	logger *logrus.Entry,
 	roleService *services.RoleService,
 ) {
+	if !ensureRolesAuthz(w, r, "update") {
+		return
+	}
 	id, err := shared.ParseID(r)
 	if err != nil {
 		logger.Errorf("Error parsing role ID: %v", err)
@@ -239,6 +279,11 @@ func (c *RolesController) GetNew(
 	w http.ResponseWriter,
 	logger *logrus.Entry,
 ) {
+	if !ensureRolesAuthz(w, r, "create") {
+		return
+	}
+
+	ensurePageCapabilities(r, rolesAuthzObject, "create")
 	props := &roles.CreateFormProps{
 		Role:                   &viewmodels.Role{},
 		ModulePermissionGroups: c.modulePermissionGroups(),
@@ -253,6 +298,9 @@ func (c *RolesController) Create(
 	logger *logrus.Entry,
 	roleService *services.RoleService,
 ) {
+	if !ensureRolesAuthz(w, r, "create") {
+		return
+	}
 	dto, err := composables.UseForm(&dtos.CreateRoleDTO{}, r)
 	if err != nil {
 		logger.Errorf("Error parsing form: %v", err)
