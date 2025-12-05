@@ -16,9 +16,9 @@ var EmployeesLink = types.NavigationItem{
 }
 
 var HRMLink = types.NavigationItem{
-	Name:       "NavigationLinks.HRM",
-	Icon:       icons.UsersThree(icons.Props{Size: "20"}),
-	Href:       "/hrm",
+	Name:        "NavigationLinks.HRM",
+	Icon:        icons.UsersThree(icons.Props{Size: "20"}),
+	Href:        "/hrm",
 	AuthzObject: "hrm.employees",
 	AuthzAction: "list",
 	Children: []types.NavigationItem{
