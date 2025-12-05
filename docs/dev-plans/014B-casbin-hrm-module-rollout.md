@@ -12,13 +12,15 @@
 - DEV-PLAN-014A 已完成 `authz.ViewState` 注入、`ensureAuthz`/`authorizeCore` helper，可作为 HRM Controller/Service 实现模板；缺少的 helper 需在 HRM 模块内复制并与 core/authzutil 对齐。
 - HRM SQLC、Atlas、schema 导出流程（DEV-PLAN-010/011）必须保持可运行，以便在授权改造期间新增字段/索引时可随时生成迁移。
 
-## 范围
+-## 范围
 - `modules/hrm/presentation/controllers/employee_controller.go` 及未来 HRM 控制器。
-- `modules/hrm/services/**`、潜在批处理/导入 Job。
+- `modules/hrm/services/**`（包含 Employee/Position + 后续批处理/导入 Job），确保所有可写路径在进入仓储前完成授权。
 - `modules/hrm/presentation/templates/**`、`viewmodels`、`mappers`、`locales`。
 - HRM 导航（`modules/hrm/links.go`）、Quick Links（`modules/hrm/module.go`）与 Spotlight 入口。
 - e2e/Playwright `e2e/tests/employees/**` 与任何 HRM 相关集成测试。
 - HRM 相关 docs/dev-records、README/CONTRIBUTING 补充说明。
+- `config/access/policies/**`、`config/access/policy.csv(.rev)` 及 `make authz-pack` 产物，覆盖 `hrm.employees:*`（以及 Position/未来聚合）的 policy 片段。
+- e2e/seed 数据中 HRM 权限矩阵（含“具备全部权限”与“无 HRM 权限”两类账号），确保授权体验可在自测/CI 中复现。
 
 ## 目标
 1. HRM 控制器、服务、导航、Quick Links 全面接入 Casbin，legacy 权限仅在 shadow 模式兜底，并具备统一 403 响应与 MissingPolicies 注入。
@@ -37,6 +39,7 @@
 ### 2. 服务层 & 异步任务
 - [ ] 在 `modules/hrm/services` 创建 `authorizeHRM` helper，行为与 `authorizeCore` 相同；所有写操作（Create/Update/Delete、批量导入、事件消费）进入 Repository 前必须调用，必要时传入 `authz.Attributes`（例如导入批次 ID）。
 - [ ] EmployeeService：Create/Update/Delete 加 guard，`Count/GetPaginated` 可选 shadow 只读；触发 `employee.NewCreatedEvent` 等事件前若授权失败需返回 `authz.ErrForbidden`。
+- [ ] PositionService 以及未来 HRM 服务的 Create/Update/Delete 同样复用 capability（建议 `hrm.positions:{create|update|delete}`），通过表驱动测试验证拒绝时不会触发仓储/事件。
 - [ ] 若存在批处理或 future job（导入 CSV、同步第三方数据、工资计算等），需定义 system subject（例如 `system:hrm.job`），并在 docs/dev-records 中登记策略写法。
 - [ ] 为每个操作新增/更新单测：使用 testify + mock repository，模拟上下文无用户/无权限/有权限；拒绝时断言仓储未被调用。
 
@@ -47,12 +50,13 @@
 - [ ] `modules/hrm/presentation/locales/{en,ru,uz}.json` 增加 Casbin 相关文案（Denied 标题、申请按钮、调试提示）；完成后运行 `make check tr`。
 
 ### 4. 导航 & Quick Links
-- [ ] `modules/hrm/links.go`：为 `HRMLink`/`EmployeesLink` 补充 `AuthzObject`（`"hrm.employees"`）和动作（`"list"`/`"view"`），并清理 `Permissions` 字段。
+- [ ] `modules/hrm/links.go`：为 `HRMLink`/`EmployeesLink` 补充 `AuthzObject`（`"hrm.employees"`）和动作（`"list"`/`"view"`），并清理 `Permissions` 字段；若新增 Position/Dashboard，再按同样模式扩展。
 - [ ] `modules/hrm/module.go` Quick Link 通过 `.RequireAuthz("hrm.employees", "create")`，未授权用户不再看到“新建员工”入口，保留 `.RequirePermissions` 作为 shadow fallback。
 - [ ] 若 HRM 未来新增 Dashboard/Reports，需在本计划输出的 checklist 中说明如何声明 `AuthzObject` 以及 Quick Link/Navigation 的层级策略。
 
 ### 5. 测试、E2E 与记录
 - [ ] 扩充 `e2e/tests/employees/employees.spec.ts`：一套具备 `Employee.*` 权限的用户 + 一套无权限用户，验证列表访问、创建按钮显示、403 UI 与权限申请入口。
+- [ ] `pkg/commands/e2e/seed.go` 新增“无 HRM 权限”账号，并通过 `config/access/policies/**` 追加实例化 policy（或基于角色的 policy），保证 Playwright/UI 能真实复现缺权场景。
 - [ ] 对 controller/service 新增 go test：`go test ./modules/hrm/...` 至少覆盖授权通过/拒绝路径；模板改动后执行 `templ generate && make css` 并确认 `git status --short` 干净。
 - [ ] 每轮 readiness：`make authz-test authz-lint && go test ./pkg/authz/... ./modules/hrm/...`，结果记录 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
 - [ ] `docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md`：记录 HRM shadow→enforce 灰度命令（`AUTHZ_ENFORCE=1 make run` 等）、观测到的 diff（含 `scripts/authz/verify` 输出）、回滚步骤。
@@ -60,7 +64,12 @@
 ### 6. 灰度与回滚
 - [ ] 在 HRM 模块启用前，通过 `AUTHZ_ENFORCE=0`（shadow）运行全量自测，确认 legacy fallback 生效；shadow 阶段记录 `MissingPolicies`，用于提前补充策略。
 - [ ] 切换 enforce：`AUTHZ_ENFORCE=1` 后重新执行 Playwright + `go test ./modules/hrm/...`，若发现 diff，使用 `scripts/authz/export` 生成旧策略辅助排查。
-- [ ] 回滚方案：关闭 feature flag + revert HRM 授权 commit，必要时恢复 `policy.csv`；将命令样例与检查点写入 dev-records。
+- [ ] 回滚方案：关闭 feature flag + revert HRM 授权 commit，必要时恢复 `policy.csv`；将命令样例与检查点写入 dev-records，并在需要时回滚 `make authz-pack` 产物。
+
+### 7. Policy 维护（新增）
+- [ ] 在 `config/access/policies/hrm/`（或现有片段目录）定义 `hrm.employees:*`、`hrm.positions:*` 等 capability 对应的 policy 行，命名遵循现有“模块.资源.动作”语义。
+- [ ] 执行 `make authz-pack`（会同步刷新 `config/access/policy.csv` 与 `.rev`），并在 PR 说明中贴出关键 diff；如需单点策略回滚，文档需补充操作流程。
+- [ ] 若 E2E/演示租户需要快速赋权，补充 `scripts/authz/verify`/`go test ./pkg/authz/...` 中的 fixture，避免策略 drift。
 
 ## 交付物
 - HRM 控制器/服务授权 helper、能力矩阵、403 体验。
