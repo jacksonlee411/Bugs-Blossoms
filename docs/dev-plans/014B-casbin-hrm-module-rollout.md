@@ -72,6 +72,7 @@
 - [ ] M3：扩充 `e2e/tests/employees/employees.spec.ts`、在 `pkg/commands/e2e/seed.go` 增加缺权账号并对齐策略。
 - [x] M2：`make authz-test authz-lint && go test ./pkg/authz/... ./modules/hrm/...` 结果记录到 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
 - [ ] M3：`docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md` 记录 shadow/enforce 切换命令与 diff。
+- [ ] CI/Actions：PR #92 lint/action 失败待排查（本地因 sandbox 无法直接访问日志；需在远端查看具体错误后补充修复）。
 
 ### 6. 灰度与回滚
 - [ ] M1：开发阶段默认直接 enforce，必要时用 `AUTHZ_ENFORCE=0` 做一次 shadow 对比。
