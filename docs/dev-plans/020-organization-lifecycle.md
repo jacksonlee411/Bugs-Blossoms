@@ -65,6 +65,11 @@
 - Retroactive Correction：Active 后仍允许产生 `RetroChange`，以“撤销原记录 + 生成新记录”方式落表，并触发 HRM/财务补差事件。
 - Mass Reorg：Change Request 支持角色“MassMove”，一次移动整棵子树或批量员工，默认生成 Impact 报告（人数、预算、BP 清单）。
 - 并行版本：Scheduled 状态的数据形成“Parallel Version”，允许提前与 Active 版本对比；合并时进行冲突检测。
+- 并发与锁：同一节点+时间窗口的 Draft/Review/Scheduled 需序列化，使用 `(tenant_id, node_id, tstzrange)` 应用锁/DB 锁防止双重提交；变更执行时生成幂等 token，重复执行跳过已处理批次。
+- 生效批次与补偿：Scheduled→Active 支持按批次（节点/子树分批）幂等执行，记录批次游标，可重试失败批次；提供“跳过已执行步骤/重放事件”机制，避免半成品。
+- 预验证与脏数据隔离：大批量导入先跑离线校验报告（必填/编码/命名/字典/重名/时间重叠），不通过不入 Draft；Draft 仅存隔离空间，不污染主表，审核通过后才写并发检查。
+- Retro/结账耦合：Retro 请求需检查 payroll/审批结账周期，强制生成补差/重放计划（事件重播、下游对账）；若下游已消费，标记漂移并要求对账确认后执行。
+- 版本推广：并行版本支持环境/审批模板版本绑定（dev→staging→prod），promotion/回滚有审计记录；审批模板版本化，变更绑定模板版本，回滚可快速切换至上一个稳定版本。
 ### 3. 时间约束策略
 - **有效期重叠检测**：`OrgNode`、`OrgEdge`、`Assignment`（员工隶属）在同一实体/维度下不得出现重叠区间。算法：保存所有区间后运行线段树或 SQL 约束（`EXCLUDE USING gist` + `tsrange`）。
 - **冻结窗口**：敏感层级（公司、成本中心）在财务结账期（例如月底 +3 天）禁止生效变更，仅允许未来日期。
@@ -155,11 +160,14 @@
 3. **M3（Phase 3）：Lifecycle & BP/安全域绑定**（3 周）
    - 实现 change request 仓储、并行版本合并、BP route preview、security domain 映射；`POST/GET /org/change-requests`，`/simulate`，`/approve|reject|schedule|cancel`。
    - Retro API 定义与冲突策略，事件链 `OrgChanged`、`OrgAssignmentChanged`、`SecurityPolicyChanged`；审批/下游消费作为独立集成包，可与主数据解耦发布。
+   - 并发/锁/幂等：同节点+时间窗口的请求序列化（应用锁/DB 锁），执行批次记录幂等 token，可重试失败批次；Draft/Review 预验证通过后才进入 Scheduled。
+   - 版本推广：并行版本与审批模板版本绑定，支持 dev→staging→prod promotion/回滚审计。
 4. **M4（Phase 4）：Assignments & Impact UI**（2 周）
    - 完成员工/职位/成本中心分配批量接口、Impact Simulation、树+时间轴 UI、Security Inspector、BP route 预览、多语言；发布口径说明（员工数、FTE、岗位数、成本额、审批链）。
    - 发布 Workday 场景（mass move、future-dated、retro correction）演示脚本。
 5. **M5：优化、验证与培训**（1-2 周）
    - 性能测试（1k 节点、10k 员工，查询延迟 < 200ms）、缓存策略、BI 导出、文档/培训、Workday parity checklist 签署。
+   - Retro/补偿演练：结账前/后 Retro 演练、事件重播和下游对账脚本；生效批次重试/跳过流程演练。
 
 ## 验收标准
 - Phase 0/1：单树 CRUD + 有效期/去重名/无重叠 + 租户隔离查询性能达标（1k 节点 <200ms），审计和冻结窗口生效；主数据治理（编码/命名/必填/发布模式/SOR 边界）落地。
