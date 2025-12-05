@@ -16,11 +16,12 @@
 6. **可扩展事件流**：关键变更（新建部门、层级调整、员工调动、权限继承）通过 `pkg/eventbus` 发布，供 HRM/财务/审批模块订阅。
 
 ## 目标
-1. 交付 Workday 级别的组织架构生命周期管理：草稿、审批、定时生效、撤销/回滚。
-2. 建立完整的组织层级体系，支持至少四种层级以及跨层级的“虚拟/矩阵”关系。
-3. 引入时序约束与冲突检测（同一员工同一时间仅能挂载单一 Supervisory 节点等）。
-4. 提供 API/UI 以可视化组织树、变更时间线，并允许按时间点执行 Impact Analysis。
-5. 为 HRM 员工模型、权限系统、成本核算提供统一的组织引用与缓存。
+- **MVP（Phase 0/1，对齐主流 org 基线）**：单一 Supervisory 树 + OrgNode/OrgEdge/Assignment CRUD，强制有效期/去重名/无重叠、租户隔离查询性能（1k 节点 200ms 内）、审计/冻结窗口和主数据接口（ID/Code 规范、引用口径）。
+- **Phase 2**：扩展多层级（Company/Cost/Custom），仍保持“先主组织后矩阵”，矩阵/侧向链接仅提供数据模型占位与只读视图，不影响主链约束。
+- **Phase 3**：Lifecycle & BP 绑定、并行版本、Retro、更完整冲突检测（MassMove/版本合并）。
+- **Phase 4**：Impact Analysis/UI（树 + 时间轴 + What-if），口径锁定：员工数/FTE、岗位数、成本额、审批链；数据源/滞后性在文档中声明。
+- 组织/职位/岗位边界：本计划仅覆盖组织层级与“人/职位/成本中心隶属”关系，不引入编制/空岗管理，Position 编制控制在后续 DEV-PLAN-021 处理。
+- 持续 Workday 对齐，但每阶段可独立上线，确保 HRM/Authz/Finance 等依赖至少获得稳定的组织主数据引用与事件。
 
 ## 范围
 - **组织单元（Org Unit）**：公司、事业部、部门、项目团队、自定义群组。
@@ -28,7 +29,8 @@
 - **时间维度**：组织、层级、分配、权限继承的有效期字段与校验。
 - **流程引擎对接**：与现有审批/工作流复用同一 `pkg/workflow`（若缺失则提供最小审批服务）。
 - **权限钩子**：组织层级变化触发 `pkg/authz` policy 生成建议。
-- **非目标**：不实现薪酬预算、绩效考核，只预留事件。
+- **阶段化限制**：Phase 0/1 仅交付单一 Supervisory 树及基本 CRUD/有效期校验，矩阵/侧向链接在 Phase 2 以后开放，默认只读不影响主链；多层级（Company/Cost/Custom）逐步放量。
+- **非目标**：不实现薪酬预算、绩效考核，不做编制/空岗管理，只预留事件。
 
 ## Workday 能力对齐
 | Workday 关键点 | Workday 行为说明 | 本计划方案 | 差距/补充动作 |
@@ -92,15 +94,17 @@
 
 ### Infrastructure Layer
 - 新建 schema `modules/org/infrastructure/persistence/schema/org-schema.sql`，核心表：
-  - `org_nodes`（id, tenant_id, type, code, name, status, effective_start, effective_end, parent_hint, owner_user_id, created_at, updated_at）。
-  - `org_edges`（id, hierarchy_id, parent_node_id, child_node_id, effective_start, effective_end, depth, path ltree）。
-  - `org_assignments`（id, node_id, subject_type(enum: employee, position, cost_center), subject_id, effective_start, effective_end, primary bool, allocation_percent）。
-  - `org_change_requests`（draft json、BP id、状态、审批轨迹、计划生效/终止时间、impact summary）。
-  - `org_retro_changes`（源记录、矫正记录、差异说明、审批信息）。
+  - `org_nodes`（tenant_id, id, type, code, name, status, effective_start, effective_end, parent_hint, owner_user_id, created_at, updated_at）。
+  - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_start, effective_end, depth, path ltree）。
+  - `org_assignments`（tenant_id, id, node_id, subject_type(enum: employee, position, cost_center), subject_id, effective_start, effective_end, primary bool, allocation_percent）。
+  - `org_change_requests`（tenant_id, id, draft json、BP id、状态、审批轨迹、计划生效/终止时间、impact summary）。
+  - `org_retro_changes`（tenant_id, id, 源记录、矫正记录、差异说明、审批信息）。
   - `org_security_domains` / `org_security_groups`：映射节点与安全域/组、权限继承链。
   - `org_bp_bindings`：记录每个层级/节点关联的 BP 定义，用于 route preview。
   - `org_version_snapshots`：保存并行版本与 impact 结果，方便对比。
-  - 附加索引：`gist (node_id, tstzrange(effective_start, effective_end))` 用于时间冲突约束。
+  - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_start, effective_end))` 用于时间冲突约束。
+- 多租户隔离：所有主键/唯一约束均以 `(tenant_id, <id/unique fields>)` 复合，外键与 sqlc 查询强制带 tenant 过滤；路径/缓存 key 同样纳入 tenant，避免跨租户穿透。
+- Postgres 依赖：迁移启用 `ltree` 与 `btree_gist` 扩展；有效期字段统一 `tstzrange` 且使用 `[start, end)` 半开区间，写入/校验一律 UTC，迁移包含时区/边界说明。
 - sqlc 包：`modules/org/infrastructure/sqlc/...` 负责 CRUD + 冲突检测查询。
 - 需要 Atlas/Goose 迁移流程，沿用 HRM 指南。
 
@@ -135,33 +139,34 @@
 - **Authz/Casbin**：组织节点作为 `object` 维度之一，`pkg/authz` 增加 `OrgScope` 属性用于 ABAC。
 - **Workflow**：若现有 `pkg/workflow` 未覆盖，将在本计划 M1 同步补齐最小审批引擎或复用外部服务。
 - **Position/Compensation**：HRM Position/JobProfile/Comp 模块必须引用 Supervisory org，OrgAssignmentService 提供钩子确保职位移动时同步预算/薪酬计划。
-- **Finance/Projects/Procurement**：Cost Center 与 Company 层级需要与 finance 模块共享，事件 `OrgCostCenterChanged` 触发总账/项目的成本归集更新。
+- **Finance/Projects/Procurement**：Cost Center 与 Company 层级需要与 finance 模块共享，事件 `OrgCostCenterChanged` 触发总账/项目的成本归集更新；因 `modules/finance` 处于冻结，短期仅输出事件与只读视图，不改动冻结模块代码，待解除冻结后再落地消费/表结构变更并在 dev-plan 记录。
 - **缓存**：树结构在 Redis/内存缓存，Key 含层级类型 + effective date（按日）。变更事件触发缓存失效。
 - **Reporting/Analytics**：提供 `org_reporting` 视图供 BI 工具使用，支持任意时间点快照，与 Workday Custom Reporting 对齐。
 
 ## 里程碑
-1. **M1：域模型与 schema + Workday 映射**（2 周）
-   - 定稿 `EffectiveWindow` 规则、OrgNode/Hierarchy/OrgChange 聚合、Atlas 迁移与 sqlc。
-   - 输出 Workday 对齐表 v1，单元测试覆盖重叠检测、merge/split、版本冻结。
-2. **M2：Lifecycle & BP/安全域绑定**（3 周）
-   - 实现 change request 仓储、并行版本、BP route preview、security domain 映射。
-   - API：`POST/GET /org/change-requests`，`POST /org/change-requests/{id}/simulate`，`PATCH /org/nodes`。
-3. **M3：Assignments & Retro/HRM/Position 集成**（3 周）
-   - 完成员工/职位/成本中心分配、Retro API，HRM/Position/Finance 调用与事件订阅。
-   - 建立 `OrgChanged`、`OrgAssignmentChanged`、`SecurityPolicyChanged` 事件链。
-4. **M4：Presentation & Workday 体验**（2 周）
-   - 完成树形 UI、时间轴、Impact Simulation、Security Inspector、BP route 预览、多语言。
+1. **M1（Phase 0/1）：MVP 主链**（2 周）
+   - 单一 Supervisory 树 + OrgNode/OrgEdge/Assignment CRUD，`EffectiveWindow` 规则、无重叠/重名、租户隔离查询；Atlas 迁移/sqlc、ltree/btree_gist 扩展。
+   - 输出 Workday 对齐表 v1，单元测试覆盖重叠检测、merge/split、冻结窗口；主数据接口规范（ID/Code/口径）。
+2. **M2（Phase 2）：多层级与矩阵占位**（3 周）
+   - 开放 Company/Cost/Custom 多树读写，矩阵/侧向链接仅只读占位，不影响主 Supervisory 约束；并行版本骨架。
+   - API：`GET /org/hierarchies`、`PATCH /org/nodes` 基于多层级；`org_bp_bindings` 数据模型占位。
+   - 补充 `config/access/policies/**` 片段并执行 `make authz-pack`、`make authz-test`，生成/校验 `policy.csv/.rev`，确保 OrgScope 权限链路纳入 CI。
+3. **M3（Phase 3）：Lifecycle & BP/安全域绑定**（3 周）
+   - 实现 change request 仓储、并行版本合并、BP route preview、security domain 映射；`POST/GET /org/change-requests`，`/simulate`，`/approve|reject|schedule|cancel`。
+   - Retro API 定义与冲突策略，事件链 `OrgChanged`、`OrgAssignmentChanged`、`SecurityPolicyChanged`。
+4. **M4（Phase 4）：Assignments & Impact UI**（2 周）
+   - 完成员工/职位/成本中心分配批量接口、Impact Simulation、树+时间轴 UI、Security Inspector、BP route 预览、多语言。
    - 发布 Workday 场景（mass move、future-dated、retro correction）演示脚本。
 5. **M5：优化、验证与培训**（1-2 周）
    - 性能测试（1k 节点、10k 员工，查询延迟 < 200ms）、缓存策略、BI 导出、文档/培训、Workday parity checklist 签署。
 
 ## 验收标准
-- 所有组织实体 CRUD 均可按任意 `effective_at` 查询/回滚，历史记录齐全，并支持 Retro API 生成矫正记录。
-- 变更流程覆盖典型 Workday 场景：Future-dated move、Mass reorganization、Retro correction、Parallel version merge，均能输出 Impact 报告。
-- HRM/Position/Finance 集成通过：员工/职位/成本中心分配更新、审批路由自动切换、财务成本归集无遗漏。
-- Authz 可消费组织事件生成 security domain/group 策略草稿，并能在 Security Inspector 可视化继承链。
-- Workflow/BP 路由与 Change Request 绑定，审批模拟结果与实际执行一致，支持 route export。
-- 文档完整：模块 README、API 参考、操作手册、dev-record、Workday parity checklist。
+- Phase 0/1：单树 CRUD + 有效期/去重名/无重叠 + 租户隔离查询性能达标（1k 节点 <200ms），审计和冻结窗口生效。
+- Phase 2：多层级读写稳定，矩阵/侧向链接仅只读占位，不影响主链；并行版本骨架可保存对比。
+- Phase 3：Lifecycle/Retro/BP/安全域链路闭环，可生成/合并并行版本并通过 `make authz-pack`/`make authz-test`。
+- Phase 4：Impact/UI 输出的口径明确（员工数、FTE、岗位数、成本额、审批链），与数据源/滞后性说明一致，典型 Workday 场景（Future-dated、Mass reorg、Retro、Parallel merge）可生成报告。
+- HRM/Position/Finance 集成：员工/职位/成本中心分配更新与事件链打通；Finance 端在冻结期仅消费事件/视图，无侵入改动。
+- 文档完整：模块 README、API 参考、口径说明、操作手册、dev-record、Workday parity checklist。
 
 ## 风险与缓解
 - **时间区间复杂度**：大量有效期校验可能拖慢写入 → 通过数据库 `EXCLUDE` 约束 + 应用层线段树缓存，并在事务内批量校验。
