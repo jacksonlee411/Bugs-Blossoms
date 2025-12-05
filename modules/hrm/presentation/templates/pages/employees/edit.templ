@@ -21,7 +21,7 @@ type EditPageProps struct {
 }
 
 templ EditForm(props *EditPageProps) {
-{{
+	{{
 	sharedProps := SharedProps{
 		Employee: props.Employee,
 		Errors:   props.Errors,
@@ -179,13 +179,14 @@ templ EditForm(props *EditPageProps) {
 			x-data
 			class="h-20 shadow-t-lg border-t w-full flex items-center justify-end px-8 bg-surface-300 border-t-primary mt-auto gap-4"
 		>
-			{{ deleteAttrs := templ.Attributes{
-				"name":   "_action",
-				"value":  "delete",
-				"type":   "button",
-				"@click": "$dispatch('open-delete-employee-confirmation')",
-				"id":     "delete-employee-btn",
-			} }}
+			{{deleteAttrs := templ.Attributes{
+	"name":   "_action",
+	"value":  "delete",
+	"type":   "button",
+	"@click": "$dispatch('open-delete-employee-confirmation')",
+	"id":     "delete-employee-btn",
+}
+			}}
 			if !canDelete {
 				deleteAttrs["disabled"] = "true"
 				deleteAttrs["aria-disabled"] = "true"
@@ -201,17 +202,18 @@ templ EditForm(props *EditPageProps) {
 				hx-disabled-elt="find button"
 			>
 				@button.Danger(button.Props{
-					Size: button.SizeMD,
+					Size:  button.SizeMD,
 					Attrs: deleteAttrs,
 				}) {
 					{ pageCtx.T("Delete") }
 				}
 			</form>
-			{{ saveAttrs := templ.Attributes{
-				"name":  "_action",
-				"value": "save",
-				"id":    "save-btn",
-			} }}
+			{{saveAttrs := templ.Attributes{
+	"name":  "_action",
+	"value": "save",
+	"id":    "save-btn",
+}
+			}}
 			if !canUpdate {
 				saveAttrs["disabled"] = "true"
 				saveAttrs["aria-disabled"] = "true"
@@ -226,7 +228,7 @@ templ EditForm(props *EditPageProps) {
 				hx-swap="outerHTML"
 			>
 				@button.Primary(button.Props{
-					Size: button.SizeMD,
+					Size:  button.SizeMD,
 					Attrs: saveAttrs,
 				}) {
 					{ pageCtx.T("Save") }
