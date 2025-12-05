@@ -20,7 +20,7 @@ func (s *stubUserQueryRepo) FindUsers(ctx context.Context, params *query.FindPar
 
 func (s *stubUserQueryRepo) FindUserByID(ctx context.Context, userID int) (*viewmodels.User, error) {
 	s.called = true
-	return nil, nil
+	return &viewmodels.User{}, nil
 }
 
 func (s *stubUserQueryRepo) SearchUsers(ctx context.Context, params *query.FindParams) ([]*viewmodels.User, int, error) {
