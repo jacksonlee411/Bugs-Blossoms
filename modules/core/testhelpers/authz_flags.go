@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/iota-uz/iota-sdk/pkg/authz"
+	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,19 +20,23 @@ func WithAuthzMode(t *testing.T, mode authz.Mode) {
 
 	authzFlagMu.Lock()
 
-	flagPath := os.Getenv("AUTHZ_FLAG_CONFIG")
-	if flagPath == "" {
-		flagPath = filepath.Join("config", "access", "authz_flags.yaml")
-	}
-
 	tmpDir := t.TempDir()
 	tmpFlagPath := filepath.Join(tmpDir, "authz_flags.yaml")
 	newContent := []byte(fmt.Sprintf("mode: %s\n", mode))
 	require.NoError(t, os.WriteFile(tmpFlagPath, newContent, 0o644))
 	t.Setenv("AUTHZ_FLAG_CONFIG", tmpFlagPath)
+
+	cfg := configuration.Use()
+	origFlagPath := cfg.Authz.FlagConfigPath
+	origMode := cfg.Authz.Mode
+	cfg.Authz.FlagConfigPath = tmpFlagPath
+	cfg.Authz.Mode = string(mode)
+
 	authz.Reset()
 
 	t.Cleanup(func() {
+		cfg.Authz.FlagConfigPath = origFlagPath
+		cfg.Authz.Mode = origMode
 		authz.Reset()
 		authzFlagMu.Unlock()
 	})
