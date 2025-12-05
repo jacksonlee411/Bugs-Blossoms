@@ -6,6 +6,7 @@
 |------------|-------------|------|-------------|-------------|------|
 | _TODO_ | Core × dev 租户 | `shadow → enforce` | `AUTHZ_ENFORCE=core-dev`（示例） | `scripts/authz/verify --tenant ...`，关键流程未出现 4xx/5xx | _待记录_ |
 | 2025-12-05 00:01 | Core × dev 租户 | Shadow readiness（UI capability gating） | `AUTHZ_MODE=shadow go test ./modules/core/...` | Users/Roles/Groups 页面操作、Quick Links、Spotlight 入口均依据 `pageCtx.CanAuthz` 渲染，403 统一输出 Unauthorized 组件；未观察到 legacy fallback diff | ✅ |
+| 2025-12-05 11:10 | HRM × dev 租户 | 无灰度，直接 enforce | 按 AGENTS.md，不开启 shadow/回滚；使用当前 `policy.csv.rev` | HRM 页面已接入 `pageCtx.CanAuthz`，缺权用户 e2e（nohrm@example.com）返回 403 + Unauthorized 组件；CI#98 通过 | ✅（灰度 N/A） |
 
 > 记录建议：
 > 1. 操作列包含“启用 shadow/enforce”“关闭 flag”“回滚（git revert + flag reset）”等；如有多条命令，可在“命令 / Flag”列换行列出。

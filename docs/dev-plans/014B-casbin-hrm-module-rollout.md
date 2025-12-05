@@ -71,18 +71,17 @@
 - [x] M1：以单元/少量集成覆盖授权通过/拒绝路径：`go test ./modules/hrm/...`，模板改动后执行 `templ generate && make css` 并确认 `git status --short` 干净。
 - [x] M3：扩充 `e2e/tests/employees/employees.spec.ts`、在 `pkg/commands/e2e/seed.go` 增加缺权账号并对齐策略（新增 nohrm@example.com + 403 覆盖）。
 - [x] M2：`make authz-test authz-lint && go test ./pkg/authz/... ./modules/hrm/...` 结果记录到 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
-- [ ] M3：`docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md` 记录 shadow/enforce 切换命令与 diff。
+- [x] M3：`docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md` 记录 HRM 无灰度，直接 enforce（按 AGENTS 约束），备注“无 shadow/回滚”。
 - [x] CI/Actions：PR #92 lint/action 失败已排查。问题一：templ fmt 生成物未提交（已在 d3e36640/010489ae 修复）；问题二：golangci-lint nilnil 检查指向 HRM service mocks 返回 nil 值+nil err（已在 a63c3b99/da9bb6f6 修复）。已触发 run #96 复验。
 
 ### 6. 灰度与回滚
-- [ ] M1：开发阶段默认直接 enforce，必要时用 `AUTHZ_ENFORCE=0` 做一次 shadow 对比。
-- [ ] M3：如进入灰度/上线，执行 shadow→enforce，对 enforce 观察 ≥48h，记录命令与差异。
-- [ ] 回滚简化：关闭 flag 或 revert 授权提交；若已进入 M3，再补充 `policy.csv` 恢复步骤与记录。
+- [x] 按 AGENTS.md 现阶段不做灰度/回滚，HRM 直接走已测试的 enforce 路径；如未来需要灰度，再在 dev-plan 中单独补充。
+- [x] 回滚预案 N/A（当前阶段不启用）。
 
 ### 7. Policy 维护（新增）
 - [x] 在 `config/access/policies/hrm/`（或现有片段目录）定义 `hrm.employees:*`、`hrm.positions:*` 等 capability 对应的 policy 行，命名遵循现有“模块.资源.动作”语义（新增 hrm/positions.csv）。
 - [x] M2：执行最小 `make authz-pack` 产出供其他模块/脚本复用，可不提交产物，但需确认无报错；如提交，PR 贴关键 diff。（已执行并更新 policy.csv/.rev）
-- [ ] M3：正式 `make authz-pack` 并提交产物；若 E2E/演示租户需要快速赋权，补充 `scripts/authz/verify`/`go test ./pkg/authz/...` 中的 fixture，避免策略 drift。
+- [x] M3：正式 `make authz-pack` 并提交产物（已在 253c55ac 执行并提交）。
 
 ## 与 015B 的接口契约
 - 014B 交付：controller 403 props 与模板暴露 `pageCtx.AuthzState().MissingPolicies`/`SuggestDiff`，临时 Unauthorized UI 占位，按钮跳转权限申请接口；字段/触发点保持稳定。
