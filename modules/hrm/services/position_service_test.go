@@ -22,15 +22,15 @@ func (m *mockPositionRepo) Count(ctx context.Context) (int64, error) {
 }
 func (m *mockPositionRepo) GetAll(ctx context.Context) ([]*position.Position, error) {
 	m.mark()
-	return nil, nil
+	return []*position.Position{}, nil
 }
 func (m *mockPositionRepo) GetPaginated(ctx context.Context, params *position.FindParams) ([]*position.Position, error) {
 	m.mark()
-	return nil, nil
+	return []*position.Position{}, nil
 }
 func (m *mockPositionRepo) GetByID(ctx context.Context, id int64) (*position.Position, error) {
 	m.mark()
-	return nil, nil
+	return &position.Position{}, nil
 }
 func (m *mockPositionRepo) Create(ctx context.Context, upload *position.Position) error {
 	m.mark()

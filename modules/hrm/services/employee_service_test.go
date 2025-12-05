@@ -22,19 +22,19 @@ func (m *mockEmployeeRepo) Count(ctx context.Context) (int64, error) {
 }
 func (m *mockEmployeeRepo) GetAll(ctx context.Context) ([]employee.Employee, error) {
 	m.mark()
-	return nil, nil
+	return []employee.Employee{}, nil
 }
 func (m *mockEmployeeRepo) GetPaginated(ctx context.Context, params *employee.FindParams) ([]employee.Employee, error) {
 	m.mark()
-	return nil, nil
+	return []employee.Employee{}, nil
 }
 func (m *mockEmployeeRepo) GetByID(ctx context.Context, id uint) (employee.Employee, error) {
 	m.mark()
-	return nil, nil
+	return nil, errors.New("not implemented")
 }
 func (m *mockEmployeeRepo) Create(ctx context.Context, data employee.Employee) (employee.Employee, error) {
 	m.mark()
-	return nil, nil
+	return nil, errors.New("not implemented")
 }
 func (m *mockEmployeeRepo) Update(ctx context.Context, data employee.Employee) error {
 	m.mark()
