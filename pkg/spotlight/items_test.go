@@ -32,7 +32,7 @@ func TestQuickLinks_AuthorizeByCapability(t *testing.T) {
 	state := authz.NewViewState(authz.SubjectForUserID(tenantID, "user-1"), authz.DomainFromTenant(tenantID))
 	state.SetCapability("logging.logs.view", true)
 
-	ctx := withLocalizer(context.Background())
+	ctx := withLocalizer(t, context.Background())
 	ctx = authz.WithViewState(ctx, state)
 	ctx = composables.WithTenantID(ctx, tenantID)
 	ctx = composables.WithUser(ctx, u)
@@ -60,7 +60,7 @@ func TestQuickLinks_DeniedWhenCapabilityMissing(t *testing.T) {
 	state := authz.NewViewState(authz.SubjectForUserID(tenantID, "user-2"), authz.DomainFromTenant(tenantID))
 	state.SetCapability("logging.logs.view", false)
 
-	ctx := withLocalizer(context.Background())
+	ctx := withLocalizer(t, context.Background())
 	ctx = authz.WithViewState(ctx, state)
 	ctx = composables.WithTenantID(ctx, tenantID)
 	ctx = composables.WithUser(ctx, u)
@@ -72,12 +72,13 @@ func TestQuickLinks_DeniedWhenCapabilityMissing(t *testing.T) {
 	require.Empty(t, found)
 }
 
-func withLocalizer(ctx context.Context) context.Context {
+func withLocalizer(t *testing.T, ctx context.Context) context.Context {
 	bundle := i18n.NewBundle(language.English)
-	bundle.AddMessages(language.English, &i18n.Message{
+	err := bundle.AddMessages(language.English, &i18n.Message{
 		ID:    "NavigationLinks.Logs",
 		Other: "Logs",
 	})
+	require.NoError(t, err)
 	localizer := i18n.NewLocalizer(bundle, "en")
 	ctx = intl.WithLocale(ctx, language.English)
 	ctx = intl.WithLocalizer(ctx, localizer)
