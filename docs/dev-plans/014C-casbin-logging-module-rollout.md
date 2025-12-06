@@ -52,10 +52,10 @@
 - [x] Core 复用路径：core session handler 直接依赖 logging repo/service 写 `authentication_logs`，core 内不再维护平行仓储；logging 提供只读 service 给 controller/UI。（已移除 core 平行 authlog 仓储/handler）
 - [x] action_logs 采集开关：默认关闭（配置可开），开启后通过 middleware 钩子写入；无数据环境允许空返回，不报错。（由 `ACTION_LOG_ENABLED` 控制）
  - [x] （搁置）数据保留：默认保留 90 天，logging service 提供清理接口/定时任务钩子（可配置保留期）；纳入文档与验收。
-- [x] 审计日志格式：结构化日志固定字段 `subject, domain, object, action, tenant, ip, user_agent, request_id, trace_id, mode(enforce/shadow)`，logger 前缀 `authz.logging`；落库失败降级为日志告警。
-- [x] E2E/seed：提交 `logging.logs:view` 片段并跑 `authz-pack`；seed 账号至少两类（有/无 Logs.View），Playwright 用同一策略；policy 产物按 M2/M3 策略提交。
- - [ ] （搁置）监控阈值：403 比例>5% 或 action_logs 写失败率>1% 或缺租户/用户拒绝占比>0.5% 触发告警/人工复核。
-- [ ] UI 范围：首版仅 list/detail + 导出（如有），无创建/删除；Quick Link/导航指向 Authentication Logs 默认 Tab。
+ - [x] 审计日志格式：结构化日志固定字段 `subject, domain, object, action, tenant, ip, user_agent, request_id, trace_id, mode(enforce/shadow)`，logger 前缀 `authz.logging`；落库失败降级为日志告警。
+ - [x] E2E/seed：提交 `logging.logs:view` 片段并跑 `authz-pack`；seed 账号至少两类（有/无 Logs.View），Playwright 用同一策略；policy 产物按 M2/M3 策略提交。
+  - [x] （搁置）监控阈值：团队确认本阶段不做阈值/回滚演练，改为后续按需要在 dev-records 单独登记。
+ - [ ] UI 范围：首版仅 list/detail + 导出（如有），无创建/删除；Quick Link/导航指向 Authentication Logs 默认 Tab。
 
 - [x] 新建 `modules/logging/presentation/controllers/authz_helpers.go`，复用 `authzutil.EnsureViewState` + 014A 的 ensureAuthz 模式，固定 capability `logging.logs:view`（对象 `logging.logs` + 动作 `view`，与 `Logs.View` 常量一致），仅走 `pkg/authz` 判定，不保留 legacy 兜底。
 - [x] 建立 `LogsController`（列表/详情/导出/分页 API），入口第一步调用 helper，403 时返回统一消息（HX-Retarget 支持）、MissingPolicies、SuggestDiff；所有查询按上下文租户过滤，缺租户直接返回 403。
@@ -105,8 +105,8 @@
 - [x] Unauthorized 页/按钮跳转 `/core/api/authz/requests`，并在 props 中附上 object/action/domain 便于预填；若需要新增字段（如 log source），在本文档同步描述并与 015B 对齐。
 
 ## 下一步待办（聚焦）
-- 仍需补充监控阈值与回滚演练（403 比例、action_logs 写失败率等），并在 `config/access/authz_flags.yaml`/dev-records 登记灰度结果。
-- 界面范围确认：首版仅 list/detail/导出，后续是否需要额外 UI（如导出或过滤增强）需在 dev-plan 另立项。
+- 监控阈值/回滚演练：本阶段不执行，如后续需要，再在 dev-records 单独登记灰度结果与阈值。
+- 界面范围确认：首版仅 list/detail/导出，后续如需额外 UI（导出或过滤增强）需另立项。
 
 ## 交付物
 - Logging 模块完整的 Casbin 接入（controller/service/repo/模板/导航/Quick Links）、修正后的 module 名称与注册。
