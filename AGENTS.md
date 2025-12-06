@@ -105,6 +105,7 @@ modules/{module}/
 - Core 模块暴露 `/core/api/authz/**` API：`GET /policies`、`GET /requests`、`POST /requests` 及 `POST /requests/{id}/approve|reject|cancel|trigger-bot|revert`，调用前确保用户拥有 `Authz.*` 权限；若收到 `AUTHZ_INVALID_REQUEST`，请检查请求体的 `base_revision` 是否落后 `config/access/policy.csv.rev`。
   - 示例：`curl -b sid=<sid> -X POST /core/api/authz/requests -d '{"object":"core.users","action":"read","diff":[...]}' -H 'Content-Type: application/json'`.
 - `GET /core/api/authz/debug` 仅对 `Authz.Debug` 权限开放，必需 `subject/object/action` 查询参数，可选 `domain` 与 `attr.<key>=<value>` 形式的 ABAC 属性；接口自带 `20 req/min/IP` 限流，响应包含 `allowed/mode/latency_ms/request/attributes/trace.matched_policy`，并在日志与 `authz_debug_requests_total|latency_seconds` 指标中记录 request id 与 tenant。
+- 403 契约：未经授权返回 JSON，字段包含 `error/object/action/subject/domain/missing_policies/suggest_diff/request_url/debug_url`，示例见 README/CONTRIBUTING；HX/REST 统一格式。
 - Run `make authz-test` (compiles `pkg/authz` plus helper packages) before committing any authz-related Go changes.
 - Run `make authz-lint` to execute policy packing and the deterministic parity fixtures (`scripts/authz/verify --fixtures ...`). CI hooks onto the same targets.
 - Use `go run ./scripts/authz/export -dsn <dsn> -out <path> -dry-run` for audited exports (requires `ALLOWED_ENV=production_export`).

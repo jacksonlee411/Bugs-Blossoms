@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -107,16 +108,46 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 	msg := fmt.Sprintf("Forbidden: %s %s. 如需申请权限，请访问 /core/api/authz/requests。", object, action)
 
 	state := authz.ViewStateFromContext(r.Context())
+	normalizedAction := authz.NormalizeAction(action)
+	requestURL := "/core/api/authz/requests"
+	debugURL := "/core/api/authz/debug"
+	subject := ""
+	domain := ""
+	var missingPolicies []authz.MissingPolicy
+	var suggestDiff []authz.PolicySuggestion
+
+	if state != nil {
+		subject = state.Subject
+		domain = state.Tenant
+		missingPolicies = state.MissingPolicies
+		for _, policy := range state.MissingPolicies {
+			suggestDiff = append(suggestDiff, state.SuggestDiff(policy)...)
+		}
+	}
+	if subject != "" && object != "" && normalizedAction != "" {
+		q := url.Values{}
+		q.Set("subject", subject)
+		q.Set("object", object)
+		q.Set("action", normalizedAction)
+		if domain != "" {
+			q.Set("domain", domain)
+		}
+		debugURL = fmt.Sprintf("/core/api/authz/debug?%s", q.Encode())
+	}
+
 	accept := strings.ToLower(r.Header.Get("Accept"))
 	if strings.Contains(accept, "application/json") {
 		payload := map[string]interface{}{
-			"message":         msg,
-			"object":          object,
-			"action":          action,
-			"missingPolicies": nil,
-		}
-		if state != nil {
-			payload["missingPolicies"] = state.MissingPolicies
+			"error":            "forbidden",
+			"message":          msg,
+			"object":           object,
+			"action":           normalizedAction,
+			"subject":          subject,
+			"domain":           domain,
+			"missing_policies": missingPolicies,
+			"suggest_diff":     suggestDiff,
+			"request_url":      requestURL,
+			"debug_url":        debugURL,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
@@ -133,10 +164,10 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 	if _, ok := composables.TryUsePageCtx(r.Context()); ok {
 		props := &corecomponents.UnauthorizedProps{
 			Object:    object,
-			Action:    action,
-			Operation: fmt.Sprintf("%s %s", object, action),
+			Action:    normalizedAction,
+			Operation: fmt.Sprintf("%s %s", object, normalizedAction),
 			State:     state,
-			Request:   "/core/api/authz/requests",
+			Request:   requestURL,
 		}
 		w.WriteHeader(http.StatusForbidden)
 		templ.Handler(corecomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
