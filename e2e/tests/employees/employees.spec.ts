@@ -40,6 +40,6 @@ test.describe('employees CRUD operations', () => {
 			expect([401, 403]).toContain(response.status());
 		}
 		await expect(page.getByText('Permission required', { exact: false })).toBeVisible();
-		await expect(page.getByText('Request access', { exact: false })).toBeVisible();
+		await expect(page.getByRole('link', { name: /Request access/i })).toBeVisible();
 	});
 });

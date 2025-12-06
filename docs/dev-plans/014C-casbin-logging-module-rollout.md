@@ -1,6 +1,6 @@
 # DEV-PLAN-014C：Logging 模块 Casbin 改造细化计划
 
-**状态**: 草拟中（2025-12-05 20:45） — 已采纳评审意见与行业最佳实践（唯一入口/单一来源、租户隔离、集中审计降级）。
+**状态**: 准备就绪（2025-12-06 00:02 UTC） — 已采纳评审意见与行业最佳实践（唯一入口/单一来源、租户隔离、集中审计降级）。
 
 ## 背景
 - DEV-PLAN-014 要求 Core→HRM→Logging 依次完成 Casbin 改造。Core/HRM 已分别通过 014A/014B 建立 helper、ViewState、导航过滤与 shadow/enforce 流程，Logging 仍处空白。
@@ -13,11 +13,11 @@
 - 015A 提供 `/core/api/authz/requests|debug`、PolicyDraftService 与 bot/CLI；015B（Unauthorized/PolicyInspector UI）尚未落地，需在本计划中暴露兼容数据结构与占位 UI。
 
 ## 前置准备清单（进入实施前完成并记录）
-- [ ] 重新执行并登记 readiness：`make authz-test authz-lint && go test ./pkg/authz/...`（结果写入 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`）。
-- [ ] 确认 Logging 表可用：`make db plan` 或等效迁移检查确保 `authentication_logs/action_logs` 已存在且无 drift；如需 schema 调整，先补 atlas/goose 变更。
-- [ ] 验证运行基线：`AUTHZ_ENFORCE=0 make run`（或最小 dev 启动）确保日志采集/Loki 配置缺省不会阻塞启动；无数据时准备 mock/seed。
-- [ ] 验证 policy 打包链路：`make authz-pack` 在当前代码上可成功生成 `config/access/policy.csv(.rev)`，确认无 logging 相关差异。
-- [ ] 将本文档状态更新为“准备就绪/已批准”，附 readiness 命令时间戳。
+- [x] 重新执行并登记 readiness：`GOCACHE=/tmp/go-cache make authz-test`、`make authz-lint`、`go test ./pkg/authz/...` 已于 2025-12-06 00:02 UTC 完成，结果写入 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
+- [x] 确认 Logging 表可用：使用运行中的 `bugs-blossoms-db-1`（localhost:5438）执行 `SELECT ... FROM information_schema.tables`，确认 `authentication_logs`/`action_logs` 均存在（2025-12-06 00:02 UTC）。
+- [x] 验证运行基线：`AUTHZ_ENFORCE=0 DB_HOST=localhost DB_PORT=5438 DB_NAME=iota_erp DB_USER=postgres DB_PASSWORD=postgres REDIS_URL=localhost:6379 timeout 45s go run cmd/server/main.go` 成功监听 http://localhost，45s 超时后主动退出（用于验证缺省 Loki/日志配置不阻塞启动）。
+- [x] 验证 policy 打包链路：`GOCACHE=/tmp/go-cache make authz-lint`（含 `make authz-pack`）在当前代码上生成聚合策略并通过 fixture parity（2025-12-06 00:02 UTC）。
+- [x] 将本文档状态更新为“准备就绪/已批准”，附 readiness 命令时间戳（2025-12-06 00:02 UTC）。
 
 ## 范围
 - `modules/logging/**` 的 DDD 结构（domain/entities & aggregates、infrastructure/persistence、services、presentation/controllers/templates/locales）、module 注册与导航/Quick Links。

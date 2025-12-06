@@ -26,14 +26,15 @@ type DataSpec struct {
 }
 
 type UserSpec struct {
-	Email       string   `json:"email"`
-	Password    string   `json:"password"`
-	FirstName   string   `json:"firstName"`
-	LastName    string   `json:"lastName"`
-	Permissions []string `json:"permissions,omitempty"`
-	Language    string   `json:"language,omitempty"`
-	Ref         string   `json:"_ref,omitempty"`
-	CasbinRoles []string `json:"casbinRoles,omitempty"`
+	Email            string   `json:"email"`
+	Password         string   `json:"password"`
+	FirstName        string   `json:"firstName"`
+	LastName         string   `json:"lastName"`
+	Permissions      []string `json:"permissions,omitempty"`
+	Language         string   `json:"language,omitempty"`
+	Ref              string   `json:"_ref,omitempty"`
+	CasbinRoles      []string `json:"casbinRoles,omitempty"`
+	SkipDefaultAdmin bool     `json:"skipDefaultAdmin,omitempty"`
 }
 
 type FinanceSpec struct {
