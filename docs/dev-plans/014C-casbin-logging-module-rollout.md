@@ -37,6 +37,9 @@
 - 审计链路单点：未授权/关键操作先写集中结构化日志，按需异步落库，失败降级但不复制多套落点。
 - 回滚与灰度只依赖 feature flag 与策略版本控制，避免为“向后兼容”额外维护多套代码分支。
 
+## 提交流程
+- 按“工作拆解”小节推进，每完成一个小节的主要实现与验证后立即推送一次 PR（小步提交便于审阅），必要时在 dev-records 补充对应命令/结果。
+
 ## 阶段划分（与 014 主计划对齐）
 - M1（开发）：补齐 controller/service/repo + 模板/导航鉴权，默认 enforce 开发，可选一次 shadow 对比。
 - M2（上线前准备）：完成最小 `make authz-test authz-lint`、`go test ./modules/logging/...`、`make authz-pack` readiness 并记录 dev-records。
