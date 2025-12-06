@@ -12,6 +12,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
@@ -205,6 +206,11 @@ func logUnauthorizedAccess(r *http.Request, req authz.Request, mode authz.Mode, 
 	logger := composables.UseLogger(r.Context())
 	ip, _ := composables.UseIP(r.Context())
 	ua, _ := composables.UseUserAgent(r.Context())
+	tenantID := tenantIDFromContext(r)
+	traceID := ""
+	if spanCtx := trace.SpanFromContext(r.Context()).SpanContext(); spanCtx.HasTraceID() {
+		traceID = spanCtx.TraceID().String()
+	}
 
 	fields := logrus.Fields{
 		"authz.subject": req.Subject,
@@ -215,6 +221,12 @@ func logUnauthorizedAccess(r *http.Request, req authz.Request, mode authz.Mode, 
 		"ip":            ip,
 		"user_agent":    ua,
 		"request_id":    r.Header.Get("X-Request-ID"),
+		"tenant_id":     tenantID,
+		"http.method":   r.Method,
+		"http.path":     r.URL.Path,
+	}
+	if traceID != "" {
+		fields["trace_id"] = traceID
 	}
 
 	entry := logger.WithFields(fields)
@@ -235,7 +247,6 @@ func logUnauthorizedAccess(r *http.Request, req authz.Request, mode authz.Mode, 
 	if userErr != nil || currentUser == nil {
 		return
 	}
-	tenantID := tenantIDFromContext(r)
 	if tenantID == uuid.Nil {
 		return
 	}

@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -11,7 +10,6 @@ import (
 	"github.com/a-h/templ"
 	"github.com/gorilla/mux"
 
-	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/authenticationlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/mappers"
@@ -19,7 +17,6 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/logging/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
-	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
 	"github.com/iota-uz/iota-sdk/pkg/mapping"
@@ -97,9 +94,6 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 	props := &viewmodels.LogsPageProps{
 		BasePath:  c.basePath,
 		ActiveTab: tab,
-		Authz: viewmodels.LogsAuthz{
-			CanView: canViewLogs(r.Context()),
-		},
 		Authentication: viewmodels.AuthenticationSection{
 			Logs:    mapping.MapViewModels(authLogs, mappers.AuthenticationLogToViewModel),
 			Total:   authTotal,
@@ -161,15 +155,6 @@ func buildAuthenticationFilters(
 		}
 	}
 	return params, filters
-}
-
-func canViewLogs(ctx context.Context) bool {
-	state := authz.ViewStateFromContext(ctx)
-	if state == nil {
-		return true
-	}
-	allowed, ok := state.CapabilityValue(authzutil.CapabilityKey(logsAuthzObject, "view"))
-	return ok && allowed
 }
 
 func buildActionFilters(

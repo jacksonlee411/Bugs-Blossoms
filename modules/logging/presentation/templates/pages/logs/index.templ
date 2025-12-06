@@ -38,7 +38,8 @@ templ Index(props *viewmodels.LogsPageProps) {
 
 templ Content(props *viewmodels.LogsPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	if !props.Authz.CanView {
+	{{ canView := pageCtx != nil && pageCtx.CanAuthz("logging.logs", "view") }}
+	if !canView {
 		@corecomponents.Unauthorized(&corecomponents.UnauthorizedProps{
 			Object:    "logging.logs",
 			Action:    "view",

@@ -52,14 +52,9 @@ type ActionSection struct {
 	PerPage int
 }
 
-type LogsAuthz struct {
-	CanView bool
-}
-
 type LogsPageProps struct {
 	BasePath       string
 	ActiveTab      string
 	Authentication AuthenticationSection
 	Action         ActionSection
-	Authz          LogsAuthz
 }

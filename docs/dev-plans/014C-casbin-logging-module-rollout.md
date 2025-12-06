@@ -52,7 +52,7 @@
 - [ ] Core 复用路径：core session handler 直接依赖 logging repo/service 写 `authentication_logs`，core 内不再维护平行仓储；logging 提供只读 service 给 controller/UI。
 - [ ] action_logs 采集开关：默认关闭（配置可开），开启后通过 middleware 钩子写入；无数据环境允许空返回，不报错。
  - [ ] （搁置）数据保留：默认保留 90 天，logging service 提供清理接口/定时任务钩子（可配置保留期）；纳入文档与验收。
-- [ ] 审计日志格式：结构化日志固定字段 `subject, domain, object, action, tenant, ip, user_agent, request_id, trace_id, mode(enforce/shadow)`，logger 前缀 `authz.logging`；落库失败降级为日志告警。
+- [x] 审计日志格式：结构化日志固定字段 `subject, domain, object, action, tenant, ip, user_agent, request_id, trace_id, mode(enforce/shadow)`，logger 前缀 `authz.logging`；落库失败降级为日志告警。
 - [x] E2E/seed：提交 `logging.logs:view` 片段并跑 `authz-pack`；seed 账号至少两类（有/无 Logs.View），Playwright 用同一策略；policy 产物按 M2/M3 策略提交。
  - [ ] （搁置）监控阈值：403 比例>5% 或 action_logs 写失败率>1% 或缺租户/用户拒绝占比>0.5% 触发告警/人工复核。
 - [ ] UI 范围：首版仅 list/detail + 导出（如有），无创建/删除；Quick Link/导航指向 Authentication Logs 默认 Tab。
@@ -71,7 +71,7 @@
 - [ ] 单元测试（表驱动 + testify + mock repo）覆盖：①无用户/租户②无权限③有权限，拒绝时仓储不被调用；验证 attributes 透传（tenant、path、method）。
 
 ### 3. Presentation / 模板 / Locales
-- [ ] 在 `modules/logging/presentation/templates/pages/logs/` 创建 list/detail/empty templat，全部用 `pageCtx.CanAuthz("logging.logs", "view")` 控制入口，禁止 `user.Can`；空态支持“无数据/无权限”两类。
+- [x] 在 `modules/logging/presentation/templates/pages/logs/` 创建 list/detail/empty templat，全部用 `pageCtx.CanAuthz("logging.logs", "view")` 控制入口，禁止 `user.Can`；空态支持“无数据/无权限”两类。
 - [x] 临时 Unauthorized 组件读取 `pageCtx.AuthzState().MissingPolicies` + `SuggestDiff`，提供跳转 `/core/api/authz/requests` 按钮；待 015B 可直接替换。
 - [x] 补充 viewmodels/mappers 携带 `CanExport`, `CanInspect` 等布尔值，模板避免再做判定；HTMX partial 复用相同 props。
 - [x] 更新 locales `{en,ru,uz,zh}.json`：新增 Logging 页面标题、筛选项、403 文案、申请权限按钮；完成后运行 `make check tr`。
