@@ -162,6 +162,7 @@ type Configuration struct {
 	Stripe        StripeOptions
 	RateLimit     RateLimitOptions
 	Authz         AuthzOptions
+	ActionLogEnabled bool `env:"ACTION_LOG_ENABLED" envDefault:"false"`
 
 	RedisURL         string        `env:"REDIS_URL" envDefault:"localhost:6379"`
 	MigrationsDir    string        `env:"MIGRATIONS_DIR" envDefault:"migrations"`

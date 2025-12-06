@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
@@ -11,8 +13,12 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
+	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
+	"github.com/iota-uz/iota-sdk/modules/logging/services"
+	"github.com/iota-uz/iota-sdk/pkg/application"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
+	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
 )
 
@@ -163,4 +169,58 @@ func logUnauthorizedAccess(r *http.Request, req authz.Request, mode authz.Mode, 
 		entry = entry.WithError(err)
 	}
 	entry.Warn("logging.authz.forbidden")
+
+	if !configuration.Use().ActionLogEnabled {
+		return
+	}
+
+	app, appErr := application.UseApp(r.Context())
+	if appErr != nil {
+		return
+	}
+	currentUser, userErr := composables.UseUser(r.Context())
+	if userErr != nil || currentUser == nil {
+		return
+	}
+	tenantID := tenantIDFromContext(r)
+	if tenantID == uuid.Nil {
+		return
+	}
+
+	tx, txErr := app.DB().Begin(r.Context())
+	if txErr != nil {
+		logger.WithError(txErr).Warn("action-log: failed to begin transaction")
+		return
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback(r.Context())
+		}
+	}()
+
+	ctx := composables.WithTx(r.Context(), tx)
+	ctx = composables.WithTenantID(ctx, tenantID)
+
+	userID := currentUser.ID()
+	entryPayload := &actionlog.ActionLog{
+		TenantID:  tenantID,
+		UserID:    &userID,
+		Method:    strings.ToUpper(r.Method),
+		Path:      r.URL.Path,
+		UserAgent: ua,
+		IP:        ip,
+		CreatedAt: time.Now(),
+	}
+
+	logsService := app.Service(services.LogsService{}).(*services.LogsService)
+	if err := logsService.CreateActionLog(ctx, entryPayload); err != nil {
+		logger.WithError(err).Warn("action-log: failed to persist forbidden request")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		logger.WithError(err).Warn("action-log: failed to commit transaction")
+		return
+	}
+	committed = true
 }
