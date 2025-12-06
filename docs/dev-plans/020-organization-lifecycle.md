@@ -79,7 +79,7 @@
 - 新建 schema `modules/org/infrastructure/persistence/schema/org-schema.sql`，核心表：
   - `org_nodes`（tenant_id, id, type, code, name, status, effective_date, end_date, parent_hint, owner_user_id, created_at, updated_at）。
   - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_date, end_date, depth, path ltree）。
-  - `org_assignments`（tenant_id, id, node_id, subject_type=person, subject_id=person_id, pernr, effective_date, end_date, primary bool）。
+  - `org_assignments`（tenant_id, id, node_id, subject_type=person, subject_id=person_id, pernr, position_id 可空占位, effective_date, end_date, primary bool）。
   - 其他表（change_requests、retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
   - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_date, end_date))` 用于时间冲突约束。
 - 约束（M1 落地）：`org_nodes` 的 code 需在 tenant 内唯一；name 在同一父节点+时间窗口内唯一；`org_edges` 需防环/双亲（ltree path + 唯一 child per hierarchy）；`org_assignments` 对同一 subject 在重叠时间内仅允许一个 primary（部分唯一约束）。
@@ -105,9 +105,9 @@
 ## 集成与依赖
 - **SOR 边界**：Org 模块为组织层级 SOR；HRM/Position 为人/岗位 SOR，Position 编制/空岗在 DEV-PLAN-021；Finance 为 Cost Center/Company 财务口径 SOR（冻结期间不改 schema）。
 - **HRM 员工**：提供 `OrgAssignments` 视图和分配 API，表单默认 `effective_date = hire_date`，按 SOR 边界执行回写/订阅；主体标识使用 `person_id`（不可变）+ `pernr`（工号，租户内唯一且不变）。
-- **Authz/Casbin**：M1 仅发布事件；`OrgScope` ABAC 属性与 policy pack/test 放入后续里程碑。
-- **Workflow**：M1 不引入审批引擎，后续若需要再复用 `pkg/workflow`。
-- **Position/Compensation**：M1 仅面向员工，职位/成本中心钩子留待 DEV-PLAN-021/M3+。
+- **Authz/Casbin**：M1 仅发布事件；事件 payload 预留 `tenant_id/org_id/hierarchy_type/node_type/person_id/pernr/position_id/effective_date/end_date` 和 `version/timestamp`，供后续 `OrgScope`/ABAC 计算。policy pack/test 放入后续里程碑。
+- **Workflow**：M1 不引入审批引擎，事件中预留变更上下文字段（如 `change_type`, `initiator_id`）便于后续 route preview/绑定。
+- **Position/Compensation**：M1 面向人员，保留 `position_id` 可空占位随 Assignment 写入；编制/岗位/成本中心钩子留待 DEV-PLAN-021/M3+。
 - **Finance/Projects/Procurement**：冻结期仅消费事件与只读视图，不改 finance 相关 schema；解冻后若有需求在 dev-plan 记录。
 - **缓存**：树结构在 Redis/内存缓存，Key 含层级类型 + effective date（按日）。变更事件触发缓存失效。
 - **Reporting/Analytics**：提供 `org_reporting` 视图供 BI 工具使用，支持任意时间点快照，与 Workday Custom Reporting 对齐。
