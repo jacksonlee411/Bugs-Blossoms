@@ -15,6 +15,7 @@
 4. **生命周期驱动（后续）**：组织单元的创建、重命名、合并、撤销等动作理想路径是“请求→审批→生效”，但 M1 仅直接 CRUD；审批/草稿/仿真视图待后续里程碑再启用。
 5. **时间线 API**：所有读写接口必须显式接受 `effective_at`，未提供时默认 `time.Now()`，以保障历史查询与未来排程。
 6. **可扩展事件流**：关键变更（新建部门、层级调整、员工调动、权限继承）通过 `pkg/eventbus` 发布，供 HRM/财务/审批模块订阅。
+- **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”。
 
 ## 目标
 - **Phase 0/1（M1）**：仅交付单一 Supervisory 树的 OrgNode/OrgEdge/Assignment CRUD，强制有效期/去重名/无重叠、租户隔离查询性能（1k 节点 200ms 内）、基础审计与冻结窗口。无审批流、无 BP 绑定、无并行版本、无策略生成，先提供稳定 SOR 与事件出口。
@@ -138,7 +139,7 @@
 ## 术语映射表（Workday/主流 HR ↔ SAP HCM ↔ 本项目）
 | Workday 术语 | 主流 HR 习惯 | SAP HCM 字段名 | 本项目字段名 | 说明 |
 | --- | --- | --- | --- | --- |
-| Supervisory Organization | 部门/主管线 | ORGEH（Org Unit），关系 A/B002 | `hierarchy_type=Supervisory`，`node_type=OrgUnit` | M1 仅单树。 |
+| Supervisory Organization | 部门/主管线 | ORGEH（Org Unit），关系 A/B002 | 术语：Organization Unit（字段/标签：Org Unit）；`hierarchy_type=Supervisory`，`node_type=OrgUnit` | M1 仅单树。 |
 | Company Organization | 法人/公司 | BUKRS（Company Code） | `hierarchy_type=Company`（M2+ 预留） | M1 不落地，后续占位。 |
 | Cost Center | 成本中心 | KOSTL（Cost Center） | `hierarchy_type=CostCenter`（M2+ 预留） | finance SOR，仅消费事件/视图。 |
 | Custom Organization | 自定义报表分组 | 自定义评估路径/对象类型（例如 O/Z*） | `hierarchy_type=Custom`（M2+ 预留） | 用于报表分组，占位。 |
