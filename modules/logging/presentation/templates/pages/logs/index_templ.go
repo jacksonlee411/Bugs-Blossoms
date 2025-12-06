@@ -555,7 +555,7 @@ func AuthenticationLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var25 string
 							templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", log.ID))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 179, Col: 74}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 180, Col: 34}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 							if templ_7745c5c3_Err != nil {
@@ -586,7 +586,7 @@ func AuthenticationLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var27 string
 							templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", log.UserID))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 180, Col: 78}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 183, Col: 38}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 							if templ_7745c5c3_Err != nil {
@@ -617,7 +617,7 @@ func AuthenticationLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var29 string
 							templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(log.IP)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 181, Col: 55}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 186, Col: 15}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 							if templ_7745c5c3_Err != nil {
@@ -648,7 +648,7 @@ func AuthenticationLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var31 string
 							templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(log.UserAgent)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 182, Col: 62}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 189, Col: 22}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 							if templ_7745c5c3_Err != nil {
@@ -679,7 +679,7 @@ func AuthenticationLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var33 string
 							templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(log.CreatedAt)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 183, Col: 62}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 192, Col: 22}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 							if templ_7745c5c3_Err != nil {
@@ -750,7 +750,7 @@ func ActionLogs(props *viewmodels.LogsPageProps) templ.Component {
 		var templ_7745c5c3_Var35 string
 		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s?tab=action", props.BasePath))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 196, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 206, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
@@ -763,7 +763,7 @@ func ActionLogs(props *viewmodels.LogsPageProps) templ.Component {
 		var templ_7745c5c3_Var36 string
 		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.Action.PerPage))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 202, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 212, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
@@ -862,7 +862,7 @@ func ActionLogs(props *viewmodels.LogsPageProps) templ.Component {
 			var templ_7745c5c3_Var38 string
 			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Search"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 259, Col: 26}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 269, Col: 26}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 			if templ_7745c5c3_Err != nil {
@@ -894,7 +894,7 @@ func ActionLogs(props *viewmodels.LogsPageProps) templ.Component {
 			var templ_7745c5c3_Var40 string
 			templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Reset"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 270, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 280, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 			if templ_7745c5c3_Err != nil {
@@ -1005,7 +1005,7 @@ func ActionLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var45 string
 							templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", log.ID))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 302, Col: 74}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 313, Col: 34}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 							if templ_7745c5c3_Err != nil {
@@ -1036,7 +1036,7 @@ func ActionLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var47 string
 							templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(log.UserID)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 303, Col: 59}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 316, Col: 19}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 							if templ_7745c5c3_Err != nil {
@@ -1067,7 +1067,7 @@ func ActionLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var49 string
 							templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(strings.ToUpper(log.Method))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 304, Col: 76}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 319, Col: 36}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
 							if templ_7745c5c3_Err != nil {
@@ -1098,7 +1098,7 @@ func ActionLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var51 string
 							templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(log.Path)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 305, Col: 57}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 322, Col: 17}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 							if templ_7745c5c3_Err != nil {
@@ -1129,7 +1129,7 @@ func ActionLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var53 string
 							templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(log.IP)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 306, Col: 55}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 325, Col: 15}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 							if templ_7745c5c3_Err != nil {
@@ -1160,7 +1160,7 @@ func ActionLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var55 string
 							templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(log.UserAgent)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 307, Col: 62}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 328, Col: 22}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 							if templ_7745c5c3_Err != nil {
@@ -1191,7 +1191,7 @@ func ActionLogsTable(props *viewmodels.LogsPageProps) templ.Component {
 							var templ_7745c5c3_Var57 string
 							templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(log.CreatedAt)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 308, Col: 62}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/logging/presentation/templates/pages/logs/index.templ`, Line: 331, Col: 22}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 							if templ_7745c5c3_Err != nil {
