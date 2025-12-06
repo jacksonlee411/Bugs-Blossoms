@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -104,16 +105,35 @@ func enforceRequest(ctx context.Context, svc *authz.Service, req authz.Request, 
 
 func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, action string) {
 	msg := fmt.Sprintf("Forbidden: %s %s. 如需申请权限，请访问 /core/api/authz/requests。", object, action)
+
+	state := authz.ViewStateFromContext(r.Context())
+	accept := strings.ToLower(r.Header.Get("Accept"))
+	if strings.Contains(accept, "application/json") {
+		payload := map[string]interface{}{
+			"message":         msg,
+			"object":          object,
+			"action":          action,
+			"missingPolicies": nil,
+		}
+		if state != nil {
+			payload["missingPolicies"] = state.MissingPolicies
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_ = json.NewEncoder(w).Encode(payload)
+		return
+	}
+
 	if htmx.IsHxRequest(r) {
 		w.Header().Set("HX-Retarget", "body")
 		w.Header().Set("HX-Reswap", "innerHTML")
 	}
-	if pageCtx, ok := composables.TryUsePageCtx(r.Context()); ok {
+	if _, ok := composables.TryUsePageCtx(r.Context()); ok {
 		props := &corecomponents.UnauthorizedProps{
 			Object:    object,
 			Action:    action,
 			Operation: fmt.Sprintf("%s %s", object, action),
-			State:     pageCtx.AuthzState(),
+			State:     state,
 			Request:   "/core/api/authz/requests",
 		}
 		w.WriteHeader(http.StatusForbidden)
