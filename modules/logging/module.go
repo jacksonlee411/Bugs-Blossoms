@@ -8,6 +8,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/controllers"
 	"github.com/iota-uz/iota-sdk/modules/logging/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/spotlight"
 )
 
@@ -41,6 +42,9 @@ func (m *Module) Register(app application.Application) error {
 			RequireAuthz(LogsLink.AuthzObject, LogsLink.AuthzAction),
 	)
 	handlers.RegisterSessionEventHandlers(app)
+	if configuration.Use().ActionLogEnabled {
+		app.RegisterMiddleware(handlers.ActionLogMiddleware(app))
+	}
 	return nil
 }
 
