@@ -135,6 +135,26 @@
 - **范围回弹**：高级特性（workflow/Authz/Impact）被提前挤入 M1 → 通过文档声明与里程碑约束，严格 CR 控制。
 - **跨模块耦合**：若 HRM/Finance 期待同步 schema 变更 → 明确 SOR 边界，仅发布事件/视图，避免修改冻结模块。
 
+## 术语映射表（Workday/主流 HR ↔ 本方案）
+| Workday 术语 | 主流 HR 习惯 | 本方案字段/枚举 | 说明 |
+| --- | --- | --- | --- |
+| Supervisory Organization | 部门/主管线 | `HierarchyType=Supervisory`，`NodeType=OrgUnit` | M1 仅单树。 |
+| Company Organization | 法人/公司 | `HierarchyType=Company`（M2+ 预留） | M1 不落地，后续占位。 |
+| Cost Center | 成本中心 | `HierarchyType=CostCenter`（M2+ 预留） | finance SOR，仅消费事件/视图。 |
+| Custom Organization | 自定义报表分组 | `HierarchyType=Custom`（M2+ 预留） | 用于报表分组，占位。 |
+| Org ID/Code | 组织编码 | `org_nodes.code` | 租户内唯一。 |
+| Org Name | 组织名称 | `org_nodes.name` | 父节点+时间窗口内唯一。 |
+| Parent Org | 父子关系 | `org_edges.parent_node_id` / `child_node_id` | `org_nodes.parent_hint` 仅缓存，建议重命名为 `parent_node_cache` 或隐藏。 |
+| Manager/Supervisor | 组织负责人 | `owner_user_id`（建议改 `manager_user_id`） | 对齐 Workday Manager 语义。 |
+| Effective Start/End | 生效/失效日期 | `effective_start` / `effective_end` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
+| As-of Date | 查询时点 | `effective_at` 参数 | 未传则默认 `time.Now()`。 |
+| Primary Supervisory Org | 主属组织 | `org_assignments.primary` | 仅支持主属，辅属/矩阵待 M2+。 |
+| Worker | 员工/雇员 | `subject_type=employee` + `subject_id` | 若接 Position，可改为 `worker_type/worker_id`。 |
+| Position | 职位 | （未落地）`position_id` 占位 | 计划在 DEV-PLAN-021/M3+。 |
+| Effective Status | 状态 | `status=Active/Retired` | 如需停用态可扩展 `Inactive`。 |
+| Org Level | 组织层级 | （未落地）`org_level` 占位 | 便于报表/BP 路由。 |
+| Org Roles (HR Partner 等) | HR 伙伴/业务负责人 | （未落地）`hr_partner_user_id` 等 | 可在后续里程碑补充。 |
+
 ## 后续动作
 - 记录本计划在 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md` 的 PoC/联调日志。
 - 与产品/HR BP 对齐 Workday 关键流程（Supervisory、Matrix、Effective Dating）。
