@@ -156,6 +156,12 @@ func buildModulePermissionSets() []rbac.PermissionSet {
 		hrm.manageSet("Employee", hrmPerms.EmployeeCreate, hrmPerms.EmployeeRead, hrmPerms.EmployeeUpdate, hrmPerms.EmployeeDelete),
 	)
 
+	// Logging module
+	logging := newPermissionSetBuilder("Logging")
+	sets = append(sets,
+		logging.viewSet("Logs", loggingPerms.ViewLogs),
+	)
+
 	return sets
 }
 
@@ -164,7 +170,6 @@ func appendRemainingPermissionSets(sets []rbac.PermissionSet) []rbac.PermissionS
 	// Collect all remaining permissions
 	remainingPermissions := make([]*permission.Permission, 0)
 	remainingPermissions = append(remainingPermissions, billingPerms.Permissions...)
-	remainingPermissions = append(remainingPermissions, loggingPerms.Permissions...)
 
 	// Convert each permission to a permission set
 	for _, perm := range remainingPermissions {

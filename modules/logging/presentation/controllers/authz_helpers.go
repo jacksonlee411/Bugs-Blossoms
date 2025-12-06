@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
+	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/services"
@@ -34,29 +35,27 @@ func ensureLoggingAuthz(
 	opts ...authz.RequestOption,
 ) bool {
 	capKey := authzutil.CapabilityKey(logsAuthzObject, action)
-
-	currentUser, err := composables.UseUser(r.Context())
-	if err != nil || currentUser == nil {
-		recordForbiddenCapability(authz.ViewStateFromContext(r.Context()), r, logsAuthzObject, action, capKey)
-		writeForbiddenResponse(w, r, logsAuthzObject, action)
-		return false
-	}
-
 	tenantID := tenantIDFromContext(r)
-	ctxWithState, state := authzutil.EnsureViewState(r.Context(), tenantID, currentUser)
-	if ctxWithState != r.Context() {
-		*r = *r.WithContext(ctxWithState)
-	}
-
-	svc := authz.Use()
-	mode := svc.Mode()
+	currentUser, err := composables.UseUser(r.Context())
+	state := ensureLoggingViewState(r, tenantID, currentUser)
+	subject := resolveLoggingSubject(tenantID, currentUser)
 	req := authz.NewRequest(
-		authzutil.SubjectForUser(tenantID, currentUser),
+		subject,
 		authz.DomainFromTenant(tenantID),
 		logsAuthzObject,
 		authz.NormalizeAction(action),
 		opts...,
 	)
+
+	if err != nil || currentUser == nil {
+		recordForbiddenCapability(state, r, logsAuthzObject, action, capKey)
+		logUnauthorizedAccess(r, req, authz.Use().Mode(), err)
+		writeForbiddenResponse(w, r, logsAuthzObject, action)
+		return false
+	}
+
+	svc := authz.Use()
+	mode := svc.Mode()
 
 	allowed, authzErr := enforceRequest(r.Context(), svc, req, mode)
 	if authzErr != nil {
@@ -113,7 +112,7 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 	requestURL := "/core/api/authz/requests"
 	debugURL := "/core/api/authz/debug"
 	subject := ""
-	domain := ""
+	domain := authzDomainFromContext(r)
 	var missingPolicies []authz.MissingPolicy
 	var suggestDiff []authz.PolicySuggestion
 
@@ -124,6 +123,13 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 		for _, policy := range state.MissingPolicies {
 			suggestDiff = append(suggestDiff, state.SuggestDiff(policy)...)
 		}
+	}
+	if len(missingPolicies) == 0 && object != "" && normalizedAction != "" {
+		missingPolicies = []authz.MissingPolicy{{
+			Domain: domain,
+			Object: object,
+			Action: normalizedAction,
+		}}
 	}
 	if subject != "" && object != "" && normalizedAction != "" {
 		q := url.Values{}
@@ -243,6 +249,10 @@ func logUnauthorizedAccess(r *http.Request, req authz.Request, mode authz.Mode, 
 	if appErr != nil {
 		return
 	}
+	if app.DB() == nil {
+		logger.Warn("action-log: database pool not available, skip audit persistence")
+		return
+	}
 	currentUser, userErr := composables.UseUser(r.Context())
 	if userErr != nil || currentUser == nil {
 		return
@@ -287,4 +297,31 @@ func logUnauthorizedAccess(r *http.Request, req authz.Request, mode authz.Mode, 
 		return
 	}
 	committed = true
+}
+
+func ensureLoggingViewState(r *http.Request, tenantID uuid.UUID, currentUser user.User) *authz.ViewState {
+	if currentUser != nil {
+		ctxWithState, state := authzutil.EnsureViewState(r.Context(), tenantID, currentUser)
+		if ctxWithState != r.Context() {
+			*r = *r.WithContext(ctxWithState)
+		}
+		return state
+	}
+
+	state := authz.ViewStateFromContext(r.Context())
+	if state == nil {
+		state = authz.NewViewState(authz.SubjectForUserID(tenantID, "anonymous"), authz.DomainFromTenant(tenantID))
+		ctxWithState := authz.WithViewState(r.Context(), state)
+		*r = *r.WithContext(ctxWithState)
+	} else if state.Tenant == "" {
+		state.Tenant = authz.DomainFromTenant(tenantID)
+	}
+	return state
+}
+
+func resolveLoggingSubject(tenantID uuid.UUID, currentUser user.User) string {
+	if currentUser == nil {
+		return authz.SubjectForUserID(tenantID, "anonymous")
+	}
+	return authzutil.SubjectForUser(tenantID, currentUser)
 }

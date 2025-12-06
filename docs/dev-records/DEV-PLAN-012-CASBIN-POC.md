@@ -13,5 +13,7 @@
 | 2025-12-06 00:02 | `GOCACHE=/tmp/go-cache make authz-test` | readiness 检查：`pkg/authz` + `scripts/authz/internal/...` 用例需通过 | 所有相关用例通过（014C 前置检查） | ✅ |
 | 2025-12-06 00:02 | `GOCACHE=/tmp/go-cache make authz-lint` | readiness 检查：策略打包 + fixture parity 需通过 | `authz-pack` 生成成功，`scripts/authz/verify --fixtures` 通过 | ✅ |
 | 2025-12-06 00:02 | `GOCACHE=/tmp/go-cache go test ./pkg/authz/...` | readiness 补充：重复验证 `pkg/authz` 及子包单测 | 所有相关用例通过 | ✅ |
+| 2025-12-07 09:30 | `GOCACHE=/tmp/go-cache go test ./modules/logging/...` | Logging 控制器/服务/仓储单测覆盖无 Session/无租户/无权限/成功路径 | 所有 logging 包用例通过（含 action log 开关降级场景） | ✅ |
+| 2025-12-07 09:30 | `GOCACHE=/tmp/go-cache make authz-lint` | readiness 补充：policy 打包 + fixtures parity（含 logging.view 基线） | `authz-pack` + fixtures parity 通过 | ✅ |
 
 > 提示：若命令失败，请先记录“❌ + 原因/堆栈”，完成修复后再追加新的“✅”行，确保整个 014 改造期间具备可追踪的 readiness 审计链路。

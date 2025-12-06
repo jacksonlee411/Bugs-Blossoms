@@ -105,8 +105,14 @@ func (r *ActionLogRepository) Create(ctx context.Context, log *actionlog.ActionL
 	}
 
 	dbRow := toDBActionLog(log)
+	if log != nil && log.TenantID == uuid.Nil {
+		dbRow.TenantID = ""
+	}
 	if dbRow.TenantID == "" {
 		dbRow.TenantID = tenantID.String()
+	}
+	if log != nil && log.TenantID == uuid.Nil {
+		log.TenantID = tenantID
 	}
 	if dbRow.CreatedAt.IsZero() {
 		dbRow.CreatedAt = time.Now()

@@ -4,6 +4,12 @@
   action: list
   legacy: true
   note: superadmin baseline
+- subject: role:core.superadmin
+  domain: global
+  object: logging.logs
+  action: view
+  legacy: true
+  note: logging view baseline
 - subject: tenant:global:user:test
   domain: global
   object: core.users

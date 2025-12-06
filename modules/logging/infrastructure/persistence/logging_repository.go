@@ -97,8 +97,14 @@ func (r *AuthenticationLogRepository) Create(ctx context.Context, log *authentic
 	}
 
 	dbRow := toDBAuthenticationLog(log)
+	if log != nil && log.TenantID == uuid.Nil {
+		dbRow.TenantID = ""
+	}
 	if dbRow.TenantID == "" {
 		dbRow.TenantID = tenantID.String()
+	}
+	if log != nil && log.TenantID == uuid.Nil {
+		log.TenantID = tenantID
 	}
 	if dbRow.CreatedAt.IsZero() {
 		dbRow.CreatedAt = time.Now()

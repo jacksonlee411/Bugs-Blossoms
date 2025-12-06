@@ -18,8 +18,10 @@ test.describe('logging authz gating', () => {
 		await logout(page);
 	});
 
-	test('allows superadmin to view logs page', async ({ page }) => {
+	test('allows superadmin to view logs page and tabs', async ({ page }) => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
+
+		await expect(page.getByRole('link', { name: /^Logs$/ })).toBeVisible();
 
 		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
 		if (response) {
@@ -27,10 +29,14 @@ test.describe('logging authz gating', () => {
 		}
 		await expect(page).toHaveURL(/\/logs/);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText(/Logs/i);
+		await expect(page.getByRole('button', { name: /Authentication Logs/i })).toBeVisible();
+		await expect(page.getByRole('button', { name: /Action Logs/i })).toBeVisible();
 	});
 
 	test('blocks logs page for user without logging permissions', async ({ page }) => {
 		await login(page, 'nohrm@example.com', 'TestPass123!');
+
+		await expect(page.getByRole('link', { name: /^Logs$/ })).toHaveCount(0);
 
 		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
 		if (response) {
@@ -38,5 +44,19 @@ test.describe('logging authz gating', () => {
 		}
 		await expect(page.getByText(/Permission required/i)).toBeVisible();
 		await expect(page.getByRole('link', { name: /Request access/i })).toBeVisible();
+
+		const apiResponse = await page.request.get('/logs', {
+			headers: { Accept: 'application/json' },
+		});
+		expect(apiResponse.status()).toBe(403);
+		const body = await apiResponse.json();
+		expect(body.object).toBe('logging.logs');
+		expect(body.action).toBe('view');
+		expect(typeof body.subject).toBe('string');
+		expect(body.subject).toMatch(/tenant:/);
+		expect(body.domain).toBeTruthy();
+		expect(Array.isArray(body.missing_policies)).toBeTruthy();
+		expect(body.missing_policies.length).toBeGreaterThan(0);
+		expect(body.debug_url).toContain('/core/api/authz/debug');
 	});
 });

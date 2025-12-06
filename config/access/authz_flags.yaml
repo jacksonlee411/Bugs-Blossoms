@@ -1,1 +1,13 @@
 mode: shadow
+segments:
+  logging:
+    mode: shadow
+    flags:
+      authz: AUTHZ_ENFORCE
+      action_logs: ACTION_LOG_ENABLED
+    rollback: >
+      Disable AUTHZ_ENFORCE for logging or revert the logging policy pack, then set
+      ACTION_LOG_ENABLED=false before redeploying.
+    monitor: >
+      Track 403 ratio, missing tenant/user denies, and action_logs persistence errors;
+      revert to shadow if error rates spike.
