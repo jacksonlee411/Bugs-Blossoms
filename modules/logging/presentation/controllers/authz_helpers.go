@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
@@ -138,32 +137,4 @@ func recordForbiddenCapability(state *authz.ViewState, r *http.Request, object, 
 		Object: object,
 		Action: authz.NormalizeAction(action),
 	})
-}
-
-func ensurePageCapabilities(r *http.Request, object string, actions ...string) {
-	if len(actions) == 0 || strings.TrimSpace(object) == "" {
-		return
-	}
-
-	state := authz.ViewStateFromContext(r.Context())
-	if state == nil {
-		return
-	}
-
-	currentUser, err := composables.UseUser(r.Context())
-	if err != nil || currentUser == nil {
-		return
-	}
-
-	tenantID := tenantIDFromContext(r)
-	logger := composables.UseLogger(r.Context())
-
-	for _, action := range actions {
-		if strings.TrimSpace(action) == "" {
-			continue
-		}
-		if _, _, err := authzutil.CheckCapability(r.Context(), state, tenantID, currentUser, object, action); err != nil {
-			logger.WithError(err).WithField("capability", action).Warn("failed to evaluate capability")
-		}
-	}
 }
