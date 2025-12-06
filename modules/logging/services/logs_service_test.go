@@ -101,7 +101,7 @@ func TestLogsService_ListAuthenticationLogs_Authorized(t *testing.T) {
 	logs, total, err := svc.ListAuthenticationLogs(context.Background(), nil)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), total)
-	require.Len(t, logs, 0)
+	require.Empty(t, logs)
 	require.True(t, authRepo.calledList, "repository should be invoked when authorized")
 	require.NotNil(t, authRepo.lastParams, "params should default to non-nil value")
 }
@@ -121,7 +121,7 @@ func TestLogsService_ListActionLogs_Authorized(t *testing.T) {
 	logs, total, err := svc.ListActionLogs(context.Background(), nil)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), total)
-	require.Len(t, logs, 0)
+	require.Empty(t, logs)
 	require.True(t, actionRepo.calledList, "repository should be invoked when authorized")
 	require.NotNil(t, actionRepo.lastParams, "params should default to non-nil value")
 }

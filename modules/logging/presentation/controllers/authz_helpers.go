@@ -120,13 +120,15 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
-		_ = json.NewEncoder(w).Encode(payload)
+		if err := json.NewEncoder(w).Encode(payload); err != nil {
+			composables.UseLogger(r.Context()).WithError(err).Warn("failed to encode forbidden response")
+		}
 		return
 	}
 
 	if htmx.IsHxRequest(r) {
-		w.Header().Set("HX-Retarget", "body")
-		w.Header().Set("HX-Reswap", "innerHTML")
+		w.Header().Set("Hx-Retarget", "body")
+		w.Header().Set("Hx-Reswap", "innerHTML")
 	}
 	if _, ok := composables.TryUsePageCtx(r.Context()); ok {
 		props := &corecomponents.UnauthorizedProps{
