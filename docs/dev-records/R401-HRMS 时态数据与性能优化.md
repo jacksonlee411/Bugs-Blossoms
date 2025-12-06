@@ -24,6 +24,7 @@
 * **时态数据库设计**：基于 PostgreSQL 的 Range Types 与 GiST 索引构建坚实的数据底层。  
 * **高性能层级检索**：对比闭包表（Closure Table）与递归 CTE，提出“时态闭包表”方案。  
 * **读写优化策略**：在 PostgreSQL 内构建物化视图、快照表与维度快照，满足读多写少场景。
+* **SOR 统一性**：短期不做“一刀切”三表迁移（standard_objects/versions/links），各域保持各自 SOR，统一通过事件/只读视图/快照对齐；若未来多域需共用对象框架，再评估 SOM 收敛路径。
 
 ---
 

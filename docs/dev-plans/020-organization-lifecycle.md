@@ -90,6 +90,8 @@
 - sqlc 包：`modules/org/infrastructure/sqlc/...` 负责 CRUD + 冲突检测查询。
 - 性能与冲突验证：itf/bench 覆盖 1k 节点查询 <200ms，重叠/重名写入被拒绝；在 CI 以基准或集成测试执行。
 - 需要 Atlas/Goose 迁移流程，沿用 HRM 指南。
+- 深层级读性能（M2 预留）：写侧保持 `OrgEdge` + ltree，禁止同步级联更新；读侧引入时态闭包表 `org_hierarchy_closure`（ancestor_id, descendant_id, depth, validity tstzrange, tenant_id，GiST/EXCLUDE）仅供查询；为常用时间片构建 `org_hierarchy_snapshots`/物化视图按 as_of_date/tenant 索引，Outbox 驱动 Job 刷新，热点查询禁止递归 CTE，优先走闭包表/快照。
+- 审计/事务时间：主表保持单时态（effective_date/end_date + EXCLUDE），事务时间写入审计表或 Outbox 事件（recorded_at/operator/旧值/新值），供时光机/回放使用，不在主表叠加 tx_range。
 
 ### Service Layer
 - **M1**：`OrgHierarchyService`（增删改查树 + 缓存失效）、`OrgAssignmentService`（员工分配 CRUD + 重叠校验）、`OrgEffectiveDateService`（effective_date 查询封装）。
@@ -123,16 +125,21 @@
 - 灰度与回滚：按租户/环境开关只读接口，写接口仅对导入账号开放；导入前对 org 相关表快照（pg_dump），提供清理脚本与缓存重建。
 - 性能基准：itf/bench 生成 1k 节点树验证查询耗时、重叠写入拒绝；挂入 CI 执行。
 
-## 里程碑
-1. **M1（Phase 0/1）：最小可用主链**
-   - 单一 Organization Unit 树 + OrgNode/OrgEdge/Assignment CRUD，`EffectiveWindow` 规则、无重叠/重名、租户隔离查询；Atlas 迁移/sqlc、ltree/btree_gist 扩展与基础审计。
-   - 性能基线（1k 节点 <200ms 查询）、冻结窗口规则、API/事件规范；测试覆盖重叠检测、父子校验、冻结窗口。
-2. **M2（Phase 2，可选）：多层级与矩阵占位**
-   - 开放 Company/Cost/Custom 多树只读/占位能力，保持主 Organization Unit 约束；可选 Matrix/Lateral link 占位。
-   - 评估是否需要并行版本骨架与 Authz 事件属性扩展，仍不生成策略。
-3. **M3+（后续 backlog）**：
-   - Lifecycle/BP 绑定、并行版本、Retro、更复杂冲突检测。
-   - Authz policy 生成、Security Domain/Group 继承、Impact/What-if UI、route preview、批量 MassMove 脚本。
+## 里程碑（7 阶段拆分）
+1. **阶段 1（M1）：最小可用主链**
+   - 单一 Organization Unit 树 CRUD（OrgNode/OrgEdge/Assignment）、有效期/重名/无重叠/防环、审计（事务时间写审计/Outbox）、1k 节点 <200ms 基线，导入/灰度最小脚本。
+2. **阶段 2：深层级读优化**
+   - 时态闭包表 + SQLC 只读查询，as_of_date/tenant 快照或物化视图，Outbox 驱动刷新；热点查询禁用递归 CTE；基准扩展至 10k+ 节点/时间片查询与快照刷新耗时。
+3. **阶段 3：多层级占位与矩阵雏形**
+   - 开放 Company/Cost/Custom 多树只读/占位，Matrix/Lateral link 占位；保持主 OrgUnit 约束，评估并行版本骨架，Authz 事件属性扩展（仍不生成策略）。
+4. **阶段 4：Lifecycle/Retro 雏形**
+   - 变更草稿/请求流、冻结窗口强化、Retro 入口（可默认关闭），批次/重放校验；扩展导入/对账工具。
+5. **阶段 5：Authz/安全域与策略生成**
+   - 最小策略生成或映射（Org ↔ security group），`make authz-pack/test` 覆盖，Authz 调试/继承只读视图；路由预览接入 Authz 属性。
+6. **阶段 6：Impact/What-if 与时光机 UI**
+   - 时光机（有效时间 + 审计回放视图）、Impact/What-if 只读预览，Route preview UI；缓存失效/一致性强化。
+7. **阶段 7：运维与性能固化 / 可选 SOM 对齐**
+   - 监控/指标（闭包/快照刷新延迟）、压测脚本常驻、导入/回滚自动化；可选评估 SOM/标准对象框架对齐或并行版本全面化。
 
 ## 验收标准
 - Phase 0/1：单树 CRUD + 有效期/去重名/无重叠 + 租户隔离查询性能达标（1k 节点 <200ms），审计和冻结窗口生效；主数据治理（编码/命名/必填/发布模式/SOR 边界）落地。
