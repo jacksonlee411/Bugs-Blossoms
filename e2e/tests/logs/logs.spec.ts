@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import { login, logout } from '../../fixtures/auth';
 import { resetTestDatabase, seedScenario } from '../../fixtures/test-data';
 
+test.describe.configure({ mode: 'serial' });
+
 test.describe('logging authz gating', () => {
 	test.beforeAll(async ({ request }) => {
 		await resetTestDatabase(request, { reseedMinimal: false });
@@ -19,7 +21,7 @@ test.describe('logging authz gating', () => {
 	test('allows superadmin to view logs page', async ({ page }) => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
 
-		const response = await page.goto('/logs');
+		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
 		if (response) {
 			expect(response.status()).toBeLessThan(400);
 		}
@@ -30,7 +32,7 @@ test.describe('logging authz gating', () => {
 	test('blocks logs page for user without logging permissions', async ({ page }) => {
 		await login(page, 'nohrm@example.com', 'TestPass123!');
 
-		const response = await page.goto('/logs');
+		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
 		if (response) {
 			expect([401, 403]).toContain(response.status());
 		}

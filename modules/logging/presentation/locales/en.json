@@ -33,5 +33,6 @@
 			"Title": "No logs yet",
 			"_Description": "No matching logs were found for the current filters."
 		}
-	}
+	},
+	"Reset": "Reset"
 }
