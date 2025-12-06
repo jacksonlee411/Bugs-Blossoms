@@ -1,3 +1,4 @@
+# 请总是用中文回复。
 # CLAUDE.md - IOTA SDK Guide
 
 ## Overview
