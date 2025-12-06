@@ -5,3 +5,4 @@ p, role:bot-dev-2, core.users, list, global, allow
 p, role:core.superadmin, *, *, *, allow
 p, role:core.superadmin, hrm.employees, *, global, allow
 p, role:core.superadmin, hrm.positions, *, global, allow
+p, role:core.superadmin, logging.logs, *, global, allow

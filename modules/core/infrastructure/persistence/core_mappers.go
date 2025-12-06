@@ -12,7 +12,6 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/group"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
-	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/authlog"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/currency"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/passport"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
@@ -307,33 +306,6 @@ func ToDomainSession(dbSession *models.Session) *session.Session {
 		UserAgent: dbSession.UserAgent,
 		CreatedAt: dbSession.CreatedAt,
 		ExpiresAt: dbSession.ExpiresAt,
-	}
-}
-
-func toDBAuthenticationLog(log *authlog.AuthenticationLog) *models.AuthenticationLog {
-	return &models.AuthenticationLog{
-		ID:        log.ID,
-		TenantID:  log.TenantID.String(),
-		UserID:    log.UserID,
-		IP:        log.IP,
-		UserAgent: log.UserAgent,
-		CreatedAt: log.CreatedAt,
-	}
-}
-
-func toDomainAuthenticationLog(dbLog *models.AuthenticationLog) *authlog.AuthenticationLog {
-	tenantID, err := uuid.Parse(dbLog.TenantID)
-	if err != nil {
-		tenantID = uuid.Nil
-	}
-
-	return &authlog.AuthenticationLog{
-		ID:        dbLog.ID,
-		TenantID:  tenantID,
-		UserID:    dbLog.UserID,
-		IP:        dbLog.IP,
-		UserAgent: dbLog.UserAgent,
-		CreatedAt: dbLog.CreatedAt,
 	}
 }
 

@@ -1,7 +1,14 @@
+# 请总是用中文回复。
 # CLAUDE.md - IOTA SDK Guide
 
 ## Overview
 DO NOT COMMENT EXECESSIVELY. Instead, write clear and concise code that is self-explanatory.
+
+### Code Quality & Format (与 CI 对齐)
+- 推送前必须运行与 CI 相同的检查，避免远程 Quality Gates 报红。
+- 必跑：`make check lint`（包含 golangci-lint + cleanarch 等规则，例如 canonicalheader/errchkjson/testifylint），以及相关路径的 `go test`（例如 `go test ./modules/logging/...`）。
+- 根据改动范围追加：模板/样式改动跑 `templ generate && make css`；多语言改动跑 `make check tr`；authz 相关跑 `make authz-test`/`make authz-lint`。
+- 不要仅依赖 `gofmt` 或单纯的 `go test`，它们覆盖不到 CI 的 lint 规则。
 
 ## 项目现状
 - 项目仍处于早期开发阶段，尚未投产，所有特性以快速验证为主。
@@ -105,6 +112,7 @@ modules/{module}/
 - Core 模块暴露 `/core/api/authz/**` API：`GET /policies`、`GET /requests`、`POST /requests` 及 `POST /requests/{id}/approve|reject|cancel|trigger-bot|revert`，调用前确保用户拥有 `Authz.*` 权限；若收到 `AUTHZ_INVALID_REQUEST`，请检查请求体的 `base_revision` 是否落后 `config/access/policy.csv.rev`。
   - 示例：`curl -b sid=<sid> -X POST /core/api/authz/requests -d '{"object":"core.users","action":"read","diff":[...]}' -H 'Content-Type: application/json'`.
 - `GET /core/api/authz/debug` 仅对 `Authz.Debug` 权限开放，必需 `subject/object/action` 查询参数，可选 `domain` 与 `attr.<key>=<value>` 形式的 ABAC 属性；接口自带 `20 req/min/IP` 限流，响应包含 `allowed/mode/latency_ms/request/attributes/trace.matched_policy`，并在日志与 `authz_debug_requests_total|latency_seconds` 指标中记录 request id 与 tenant。
+- 403 契约：未经授权返回 JSON，字段包含 `error/object/action/subject/domain/missing_policies/suggest_diff/request_url/debug_url`，示例见 README/CONTRIBUTING；HX/REST 统一格式。
 - Run `make authz-test` (compiles `pkg/authz` plus helper packages) before committing any authz-related Go changes.
 - Run `make authz-lint` to execute policy packing and the deterministic parity fixtures (`scripts/authz/verify --fixtures ...`). CI hooks onto the same targets.
 - Use `go run ./scripts/authz/export -dsn <dsn> -out <path> -dry-run` for audited exports (requires `ALLOWED_ENV=production_export`).
@@ -113,6 +121,12 @@ modules/{module}/
 
 ## Tool use
 - DO NOT USE `sed` for file manipulation
+
+### Code Quality & Format (与 CI 对齐)
+- 推送前必须运行与 CI 相同的检查，避免远程 Quality Gates 报红。
+- 必跑：`make check lint`（包含 golangci-lint + cleanarch 等规则，例如 canonicalheader/errchkjson/testifylint），以及相关路径的 `go test`（例如 `go test ./modules/logging/...`）。
+- 根据改动范围追加：模板/样式改动跑 `templ generate && make css`；多语言改动跑 `make check tr`；authz 相关跑 `make authz-test`/`make authz-lint`。
+- 不要仅依赖 `gofmt` 或单纯的 `go test`，它们覆盖不到 CI 的 lint 规则。
 
 ## HRM sqlc 指南
 - HRM SQL 与 schema 必须通过 `scripts/db/export_hrm_schema.sh` 更新（可设置 `SKIP_MIGRATE=1` 仅导出 schema）。

@@ -4,7 +4,6 @@ import (
 	"embed"
 
 	"github.com/iota-uz/iota-sdk/modules/hrm/infrastructure/persistence"
-	"github.com/iota-uz/iota-sdk/modules/hrm/permissions"
 	"github.com/iota-uz/iota-sdk/modules/hrm/presentation/controllers"
 	"github.com/iota-uz/iota-sdk/modules/hrm/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
@@ -36,8 +35,7 @@ func (m *Module) Register(app application.Application) error {
 	)
 	app.QuickLinks().Add(
 		spotlight.NewQuickLink(nil, EmployeesLink.Name, EmployeesLink.Href).
-			RequireAuthz(EmployeesLink.AuthzObject, "create").
-			RequirePermissions(permissions.EmployeeCreate),
+			RequireAuthz(EmployeesLink.AuthzObject, "create"),
 	)
 	return nil
 }

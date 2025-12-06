@@ -108,7 +108,7 @@ func UserRow(user *viewmodels.User, rowProps *base.TableRowProps) templ.Componen
 		pageCtx := composables.UsePageCtx(ctx)
 		rowProps.Attrs["id"] = fmt.Sprintf("user-%s", user.ID)
 		rowProps.Attrs["class"] = "hide-on-load"
-		canEdit := pageCtx.CanAuthz("core.users", "update") && user.CanUpdate
+		canEdit := pageCtx.CanAuthz("core.users", "update")
 		editAttrs := templ.Attributes{
 			"class": "btn-fixed",
 		}

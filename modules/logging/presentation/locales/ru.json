@@ -6,5 +6,33 @@
 		"Logs": {
 			"View": "Просмотр логов"
 		}
-	}
+	},
+	"NavigationLinks": {
+		"Logs": "Логи"
+	},
+	"Logs": {
+		"Meta": {
+			"List": {
+				"Title": "Логи"
+			}
+		},
+		"List": {
+			"AuthenticationTab": "Логи аутентификации",
+			"ActionTab": "Логи действий"
+		},
+		"Filters": {
+			"UserID": "ID пользователя",
+			"IP": "IP адрес",
+			"UserAgent": "User Agent",
+			"From": "С",
+			"To": "По",
+			"Method": "Метод",
+			"Path": "Путь"
+		},
+		"Empty": {
+			"Title": "Нет логов",
+			"_Description": "По заданным фильтрам ничего не найдено."
+		}
+	},
+	"Reset": "Сбросить"
 }

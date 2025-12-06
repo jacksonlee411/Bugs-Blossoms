@@ -3,10 +3,10 @@
 
 postgres:
   desc: Database container (PostgreSQL 17)
-  port: 5432
+  port: 5438
   run: docker compose -f compose.dev.yml up db
   health:
-    tcp: 5432
+    tcp: 5438
     wait: 20s
 
 server:

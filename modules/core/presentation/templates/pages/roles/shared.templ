@@ -61,7 +61,11 @@ type PermissionSetProps struct {
 templ PermissionSet(props PermissionSetProps) {
 	{{ setId := fmt.Sprintf("%s-set-%d", props.ResourceName, props.SetIndex) }}
 	{{ toggleId := fmt.Sprintf("toggle-%s", setId) }}
-	{{ label := props.PageContext.T(props.Set.Label) }}
+	{{ label := props.PageContext.TSafe(props.Set.Label) }}
+	{{if label == "" {
+	label = props.Set.Label
+}
+	}}
 	// For single permission sets, render a simple toggle
 	if len(props.Set.Permissions) == 1 {
 		<div class="border border-gray-400 bg-surface-100 rounded-md py-2 px-3">
@@ -76,7 +80,12 @@ templ PermissionSet(props PermissionSetProps) {
 				},
 			})
 			if props.Set.Description != "" {
-				<p class="text-sm text-gray-600 mt-1">{ props.PageContext.T(props.Set.Description) }</p>
+				{{ description := props.PageContext.TSafe(props.Set.Description) }}
+				{{if description == "" {
+	description = props.Set.Description
+}
+				}}
+				<p class="text-sm text-gray-600 mt-1">{ description }</p>
 			}
 		</div>
 	} else {
@@ -114,7 +123,12 @@ templ PermissionSet(props PermissionSetProps) {
 					</button>
 				</div>
 				if props.Set.Description != "" {
-					<p class="text-sm text-gray-600 mt-1">{ props.PageContext.T(props.Set.Description) }</p>
+					{{ description := props.PageContext.TSafe(props.Set.Description) }}
+					{{if description == "" {
+	description = props.Set.Description
+}
+					}}
+					<p class="text-sm text-gray-600 mt-1">{ description }</p>
 				}
 			</div>
 			<div
@@ -125,9 +139,14 @@ templ PermissionSet(props PermissionSetProps) {
 				<div class="p-3 space-y-2">
 					for _, perm := range props.Set.Permissions {
 						<div class="child-permission pl-4">
+							{{ permLabel := props.PageContext.TSafe(fmt.Sprintf("Permissions.%s", perm.Name)) }}
+							{{if permLabel == "" {
+	permLabel = perm.Name
+}
+							}}
 							@input.Switch(&input.SwitchProps{
 								ID:           fmt.Sprintf("%s-perm-%s", setId, perm.ID),
-								Label:        props.PageContext.T(fmt.Sprintf("Permissions.%s", perm.Name)),
+								Label:        permLabel,
 								LabelClasses: templ.Classes("flex-row-reverse justify-between w-full text-sm"),
 								Checked:      perm.Checked,
 								Attrs: templ.Attributes{
@@ -181,7 +200,12 @@ templ ResourceGroup(props ResourceGroupProps) {
 	>
 		<div class="flex items-center mb-2">
 			<button type="button" class="flex items-center justify-between w-full font-medium text-lg cursor-pointer" @click="toggleAll()">
-				<span>{ props.PageContext.T(fmt.Sprintf("Resources.%s", props.ResourceGroup.Resource)) }</span>
+				{{ resourceLabel := props.PageContext.TSafe(fmt.Sprintf("Resources.%s", props.ResourceGroup.Resource)) }}
+				{{if resourceLabel == "" {
+	resourceLabel = props.ResourceGroup.Resource
+}
+				}}
+				<span>{ resourceLabel }</span>
 				{{ toggleClasses := "bg-gray-200 after:border-gray-300" }}
 				{{if allChecked {
 	toggleClasses = "bg-brand-600 after:translate-x-full after:border-white"

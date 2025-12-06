@@ -42,6 +42,7 @@ var (
 		hrm.NavItems,
 		finance.NavItems,
 		projects.NavItems,
+		logging.NavItems,
 		warehouse.NavItems,
 		crm.NavItems,
 		website.NavItems,
