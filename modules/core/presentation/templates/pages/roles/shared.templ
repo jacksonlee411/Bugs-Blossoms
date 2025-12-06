@@ -62,9 +62,9 @@ templ PermissionSet(props PermissionSetProps) {
 	{{ setId := fmt.Sprintf("%s-set-%d", props.ResourceName, props.SetIndex) }}
 	{{ toggleId := fmt.Sprintf("toggle-%s", setId) }}
 	{{ label := props.PageContext.TSafe(props.Set.Label) }}
-	{{ if label == "" {
-		label = props.Set.Label
-	}
+	{{if label == "" {
+	label = props.Set.Label
+}
 	}}
 	// For single permission sets, render a simple toggle
 	if len(props.Set.Permissions) == 1 {
@@ -81,9 +81,9 @@ templ PermissionSet(props PermissionSetProps) {
 			})
 			if props.Set.Description != "" {
 				{{ description := props.PageContext.TSafe(props.Set.Description) }}
-				{{ if description == "" {
-					description = props.Set.Description
-				}
+				{{if description == "" {
+	description = props.Set.Description
+}
 				}}
 				<p class="text-sm text-gray-600 mt-1">{ description }</p>
 			}
@@ -124,9 +124,9 @@ templ PermissionSet(props PermissionSetProps) {
 				</div>
 				if props.Set.Description != "" {
 					{{ description := props.PageContext.TSafe(props.Set.Description) }}
-					{{ if description == "" {
-						description = props.Set.Description
-					}
+					{{if description == "" {
+	description = props.Set.Description
+}
 					}}
 					<p class="text-sm text-gray-600 mt-1">{ description }</p>
 				}
@@ -140,9 +140,9 @@ templ PermissionSet(props PermissionSetProps) {
 					for _, perm := range props.Set.Permissions {
 						<div class="child-permission pl-4">
 							{{ permLabel := props.PageContext.TSafe(fmt.Sprintf("Permissions.%s", perm.Name)) }}
-							{{ if permLabel == "" {
-								permLabel = perm.Name
-							}
+							{{if permLabel == "" {
+	permLabel = perm.Name
+}
 							}}
 							@input.Switch(&input.SwitchProps{
 								ID:           fmt.Sprintf("%s-perm-%s", setId, perm.ID),
@@ -201,9 +201,9 @@ templ ResourceGroup(props ResourceGroupProps) {
 		<div class="flex items-center mb-2">
 			<button type="button" class="flex items-center justify-between w-full font-medium text-lg cursor-pointer" @click="toggleAll()">
 				{{ resourceLabel := props.PageContext.TSafe(fmt.Sprintf("Resources.%s", props.ResourceGroup.Resource)) }}
-				{{ if resourceLabel == "" {
-					resourceLabel = props.ResourceGroup.Resource
-				}
+				{{if resourceLabel == "" {
+	resourceLabel = props.ResourceGroup.Resource
+}
 				}}
 				<span>{ resourceLabel }</span>
 				{{ toggleClasses := "bg-gray-200 after:border-gray-300" }}
