@@ -28,3 +28,4 @@
 | 时间 (UTC) | 模块 × 租户 | 操作 | 命令 / Flag | 观测与验证 | 结果 |
 |------------|-------------|------|-------------|-------------|------|
 | 2025-12-06 16:55 | Logging × all | 清理 core 平行 authlog；ActionLogMiddleware 保持默认关闭；新增 session handler 单测 | `go test ./modules/core/...`；`go test ./modules/logging/...`（`ACTION_LOG_ENABLED` 默认 false） | session.CreatedEvent 仅由 logging handler 写入 authentication_logs；action_logs 仅在 `ACTION_LOG_ENABLED=true` 时写入 | ✅ |
+| 2025-12-06 09:35 | Logging × all | 014C 文档登记：补充已完成项与下一步待办（core 复用 logging 仓储、action_logs 开关、session handler 单测） | 文档更新 | 014C 计划已标记已完成项，并集中列出剩余待办，后续按表推进 | ✅（文档已同步） |
