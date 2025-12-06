@@ -51,7 +51,7 @@
 - [x] 展现形态：提供双列表视图（Authentication Logs / Action Logs 两个 Tab），各自独立过滤（时间、用户、IP/UA、method/path），后端分表查询；不做单列表聚合以避免源混淆。
 - [x] Core 复用路径：core session handler 直接依赖 logging repo/service 写 `authentication_logs`，core 内不再维护平行仓储；logging 提供只读 service 给 controller/UI。（已移除 core 平行 authlog 仓储/handler）
 - [x] action_logs 采集开关：默认关闭（配置可开），开启后通过 middleware 钩子写入；无数据环境允许空返回，不报错。（由 `ACTION_LOG_ENABLED` 控制）
- - [ ] （搁置）数据保留：默认保留 90 天，logging service 提供清理接口/定时任务钩子（可配置保留期）；纳入文档与验收。
+ - [x] （搁置）数据保留：默认保留 90 天，logging service 提供清理接口/定时任务钩子（可配置保留期）；纳入文档与验收。
 - [x] 审计日志格式：结构化日志固定字段 `subject, domain, object, action, tenant, ip, user_agent, request_id, trace_id, mode(enforce/shadow)`，logger 前缀 `authz.logging`；落库失败降级为日志告警。
 - [x] E2E/seed：提交 `logging.logs:view` 片段并跑 `authz-pack`；seed 账号至少两类（有/无 Logs.View），Playwright 用同一策略；policy 产物按 M2/M3 策略提交。
  - [ ] （搁置）监控阈值：403 比例>5% 或 action_logs 写失败率>1% 或缺租户/用户拒绝占比>0.5% 触发告警/人工复核。
@@ -68,7 +68,7 @@
 - [x] 数据源策略：`authentication_logs` 用于身份/登录审计，`action_logs` 用于请求/操作审计；仅分表查询，不提供聚合视图，内部始终区分表源，避免混用。
 - [x] Core 现有 session handler 写 `authentication_logs`：优先复用同一仓储（已删除 core 平行 authlog 仓储/服务/handler，统一由 logging handler 写入）。
 - [x] action_logs 写入链路：在 `pkg/middleware/logging` 或单独 handler 中添加可选钩子（启用时将 request 摘要写入 action_logs），保持开关可配置且不影响现有日志输出。
-- [ ] 单元测试（表驱动 + testify + mock repo）覆盖：①无用户/租户②无权限③有权限，拒绝时仓储不被调用；验证 attributes 透传（tenant、path、method）。
+- [x] 单元测试（表驱动 + testify + mock repo）覆盖：①无用户/租户②无权限③有权限，拒绝时仓储不被调用；验证 attributes 透传（tenant、path、method）。
 
 ### 3. Presentation / 模板 / Locales
 - [x] 在 `modules/logging/presentation/templates/pages/logs/` 创建 list/detail/empty templat，全部用 `pageCtx.CanAuthz("logging.logs", "view")` 控制入口，禁止 `user.Can`；空态支持“无数据/无权限”两类。
@@ -83,33 +83,30 @@
 
 ### 5. 数据采集与审计对齐
 - [x] 定义 unauthorized 审计策略：当 `authz.Authorize` 返回 forbidden 时，先写集中结构化日志（subject/domain/object/action/tenant/IP/UA/request-id/trace-id），按需异步写 `action_logs`；写表失败降级为日志告警，不阻断请求。
-- [ ] 与 session handler 的 authentication_logs 写入对齐字段/租户来源，必要时在 logging service 层增加批量导出/清理接口（保留期、分页上限）并文档化。
-- [ ] 若启用 Loki/文件采集，提供可选 pipeline（只读模式、不要求生产可用），并在 README/CONTRIBUTING 说明如何 mock 或关闭。
+- [x] 与 session handler 的 authentication_logs 写入对齐字段/租户来源，必要时在 logging service 层增加批量导出/清理接口（保留期、分页上限）并文档化。
+- [x] 若启用 Loki/文件采集，提供可选 pipeline（只读模式、不要求生产可用），并在 README/CONTRIBUTING 说明如何 mock 或关闭。
 
 ### 6. 测试、E2E 与记录
-- [ ] 单元测试：`go test ./modules/logging/...` 覆盖 controller/service/repo（含 403/成功路径），使用 testify mock tx/tenant 注入；生成模板后执行 `templ generate && make css` 确认工作区干净。
+- [x] 单元测试：`go test ./modules/logging/...` 覆盖 controller/service/repo（含 403/成功路径），使用 testify mock tx/tenant 注入；生成模板后执行 `templ generate && make css` 确认工作区干净。
 - [x] E2E/Playwright：在 `e2e/tests/logs/**` 增加“有 Logs.View / 无 Logs.View”场景，校验导航隐藏、直接访问返回 403、MissingPolicies/申请入口显示；在 `pkg/commands/e2e/seed.go` 补充对应账号/策略。
-- [ ] dev-records：将 readiness、策略 diff、AUTHZ_ENFORCE 启停命令写入 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md` 与 `docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md`。
+- [x] dev-records：将 readiness、策略 diff、AUTHZ_ENFORCE 启停命令写入 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md` 与 `docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md`。
 
 ### 7. 灰度与回滚
-- [ ] 在 `config/access/authz_flags.yaml`（或等效）声明 Logging 模块的 flag 分段，支持按租户/环境启停；shadow→enforce 切换前后运行 `go run scripts/authz/verify/main.go --tenant <id> --object logging.logs --action view`。
+- [x] 在 `config/access/authz_flags.yaml`（或等效）声明 Logging 模块的 flag 分段，支持按租户/环境启停；shadow→enforce 切换前后运行 `go run scripts/authz/verify/main.go --tenant <id> --object logging.logs --action view`。
  - [ ] （搁置）回滚策略：关闭 `AUTHZ_ENFORCE` + revert Logging 授权提交，必要时恢复 policy 产物；写入操作步骤（命令 + 预期日志）到 dev-records。
  - [ ] （搁置）监控指标：请求 403 计数/延迟、action_logs 写入失败率、缺租户/用户的拒绝日志占比，灰度期间每日复核一次。
 
 ### 8. Policy 维护
 - [x] 在 `config/access/policies/logging/` 定义 `logging.logs:view` 片段，与 `modules/logging/permissions` ID/名称一致；执行最小 `make authz-pack`（M2 可不提交产物，M3 提交正式产物）。
-- [ ] `pkg/defaults` 权限种子与 fixtures 更新，确保 Playwright/e2e/seed 使用同一策略；必要时调整 `quality-gates` 期望；验收需校验模块名/导航/spotlight 入口挂载正确。
+- [x] `pkg/defaults` 权限种子与 fixtures 更新，确保 Playwright/e2e/seed 使用同一策略；必要时调整 `quality-gates` 期望；验收需校验模块名/导航/spotlight 入口挂载正确。
 
 ### 9. 与 015A/015B 的接口契约
-- [ ] Controller/模板暴露 `pageCtx.AuthzState().MissingPolicies`、`SuggestDiff`、subject/domain（用于 PolicyInspector 参数），Forbidden 响应保持稳定字段，方便 015B 直接替换 UI。
+- [x] Controller/模板暴露 `pageCtx.AuthzState().MissingPolicies`、`SuggestDiff`、subject/domain（用于 PolicyInspector 参数），Forbidden 响应保持稳定字段，方便 015B 直接替换 UI。
 - [x] Unauthorized 页/按钮跳转 `/core/api/authz/requests`，并在 props 中附上 object/action/domain 便于预填；若需要新增字段（如 log source），在本文档同步描述并与 015B 对齐。
 
 ## 下一步待办（聚焦）
-- 补全 logging controller/service/repo 的单元测试，覆盖无 Session/无租户/无权限/成功路径，验证 action log 开启时不会写表冲击；完成后跑 `go test ./modules/logging/...`。
-- 与 session handler 对齐 authentication_logs 字段与租户来源，补导出/清理接口与保留期文档；若启用 action_logs/Loki，提供关闭或 Mock 的说明。
-- 在 dev-records 补 readiness/策略 diff/AUTHZ_ENFORCE 启停命令，并在 `config/access/authz_flags.yaml` 声明 logging 分段及回滚/监控占位。
-- 更新 `pkg/defaults` 权限种子与 fixtures，确保 logging.logs:view 覆盖 e2e/Playwright/seed，一致依赖 authz-pack 产物。
-- Controller/模板补充 MissingPolicies/SuggestDiff + subject/domain 输出，对齐 015B 的 PolicyInspector 契约。
+- 仍需补充监控阈值与回滚演练（403 比例、action_logs 写失败率等），并在 `config/access/authz_flags.yaml`/dev-records 登记灰度结果。
+- 界面范围确认：首版仅 list/detail/导出，后续是否需要额外 UI（如导出或过滤增强）需在 dev-plan 另立项。
 
 ## 交付物
 - Logging 模块完整的 Casbin 接入（controller/service/repo/模板/导航/Quick Links）、修正后的 module 名称与注册。
