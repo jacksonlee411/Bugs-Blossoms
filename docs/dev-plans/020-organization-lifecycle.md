@@ -10,12 +10,12 @@
 
 ## 设计原则
 1. **DDD 模块化**：新增 `modules/org`，严格遵守 AGENTS 规定的 domain/infrastructure/services/presentation 分层；禁止其他模块直接访问其内部实现，统一通过 service 接口或事件集成。
-2. **有效期优先**：所有组织单元、层级关系、分配记录均采用“生效时间 / 失效时间”双字段，默认强制 `StartAt <= EndAt` 并避免重叠。
+2. **有效期优先**：所有组织单元、层级关系、分配记录均采用“生效时间 / 失效时间”双字段，默认强制 `effective_date <= end_date` 并避免重叠。
 3. **多层级模型**：同时支持 Workday 的 Supervisory、Company、Cost Center、Custom Reporting 四类层级，通过 `HierarchyType` 与 `NodeType` 组合实现。
 4. **生命周期驱动（后续）**：组织单元的创建、重命名、合并、撤销等动作理想路径是“请求→审批→生效”，但 M1 仅直接 CRUD；审批/草稿/仿真视图待后续里程碑再启用。
-5. **时间线 API**：所有读写接口必须显式接受 `effective_at`（对齐 Workday 的 `Effective Date` 查询点），未提供时默认 `time.Now()`，以保障历史查询与未来排程。
+5. **时间线 API**：所有读写接口必须显式接受 `effective_date`（对齐 Workday 的 `Effective Date` 查询点），未提供时默认 `time.Now()`，以保障历史查询与未来排程。
 6. **可扩展事件流**：关键变更（新建部门、层级调整、员工调动、权限继承）通过 `pkg/eventbus` 发布，供 HRM/财务/审批模块订阅。
-- **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；Workday 的 `Effective Date` 对应本方案的 `effective_start`，`End Date/Inactive Date` 对应 `effective_end`（半开区间）。
+- **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；日期字段命名与 Workday 对齐：`effective_date`（开始），`end_date`/`inactive_date`（结束，半开区间）。
 - **人员标识**：采用 `person_id` 作为自然人主键（不可变）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户下同一 person 不变。
 
 ## 目标
@@ -26,8 +26,8 @@
 - 每阶段可独立上线，确保 HRM/Authz/Finance 等依赖至少获得稳定的组织主数据引用与事件，不因未完成高级特性而阻塞。
 
 ## 范围
-- **M1 主数据最小集**：单一 Organization Unit 树，必备属性（code、name、parent、effective window、tenant），强制去重名/无重叠/租户隔离性能；父子校验、基础审计、冻结窗口为硬约束。
-- **时间维度**：节点/关系/分配的有效期字段与校验；只提供 `effective_at` 查询与基础 CRUD，不做 retro/并行版本。
+- **M1 主数据最小集**：单一 Organization Unit 树，必备属性（code、name、parent、effective_date、end_date、tenant），强制去重名/无重叠/租户隔离性能；父子校验、基础审计、冻结窗口为硬约束。
+- **时间维度**：节点/关系/分配的有效期字段与校验；只提供 `effective_date` 查询与基础 CRUD，不做 retro/并行版本。
 - **树一致性**：每租户仅一棵 Organization Unit 树，唯一根节点；禁止环、禁止双亲、禁止孤儿，`OrgEdge` 为父子真相，`OrgNode.parent_hint` 由边反查并在写入时强校验一致。
 - **主数据治理**：编码规则（唯一/长度/前缀）、命名规范、必填属性/字典校验、发布模式（API + 事件 + 批量导入）、冲突处理与审核责任写入文档；Org 为组织层级 SOR，Position/编制留在后续 DEV-PLAN-021，Cost Center/Finance 仅消费事件/视图（冻结期不改 schema）。
 - **后续可选（非 M1 交付）**：多层级/矩阵占位、workflow/BP 绑定、Authz 策略生成、并行版本、What-if/Impact UI 与安全域继承，待 M1 稳定后再立项。
@@ -46,7 +46,7 @@
 
 ## 关键业务蓝图
 ### 1. 组织结构与类型
-- **M1**：仅交付单一 Supervisory 树，字段集中在 code/name/parent/effective window/tenant/审计。
+- **M1**：仅交付单一 Organization Unit 树，字段集中在 code/name/parent/effective_date/end_date/tenant/审计。
 - **M2+**：Company/Cost/Custom 层级与矩阵/侧向链接作为占位扩展，确保不破坏 Supervisory 约束。
 - 层级由 `Hierarchy`/`OrgNode`/`OrgEdge` 表达，先保证基础查询性能，再考虑版本策略。
 - 根节点仅允许一条，创建/变更需要管理员操作，根不可被设为子节点或删除，只能通过新根+迁移策略在后续里程碑处理。
@@ -58,8 +58,8 @@
 ### 3. 时间约束策略
 - **有效期重叠检测**：`OrgNode`、`OrgEdge`、`Assignment` 在同一实体/维度下不得重叠；M1 通过数据库约束与应用校验并行实现。
 - **冻结窗口**：对 Supervisory 树应用配置化冻结窗口（默认月末+3 天，可按租户覆盖），冻结期间仅允许未来日期变更。
-- **自动补齐**：未传入 `EndAt` 默认开区间（`9999-12-31`），创建新版本时自动截断上一段，保证无空洞/无重叠。
-- **历史追溯**：提供 `effective_at` 查询。Retro 重播与补偿不在 M1 范围，列为后续增强。
+- **自动补齐**：未传入 `end_date` 默认开区间（`9999-12-31`），创建新版本时自动截断上一段，保证无空洞/无重叠。
+- **历史追溯**：提供 `effective_date` 查询。Retro 重播与补偿不在 M1 范围，列为后续增强。
 
 ### 4. 组织层级 & 权限
 - **M1**：仅发布 `OrgChanged`/`OrgAssignmentChanged` 事件供 Authz/HRM 订阅，不做策略生成/继承计算。
@@ -71,17 +71,17 @@
   - `orgnode`：封装名称、代码、parent_hint、有效期、状态（Active/Retired），提供基础行为（Create/Update/Rename/Move），parent_hint 必须由 OrgEdge 反查校验。
   - `hierarchy`：仅管理单一 Organization Unit 树及约束（无版本化），维护唯一根、无环、无孤儿、不允许双亲。
   - `assignment`：连接员工与组织节点，校验 primary 唯一、有效期无重叠。
-- 值对象：`EffectiveWindow`（start/end + 校验）、`HierarchyType`、`NodeType`。
+- 值对象：`EffectiveWindow`（effective_date/end_date + 校验）、`HierarchyType`、`NodeType`。
 - 领域服务（M1）：`OrgTimeValidator`（重叠/冻结窗口校验）、`OrgAuditTrail`（审计事件生成）。
 - 领域服务（后续）：`OrgLifecycleService`、`OrgSecurityService`、`OrgBusinessProcessAdapter` 等待后续里程碑再补。
 
 ### Infrastructure Layer
 - 新建 schema `modules/org/infrastructure/persistence/schema/org-schema.sql`，核心表：
-  - `org_nodes`（tenant_id, id, type, code, name, status, effective_start, effective_end, parent_hint, owner_user_id, created_at, updated_at）。
-  - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_start, effective_end, depth, path ltree）。
-  - `org_assignments`（tenant_id, id, node_id, subject_type=person, subject_id=person_id, pernr, effective_start, effective_end, primary bool）。
+  - `org_nodes`（tenant_id, id, type, code, name, status, effective_date, end_date, parent_hint, owner_user_id, created_at, updated_at）。
+  - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_date, end_date, depth, path ltree）。
+  - `org_assignments`（tenant_id, id, node_id, subject_type=person, subject_id=person_id, pernr, effective_date, end_date, primary bool）。
   - 其他表（change_requests、retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
-  - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_start, effective_end))` 用于时间冲突约束。
+  - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_date, end_date))` 用于时间冲突约束。
 - 约束（M1 落地）：`org_nodes` 的 code 需在 tenant 内唯一；name 在同一父节点+时间窗口内唯一；`org_edges` 需防环/双亲（ltree path + 唯一 child per hierarchy）；`org_assignments` 对同一 subject 在重叠时间内仅允许一个 primary（部分唯一约束）。
 - 多租户隔离：所有主键/唯一约束均以 `(tenant_id, <id/unique fields>)` 复合，外键与 sqlc 查询强制带 tenant 过滤；路径/缓存 key 同样纳入 tenant，避免跨租户穿透。
 - Postgres 依赖：迁移启用 `ltree` 与 `btree_gist` 扩展；有效期字段统一 `tstzrange` 且使用 `[start, end)` 半开区间，写入/校验一律 UTC，迁移包含时区/边界说明。
@@ -89,14 +89,14 @@
 - 需要 Atlas/Goose 迁移流程，沿用 HRM 指南。
 
 ### Service Layer
-- **M1**：`OrgHierarchyService`（增删改查树 + 缓存失效）、`OrgAssignmentService`（员工分配 CRUD + 重叠校验）、`OrgEffectiveDateService`（effective_at 查询封装）。
+- **M1**：`OrgHierarchyService`（增删改查树 + 缓存失效）、`OrgAssignmentService`（员工分配 CRUD + 重叠校验）、`OrgEffectiveDateService`（effective_date 查询封装）。
 - **后续**：`OrgLifecycleService`（change request）、`OrgRetroService`、`OrgSecurityService`、`OrgBusinessProcessAdapter` 在 M3+ 再加入。
 
 ### Presentation Layer & API
 - Controller 前缀 `/org`：
-  - `GET /org/hierarchies?type=OrgUnit&effective_at=`：返回树概览。
-  - `POST /org/nodes` / `PATCH /org/nodes/{id}`：节点 CRUD（含有效期、重名、父子校验）；删除改为 `PATCH` 设置 `effective_end` 或状态 `Retired`，防止破坏历史。
-  - `POST /org/assignments` / `PATCH /org/assignments/{id}` / `GET /org/assignments?subject=employee:{id}`：员工分配时间线。
+  - `GET /org/hierarchies?type=OrgUnit&effective_date=`：返回树概览。
+  - `POST /org/nodes` / `PATCH /org/nodes/{id}`：节点 CRUD（含有效期、重名、父子校验）；删除改为 `PATCH` 设置 `end_date` 或状态 `Retired`，防止破坏历史。
+  - `POST /org/assignments` / `PATCH /org/assignments/{id}` / `GET /org/assignments?subject=person:{id}`：人员分配时间线。
   - 不提供 change-requests/retro/security/BP/Impact 相关接口于 M1。
 - UI（templ）：
   - M1：树形视图 + 基础表单（节点、分配），日期选择器切换有效期。
@@ -104,7 +104,7 @@
 
 ## 集成与依赖
 - **SOR 边界**：Org 模块为组织层级 SOR；HRM/Position 为人/岗位 SOR，Position 编制/空岗在 DEV-PLAN-021；Finance 为 Cost Center/Company 财务口径 SOR（冻结期间不改 schema）。
-- **HRM 员工**：提供 `OrgAssignments` 视图和分配 API，表单默认 `effective_start = hire_date`，按 SOR 边界执行回写/订阅；主体标识使用 `person_id`（不可变）+ `pernr`（工号，租户内唯一且不变）。
+- **HRM 员工**：提供 `OrgAssignments` 视图和分配 API，表单默认 `effective_date = hire_date`，按 SOR 边界执行回写/订阅；主体标识使用 `person_id`（不可变）+ `pernr`（工号，租户内唯一且不变）。
 - **Authz/Casbin**：M1 仅发布事件；`OrgScope` ABAC 属性与 policy pack/test 放入后续里程碑。
 - **Workflow**：M1 不引入审批引擎，后续若需要再复用 `pkg/workflow`。
 - **Position/Compensation**：M1 仅面向员工，职位/成本中心钩子留待 DEV-PLAN-021/M3+。
@@ -148,8 +148,8 @@
 | Org Name | 组织名称 | STEXT（短名） | `org_nodes.name` | 父节点+时间窗口内唯一。 |
 | Parent Org | 父子关系 | 关系 A/B002（O→O 上级） | `org_edges.parent_node_id` / `child_node_id` | `org_nodes.parent_hint` 仅缓存，建议改名或隐藏。 |
 | Manager/Supervisor | 组织负责人 | Chief Position 标记（S-CHIEF，关系 A/B012） | `owner_user_id`（建议改 `manager_user_id`） | 对齐 Manager 语义。 |
-| Effective Date / End Date（Inactive Date） | 生效/失效日期 | BEGDA / ENDDA | `effective_start` / `effective_end` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
-| As-of Date | 查询时点（Key Date） | Key Date（Stichtag） | `effective_at` 参数 | 未传则默认 `time.Now()`。 |
+| Effective Date / End Date（Inactive Date） | 生效/失效日期 | BEGDA / ENDDA | `effective_date` / `end_date` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
+| As-of Date | 查询时点（Key Date） | Key Date（Stichtag） | `effective_date` 参数 | 未传则默认 `time.Now()`。 |
 | Primary Supervisory Org | 主属组织 | PA0001-ORGEH（主组织） | `org_assignments.primary` | 仅支持主属，辅属/矩阵待 M2+。 |
 | Worker（本项目术语 Person，工号 PERNR） | 员工/雇员 | PERNR | `subject_type=person` + `subject_id=person_id`（工号 `pernr` 不变） | 职位信息单独用 `position_id` 承载，不改主体标识。 |
 | Position | 职位 | PLANS（Position） | （未落地）`position_id` 占位 | 计划在 DEV-PLAN-021/M3+。 |
