@@ -37,3 +37,5 @@
   - 导出/清理：仓储 List/Count 支持 tenant + 时间窗口过滤，可直接复用过滤器导出；保留期建议默认 90 天（示例：`DELETE FROM authentication_logs WHERE tenant_id=$1 AND created_at < now() - interval '90 days';`），尚无自动任务，可由定时任务调用。
   - action_logs/Loki：`ACTION_LOG_ENABLED` 默认关闭；开启后写库失败降级为结构化日志。Mock/关闭路径：设置 env 为 false 或在 handler/service 注入 stub 仓储，Loki 采集保持可选。
   - 回滚/监控：`config/access/authz_flags.yaml` 已声明 logging 分段；回滚时先停用 AUTHZ_ENFORCE + ACTION_LOG_ENABLED，再视情况 revert policy pack，监控 403 比例与 action_logs 写失败率。
+  - 权限种子/fixtures：`pkg/defaults.AllPermissions` 已包含 `logging.logs:view`（Logs.View），e2e/seed 的默认用户获取全量权限，`nohrm@example.com` 通过过滤前缀去除 logging 权限；policy 片段位于 `config/access/policies/logging/logs.csv` 并随 `make authz-pack` 校验。
+  - Forbidden/审计：`ensureLoggingAuthz` 在 REST/HTMX/JSON 统一输出 object/action/subject/domain/missing_policies/suggest_diff/request_url/debug_url，未授权时记录结构化日志并在开启 `ACTION_LOG_ENABLED` 且有 DB/用户时写入 action_logs。
