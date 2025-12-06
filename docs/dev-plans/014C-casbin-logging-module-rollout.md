@@ -51,10 +51,10 @@
 - [x] 展现形态：提供双列表视图（Authentication Logs / Action Logs 两个 Tab），各自独立过滤（时间、用户、IP/UA、method/path），后端分表查询；不做单列表聚合以避免源混淆。
 - [ ] Core 复用路径：core session handler 直接依赖 logging repo/service 写 `authentication_logs`，core 内不再维护平行仓储；logging 提供只读 service 给 controller/UI。
 - [ ] action_logs 采集开关：默认关闭（配置可开），开启后通过 middleware 钩子写入；无数据环境允许空返回，不报错。
-- [ ] 数据保留：默认保留 90 天，logging service 提供清理接口/定时任务钩子（可配置保留期）；纳入文档与验收。
+ - [ ] （搁置）数据保留：默认保留 90 天，logging service 提供清理接口/定时任务钩子（可配置保留期）；纳入文档与验收。
 - [ ] 审计日志格式：结构化日志固定字段 `subject, domain, object, action, tenant, ip, user_agent, request_id, trace_id, mode(enforce/shadow)`，logger 前缀 `authz.logging`；落库失败降级为日志告警。
 - [ ] E2E/seed：提交 `logging.logs:view` 片段并跑 `authz-pack`；seed 账号至少两类（有/无 Logs.View），Playwright 用同一策略；policy 产物按 M2/M3 策略提交。
-- [ ] 监控阈值：403 比例>5% 或 action_logs 写失败率>1% 或缺租户/用户拒绝占比>0.5% 触发告警/人工复核。
+ - [ ] （搁置）监控阈值：403 比例>5% 或 action_logs 写失败率>1% 或缺租户/用户拒绝占比>0.5% 触发告警/人工复核。
 - [ ] UI 范围：首版仅 list/detail + 导出（如有），无创建/删除；Quick Link/导航指向 Authentication Logs 默认 Tab。
 
 - [x] 新建 `modules/logging/presentation/controllers/authz_helpers.go`，复用 `authzutil.EnsureViewState` + 014A 的 ensureAuthz 模式，固定 capability `logging.logs:view`（对象 `logging.logs` + 动作 `view`，与 `Logs.View` 常量一致），仅走 `pkg/authz` 判定，不保留 legacy 兜底。
@@ -93,8 +93,8 @@
 
 ### 7. 灰度与回滚
 - [ ] 在 `config/access/authz_flags.yaml`（或等效）声明 Logging 模块的 flag 分段，支持按租户/环境启停；shadow→enforce 切换前后运行 `go run scripts/authz/verify/main.go --tenant <id> --object logging.logs --action view`。
-- [ ] 回滚策略：关闭 `AUTHZ_ENFORCE` + revert Logging 授权提交，必要时恢复 policy 产物；写入操作步骤（命令 + 预期日志）到 dev-records。
-- [ ] 监控指标：请求 403 计数/延迟、action_logs 写入失败率、缺租户/用户的拒绝日志占比，灰度期间每日复核一次。
+ - [ ] （搁置）回滚策略：关闭 `AUTHZ_ENFORCE` + revert Logging 授权提交，必要时恢复 policy 产物；写入操作步骤（命令 + 预期日志）到 dev-records。
+ - [ ] （搁置）监控指标：请求 403 计数/延迟、action_logs 写入失败率、缺租户/用户的拒绝日志占比，灰度期间每日复核一次。
 
 ### 8. Policy 维护
 - [x] 在 `config/access/policies/logging/` 定义 `logging.logs:view` 片段，与 `modules/logging/permissions` ID/名称一致；执行最小 `make authz-pack`（M2 可不提交产物，M3 提交正式产物）。
