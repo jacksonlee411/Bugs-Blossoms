@@ -53,7 +53,7 @@
 - [ ] action_logs 采集开关：默认关闭（配置可开），开启后通过 middleware 钩子写入；无数据环境允许空返回，不报错。
  - [ ] （搁置）数据保留：默认保留 90 天，logging service 提供清理接口/定时任务钩子（可配置保留期）；纳入文档与验收。
 - [ ] 审计日志格式：结构化日志固定字段 `subject, domain, object, action, tenant, ip, user_agent, request_id, trace_id, mode(enforce/shadow)`，logger 前缀 `authz.logging`；落库失败降级为日志告警。
-- [ ] E2E/seed：提交 `logging.logs:view` 片段并跑 `authz-pack`；seed 账号至少两类（有/无 Logs.View），Playwright 用同一策略；policy 产物按 M2/M3 策略提交。
+- [x] E2E/seed：提交 `logging.logs:view` 片段并跑 `authz-pack`；seed 账号至少两类（有/无 Logs.View），Playwright 用同一策略；policy 产物按 M2/M3 策略提交。
  - [ ] （搁置）监控阈值：403 比例>5% 或 action_logs 写失败率>1% 或缺租户/用户拒绝占比>0.5% 触发告警/人工复核。
 - [ ] UI 范围：首版仅 list/detail + 导出（如有），无创建/删除；Quick Link/导航指向 Authentication Logs 默认 Tab。
 
@@ -88,7 +88,7 @@
 
 ### 6. 测试、E2E 与记录
 - [ ] 单元测试：`go test ./modules/logging/...` 覆盖 controller/service/repo（含 403/成功路径），使用 testify mock tx/tenant 注入；生成模板后执行 `templ generate && make css` 确认工作区干净。
-- [ ] E2E/Playwright：在 `e2e/tests/logs/**` 增加“有 Logs.View / 无 Logs.View”场景，校验导航隐藏、直接访问返回 403、MissingPolicies/申请入口显示；在 `pkg/commands/e2e/seed.go` 补充对应账号/策略。
+- [x] E2E/Playwright：在 `e2e/tests/logs/**` 增加“有 Logs.View / 无 Logs.View”场景，校验导航隐藏、直接访问返回 403、MissingPolicies/申请入口显示；在 `pkg/commands/e2e/seed.go` 补充对应账号/策略。
 - [ ] dev-records：将 readiness、策略 diff、AUTHZ_ENFORCE 启停命令写入 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md` 与 `docs/dev-records/DEV-PLAN-014-CASBIN-ROLLING.md`。
 
 ### 7. 灰度与回滚
