@@ -18,6 +18,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/hrm/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/hrm/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/intl"
 	"github.com/iota-uz/iota-sdk/pkg/mapping"
@@ -26,6 +27,12 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/serrors"
 	"github.com/iota-uz/iota-sdk/pkg/shared"
 )
+
+var hrmEmployeesAuthzObject = authz.ObjectName("hrm", "employees")
+
+func ensureEmployeeAuthz(w http.ResponseWriter, r *http.Request, action string) bool {
+	return ensureHRMAuthz(w, r, hrmEmployeesAuthzObject, action, legacyEmployeePermission(action))
+}
 
 type EmployeeController struct {
 	app             application.Application
@@ -49,6 +56,7 @@ func (c *EmployeeController) Register(r *mux.Router) {
 	commonMiddleware := []mux.MiddlewareFunc{
 		middleware.Authorize(),
 		middleware.RedirectNotAuthenticated(),
+		middleware.RequireAuthorization(),
 		middleware.ProvideUser(),
 		middleware.ProvideDynamicLogo(c.app),
 		middleware.ProvideLocalizer(c.app),
@@ -70,6 +78,11 @@ func (c *EmployeeController) Register(r *mux.Router) {
 }
 
 func (c *EmployeeController) List(w http.ResponseWriter, r *http.Request) {
+	if !ensureEmployeeAuthz(w, r, "list") {
+		return
+	}
+	ensurePageCapabilities(r, hrmEmployeesAuthzObject, "create", "update", "delete")
+
 	params := composables.UsePaginated(r)
 	employeeEntities, err := c.employeeService.GetPaginated(r.Context(), &employee.FindParams{
 		Limit:  params.Limit,
@@ -81,9 +94,17 @@ func (c *EmployeeController) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	isHxRequest := len(r.Header.Get("Hx-Request")) > 0
+	pageCtx, _ := composables.TryUsePageCtx(r.Context())
+	canCreate := pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "create")
+	canUpdate := pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "update")
+	employeesVM := mapping.MapViewModels(employeeEntities, mappers.EmployeeToViewModel)
+	for _, vm := range employeesVM {
+		vm.CanUpdate = canUpdate
+	}
 	props := &employees.IndexPageProps{
-		Employees: mapping.MapViewModels(employeeEntities, mappers.EmployeeToViewModel),
+		Employees: employeesVM,
 		NewURL:    fmt.Sprintf("%s/new", c.basePath),
+		CanCreate: canCreate,
 	}
 	if isHxRequest {
 		templ.Handler(employees.EmployeesTable(props), templ.WithStreaming()).ServeHTTP(w, r)
@@ -93,6 +114,9 @@ func (c *EmployeeController) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *EmployeeController) GetNew(w http.ResponseWriter, r *http.Request) {
+	if !ensureEmployeeAuthz(w, r, "create") {
+		return
+	}
 	entity := employee.New(
 		"",
 		"",
@@ -114,6 +138,11 @@ func (c *EmployeeController) GetNew(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *EmployeeController) GetEdit(w http.ResponseWriter, r *http.Request) {
+	if !ensureEmployeeAuthz(w, r, "view") {
+		return
+	}
+	ensurePageCapabilities(r, hrmEmployeesAuthzObject, "update", "delete")
+
 	id, err := shared.ParseID(r)
 	if err != nil {
 		http.Error(w, "Error parsing id", http.StatusInternalServerError)
@@ -125,8 +154,12 @@ func (c *EmployeeController) GetEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Error retrieving account", http.StatusInternalServerError)
 		return
 	}
+	pageCtx, _ := composables.TryUsePageCtx(r.Context())
+	vm := mappers.EmployeeToViewModel(entity)
+	vm.CanUpdate = pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "update")
+	vm.CanDelete = pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "delete")
 	props := &employees.EditPageProps{
-		Employee:  mappers.EmployeeToViewModel(entity),
+		Employee:  vm,
 		Errors:    map[string]string{},
 		SaveURL:   fmt.Sprintf("%s/%d", c.basePath, id),
 		DeleteURL: fmt.Sprintf("%s/%d", c.basePath, id),
@@ -135,6 +168,9 @@ func (c *EmployeeController) GetEdit(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *EmployeeController) Create(w http.ResponseWriter, r *http.Request) {
+	if !ensureEmployeeAuthz(w, r, "create") {
+		return
+	}
 	dto, err := composables.UseForm(&employee.CreateDTO{}, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -219,6 +255,9 @@ func (c *EmployeeController) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *EmployeeController) Update(w http.ResponseWriter, r *http.Request) {
+	if !ensureEmployeeAuthz(w, r, "update") {
+		return
+	}
 	id, err := shared.ParseID(r)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("%+v", err), http.StatusBadRequest)
@@ -295,6 +334,9 @@ func (c *EmployeeController) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *EmployeeController) Delete(w http.ResponseWriter, r *http.Request) {
+	if !ensureEmployeeAuthz(w, r, "delete") {
+		return
+	}
 	id, err := shared.ParseID(r)
 	if err != nil {
 		http.Error(w, "Error parsing id", http.StatusInternalServerError)

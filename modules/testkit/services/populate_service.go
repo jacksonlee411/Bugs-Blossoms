@@ -261,9 +261,9 @@ func (s *PopulateService) createUsers(ctx context.Context, users []schemas.UserS
 			}
 		}
 
-		// 5. Assign default role if no specific permissions provided
+		// 5. Assign default role if no specific permissions provided and not explicitly skipped
 		// Use the admin role that was ensured to exist earlier
-		if len(userSpec.Permissions) == 0 {
+		if len(userSpec.Permissions) == 0 && !userSpec.SkipDefaultAdmin {
 			newUser = newUser.AddRole(adminRole)
 			logger.WithField("email", userSpec.Email).Debug("Assigned Admin role to user")
 		}

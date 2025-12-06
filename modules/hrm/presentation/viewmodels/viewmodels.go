@@ -16,4 +16,6 @@ type Employee struct {
 	Notes           string
 	CreatedAt       string
 	UpdatedAt       string
+	CanUpdate       bool
+	CanDelete       bool
 }

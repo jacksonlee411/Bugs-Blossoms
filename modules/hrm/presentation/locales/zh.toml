@@ -2,6 +2,14 @@
   HRM = "人力资源管理"
   Employees = "员工"
 
+[Authz.Unauthorized]
+  Title = "需要权限"
+  _Description = "您没有 {{.Operation}} 的权限。请申请权限或联系管理员。"
+  MissingPolicies = "缺失的策略"
+  Apply = "申请权限"
+  ApplyDescription = "通过 /core/api/authz/requests 提交策略变更请求。"
+  ApplyHint = "没有执行此操作的权限"
+
 [Resources]
   employee = "员工"
 
@@ -85,4 +93,3 @@
     [Employees.Private.Pin]
       Label = "个人识别号码"
       Placeholder = "123456789192121"
-

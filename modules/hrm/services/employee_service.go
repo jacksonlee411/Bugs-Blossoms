@@ -36,6 +36,9 @@ func (s *EmployeeService) GetPaginated(ctx context.Context, params *employee.Fin
 }
 
 func (s *EmployeeService) Create(ctx context.Context, data *employee.CreateDTO) error {
+	if err := authorizeHRM(ctx, EmployeesAuthzObject, "create"); err != nil {
+		return err
+	}
 	entity, err := data.ToEntity()
 	if err != nil {
 		return err
@@ -53,6 +56,9 @@ func (s *EmployeeService) Create(ctx context.Context, data *employee.CreateDTO) 
 }
 
 func (s *EmployeeService) Update(ctx context.Context, id uint, data *employee.UpdateDTO) error {
+	if err := authorizeHRM(ctx, EmployeesAuthzObject, "update"); err != nil {
+		return err
+	}
 	entity, err := data.ToEntity(id)
 	if err != nil {
 		return err
@@ -69,6 +75,9 @@ func (s *EmployeeService) Update(ctx context.Context, id uint, data *employee.Up
 }
 
 func (s *EmployeeService) Delete(ctx context.Context, id uint) (employee.Employee, error) {
+	if err := authorizeHRM(ctx, EmployeesAuthzObject, "delete"); err != nil {
+		return nil, err
+	}
 	if err := s.repo.Delete(ctx, id); err != nil {
 		return nil, err
 	}

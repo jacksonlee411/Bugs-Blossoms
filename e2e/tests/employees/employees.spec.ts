@@ -31,4 +31,15 @@ test.describe('employees CRUD operations', () => {
 		await expect(page.locator('form input[name="name"]')).toBeVisible();
 		await expect(page.locator('form select[name="limit"]')).toBeVisible();
 	});
+
+	test('blocks employees list for user without HRM permissions', async ({ page }) => {
+		await login(page, 'nohrm@example.com', 'TestPass123!');
+
+		const response = await page.goto('/hrm/employees');
+		if (response) {
+			expect([401, 403]).toContain(response.status());
+		}
+		await expect(page.getByText('Permission required', { exact: false })).toBeVisible();
+		await expect(page.getByRole('link', { name: /Request access/i })).toBeVisible();
+	});
 });

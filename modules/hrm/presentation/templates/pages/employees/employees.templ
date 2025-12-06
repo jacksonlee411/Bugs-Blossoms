@@ -14,6 +14,7 @@ import (
 type IndexPageProps struct {
 	Employees []*viewmodels.Employee
 	NewURL    string
+	CanCreate bool
 }
 
 templ EmployeesTable(props *IndexPageProps) {
@@ -47,13 +48,15 @@ templ EmployeesTable(props *IndexPageProps) {
 						</div>
 					}
 					@base.TableCell(base.TableCellProps{}) {
-						@button.Secondary(button.Props{
-							Fixed: true,
-							Size:  button.SizeSM,
-							Class: "btn-fixed",
-							Href:  fmt.Sprintf("/hrm/employees/%s", employee.ID),
-						}) {
-							@icons.PencilSimple(icons.Props{Size: "20"})
+						if employee.CanUpdate {
+							@button.Secondary(button.Props{
+								Fixed: true,
+								Size:  button.SizeSM,
+								Class: "btn-fixed",
+								Href:  fmt.Sprintf("/hrm/employees/%s", employee.ID),
+							}) {
+								@icons.PencilSimple(icons.Props{Size: "20"})
+							}
 						}
 					}
 				}
@@ -104,8 +107,16 @@ templ EmployeesContent(props *IndexPageProps) {
 					Size: button.SizeNormal,
 					Href: props.NewURL,
 					Icon: icons.PlusCircle(icons.Props{Size: "18"}),
+					Attrs: templ.Attributes{
+						"aria-disabled": templ.KV("true", !props.CanCreate),
+						"disabled":      templ.KV("true", !props.CanCreate),
+					},
 				}) {
-					{ pageCtx.T("Employees.List.New") }
+					if props.CanCreate {
+						{ pageCtx.T("Employees.List.New") }
+					} else {
+						{ pageCtx.T("Authz.Unauthorized.ApplyHint") }
+					}
 				}
 			</form>
 			@EmployeesTable(props)

@@ -2,6 +2,14 @@
 HRM = "HRM"
 Employees = "Сотрудники"
 
+[Authz.Unauthorized]
+Title = "Требуется доступ"
+_Description = "У вас нет прав на {{.Operation}}. Запросите доступ или свяжитесь с администратором."
+MissingPolicies = "Отсутствующие политики"
+Apply = "Запросить доступ"
+ApplyDescription = "Отправьте запрос на изменение политики через /core/api/authz/requests."
+ApplyHint = "Недостаточно прав для выполнения действия"
+
 [Resources]
 employee = "Сотрудник"
 

@@ -2,15 +2,20 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/modules"
+	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
+	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	coreSession "github.com/iota-uz/iota-sdk/modules/core/domain/entities/session"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/internet"
+	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
 	coreseed "github.com/iota-uz/iota-sdk/modules/core/seed"
 	coreservices "github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/modules/hrm/domain/aggregates/employee"
@@ -22,6 +27,7 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/defaults"
+	"github.com/iota-uz/iota-sdk/pkg/repo"
 	"github.com/iota-uz/iota-sdk/pkg/shared"
 )
 
@@ -71,6 +77,7 @@ func Seed() error {
 	}
 
 	allPermissions := defaults.AllPermissions()
+	noHRMPermissions := filterOutHRMPermissions(allPermissions)
 	seeder.Register(
 		coreseed.CreateDefaultTenant,
 		coreseed.CreateCurrencies,
@@ -85,6 +92,7 @@ func Seed() error {
 			user.UILanguageEN,
 			user.WithTenantID(defaultTenant.ID),
 		), allPermissions),
+		createLimitedUserSeedFunc(noHRMPermissions),
 		websiteseed.AIChatConfigSeedFunc(aichatconfig.MustNew(
 			"gemma-12b-it",
 			aichatconfig.AIModelTypeOpenAI,
@@ -118,6 +126,77 @@ func Seed() error {
 
 	conf.Logger().Info("Seeded e2e database with test data")
 	return nil
+}
+
+func filterOutHRMPermissions(perms []*permission.Permission) []*permission.Permission {
+	filtered := make([]*permission.Permission, 0, len(perms))
+	for _, p := range perms {
+		if !strings.HasPrefix(p.Name, "hrm.") {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
+}
+
+func createLimitedUserSeedFunc(perms []*permission.Permission) application.SeedFunc {
+	return func(ctx context.Context, app application.Application) error {
+		tenantID, err := composables.UseTenantID(ctx)
+		if err != nil {
+			return err
+		}
+
+		roleRepo := persistence.NewRoleRepository()
+		roles, err := roleRepo.GetPaginated(ctx, &role.FindParams{
+			Filters: []role.Filter{
+				{
+					Column: role.NameField,
+					Filter: repo.Eq("NoHRM"),
+				},
+			},
+		})
+		if err != nil {
+			return err
+		}
+
+		limitedRole := role.New(
+			"NoHRM",
+			role.WithDescription("User without HRM permissions"),
+			role.WithPermissions(perms),
+			role.WithType(role.TypeSystem),
+			role.WithTenantID(tenantID),
+		)
+		if len(roles) == 0 {
+			if limitedRole, err = roleRepo.Create(ctx, limitedRole); err != nil {
+				return err
+			}
+		} else {
+			limitedRole = roles[0]
+		}
+
+		uploadRepo := persistence.NewUploadRepository()
+		userRepo := persistence.NewUserRepository(uploadRepo)
+		existing, err := userRepo.GetByEmail(ctx, "nohrm@example.com")
+		if err != nil && !errors.Is(err, persistence.ErrUserNotFound) {
+			return err
+		}
+		if existing != nil {
+			return nil
+		}
+
+		limitedUser, err := user.New(
+			"NoHRM",
+			"User",
+			internet.MustParseEmail("nohrm@example.com"),
+			user.UILanguageEN,
+			user.WithTenantID(tenantID),
+		).SetPassword("TestPass123!")
+		if err != nil {
+			return err
+		}
+
+		_, err = userRepo.Create(ctx, limitedUser.AddRole(limitedRole))
+		return err
+	}
 }
 
 func seedEmployees(ctx context.Context, app application.Application) error {

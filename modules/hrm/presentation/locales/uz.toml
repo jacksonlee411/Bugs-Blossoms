@@ -2,6 +2,14 @@
   HRM = "HRM"
   Employees = "Xodimlar"
 
+[Authz.Unauthorized]
+  Title = "Ruxsat talab qilinadi"
+  _Description = "Sizda {{.Operation}} uchun ruxsat yo'q. Ruxsat so'rang yoki administrator bilan bog'laning."
+  MissingPolicies = "Yetishmayotgan siyosatlar"
+  Apply = "Ruxsat so'rash"
+  ApplyDescription = "/core/api/authz/requests orqali siyosatga o'zgartirish so'rovini yuboring."
+  ApplyHint = "Bu amal uchun ruxsat yo'q"
+
 [Resources]
   employee = "Xodimlar"
 
