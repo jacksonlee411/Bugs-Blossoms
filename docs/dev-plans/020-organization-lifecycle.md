@@ -1,7 +1,7 @@
 # DEV-PLAN-020：组织机构模块（对标 Workday）
 
 **状态**: 草拟中（2025-01-15 11:30）  
-**评审结论**：M1 收敛为“单一 Organization Unit 树（原 Supervisory）+ 有效期校验 + 去重/无重叠 + 基础审计/查询性能”，暂不落地 workflow/BP 绑定、Authz 策略生成、并行版本、What-if/Impact UI 等高阶能力，统一挪到后续阶段或 backlog。
+**评审结论**：M1 收敛为“单一 Organization Unit 树（原 Supervisory）+ 有效期校验 + 去重/无重叠 + 基础审计/查询性能”，暂不落地 workflow/BP 绑定、Authz 策略生成、并行版本、What-if/Impact UI 等高阶能力，统一挪到后续阶段或 backlog；M1 即交付最小权限集（Org.Read/Org.Write/Org.Assign/Org.Admin）及基础策略片段。
 
 ## 背景
 - 现有 HRM 仅具备员工实体与基础表单，缺乏组织维度，导致薪酬、审批流与权限无法按照部门/成本中心划分。
@@ -15,6 +15,7 @@
 4. **生命周期驱动（后续）**：组织单元的创建、重命名、合并、撤销等动作理想路径是“请求→审批→生效”，但 M1 仅直接 CRUD；审批/草稿/仿真视图待后续里程碑再启用。
 5. **时间线 API**：所有读写接口必须显式接受 `effective_date`（对齐 Workday 的 `Effective Date` 查询点），未提供时默认 `time.Now()`，以保障历史查询与未来排程。
 6. **可扩展事件流**：关键变更（新建部门、层级调整、员工调动、权限继承）通过 `pkg/eventbus` 发布，供 HRM/财务/审批模块订阅。
+- **安全与最小权限**：M1 定义 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`，接口默认要求 Session+租户校验与对应权限，配套策略片段纳入 `make authz-pack/test`。
 - **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；日期字段命名与 Workday 对齐：`effective_date`（开始），`end_date`/`inactive_date`（结束，半开区间）。
 - **人员标识**：采用 `person_id` 作为自然人主键（不可变）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户下同一 person 不变。
 
@@ -30,6 +31,7 @@
 - **时间维度**：节点/关系/分配的有效期字段与校验；只提供 `effective_date` 查询与基础 CRUD，不做 retro/并行版本。
 - **树一致性**：每租户仅一棵 Organization Unit 树，唯一根节点；禁止环、禁止双亲、禁止孤儿，`OrgEdge` 为父子真相，`OrgNode.parent_hint` 由边反查并在写入时强校验一致。
 - **主数据治理**：编码规则（唯一/长度/前缀）、命名规范、必填属性/字典校验、发布模式（API + 事件 + 批量导入）、冲突处理与审核责任写入文档；Org 为组织层级 SOR，Position/编制留在后续 DEV-PLAN-021，Cost Center/Finance 仅消费事件/视图（冻结期不改 schema）。
+- **跨 SOR 协议**：`person_id/pernr` 写层不建 FK，通过 HRM 只读视图或缓存做软校验并周期性对账；`position_id/org_level` 等字段在 M1 仅占位可空，不触发校验。
 - **后续可选（非 M1 交付）**：多层级/矩阵占位、workflow/BP 绑定、Authz 策略生成、并行版本、What-if/Impact UI 与安全域继承，待 M1 稳定后再立项。
 - **非目标**：不实现薪酬预算、绩效考核，不做编制/空岗管理，不调整 finance 模块 schema，仅通过事件/视图消费。
 
@@ -84,8 +86,9 @@
   - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_date, end_date))` 用于时间冲突约束。
 - 约束（M1 落地）：`org_nodes` 的 code 需在 tenant 内唯一；name 在同一父节点+时间窗口内唯一；`org_edges` 需防环/双亲（ltree path + 唯一 child per hierarchy）；`org_assignments` 对同一 subject 在重叠时间内仅允许一个 primary（部分唯一约束）。
 - 多租户隔离：所有主键/唯一约束均以 `(tenant_id, <id/unique fields>)` 复合，外键与 sqlc 查询强制带 tenant 过滤；路径/缓存 key 同样纳入 tenant，避免跨租户穿透。
-- Postgres 依赖：迁移启用 `ltree` 与 `btree_gist` 扩展；有效期字段统一 `tstzrange` 且使用 `[start, end)` 半开区间，写入/校验一律 UTC，迁移包含时区/边界说明。
+- Postgres 依赖：迁移启用 `ltree` 与 `btree_gist` 扩展；有效期字段统一 `tstzrange` 且使用 `[start, end)` 半开区间，写入/校验一律 UTC，迁移包含时区/边界说明；`EXCLUDE USING gist (tenant_id WITH =, node_id WITH =, tstzrange(effective_date, end_date) WITH &&)` 防重叠，重名用 `(tenant_id,parent_node_id,name,effective_date,end_date)` 唯一。
 - sqlc 包：`modules/org/infrastructure/sqlc/...` 负责 CRUD + 冲突检测查询。
+- 性能与冲突验证：itf/bench 覆盖 1k 节点查询 <200ms，重叠/重名写入被拒绝；在 CI 以基准或集成测试执行。
 - 需要 Atlas/Goose 迁移流程，沿用 HRM 指南。
 
 ### Service Layer
@@ -101,6 +104,7 @@
 - UI（templ）：
   - M1：树形视图 + 基础表单（节点、分配），日期选择器切换有效期。
   - 拖拽式 Change Request Builder / Impact / Security Inspector / route preview 留作 M4+ backlog。
+- 权限要求：`/org/**` 需 Session+租户校验与 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`，无策略生成前可用特性开关仅对管理员开放。
 
 ## 集成与依赖
 - **SOR 边界**：Org 模块为组织层级 SOR；HRM/Position 为人/岗位 SOR，Position 编制/空岗在 DEV-PLAN-021；Finance 为 Cost Center/Company 财务口径 SOR（冻结期间不改 schema）。
@@ -111,6 +115,13 @@
 - **Finance/Projects/Procurement**：冻结期仅消费事件与只读视图，不改 finance 相关 schema；解冻后若有需求在 dev-plan 记录。
 - **缓存**：树结构在 Redis/内存缓存，Key 含层级类型 + effective date（按日）。变更事件触发缓存失效。
 - **Reporting/Analytics**：提供 `org_reporting` 视图供 BI 工具使用，支持任意时间点快照，与 Workday Custom Reporting 对齐。
+- **事件契约**：OrgChanged/OrgAssignmentChanged 附带 tenant_id/node_id/effective_window/version/幂等键，向后兼容扩展字段。
+- **跨模块校验**：person/pernr 通过 HRM 只读视图或缓存软校验并周期性对账；position_id 在 M1 不启用校验，等待 Position SOR 落地。
+
+## 上线与迁移
+- 租户初始化：导入脚本（CSV/JSON）创建唯一根节点、批量导入节点/边、补齐员工 primary assignment；导入前执行重叠/重名校验，导入后输出对账报告并记入 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md`。
+- 灰度与回滚：按租户/环境开关只读接口，写接口仅对导入账号开放；导入前对 org 相关表快照（pg_dump），提供清理脚本与缓存重建。
+- 性能基准：itf/bench 生成 1k 节点树验证查询耗时、重叠写入拒绝；挂入 CI 执行。
 
 ## 里程碑
 1. **M1（Phase 0/1）：最小可用主链**
@@ -129,6 +140,7 @@
 - Phase 3+：仅在立项后评估，需明确依赖（workflow/authz），并通过 `make authz-pack/test` 等质量门禁再交付。
 - HRM/Position/Finance 集成：M1 仅事件/视图消费，不改 finance 冻结模块；后续若回写需在 dev-plan 记录。
 - 文档完整：模块 README、API 参考、口径说明、操作手册、dev-record、Workday parity checklist。
+- 权限/策略：M1 提供权限常量与基础策略片段，`make authz-pack/test` 通过；无策略生成前，接口需经权限校验或特性开关保护。
 
 ## 风险与缓解
 - **时间区间复杂度**：有效期重叠校验可能拖慢写入 → 结合 `EXCLUDE` 约束 + 应用侧批量校验，提前压测 1k 节点场景。
