@@ -59,7 +59,7 @@
 
 - [x] 新建 `modules/logging/presentation/controllers/authz_helpers.go`，复用 `authzutil.EnsureViewState` + 014A 的 ensureAuthz 模式，固定 capability `logging.logs:view`（对象 `logging.logs` + 动作 `view`，与 `Logs.View` 常量一致），仅走 `pkg/authz` 判定，不保留 legacy 兜底。
 - [x] 建立 `LogsController`（列表/详情/导出/分页 API），入口第一步调用 helper，403 时返回统一消息（HX-Retarget 支持）、MissingPolicies、SuggestDiff；所有查询按上下文租户过滤，缺租户直接返回 403。
-- [ ] Controller props 注入 `authz.ViewState` 布尔值（例如 `CanViewLogs`）给模板/HTMX partial 使用；支持 query 参数过滤（用户、时间范围、IP、路径）并默认限定当前租户。
+- [x] Controller props 注入 `authz.ViewState` 布尔值（例如 `CanViewLogs`）给模板/HTMX partial 使用；支持 query 参数过滤（用户、时间范围、IP、路径）并默认限定当前租户。
 - [ ] 为 REST/HTMX/JSON 统一 handler，确保 403/200 序列化一致；记录 unauthorized 事件到审计（见“数据采集/审计”）。
 
 ### 2. 服务层、仓储与数据源
@@ -73,7 +73,7 @@
 ### 3. Presentation / 模板 / Locales
 - [ ] 在 `modules/logging/presentation/templates/pages/logs/` 创建 list/detail/empty templat，全部用 `pageCtx.CanAuthz("logging.logs", "view")` 控制入口，禁止 `user.Can`；空态支持“无数据/无权限”两类。
 - [x] 临时 Unauthorized 组件读取 `pageCtx.AuthzState().MissingPolicies` + `SuggestDiff`，提供跳转 `/core/api/authz/requests` 按钮；待 015B 可直接替换。
-- [ ] 补充 viewmodels/mappers 携带 `CanExport`, `CanInspect` 等布尔值，模板避免再做判定；HTMX partial 复用相同 props。
+- [x] 补充 viewmodels/mappers 携带 `CanExport`, `CanInspect` 等布尔值，模板避免再做判定；HTMX partial 复用相同 props。
 - [x] 更新 locales `{en,ru,uz,zh}.json`：新增 Logging 页面标题、筛选项、403 文案、申请权限按钮；完成后运行 `make check tr`。
 
 ### 4. 导航、Quick Links 与模块注册
