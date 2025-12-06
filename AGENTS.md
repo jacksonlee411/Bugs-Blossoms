@@ -3,6 +3,12 @@
 ## Overview
 DO NOT COMMENT EXECESSIVELY. Instead, write clear and concise code that is self-explanatory.
 
+### Code Quality & Format (与 CI 对齐)
+- 推送前必须运行与 CI 相同的检查，避免远程 Quality Gates 报红。
+- 必跑：`make check lint`（包含 golangci-lint + cleanarch 等规则，例如 canonicalheader/errchkjson/testifylint），以及相关路径的 `go test`（例如 `go test ./modules/logging/...`）。
+- 根据改动范围追加：模板/样式改动跑 `templ generate && make css`；多语言改动跑 `make check tr`；authz 相关跑 `make authz-test`/`make authz-lint`。
+- 不要仅依赖 `gofmt` 或单纯的 `go test`，它们覆盖不到 CI 的 lint 规则。
+
 ## 项目现状
 - 项目仍处于早期开发阶段，尚未投产，所有特性以快速验证为主。
 - 当前仅由单一开发者负责全栈交付，可在保证质量前提下省略非必要的审批与跨组沟通流程，直接按照本指南自行决策。
