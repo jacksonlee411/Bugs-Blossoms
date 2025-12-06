@@ -78,9 +78,10 @@ jobs:
               - 'modules/core/presentation/controllers/**'
 
       - name: Set up Go
-        uses: useblacksmith/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: "1.24.10"
+          cache: true
 
       - name: Install golangci-lint
         run: |
@@ -322,9 +323,10 @@ jobs:
               - '.gocleanarch.yml'
 
       - name: Set up Go
-        uses: useblacksmith/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: "1.24.10"
+          cache: true
 
       - name: Install templ
         run: |
@@ -471,9 +473,10 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: useblacksmith/setup-go@v6
+        uses: actions/setup-go@v5
         with:
           go-version: "1.24.10"
+          cache: true
 
       - name: Install templ
         run: |
