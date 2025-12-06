@@ -82,7 +82,7 @@
 - [x] 在 `modules/logging/module.go` 或等价位置注册 Quick Link（“View Logs”），使用 `.RequireAuthz("logging.logs", "view")`，并在 spotlight/side bar 依赖 `authz.ViewState` 过滤。
 
 ### 5. 数据采集与审计对齐
-- [ ] 定义 unauthorized 审计策略：当 `authz.Authorize` 返回 forbidden 时，先写集中结构化日志（subject/domain/object/action/tenant/IP/UA/request-id/trace-id），按需异步写 `action_logs`；写表失败降级为日志告警，不阻断请求。
+- [x] 定义 unauthorized 审计策略：当 `authz.Authorize` 返回 forbidden 时，先写集中结构化日志（subject/domain/object/action/tenant/IP/UA/request-id/trace-id），按需异步写 `action_logs`；写表失败降级为日志告警，不阻断请求。
 - [ ] 与 session handler 的 authentication_logs 写入对齐字段/租户来源，必要时在 logging service 层增加批量导出/清理接口（保留期、分页上限）并文档化。
 - [ ] 若启用 Loki/文件采集，提供可选 pipeline（只读模式、不要求生产可用），并在 README/CONTRIBUTING 说明如何 mock 或关闭。
 
