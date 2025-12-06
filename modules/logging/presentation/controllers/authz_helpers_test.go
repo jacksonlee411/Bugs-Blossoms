@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
@@ -36,7 +37,7 @@ func TestEnsureLoggingAuthz_AllowsWhenModeDisabled(t *testing.T) {
 	ctx := contextWithLogger(t)
 	ctx = composables.WithTenantID(ctx, tenantID)
 	ctx = composables.WithUser(ctx, u)
-	req := httptest.NewRequest("GET", "/logs", nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/logs", nil).WithContext(ctx)
 
 	rr := httptest.NewRecorder()
 	allowed := ensureLoggingAuthz(rr, req, "view")
@@ -51,7 +52,7 @@ func TestEnsureLoggingAuthz_ForbidsWithoutUser(t *testing.T) {
 
 	ctx := contextWithLogger(t)
 	ctx = composables.WithTenantID(ctx, uuid.New())
-	req := httptest.NewRequest("GET", "/logs", nil).WithContext(ctx)
+	req := httptest.NewRequest(http.MethodGet, "/logs", nil).WithContext(ctx)
 	req.Header.Set("Accept", "application/json")
 
 	rr := httptest.NewRecorder()
