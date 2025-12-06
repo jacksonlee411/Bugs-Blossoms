@@ -11,6 +11,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/gorilla/mux"
 
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/authenticationlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/mappers"
@@ -167,7 +168,8 @@ func canViewLogs(ctx context.Context) bool {
 	if state == nil {
 		return true
 	}
-	return state.Can(authz.CapabilityKey(logsAuthzObject, "view"))
+	allowed, ok := state.CapabilityValue(authzutil.CapabilityKey(logsAuthzObject, "view"))
+	return ok && allowed
 }
 
 func buildActionFilters(

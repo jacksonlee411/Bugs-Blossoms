@@ -7,6 +7,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
@@ -51,6 +52,7 @@ func ensureLoggingAuthz(
 	allowed, authzErr := enforceRequest(r.Context(), svc, req, mode)
 	if authzErr != nil {
 		recordForbiddenCapability(state, r, logsAuthzObject, action, capKey)
+		logUnauthorizedAccess(r, req, mode, authzErr)
 		writeForbiddenResponse(w, r, logsAuthzObject, action)
 		return false
 	}
@@ -63,6 +65,7 @@ func ensureLoggingAuthz(
 	}
 
 	recordForbiddenCapability(state, r, logsAuthzObject, action, capKey)
+	logUnauthorizedAccess(r, req, mode, nil)
 	writeForbiddenResponse(w, r, logsAuthzObject, action)
 	return false
 }
@@ -137,4 +140,27 @@ func recordForbiddenCapability(state *authz.ViewState, r *http.Request, object, 
 		Object: object,
 		Action: authz.NormalizeAction(action),
 	})
+}
+
+func logUnauthorizedAccess(r *http.Request, req authz.Request, mode authz.Mode, err error) {
+	logger := composables.UseLogger(r.Context())
+	ip, _ := composables.UseIP(r.Context())
+	ua, _ := composables.UseUserAgent(r.Context())
+
+	fields := logrus.Fields{
+		"authz.subject": req.Subject,
+		"authz.domain":  req.Domain,
+		"authz.object":  req.Object,
+		"authz.action":  req.Action,
+		"authz.mode":    mode,
+		"ip":            ip,
+		"user_agent":    ua,
+		"request_id":    r.Header.Get("X-Request-ID"),
+	}
+
+	entry := logger.WithFields(fields)
+	if err != nil {
+		entry = entry.WithError(err)
+	}
+	entry.Warn("logging.authz.forbidden")
 }
