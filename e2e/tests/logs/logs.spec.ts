@@ -19,18 +19,18 @@ test.describe('logging authz gating', () => {
 	test('allows superadmin to view logs page', async ({ page }) => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
 
-		const response = await page.goto('/logging/logs');
+		const response = await page.goto('/logs');
 		if (response) {
 			expect(response.status()).toBeLessThan(400);
 		}
-		await expect(page).toHaveURL(/\/logging\/logs/);
+		await expect(page).toHaveURL(/\/logs/);
 		await expect(page.getByRole('heading', { level: 1 })).toContainText(/Logs/i);
 	});
 
 	test('blocks logs page for user without logging permissions', async ({ page }) => {
 		await login(page, 'nohrm@example.com', 'TestPass123!');
 
-		const response = await page.goto('/logging/logs');
+		const response = await page.goto('/logs');
 		if (response) {
 			expect([401, 403]).toContain(response.status());
 		}
