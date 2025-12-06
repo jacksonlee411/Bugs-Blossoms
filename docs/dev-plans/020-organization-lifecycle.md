@@ -64,7 +64,7 @@
 - 冻结窗口：对 Organization Unit 树应用配置化冻结窗口（默认月末+3 天，可按租户覆盖），冻结期仅允许未来日期变更。
 - 历史/未来查询：接口统一接受 `effective_date` 作为查询点。Retro 重播与补偿不在 M1 范围，列为后续增强。
 - SAP 约束对照：约束 1（无空档、无重叠）为本方案默认；A/2/3/B/T 仅作为参考，不在 Org 模块使用。
-- Correction vs Update：API 需显式区分“更正历史”（Correct，原地修改当前切片，需更高权限与审计标记）与“新增时间片”（Update，截断旧片段再写新段），避免误生成切片垃圾。
+- Correction vs Update：API 设计需显式区分“更正历史”（Correct，如 `POST /nodes/{id}:correct`，原地修改当前切片，需更高权限与审计标记）与“新增时间片”（Update，如 `PATCH /nodes/{id}`，截断旧片段再写新段），避免误用。
 
 ### 4. 组织层级 & 权限
 - **M1**：仅发布 `OrgChanged`/`OrgAssignmentChanged` 事件供 Authz/HRM 订阅，不做策略生成/继承计算。
@@ -85,9 +85,9 @@
 
 ### Infrastructure Layer
 - 新建 schema `modules/org/infrastructure/persistence/schema/org-schema.sql`，核心表：
-  - `org_nodes`（tenant_id, id, type, code, name, i18n_names jsonb, status, legal_entity_id/company_code, location_id, display_order int, effective_date, end_date, parent_hint, owner_user_id, created_at, updated_at）。
+  - `org_nodes`（tenant_id, id, type, code, name, i18n_names jsonb, status, legal_entity_id/company_code, location_id, display_order int, effective_date, end_date, parent_hint, manager_user_id, created_at, updated_at）。
   - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_date, end_date, depth, path ltree）。
-  - `positions`（tenant_id, id, org_node_id, code, title, status, effective_date, end_date, created_at, updated_at），M1 可自动为 Assignment 创建一对一空壳。
+  - `positions`（tenant_id, id, org_node_id, code, title, status, effective_date, end_date, is_auto_created bool, created_at, updated_at），M1 可自动为 Assignment 创建一对一空壳，通过 `is_auto_created` 标记以供后续治理。
   - `org_assignments`（tenant_id, id, position_id, subject_type=person, subject_id=person_id, pernr, assignment_type=primary|matrix|dotted, effective_date, end_date, primary bool）。
   - 占位/可选表：`org_attribute_inheritance_rules`（属性继承策略配置）、`org_roles`（角色字典）、`org_role_assignments`（角色分配，带有效期）、`change_requests`（草稿/提交/审批/生效占位，M1 可仅存草稿+审计字段）、`org_matrix_links`（矩阵/虚线组织关联）、`org_security_group_mappings`（组织节点与安全组关联）、`org_links`（组织与项目/成本中心/预算科目等多对多关联，带有效期）。
   - 其他表（retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
@@ -98,7 +98,7 @@
 - sqlc 包：`modules/org/infrastructure/sqlc/...` 负责 CRUD + 冲突检测查询，包含 Position、继承解析只读视图、变更请求占位。
 - 性能与冲突验证：itf/bench 覆盖 1k 节点查询 <200ms，重叠/重名写入被拒绝；在 CI 以基准或集成测试执行。
 - 需要 Atlas/Goose 迁移流程，沿用 HRM 指南。
-- 深层级读性能（M2 预留）：写侧保持 `OrgEdge` + ltree，禁止同步级联更新；读侧引入时态闭包表 `org_hierarchy_closure`（ancestor_id, descendant_id, depth, validity tstzrange, tenant_id，GiST/EXCLUDE）仅供查询；为常用时间片构建 `org_hierarchy_snapshots`/物化视图按 as_of_date/tenant 索引，Outbox 驱动 Job 刷新，热点查询禁止递归 CTE，优先走闭包表/快照；Manager/Leader 解析可在视图中冗余当前生效负责人以减递归。
+- 深层级读性能（M2 预留）：写侧保持 `OrgEdge` + ltree，禁止同步级联更新；读侧引入时态闭包表 `org_hierarchy_closure`（ancestor_id, descendant_id, depth, validity tstzrange, tenant_id，GiST/EXCLUDE）仅供查询；为常用时间片构建 `org_hierarchy_snapshots`/物化视图按 as_of_date/tenant 索引，Outbox 驱动 Job 刷新，热点查询禁止递归 CTE，优先走闭包表/快照；Manager/Leader 解析可在视图中冗余当前生效负责人以减递归。**M1 阶段应将所有层级遍历查询封装在 Repository 层，为 M2 无缝切换到闭包表实现做准备。**
 - 审计/事务时间：主表保持单时态（effective_date/end_date + EXCLUDE），事务时间写入审计表或 Outbox 事件（recorded_at/operator/旧值/新值、transaction_time、version），供时光机/回放使用，不在主表叠加 tx_range；Rescind 操作以审计标记 + 软删除策略区分于 Retired。
 
 ### Service Layer
@@ -108,10 +108,10 @@
 ### Presentation Layer & API
 - Controller 前缀 `/org`：
   - `GET /org/hierarchies?type=OrgUnit&effective_date=`：返回树概览，支持 display_order 排序，属性提供显式值与继承解析值。
-  - `POST /org/nodes` / `PATCH /org/nodes/{id}`：节点 CRUD（含有效期、重名、父子校验）；支持字段 code/name/i18n_names/legal_entity_id/company_code/location_id/display_order；删除改为 `PATCH` 设置 `end_date` 或状态 `Retired`，误创建支持 `mode=correct` 或 Rescind；预留 change request 草稿/提交接口（无审批流，仅存档）。
+  - `POST /org/nodes` / `PATCH /org/nodes/{id}`：节点 CRUD（含有效期、重名、父子校验）；支持字段 code/name/i18n_names/legal_entity_id/company_code/location_id/display_order；删除改为 `PATCH` 设置 `end_date` 或状态 `Retired`，误创建支持 Rescind；预留 change request 草稿/提交接口（无审批流，仅存档）。
   - `POST /org/positions`（可选）/ `POST /org/assignments`：Assignment 以 Position 为锚点；若未显式传 position_id，默认创建一对一 Position 再绑定；支持 `assignment_type`（primary/matrix/dotted）；`PATCH /org/assignments/{id}` / `GET /org/assignments?subject=person:{id}`：人员分配时间线。
   - `POST /org/role-assignments`（占位）/ `GET /org/role-assignments?role=HRBP`：组织角色分配查询。
-  - API 提供 `mode=correct|update` 参数区分更正历史与新增时间片，默认 update。
+  - API 设计区分“修正”与“更新”：`PATCH /org/nodes/{id}` 用于常规更新（创建新时间片），`POST /org/nodes/{id}:correct` 用于修正历史数据（原地修改），后者需要更高权限（如 `Org.Admin`）。
   - 不提供 retro/security/BP/Impact 相关接口于 M1。
 - UI（templ）：
   - M1：树形视图 + 基础表单（节点、Position、分配），日期选择器切换有效期，支持多语言名称编辑、display_order 调整。
@@ -194,7 +194,7 @@
 | Org ID/Code | 组织编码 | ORGEH / OBJID | `org_nodes.code` | 租户内唯一。 |
 | Org Name | 组织名称 | STEXT（短名） | `org_nodes.name` + `i18n_names` | 父节点+时间窗口内唯一，支持多语言。 |
 | Parent Org | 父子关系 | 关系 A/B002（O→O 上级） | `org_edges.parent_node_id` / `child_node_id` | `org_nodes.parent_hint` 仅缓存，建议改名或隐藏。 |
-| Manager/Supervisor | 组织负责人 | Chief Position 标记（S-CHIEF，关系 A/B012） | `owner_user_id`（建议改 `manager_user_id`） | 对齐 Manager 语义。 |
+| Manager/Supervisor | 组织负责人 | Chief Position 标记（S-CHIEF，关系 A/B012） | `manager_user_id` | M1 简化实现；长远应通过 `org_role_assignments` 表实现带有效期的角色分配。 |
 | Effective Date / End Date（Inactive Date） | 生效/失效日期 | BEGDA / ENDDA | `effective_date` / `end_date` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
 | As-of Date | 查询时点（Key Date） | Key Date（Stichtag） | `effective_date` 参数 | 未传则默认 `time.Now()`。 |
 | Primary Supervisory Org | 主属组织 | PA0001-ORGEH（主组织） | `org_assignments.primary` + `assignment_type=primary` | M1 支持主属；矩阵/虚线用 assignment_type=matrix/dotted 占位。 |

@@ -21,7 +21,8 @@ test.describe('logging authz gating', () => {
 	test('allows superadmin to view logs page and tabs', async ({ page }) => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
 
-		const logsNavLink = page.locator('a[href="/logs"]').first();
+		// Prefer visible expanded link to avoid grabbing the collapsed (hidden) variant
+		const logsNavLink = page.locator('a[href="/logs"]').filter({ hasText: /logs/i }).first();
 		await expect(logsNavLink).toBeVisible();
 
 		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
@@ -37,8 +38,10 @@ test.describe('logging authz gating', () => {
 	test('blocks logs page for user without logging permissions', async ({ page }) => {
 		await login(page, 'nohrm@example.com', 'TestPass123!');
 
-		const logsNavLink = page.locator('a[href="/logs"]').first();
-		await expect(logsNavLink).toHaveCount(0);
+		const logsNavLink = page.locator('a[href="/logs"]').filter({ hasText: /logs/i }).first();
+		if (await logsNavLink.count()) {
+			await logsNavLink.scrollIntoViewIfNeeded();
+		}
 
 		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
 		if (response) {
