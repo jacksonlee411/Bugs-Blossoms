@@ -22,3 +22,9 @@
 | Core / modules/core/presentation/templates/pages/users/users.templ | 用户列表模板 | 仍存在 user.CanUpdate 组合判断，未完全移除 legacy 路径 | 用 pageCtx.CanAuthz 控制可见性/交互，移除 legacy CanUpdate 判定 | Done（模板与生成物已更新） |
 | 文档 | README/CONTRIBUTING/AGENTS | 未纳入 014D 统一的 403 JSON 示例与 /core/api/authz/requests|debug 调用示例 | 补充公共层接入流程、示例 payload/链接，完成后记录命令与验证结论 | Done |
 | 验证记录 | dev-records 本文件 | 导航/Quick Links/Spotlight 有/无权账号验证与 403 直访结果尚未登记 | 以有/无能力账号各验证一次可见性与 403 payload，填入本表或日志区 | Pending |
+
+## 日志模块记录
+
+| 时间 (UTC) | 模块 × 租户 | 操作 | 命令 / Flag | 观测与验证 | 结果 |
+|------------|-------------|------|-------------|-------------|------|
+| 2025-12-06 16:55 | Logging × all | 清理 core 平行 authlog；ActionLogMiddleware 保持默认关闭；新增 session handler 单测 | `go test ./modules/core/...`；`go test ./modules/logging/...`（`ACTION_LOG_ENABLED` 默认 false） | session.CreatedEvent 仅由 logging handler 写入 authentication_logs；action_logs 仅在 `ACTION_LOG_ENABLED=true` 时写入 | ✅ |

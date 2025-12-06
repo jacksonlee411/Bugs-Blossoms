@@ -49,8 +49,8 @@
 
 ### 决策澄清（固定选择）
 - [x] 展现形态：提供双列表视图（Authentication Logs / Action Logs 两个 Tab），各自独立过滤（时间、用户、IP/UA、method/path），后端分表查询；不做单列表聚合以避免源混淆。
-- [ ] Core 复用路径：core session handler 直接依赖 logging repo/service 写 `authentication_logs`，core 内不再维护平行仓储；logging 提供只读 service 给 controller/UI。
-- [ ] action_logs 采集开关：默认关闭（配置可开），开启后通过 middleware 钩子写入；无数据环境允许空返回，不报错。
+- [x] Core 复用路径：core session handler 直接依赖 logging repo/service 写 `authentication_logs`，core 内不再维护平行仓储；logging 提供只读 service 给 controller/UI。（已移除 core 平行 authlog 仓储/handler）
+- [x] action_logs 采集开关：默认关闭（配置可开），开启后通过 middleware 钩子写入；无数据环境允许空返回，不报错。（由 `ACTION_LOG_ENABLED` 控制）
  - [ ] （搁置）数据保留：默认保留 90 天，logging service 提供清理接口/定时任务钩子（可配置保留期）；纳入文档与验收。
 - [x] 审计日志格式：结构化日志固定字段 `subject, domain, object, action, tenant, ip, user_agent, request_id, trace_id, mode(enforce/shadow)`，logger 前缀 `authz.logging`；落库失败降级为日志告警。
 - [x] E2E/seed：提交 `logging.logs:view` 片段并跑 `authz-pack`；seed 账号至少两类（有/无 Logs.View），Playwright 用同一策略；policy 产物按 M2/M3 策略提交。
@@ -66,8 +66,8 @@
 - [x] 依据 DDD 规范补全 domain/entities（AuthenticationLog/ActionLog + FindParams）、repository interface/impl（`modules/logging/infrastructure/persistence/*`），避免继续使用 core 占位 repo，必要时抽公共 mapper；所有查询/导出必须强制 `tenant_id` 条件。
 - [x] 在 service 层新增 `authorizeLogging(ctx, action)` helper，所有读/导出操作调用 `authz.Authorize(ctx, subject, "logging.logs", "view", attrs...)`；未授权返回 `authz.ErrForbidden`，同时附带 MissingPolicies。
 - [x] 数据源策略：`authentication_logs` 用于身份/登录审计，`action_logs` 用于请求/操作审计；仅分表查询，不提供聚合视图，内部始终区分表源，避免混用。
-- [ ] Core 现有 session handler 写 `authentication_logs`：优先复用同一仓储（core handler 依赖 logging repo/service 或 logging 层提供只读 service，避免双写/双 schema）。
-- [ ] action_logs 写入链路：在 `pkg/middleware/logging` 或单独 handler 中添加可选钩子（启用时将 request 摘要写入 action_logs），保持开关可配置且不影响现有日志输出。
+- [x] Core 现有 session handler 写 `authentication_logs`：优先复用同一仓储（已删除 core 平行 authlog 仓储/服务/handler，统一由 logging handler 写入）。
+- [x] action_logs 写入链路：在 `pkg/middleware/logging` 或单独 handler 中添加可选钩子（启用时将 request 摘要写入 action_logs），保持开关可配置且不影响现有日志输出。
 - [ ] 单元测试（表驱动 + testify + mock repo）覆盖：①无用户/租户②无权限③有权限，拒绝时仓储不被调用；验证 attributes 透传（tenant、path、method）。
 
 ### 3. Presentation / 模板 / Locales
@@ -103,6 +103,13 @@
 ### 9. 与 015A/015B 的接口契约
 - [ ] Controller/模板暴露 `pageCtx.AuthzState().MissingPolicies`、`SuggestDiff`、subject/domain（用于 PolicyInspector 参数），Forbidden 响应保持稳定字段，方便 015B 直接替换 UI。
 - [x] Unauthorized 页/按钮跳转 `/core/api/authz/requests`，并在 props 中附上 object/action/domain 便于预填；若需要新增字段（如 log source），在本文档同步描述并与 015B 对齐。
+
+## 下一步待办（聚焦）
+- 补全 logging controller/service/repo 的单元测试，覆盖无 Session/无租户/无权限/成功路径，验证 action log 开启时不会写表冲击；完成后跑 `go test ./modules/logging/...`。
+- 与 session handler 对齐 authentication_logs 字段与租户来源，补导出/清理接口与保留期文档；若启用 action_logs/Loki，提供关闭或 Mock 的说明。
+- 在 dev-records 补 readiness/策略 diff/AUTHZ_ENFORCE 启停命令，并在 `config/access/authz_flags.yaml` 声明 logging 分段及回滚/监控占位。
+- 更新 `pkg/defaults` 权限种子与 fixtures，确保 logging.logs:view 覆盖 e2e/Playwright/seed，一致依赖 authz-pack 产物。
+- Controller/模板补充 MissingPolicies/SuggestDiff + subject/domain 输出，对齐 015B 的 PolicyInspector 契约。
 
 ## 交付物
 - Logging 模块完整的 Casbin 接入（controller/service/repo/模板/导航/Quick Links）、修正后的 module 名称与注册。
