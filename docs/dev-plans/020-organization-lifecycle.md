@@ -16,6 +16,7 @@
 5. **时间线 API**：所有读写接口必须显式接受 `effective_at`，未提供时默认 `time.Now()`，以保障历史查询与未来排程。
 6. **可扩展事件流**：关键变更（新建部门、层级调整、员工调动、权限继承）通过 `pkg/eventbus` 发布，供 HRM/财务/审批模块订阅。
 - **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`。
+- **人员标识**：采用 `person_id` 作为自然人主键（不可变）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户下同一 person 不变。
 
 ## 目标
 - **Phase 0/1（M1）**：仅交付单一 Organization Unit 树的 OrgNode/OrgEdge/Assignment CRUD，强制有效期/去重名/无重叠、租户隔离查询性能（1k 节点 200ms 内）、基础审计与冻结窗口。无审批流、无 BP 绑定、无并行版本、无策略生成，先提供稳定 SOR 与事件出口。
@@ -78,7 +79,7 @@
 - 新建 schema `modules/org/infrastructure/persistence/schema/org-schema.sql`，核心表：
   - `org_nodes`（tenant_id, id, type, code, name, status, effective_start, effective_end, parent_hint, owner_user_id, created_at, updated_at）。
   - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_start, effective_end, depth, path ltree）。
-  - `org_assignments`（tenant_id, id, node_id, subject_type=employee, subject_id, effective_start, effective_end, primary bool）。
+  - `org_assignments`（tenant_id, id, node_id, subject_type=person, subject_id=person_id, pernr, effective_start, effective_end, primary bool）。
   - 其他表（change_requests、retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
   - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_start, effective_end))` 用于时间冲突约束。
 - 约束（M1 落地）：`org_nodes` 的 code 需在 tenant 内唯一；name 在同一父节点+时间窗口内唯一；`org_edges` 需防环/双亲（ltree path + 唯一 child per hierarchy）；`org_assignments` 对同一 subject 在重叠时间内仅允许一个 primary（部分唯一约束）。
@@ -103,7 +104,7 @@
 
 ## 集成与依赖
 - **SOR 边界**：Org 模块为组织层级 SOR；HRM/Position 为人/岗位 SOR，Position 编制/空岗在 DEV-PLAN-021；Finance 为 Cost Center/Company 财务口径 SOR（冻结期间不改 schema）。
-- **HRM 员工**：提供 `OrgAssignments` 视图和分配 API，表单默认 `effective_start = hire_date`，按 SOR 边界执行回写/订阅。
+- **HRM 员工**：提供 `OrgAssignments` 视图和分配 API，表单默认 `effective_start = hire_date`，按 SOR 边界执行回写/订阅；主体标识使用 `person_id`（不可变）+ `pernr`（工号，租户内唯一且不变）。
 - **Authz/Casbin**：M1 仅发布事件；`OrgScope` ABAC 属性与 policy pack/test 放入后续里程碑。
 - **Workflow**：M1 不引入审批引擎，后续若需要再复用 `pkg/workflow`。
 - **Position/Compensation**：M1 仅面向员工，职位/成本中心钩子留待 DEV-PLAN-021/M3+。
@@ -150,7 +151,7 @@
 | Effective Start/End | 生效/失效日期 | BEGDA / ENDDA | `effective_start` / `effective_end` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
 | As-of Date | 查询时点（Key Date） | Key Date（Stichtag） | `effective_at` 参数 | 未传则默认 `time.Now()`。 |
 | Primary Supervisory Org | 主属组织 | PA0001-ORGEH（主组织） | `org_assignments.primary` | 仅支持主属，辅属/矩阵待 M2+。 |
-| Worker | 员工/雇员 | PERNR | `subject_type=employee` + `subject_id` | 若接 Position，可改为 `worker_type/worker_id`。 |
+| Worker（本项目术语 Person，工号 PERNR） | 员工/雇员 | PERNR | `subject_type=person` + `subject_id=person_id`（工号 `pernr` 不变） | 若接 Position，可改为 `worker_type/worker_id`。 |
 | Position | 职位 | PLANS（Position） | （未落地）`position_id` 占位 | 计划在 DEV-PLAN-021/M3+。 |
 | Effective Status | 状态 | OBJSTAT（对象状态）/ STAT2（雇佣状态） | `status=Active/Retired` | 如需停用态可扩展 `Inactive`。 |
 | Org Level | 组织层级 | OTYPE+层级自定义（如 O 等级自定义字段） | （未落地）`org_level` 占位 | 便于报表/BP 路由。 |
