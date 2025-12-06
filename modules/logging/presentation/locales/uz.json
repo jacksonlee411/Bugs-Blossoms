@@ -1,10 +1,37 @@
 {
 	"Resources": {
-		"logs": "Jurnal"
+		"logs": "Jurnallar"
 	},
 	"Permissions": {
 		"Logs": {
 			"View": "Jurnalni ko'rish"
+		}
+	},
+	"NavigationLinks": {
+		"Logs": "Jurnallar"
+	},
+	"Logs": {
+		"Meta": {
+			"List": {
+				"Title": "Jurnallar"
+			}
+		},
+		"List": {
+			"AuthenticationTab": "Autentifikatsiya jurnali",
+			"ActionTab": "Harakatlar jurnali"
+		},
+		"Filters": {
+			"UserID": "Foydalanuvchi ID",
+			"IP": "IP manzil",
+			"UserAgent": "User Agent",
+			"From": "Boshlanish",
+			"To": "Yakun",
+			"Method": "Metod",
+			"Path": "Yo'l"
+		},
+		"Empty": {
+			"Title": "Jurnal topilmadi",
+			"_Description": "Tanlangan filtrlar bo'yicha natijalar yo'q."
 		}
 	}
 }

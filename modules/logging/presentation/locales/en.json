@@ -6,5 +6,32 @@
 		"Logs": {
 			"View": "View logs"
 		}
+	},
+	"NavigationLinks": {
+		"Logs": "Logs"
+	},
+	"Logs": {
+		"Meta": {
+			"List": {
+				"Title": "Logs"
+			}
+		},
+		"List": {
+			"AuthenticationTab": "Authentication Logs",
+			"ActionTab": "Action Logs"
+		},
+		"Filters": {
+			"UserID": "User ID",
+			"IP": "IP Address",
+			"UserAgent": "User Agent",
+			"From": "From",
+			"To": "To",
+			"Method": "Method",
+			"Path": "Path"
+		},
+		"Empty": {
+			"Title": "No logs yet",
+			"_Description": "No matching logs were found for the current filters."
+		}
 	}
 }

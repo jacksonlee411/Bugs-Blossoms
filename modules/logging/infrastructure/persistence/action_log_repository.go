@@ -8,22 +8,19 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/authenticationlog"
+	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/infrastructure/persistence/models"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/repo"
 )
 
-type AuthenticationLogRepository struct{}
+type ActionLogRepository struct{}
 
-func NewAuthenticationLogRepository() authenticationlog.Repository {
-	return &AuthenticationLogRepository{}
+func NewActionLogRepository() actionlog.Repository {
+	return &ActionLogRepository{}
 }
 
-func (r *AuthenticationLogRepository) List(
-	ctx context.Context,
-	params *authenticationlog.FindParams,
-) ([]*authenticationlog.AuthenticationLog, error) {
+func (r *ActionLogRepository) List(ctx context.Context, params *actionlog.FindParams) ([]*actionlog.ActionLog, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return nil, err
@@ -33,10 +30,10 @@ func (r *AuthenticationLogRepository) List(
 		return nil, err
 	}
 
-	where, args := buildAuthLogFilters(params, tenantID)
+	where, args := buildActionLogFilters(params, tenantID)
 	query := `
-		SELECT id, tenant_id, user_id, ip, user_agent, created_at
-		FROM authentication_logs
+		SELECT id, tenant_id, user_id, method, path, before, after, user_agent, ip, created_at
+		FROM action_logs
 		WHERE ` + strings.Join(where, " AND ") + `
 		ORDER BY created_at DESC
 	`
@@ -50,13 +47,24 @@ func (r *AuthenticationLogRepository) List(
 	}
 	defer rows.Close()
 
-	var results []*authenticationlog.AuthenticationLog
+	var results []*actionlog.ActionLog
 	for rows.Next() {
-		var row models.AuthenticationLog
-		if err := rows.Scan(&row.ID, &row.TenantID, &row.UserID, &row.IP, &row.UserAgent, &row.CreatedAt); err != nil {
+		var row models.ActionLog
+		if err := rows.Scan(
+			&row.ID,
+			&row.TenantID,
+			&row.UserID,
+			&row.Method,
+			&row.Path,
+			&row.Before,
+			&row.After,
+			&row.UserAgent,
+			&row.IP,
+			&row.CreatedAt,
+		); err != nil {
 			return nil, err
 		}
-		results = append(results, toDomainAuthenticationLog(&row))
+		results = append(results, toDomainActionLog(&row))
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -64,7 +72,7 @@ func (r *AuthenticationLogRepository) List(
 	return results, nil
 }
 
-func (r *AuthenticationLogRepository) Count(ctx context.Context, params *authenticationlog.FindParams) (int64, error) {
+func (r *ActionLogRepository) Count(ctx context.Context, params *actionlog.FindParams) (int64, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return 0, err
@@ -73,11 +81,11 @@ func (r *AuthenticationLogRepository) Count(ctx context.Context, params *authent
 	if err != nil {
 		return 0, err
 	}
-	where, args := buildAuthLogFilters(params, tenantID)
+	where, args := buildActionLogFilters(params, tenantID)
 
 	var count int64
 	if err := tx.QueryRow(ctx, `
-		SELECT COUNT(*) FROM authentication_logs
+		SELECT COUNT(*) FROM action_logs
 		WHERE `+strings.Join(where, " AND "),
 		args...,
 	).Scan(&count); err != nil {
@@ -86,7 +94,7 @@ func (r *AuthenticationLogRepository) Count(ctx context.Context, params *authent
 	return count, nil
 }
 
-func (r *AuthenticationLogRepository) Create(ctx context.Context, log *authenticationlog.AuthenticationLog) error {
+func (r *ActionLogRepository) Create(ctx context.Context, log *actionlog.ActionLog) error {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return err
@@ -96,7 +104,7 @@ func (r *AuthenticationLogRepository) Create(ctx context.Context, log *authentic
 		return err
 	}
 
-	dbRow := toDBAuthenticationLog(log)
+	dbRow := toDBActionLog(log)
 	if dbRow.TenantID == "" {
 		dbRow.TenantID = tenantID.String()
 	}
@@ -106,18 +114,22 @@ func (r *AuthenticationLogRepository) Create(ctx context.Context, log *authentic
 
 	return tx.QueryRow(
 		ctx,
-		`INSERT INTO authentication_logs (tenant_id, user_id, ip, user_agent, created_at)
-		 VALUES ($1, $2, $3, $4, $5)
+		`INSERT INTO action_logs (tenant_id, method, path, user_id, before, after, user_agent, ip, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		 RETURNING id, created_at`,
 		dbRow.TenantID,
+		dbRow.Method,
+		dbRow.Path,
 		dbRow.UserID,
-		dbRow.IP,
+		dbRow.Before,
+		dbRow.After,
 		dbRow.UserAgent,
+		dbRow.IP,
 		dbRow.CreatedAt,
 	).Scan(&log.ID, &log.CreatedAt)
 }
 
-func buildAuthLogFilters(params *authenticationlog.FindParams, tenantID uuid.UUID) ([]string, []interface{}) {
+func buildActionLogFilters(params *actionlog.FindParams, tenantID uuid.UUID) ([]string, []interface{}) {
 	where := []string{"tenant_id = $1"}
 	args := []interface{}{tenantID}
 	argPos := 2
@@ -128,6 +140,16 @@ func buildAuthLogFilters(params *authenticationlog.FindParams, tenantID uuid.UUI
 	if params.UserID != nil {
 		where = append(where, fmt.Sprintf("user_id = $%d", argPos))
 		args = append(args, *params.UserID)
+		argPos++
+	}
+	if method := strings.TrimSpace(params.Method); method != "" {
+		where = append(where, fmt.Sprintf("LOWER(method) = LOWER($%d)", argPos))
+		args = append(args, method)
+		argPos++
+	}
+	if path := strings.TrimSpace(params.Path); path != "" {
+		where = append(where, fmt.Sprintf("path ILIKE $%d", argPos))
+		args = append(args, "%"+path+"%")
 		argPos++
 	}
 	if ip := strings.TrimSpace(params.IP); ip != "" {
