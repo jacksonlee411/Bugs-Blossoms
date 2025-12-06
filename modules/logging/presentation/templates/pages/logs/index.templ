@@ -1,0 +1,314 @@
+package logs
+
+import (
+	"fmt"
+	"strings"
+
+	icons "github.com/iota-uz/icons/phosphor"
+
+	"github.com/iota-uz/iota-sdk/components/base"
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
+	"github.com/iota-uz/iota-sdk/modules/logging/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+func tabButtonClass(active bool) string {
+	classes := []string{
+		"flex items-center gap-2 rounded px-3 py-2 text-sm font-medium",
+	}
+	if active {
+		classes = append(classes, "bg-primary text-white")
+	} else {
+		classes = append(classes, "bg-surface-500 hover:bg-surface-400")
+	}
+	return strings.Join(classes, " ")
+}
+
+templ Index(props *viewmodels.LogsPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{Title: pageCtx.T("Logs.Meta.List.Title")},
+	}) {
+		@Content(props)
+	}
+}
+
+templ Content(props *viewmodels.LogsPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div class="m-6 space-y-4">
+		<div class="flex items-center justify-between">
+			<h1 class="text-2xl font-medium">{ pageCtx.T("NavigationLinks.Logs") }</h1>
+		</div>
+		<div class="bg-surface-600 border border-primary rounded-lg">
+			<div class="flex flex-wrap gap-2 p-4">
+				<button
+					type="button"
+					hx-get={ fmt.Sprintf("%s?tab=authentication", props.BasePath) }
+					hx-target="#logs-content"
+					hx-swap="outerHTML"
+					hx-push-url="true"
+					class={ tabButtonClass(props.ActiveTab == "authentication") }
+				>
+					@icons.ShieldCheck(icons.Props{Size: "18"})
+					<span>{ pageCtx.T("Logs.List.AuthenticationTab") }</span>
+				</button>
+				<button
+					type="button"
+					hx-get={ fmt.Sprintf("%s?tab=action", props.BasePath) }
+					hx-target="#logs-content"
+					hx-swap="outerHTML"
+					hx-push-url="true"
+					class={ tabButtonClass(props.ActiveTab == "action") }
+				>
+					@icons.List(icons.Props{Size: "18"})
+					<span>{ pageCtx.T("Logs.List.ActionTab") }</span>
+				</button>
+			</div>
+			@TabContent(props)
+		</div>
+	</div>
+}
+
+templ TabContent(props *viewmodels.LogsPageProps) {
+	<div id="logs-content" class="border-t border-primary">
+		if props.ActiveTab == "action" {
+			@ActionLogs(props)
+		} else {
+			@AuthenticationLogs(props)
+		}
+	</div>
+}
+
+templ AuthenticationLogs(props *viewmodels.LogsPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div class="p-4 space-y-4">
+		<form
+			class="grid gap-3 md:grid-cols-3"
+			hx-get={ fmt.Sprintf("%s?tab=authentication", props.BasePath) }
+			hx-target="#logs-content"
+			hx-swap="outerHTML"
+			hx-push-url="true"
+		>
+			<input type="hidden" name="tab" value="authentication"/>
+			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", props.Authentication.PerPage) }/>
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Logs.Filters.UserID"),
+				Attrs: templ.Attributes{
+					"name":  "user_id",
+					"value": props.Authentication.Filters.UserID,
+				},
+			})
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Logs.Filters.IP"),
+				Attrs: templ.Attributes{
+					"name":  "ip",
+					"value": props.Authentication.Filters.IP,
+				},
+			})
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Logs.Filters.UserAgent"),
+				Attrs: templ.Attributes{
+					"name":  "user_agent",
+					"value": props.Authentication.Filters.UserAgent,
+				},
+			})
+			@input.Date(&input.Props{
+				Label: pageCtx.T("Logs.Filters.From"),
+				Attrs: templ.Attributes{
+					"name":  "from",
+					"value": props.Authentication.Filters.From,
+				},
+			})
+			@input.Date(&input.Props{
+				Label: pageCtx.T("Logs.Filters.To"),
+				Attrs: templ.Attributes{
+					"name":  "to",
+					"value": props.Authentication.Filters.To,
+				},
+			})
+			<div class="flex items-end gap-2">
+				@button.Primary(button.Props{
+					Icon: icons.MagnifyingGlass(icons.Props{Size: "16"}),
+					Attrs: templ.Attributes{
+						"type": "submit",
+					},
+				}) {
+					{ pageCtx.T("Search") }
+				}
+				@button.Secondary(button.Props{
+					Attrs: templ.Attributes{
+						"type":      "reset",
+						"hx-get":     fmt.Sprintf("%s?tab=authentication", props.BasePath),
+						"hx-target":  "#logs-content",
+						"hx-swap":    "outerHTML",
+						"hx-push-url": "true",
+					},
+				}) {
+					{ pageCtx.T("Reset") }
+				}
+			</div>
+		</form>
+		<div class="overflow-x-auto">
+			@AuthenticationLogsTable(props)
+		</div>
+	</div>
+}
+
+templ AuthenticationLogsTable(props *viewmodels.LogsPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if len(props.Authentication.Logs) == 0 {
+		@base.TableEmptyState(base.TableEmptyStateProps{
+			Title:       pageCtx.T("Logs.Empty.Title"),
+			Description: pageCtx.T("Logs.Empty._Description"),
+		})
+	} else {
+		@base.Table(base.TableProps{
+			Columns: []*base.TableColumn{
+				{Label: "ID", Key: "id"},
+				{Label: pageCtx.T("Logs.Filters.UserID"), Key: "user_id"},
+				{Label: pageCtx.T("Logs.Filters.IP"), Key: "ip"},
+				{Label: pageCtx.T("Logs.Filters.UserAgent"), Key: "user_agent"},
+				{Label: pageCtx.T("CreatedAt"), Key: "created_at"},
+			},
+		}) {
+			<tbody>
+				for _, log := range props.Authentication.Logs {
+					@base.TableRow(base.TableRowProps{}) {
+						@base.TableCell(base.TableCellProps{}) { { fmt.Sprintf("%d", log.ID) } }
+						@base.TableCell(base.TableCellProps{}) { { fmt.Sprintf("%d", log.UserID) } }
+						@base.TableCell(base.TableCellProps{}) { { log.IP } }
+						@base.TableCell(base.TableCellProps{}) { { log.UserAgent } }
+						@base.TableCell(base.TableCellProps{}) { { log.CreatedAt } }
+					}
+				}
+			</tbody>
+		}
+	}
+}
+
+templ ActionLogs(props *viewmodels.LogsPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div class="p-4 space-y-4">
+		<form
+			class="grid gap-3 md:grid-cols-3"
+			hx-get={ fmt.Sprintf("%s?tab=action", props.BasePath) }
+			hx-target="#logs-content"
+			hx-swap="outerHTML"
+			hx-push-url="true"
+		>
+			<input type="hidden" name="tab" value="action"/>
+			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", props.Action.PerPage) }/>
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Logs.Filters.UserID"),
+				Attrs: templ.Attributes{
+					"name":  "user_id",
+					"value": props.Action.Filters.UserID,
+				},
+			})
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Logs.Filters.Method"),
+				Attrs: templ.Attributes{
+					"name":  "method",
+					"value": props.Action.Filters.Method,
+				},
+			})
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Logs.Filters.Path"),
+				Attrs: templ.Attributes{
+					"name":  "path",
+					"value": props.Action.Filters.Path,
+				},
+			})
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Logs.Filters.IP"),
+				Attrs: templ.Attributes{
+					"name":  "ip",
+					"value": props.Action.Filters.IP,
+				},
+			})
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Logs.Filters.UserAgent"),
+				Attrs: templ.Attributes{
+					"name":  "user_agent",
+					"value": props.Action.Filters.UserAgent,
+				},
+			})
+			@input.Date(&input.Props{
+				Label: pageCtx.T("Logs.Filters.From"),
+				Attrs: templ.Attributes{
+					"name":  "from",
+					"value": props.Action.Filters.From,
+				},
+			})
+			@input.Date(&input.Props{
+				Label: pageCtx.T("Logs.Filters.To"),
+				Attrs: templ.Attributes{
+					"name":  "to",
+					"value": props.Action.Filters.To,
+				},
+			})
+			<div class="flex items-end gap-2">
+				@button.Primary(button.Props{
+					Icon: icons.MagnifyingGlass(icons.Props{Size: "16"}),
+					Attrs: templ.Attributes{
+						"type": "submit",
+					},
+				}) {
+					{ pageCtx.T("Search") }
+				}
+				@button.Secondary(button.Props{
+					Attrs: templ.Attributes{
+						"type":      "reset",
+						"hx-get":     fmt.Sprintf("%s?tab=action", props.BasePath),
+						"hx-target":  "#logs-content",
+						"hx-swap":    "outerHTML",
+						"hx-push-url": "true",
+					},
+				}) {
+					{ pageCtx.T("Reset") }
+				}
+			</div>
+		</form>
+		<div class="overflow-x-auto">
+			@ActionLogsTable(props)
+		</div>
+	</div>
+}
+
+templ ActionLogsTable(props *viewmodels.LogsPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if len(props.Action.Logs) == 0 {
+		@base.TableEmptyState(base.TableEmptyStateProps{
+			Title:       pageCtx.T("Logs.Empty.Title"),
+			Description: pageCtx.T("Logs.Empty._Description"),
+		})
+	} else {
+		@base.Table(base.TableProps{
+			Columns: []*base.TableColumn{
+				{Label: "ID", Key: "id"},
+				{Label: pageCtx.T("Logs.Filters.UserID"), Key: "user_id"},
+				{Label: pageCtx.T("Logs.Filters.Method"), Key: "method"},
+				{Label: pageCtx.T("Logs.Filters.Path"), Key: "path"},
+				{Label: pageCtx.T("Logs.Filters.IP"), Key: "ip"},
+				{Label: pageCtx.T("Logs.Filters.UserAgent"), Key: "user_agent"},
+				{Label: pageCtx.T("CreatedAt"), Key: "created_at"},
+			},
+		}) {
+			<tbody>
+				for _, log := range props.Action.Logs {
+					@base.TableRow(base.TableRowProps{}) {
+						@base.TableCell(base.TableCellProps{}) { { fmt.Sprintf("%d", log.ID) } }
+						@base.TableCell(base.TableCellProps{}) { { log.UserID } }
+						@base.TableCell(base.TableCellProps{}) { { strings.ToUpper(log.Method) } }
+						@base.TableCell(base.TableCellProps{}) { { log.Path } }
+						@base.TableCell(base.TableCellProps{}) { { log.IP } }
+						@base.TableCell(base.TableCellProps{}) { { log.UserAgent } }
+						@base.TableCell(base.TableCellProps{}) { { log.CreatedAt } }
+					}
+				}
+			</tbody>
+		}
+	}
+}
