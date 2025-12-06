@@ -17,7 +17,7 @@
   "postCreateCommand": "bash -c 'npm install -g @anthropic-ai/claude-code && go mod download && if [ -f .env.example ] && [ ! -f .env ]; then cp .env.example .env; fi'",
   "forwardPorts": [
     3200,
-    5432,
+    5438,
     9000
   ],
   "portsAttributes": {
@@ -25,7 +25,7 @@
       "label": "Application",
       "onAutoForward": "notify"
     },
-    "5432": {
+    "5438": {
       "label": "PostgreSQL",
       "onAutoForward": "silent"
     },
