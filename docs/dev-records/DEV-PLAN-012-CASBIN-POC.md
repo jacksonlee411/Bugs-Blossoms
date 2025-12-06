@@ -15,6 +15,7 @@
 | 2025-12-06 00:02 | `GOCACHE=/tmp/go-cache go test ./pkg/authz/...` | readiness 补充：重复验证 `pkg/authz` 及子包单测 | 所有相关用例通过 | ✅ |
 | 2025-12-06 16:56 | `make authz-test` | readiness 检查：`pkg/authz` + `scripts/authz/internal/...` 用例需通过 | 所有用例通过（014D Forbidden 契约调整后复核） | ✅ |
 | 2025-12-06 16:57 | `make authz-lint` | readiness 检查：策略打包 + fixture parity 需通过 | `authz-pack` 成功，fixtures parity 通过（含 403 payload 对齐） | ✅ |
+| 2025-12-07 06:58 | `go test ./pkg/spotlight/... ./modules/core/presentation/controllers/... ./modules/hrm/presentation/controllers/... ./modules/logging/presentation/controllers/...` | 验证导航/Quick Links/Unauthorized 契约，新增 QuickLinks capability 单测 | 所有相关用例通过 | ✅ |
 | 2025-12-07 09:30 | `GOCACHE=/tmp/go-cache go test ./modules/logging/...` | Logging 控制器/服务/仓储单测覆盖无 Session/无租户/无权限/成功路径 | 所有 logging 包用例通过（含 action log 开关降级场景） | ✅ |
 | 2025-12-07 09:30 | `GOCACHE=/tmp/go-cache make authz-lint` | readiness 补充：policy 打包 + fixtures parity（含 logging.view 基线） | `authz-pack` + fixtures parity 通过 | ✅ |
 

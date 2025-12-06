@@ -22,9 +22,9 @@
 2. [x] ViewState 注入一致化 —— 核验三模块 controller 入口均调用 `authzutil.EnsureViewState`/ensureAuthz；在 Logging 补齐 helper/中间件；确保 PageContext 持有 `AuthzState` 并向模板/组件透传。
 3. [x] 模板/组件清理 —— 删除模板中的 `user.Can`/legacy 判断，统一使用 `pageCtx.CanAuthz(object, action)` 或 controller 注入的布尔 props；Logging 保持双 Tab 过滤（时间/用户/IP/UA/method/path，action_logs 可选 status）、空态/无权态一致；HTMX/REST 403 均渲染 Unauthorized 占位；运行 `templ generate && make css` 后确认工作区干净。
 4. [x] Unauthorized 契约对齐 —— 为三模块的 Unauthorized props 定义统一结构（MissingPolicies、SuggestDiff、subject/domain/object/action、申请入口 URL、/core/api/authz/debug 参数），提供 015B 字段示例；统一 HX/REST 403 payload 字段名/结构，示例：`{\"error\":\"forbidden\",\"object\":\"<obj>\",\"action\":\"<act>\",\"subject\":\"<subj>\",\"domain\":\"<tenant>\",\"missing_policies\":[...],\"suggest_diff\":[...],\"request_url\":\"/core/api/authz/requests\",\"debug_url\":\"/core/api/authz/debug\"}`；更新 controller 403 响应与模板占位，确保 HX-Retarget 兼容；必要时在 pkg/templates/components 或模块 templates/components 复用。
-5. [ ] 导航/Quick Links/Spotlight 统一过滤 —— 确保导航/Quick Links/Spotlight 数据源使用 `.RequireAuthz` 或 `AuthzObject/AuthzAction`，移除 legacy `.RequirePermissions`；验证 sidebar/spotlight 过滤在三模块一致，未授权用户不可见。
-6. [ ] 文档与示例 —— 更新 README/CONTRIBUTING/AGENTS，补充公共层接入流程、Unauthorized 数据字段示例、403 JSON 示例（同上）、调用 `/core/api/authz/requests|debug` 示例链接；在 dev-records 记录 readiness 命令（`make authz-test authz-lint` 等）与契约验证结论。
-7. [ ] 验证与记录 —— 运行 `go test ./pkg/authz/...` 及受影响模块包测试；若改模板/locale，执行 `templ generate && make css`、`make check tr`。在 docs/dev-records/DEV-PLAN-012-CASBIN-POC.md 与 014 rolling 中补充记录。
+5. [x] 导航/Quick Links/Spotlight 统一过滤 —— 确保导航/Quick Links/Spotlight 数据源使用 `.RequireAuthz` 或 `AuthzObject/AuthzAction`，移除 legacy `.RequirePermissions`；验证 Core/HRM/Logging sidebar/spotlight 过滤一致且隐藏未授权入口，Logging 补齐 `logging.logs:view` 能力校验。
+6. [x] 文档与示例 —— 更新 README/CONTRIBUTING/AGENTS，补充公共层接入流程、Unauthorized 数据字段示例、403 JSON 示例（同上）、调用 `/core/api/authz/requests|debug` 示例链接；新增“统一 Unauthorized 组件替换 014A/014B/014C 临时占位”的迁移说明，标记替换路径；在 dev-records 记录 readiness 命令（`make authz-test authz-lint` 等）与契约验证结论。
+7. [x] 验证与记录 —— 运行 `go test ./pkg/authz/...` 及受影响模块包测试（含 `go test ./modules/logging/...`）；若改模板/locale，执行 `templ generate && make css`、`make check tr` 并确认 en/ru/uz/zh 均覆盖 Unauthorized/PolicyInspector 文案。在 docs/dev-records/DEV-PLAN-012-CASBIN-POC.md 与 014 rolling 中补充记录。
 
 ## 里程碑
 - UI-D1：完成差距清单与 ViewState 注入一致化（步骤 1-2），三模块 controller 均具备 `AuthzState`。
@@ -38,5 +38,5 @@
 
 ## 验收标准
 - 模板/组件/导航/Quick Links 不再包含 `user.Can` 或 legacy Permissions 分支；均使用 `pageCtx.CanAuthz` 或 `.RequireAuthz`。
-- Unauthorized 体验一致：403 响应与模板占位携带 MissingPolicies、SuggestDiff、subject/domain/object/action、authz requests/debug 参数，HX/REST 同步；未授权仓储不被调用。
-- 三模块均通过相关测试；如修改模板/locale，`templ generate && make css`、`make check tr` 后 `git status --short` 干净；dev-records/README/CONTRIBUTING/AGENTS 更新完成。
+- Unauthorized 体验一致：403 响应与模板占位携带 MissingPolicies、SuggestDiff、subject/domain/object/action、authz requests/debug 参数，HX/REST 同步；未授权仓储不被调用；统一 Unauthorized 组件已替换临时占位并完成迁移说明。
+- 三模块均通过相关测试；如修改模板/locale，`templ generate && make css`、`make check tr` 后 `git status --short` 干净；覆盖 Core/HRM/Logging（含 `go test ./modules/logging/...`），并在 dev-records/README/CONTRIBUTING/AGENTS 反映更新与 locale 覆盖情况。

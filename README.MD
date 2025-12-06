@@ -51,6 +51,7 @@
   - `POST /core/api/authz/requests` —— 创建策略草稿；`POST /requests/{id}/approve|reject|cancel|trigger-bot|revert` 负责生命周期操作。
 - `GET /core/api/authz/debug?subject=...&object=...&action=...` —— 调试接口，仅 `Authz.Debug` 可见，支持 `attr.<key>=<value>` 注入 ABAC 属性，并带有 `20 req/min/IP` 速率限制；响应包含 `allowed`、`mode`、`latency_ms`、`trace.matched_policy` 以及回显的 request/attributes。
 - 403 响应契约（HX/REST 统一）：未经授权返回 `application/json`，示例 `{\"error\":\"forbidden\",\"object\":\"logging.logs\",\"action\":\"view\",\"subject\":\"user:<uuid>\",\"domain\":\"tenant:<id>\",\"missing_policies\":[...],\"suggest_diff\":[...],\"request_url\":\"/core/api/authz/requests\",\"debug_url\":\"/core/api/authz/debug?subject=...&object=...&action=...\"}`。
+- Unauthorized 占位与前端 props：统一透出 `object`、`action`、`subject`、`domain`、`missing_policies`、`suggest_diff`、`request_url`、`debug_url`，并写入页面 `data-*` 便于 015B 组件复用；导航/Quick Links/Sidebar/Spotlight 入口均通过 `AuthzObject/AuthzAction` 或 `.RequireAuthz` 过滤，未授权用户不可见。
 
 示例：
 
