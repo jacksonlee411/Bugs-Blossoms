@@ -1,6 +1,6 @@
 # DEV-PLAN-014C：Logging 模块 Casbin 改造细化计划
 
-**状态**: 准备就绪（2025-12-06 00:02 UTC） — 已采纳评审意见与行业最佳实践（唯一入口/单一来源、租户隔离、集中审计降级）。
+**状态**: 已完成（2025-12-07 16:20 UTC） — 014C 交付内容完成，监控/回滚阈值暂缓，后续若有 UI 追加需求另行立项。
 
 ## 背景
 - DEV-PLAN-014 要求 Core→HRM→Logging 依次完成 Casbin 改造。Core/HRM 已分别通过 014A/014B 建立 helper、ViewState、导航过滤与 shadow/enforce 流程，Logging 仍处空白。
