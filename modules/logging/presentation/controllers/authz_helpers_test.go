@@ -67,8 +67,8 @@ func TestEnsureLoggingAuthz_ForbidsWithoutUser(t *testing.T) {
 	require.Equal(t, "logging.logs", payload["object"])
 	require.Equal(t, "view", payload["action"])
 	require.Equal(t, "/core/api/authz/requests", payload["request_url"])
-	_, hasMissing := payload["missing_policies"]
-	require.True(t, hasMissing)
+	require.Contains(t, payload, "missing_policies")
+	require.Contains(t, payload, "debug_url")
 }
 
 func setAuthzEnv(t *testing.T) {
