@@ -130,10 +130,41 @@ func Seed() error {
 
 func filterOutHRMPermissions(perms []*permission.Permission) []*permission.Permission {
 	filtered := make([]*permission.Permission, 0, len(perms))
+	skipPrefixes := []string{
+		"hrm.",
+		"logging.",
+		"logs.",
+		"log.",
+		"action_logs.",
+		"authentication_logs.",
+		"audit_logs.",
+		"audit.",
+		"action-log.",
+		"logging-",
+		"log-",
+		"audit-",
+		"action-log-",
+		"audit_log.",
+		"audit_log-",
+		"auditlog.",
+		"auditlog-",
+		"actionlogs.",
+		"actionlogs-",
+		"authenticationlogs.",
+		"authenticationlogs-",
+	}
 	for _, p := range perms {
-		if !strings.HasPrefix(p.Name, "hrm.") {
-			filtered = append(filtered, p)
+		shouldSkip := false
+		for _, prefix := range skipPrefixes {
+			if strings.HasPrefix(p.Name, prefix) {
+				shouldSkip = true
+				break
+			}
 		}
+		if shouldSkip {
+			continue
+		}
+		filtered = append(filtered, p)
 	}
 	return filtered
 }

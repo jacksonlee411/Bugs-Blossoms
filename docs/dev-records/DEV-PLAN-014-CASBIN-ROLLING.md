@@ -15,7 +15,7 @@
 | HRM / modules/hrm/module.go | Quick Link 注册 | Quick Link 仍保留 `RequirePermissions` 兜底 | 移除 legacy `.RequirePermissions`，仅保留 `.RequireAuthz`，并验证有/无权限账号可见性 | Done（移除兜底，待验证可见性） |
 | Logging / modules/logging/presentation/controllers/authz_helpers.go | `writeForbiddenResponse` JSON | 403 JSON 仅输出 message/缺失 MissingPolicies，未包含 subject/domain/object/action/request/debug URL，字段命名与 014D 契约不一致 | 调整 403 payload 为统一结构（含 object/action/subject/domain/missing_policies/suggest_diff/request_url/debug_url），HX/REST 一致 | Done（403 JSON/HX 统一，含 MissingPolicies/SuggestDiff） |
 | 文档 | README/CONTRIBUTING/AGENTS | 未纳入 014D 统一的 403 JSON 示例与 `/core/api/authz/requests|debug` 调用示例 | 补充公共层接入流程、示例 payload/链接，完成后记录命令与验证结论 | Done（补充统一 403 示例与指引） |
-| 验证记录 | dev-records 本文件 | 导航/Quick Links/Spotlight 有/无权账号验证与 403 直访结果尚未登记 | 以有/无能力账号各验证一次可见性与 403 payload，填入本表或日志区；当前 e2e 种子仅区分 HRM 权限，需额外创建无 `logging.logs:view` 的账号用于验证 | In progress（待无日志权限账号验证并登记） |
+| 验证记录 | dev-records 本文件 | 导航/Quick Links/Spotlight 有/无权账号验证与 403 直访结果尚未登记 | 以有/无能力账号各验证一次可见性与 403 payload，填入本表或日志区；e2e 种子已将 NoHRM 账号剥离 `logging.*` 权限，可用于无权侧验证 | In progress（账号已就绪，待执行 UI/403 验证并登记） |
 
 > 记录建议：
 > 1. 操作列包含“启用 shadow/enforce”“关闭 flag”“回滚（git revert + flag reset）”等；如有多条命令，可在“命令 / Flag”列换行列出。
