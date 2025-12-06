@@ -9,6 +9,7 @@ import (
 	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/input"
+	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
@@ -37,38 +38,48 @@ templ Index(props *viewmodels.LogsPageProps) {
 
 templ Content(props *viewmodels.LogsPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	<div class="m-6 space-y-4">
-		<div class="flex items-center justify-between">
-			<h1 class="text-2xl font-medium">{ pageCtx.T("NavigationLinks.Logs") }</h1>
-		</div>
-		<div class="bg-surface-600 border border-primary rounded-lg">
-			<div class="flex flex-wrap gap-2 p-4">
-				<button
-					type="button"
-					hx-get={ fmt.Sprintf("%s?tab=authentication", props.BasePath) }
-					hx-target="#logs-content"
-					hx-swap="outerHTML"
-					hx-push-url="true"
-					class={ tabButtonClass(props.ActiveTab == "authentication") }
-				>
-					@icons.ShieldCheck(icons.Props{Size: "18"})
-					<span>{ pageCtx.T("Logs.List.AuthenticationTab") }</span>
-				</button>
-				<button
-					type="button"
-					hx-get={ fmt.Sprintf("%s?tab=action", props.BasePath) }
-					hx-target="#logs-content"
-					hx-swap="outerHTML"
-					hx-push-url="true"
-					class={ tabButtonClass(props.ActiveTab == "action") }
-				>
-					@icons.List(icons.Props{Size: "18"})
-					<span>{ pageCtx.T("Logs.List.ActionTab") }</span>
-				</button>
+	if !props.Authz.CanView {
+		@corecomponents.Unauthorized(&corecomponents.UnauthorizedProps{
+			Object:    "logging.logs",
+			Action:    "view",
+			Operation: "logging.logs view",
+			State:     pageCtx.AuthzState(),
+			Request:   "/core/api/authz/requests",
+		})
+	} else {
+		<div class="m-6 space-y-4">
+			<div class="flex items-center justify-between">
+				<h1 class="text-2xl font-medium">{ pageCtx.T("NavigationLinks.Logs") }</h1>
 			</div>
-			@TabContent(props)
+			<div class="bg-surface-600 border border-primary rounded-lg">
+				<div class="flex flex-wrap gap-2 p-4">
+					<button
+						type="button"
+						hx-get={ fmt.Sprintf("%s?tab=authentication", props.BasePath) }
+						hx-target="#logs-content"
+						hx-swap="outerHTML"
+						hx-push-url="true"
+						class={ tabButtonClass(props.ActiveTab == "authentication") }
+					>
+						@icons.ShieldCheck(icons.Props{Size: "18"})
+						<span>{ pageCtx.T("Logs.List.AuthenticationTab") }</span>
+					</button>
+					<button
+						type="button"
+						hx-get={ fmt.Sprintf("%s?tab=action", props.BasePath) }
+						hx-target="#logs-content"
+						hx-swap="outerHTML"
+						hx-push-url="true"
+						class={ tabButtonClass(props.ActiveTab == "action") }
+					>
+						@icons.List(icons.Props{Size: "18"})
+						<span>{ pageCtx.T("Logs.List.ActionTab") }</span>
+					</button>
+				</div>
+				@TabContent(props)
+			</div>
 		</div>
-	</div>
+	}
 }
 
 templ TabContent(props *viewmodels.LogsPageProps) {

@@ -13,9 +13,9 @@
 2. **有效期优先**：所有组织单元、层级关系、分配记录均采用“生效时间 / 失效时间”双字段，默认强制 `StartAt <= EndAt` 并避免重叠。
 3. **多层级模型**：同时支持 Workday 的 Supervisory、Company、Cost Center、Custom Reporting 四类层级，通过 `HierarchyType` 与 `NodeType` 组合实现。
 4. **生命周期驱动（后续）**：组织单元的创建、重命名、合并、撤销等动作理想路径是“请求→审批→生效”，但 M1 仅直接 CRUD；审批/草稿/仿真视图待后续里程碑再启用。
-5. **时间线 API**：所有读写接口必须显式接受 `effective_at`，未提供时默认 `time.Now()`，以保障历史查询与未来排程。
+5. **时间线 API**：所有读写接口必须显式接受 `effective_at`（对齐 Workday 的 `Effective Date` 查询点），未提供时默认 `time.Now()`，以保障历史查询与未来排程。
 6. **可扩展事件流**：关键变更（新建部门、层级调整、员工调动、权限继承）通过 `pkg/eventbus` 发布，供 HRM/财务/审批模块订阅。
-- **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`。
+- **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；Workday 的 `Effective Date` 对应本方案的 `effective_start`，`End Date/Inactive Date` 对应 `effective_end`（半开区间）。
 - **人员标识**：采用 `person_id` 作为自然人主键（不可变）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户下同一 person 不变。
 
 ## 目标
@@ -148,7 +148,7 @@
 | Org Name | 组织名称 | STEXT（短名） | `org_nodes.name` | 父节点+时间窗口内唯一。 |
 | Parent Org | 父子关系 | 关系 A/B002（O→O 上级） | `org_edges.parent_node_id` / `child_node_id` | `org_nodes.parent_hint` 仅缓存，建议改名或隐藏。 |
 | Manager/Supervisor | 组织负责人 | Chief Position 标记（S-CHIEF，关系 A/B012） | `owner_user_id`（建议改 `manager_user_id`） | 对齐 Manager 语义。 |
-| Effective Start/End | 生效/失效日期 | BEGDA / ENDDA | `effective_start` / `effective_end` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
+| Effective Date / End Date（Inactive Date） | 生效/失效日期 | BEGDA / ENDDA | `effective_start` / `effective_end` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
 | As-of Date | 查询时点（Key Date） | Key Date（Stichtag） | `effective_at` 参数 | 未传则默认 `time.Now()`。 |
 | Primary Supervisory Org | 主属组织 | PA0001-ORGEH（主组织） | `org_assignments.primary` | 仅支持主属，辅属/矩阵待 M2+。 |
 | Worker（本项目术语 Person，工号 PERNR） | 员工/雇员 | PERNR | `subject_type=person` + `subject_id=person_id`（工号 `pernr` 不变） | 职位信息单独用 `position_id` 承载，不改主体标识。 |
