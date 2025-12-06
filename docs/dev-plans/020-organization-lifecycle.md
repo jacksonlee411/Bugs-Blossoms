@@ -89,7 +89,7 @@
   - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_date, end_date, depth, path ltree）。
   - `positions`（tenant_id, id, org_node_id, code, title, status, effective_date, end_date, created_at, updated_at），M1 可自动为 Assignment 创建一对一空壳。
   - `org_assignments`（tenant_id, id, position_id, subject_type=person, subject_id=person_id, pernr, assignment_type=primary|matrix|dotted, effective_date, end_date, primary bool）。
-  - 占位/可选表：`org_attribute_inheritance_rules`（属性继承策略配置）、`org_roles`（角色字典）、`org_role_assignments`（角色分配，带有效期）、`change_requests`（草稿/提交/审批/生效占位，M1 可仅存草稿+审计字段）。
+  - 占位/可选表：`org_attribute_inheritance_rules`（属性继承策略配置）、`org_roles`（角色字典）、`org_role_assignments`（角色分配，带有效期）、`change_requests`（草稿/提交/审批/生效占位，M1 可仅存草稿+审计字段）、`org_matrix_links`（矩阵/虚线组织关联）、`org_security_group_mappings`（组织节点与安全组关联）、`org_links`（组织与项目/成本中心/预算科目等多对多关联，带有效期）。
   - 其他表（retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
   - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_date, end_date))` 用于时间冲突约束，`(tenant_id, parent_node_id, display_order)` 便于排序。
 - 约束（M1 落地）：`org_nodes` 的 code 需在 tenant 内唯一；name/i18n_names 在同一父节点+时间窗口内唯一（按默认 locale）；`org_edges` 防环/双亲（ltree path + 唯一 child per hierarchy）；`positions` 需归属 OrgNode；`org_assignments` 对同一 subject 在重叠时间内仅允许一个 primary（部分唯一约束），position_id 必填，assignment_type 默认 primary。
