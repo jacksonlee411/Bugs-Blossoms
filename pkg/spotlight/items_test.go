@@ -73,6 +73,7 @@ func TestQuickLinks_DeniedWhenCapabilityMissing(t *testing.T) {
 }
 
 func withLocalizer(t *testing.T, ctx context.Context) context.Context {
+	t.Helper()
 	bundle := i18n.NewBundle(language.English)
 	err := bundle.AddMessages(language.English, &i18n.Message{
 		ID:    "NavigationLinks.Logs",
