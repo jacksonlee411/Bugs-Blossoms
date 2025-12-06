@@ -65,6 +65,14 @@
 - **M1**：仅发布 `OrgChanged`/`OrgAssignmentChanged` 事件供 Authz/HRM 订阅，不做策略生成/继承计算。
 - **后续（M3+）**：再评估 OrgSecurityDomain/Group 映射、继承计算与 policy 草稿出口，配合 `make authz-pack/test`。
 
+### 5. 时间约束（SAP 模型对齐）
+- 约束 1：任意时点必须且仅有一条记录，不能重叠、无空档（典型：组织分配）。
+- 约束 A：任意时点至少有一条记录，允许重叠，不允许出现空档。
+- 约束 2：可多条且可重叠（如多语言文本）。
+- 约束 3：可多条，允许空档，但同一时段不重叠（常见津贴类）。
+- 约束 B/T：特定技术或可重叠必有类，按 SAP 习惯用法处理。
+- M1 建议：OrgNode/OrgEdge/Assignment 采用类似约束 1（无空档、无重叠）；如需允许未来排程并覆盖现有，需应用侧并存检测与自动截断，保持半开区间一致性。
+
 ## 技术方案
 ### Domain Layer
 - `modules/org/domain/aggregates`:
