@@ -151,7 +151,7 @@
 | Effective Start/End | 生效/失效日期 | BEGDA / ENDDA | `effective_start` / `effective_end` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
 | As-of Date | 查询时点（Key Date） | Key Date（Stichtag） | `effective_at` 参数 | 未传则默认 `time.Now()`。 |
 | Primary Supervisory Org | 主属组织 | PA0001-ORGEH（主组织） | `org_assignments.primary` | 仅支持主属，辅属/矩阵待 M2+。 |
-| Worker（本项目术语 Person，工号 PERNR） | 员工/雇员 | PERNR | `subject_type=person` + `subject_id=person_id`（工号 `pernr` 不变） | 若接 Position，可改为 `worker_type/worker_id`。 |
+| Worker（本项目术语 Person，工号 PERNR） | 员工/雇员 | PERNR | `subject_type=person` + `subject_id=person_id`（工号 `pernr` 不变） | 职位信息单独用 `position_id` 承载，不改主体标识。 |
 | Position | 职位 | PLANS（Position） | （未落地）`position_id` 占位 | 计划在 DEV-PLAN-021/M3+。 |
 | Effective Status | 状态 | OBJSTAT（对象状态）/ STAT2（雇佣状态） | `status=Active/Retired` | 如需停用态可扩展 `Inactive`。 |
 | Org Level | 组织层级 | OTYPE+层级自定义（如 O 等级自定义字段） | （未落地）`org_level` 占位 | 便于报表/BP 路由。 |
