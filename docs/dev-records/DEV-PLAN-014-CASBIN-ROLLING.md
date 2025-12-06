@@ -27,12 +27,13 @@
 
 | 时间 (UTC) | 模块 × 租户 | 操作 | 命令 / Flag | 观测与验证 | 结果 |
 |------------|-------------|------|-------------|-------------|------|
+| 2025-12-07 15:45 | Logging × all | repo/service authz guard 单测补齐（无租户/无用户/无权限/成功路径，ACTION_LOG_ENABLED 开启降级验证） | `go test ./modules/logging/...` | List/Count/Create 在缺租户或未登录时直接返回 `AUTHZ_FORBIDDEN`，仓储不触达 DB；ActionLog audit 在开启时遇到无 DB/无用户安全跳过；403 JSON/HX 继续输出 MissingPolicies/SuggestDiff/subject/domain/debug_url | ✅ |
 | 2025-12-07 09:30 | Logging × all | controller/service/repo 单测，403 JSON 契约与审计降级验证（ACTION_LOG_ENABLED=true 场景覆盖） | `GOCACHE=/tmp/go-cache go test ./modules/logging/...`（`AUTHZ_MODE=enforce` + 含无 Session/无租户/无权限用例）；<br/>`GOCACHE=/tmp/go-cache make authz-lint` | 403 JSON 返回 subject/domain/missing_policies/suggest_diff/debug_url；无租户 fallback `global`，ActionLogMiddleware/unauthorized 审计在无 DB/未登录时安全跳过；authentication_logs/action_logs 写入均强制 tenant_id，policy pack 与 fixtures parity 通过 | ✅ |
 | 2025-12-06 16:55 | Logging × all | 清理 core 平行 authlog；ActionLogMiddleware 保持默认关闭；新增 session handler 单测 | `go test ./modules/core/...`；`go test ./modules/logging/...`（`ACTION_LOG_ENABLED` 默认 false） | session.CreatedEvent 仅由 logging handler 写入 authentication_logs；action_logs 仅在 `ACTION_LOG_ENABLED=true` 时写入 | ✅ |
 | 2025-12-06 09:35 | Logging × all | 014C 文档登记：补充已完成项与下一步待办（core 复用 logging 仓储、action_logs 开关、session handler 单测） | 文档更新 | 014C 计划已标记已完成项，并集中列出剩余待办，后续按表推进 | ✅（文档已同步） |
 
 - Logging 授权/审计说明：
   - authentication_logs 缺少 tenant_id 时强制使用请求上下文的租户，避免跨租户写入；action_logs 同步使用 tenant_id、method/path/IP/UA。
-  - 导出/清理：当前仅提供仓储分页查询，可按 tenant + 时间窗口导出；保留期默认 90 天，尚无自动清理，可在定时任务中复用仓储过滤实现 DELETE；未做跨表聚合。
-  - action_logs/Loki：`ACTION_LOG_ENABLED` 默认关闭，无 DB 或未登录时审计降级为结构化日志；需要脱敏/Mock 时可在 handler/service 注入 stub 仓储或关闭 env，Loki 采集保持可选。
+  - 导出/清理：仓储 List/Count 支持 tenant + 时间窗口过滤，可直接复用过滤器导出；保留期建议默认 90 天（示例：`DELETE FROM authentication_logs WHERE tenant_id=$1 AND created_at < now() - interval '90 days';`），尚无自动任务，可由定时任务调用。
+  - action_logs/Loki：`ACTION_LOG_ENABLED` 默认关闭；开启后写库失败降级为结构化日志。Mock/关闭路径：设置 env 为 false 或在 handler/service 注入 stub 仓储，Loki 采集保持可选。
   - 回滚/监控：`config/access/authz_flags.yaml` 已声明 logging 分段；回滚时先停用 AUTHZ_ENFORCE + ACTION_LOG_ENABLED，再视情况 revert policy pack，监控 403 比例与 action_logs 写失败率。

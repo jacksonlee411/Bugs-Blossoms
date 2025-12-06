@@ -5,11 +5,15 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
+	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
+	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/internet"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/authenticationlog"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
 type mockAuthLogRepo struct {
@@ -136,4 +140,58 @@ func TestLogsService_CreateActionLog_ValidatesInput(t *testing.T) {
 	svc := NewLogsService(&mockAuthLogRepo{}, &mockActionLogRepo{})
 	err := svc.CreateActionLog(context.Background(), nil)
 	require.Error(t, err)
+}
+
+func TestLogsService_ListAuthenticationLogs_MissingTenantOrUser(t *testing.T) {
+	t.Cleanup(func() { authorizeLoggingFn = defaultAuthorizeLogging })
+
+	authRepo := &mockAuthLogRepo{}
+	actionRepo := &mockActionLogRepo{}
+	svc := NewLogsService(authRepo, actionRepo)
+
+	// Missing tenant
+	_, _, err := svc.ListAuthenticationLogs(context.Background(), nil)
+	require.Error(t, err)
+	require.False(t, authRepo.calledList)
+
+	// Tenant provided, but no user in context
+	ctx := composables.WithTenantID(context.Background(), uuid.New())
+	_, _, err = svc.ListAuthenticationLogs(ctx, nil)
+	require.Error(t, err)
+	require.False(t, authRepo.calledList)
+}
+
+func TestLogsService_ListActionLogs_StopsWithoutUser(t *testing.T) {
+	t.Cleanup(func() { authorizeLoggingFn = defaultAuthorizeLogging })
+
+	authRepo := &mockAuthLogRepo{}
+	actionRepo := &mockActionLogRepo{}
+	svc := NewLogsService(authRepo, actionRepo)
+
+	ctx := composables.WithTenantID(context.Background(), uuid.New())
+	_, _, err := svc.ListActionLogs(ctx, nil)
+	require.Error(t, err)
+	require.False(t, actionRepo.calledList)
+}
+
+func TestLogsService_ListActionLogs_AllowsWithUserAndTenant(t *testing.T) {
+	t.Cleanup(func() { authorizeLoggingFn = defaultAuthorizeLogging })
+
+	authRepo := &mockAuthLogRepo{}
+	actionRepo := &mockActionLogRepo{}
+	svc := NewLogsService(authRepo, actionRepo)
+
+	tenantID := uuid.New()
+	ctx := composables.WithTenantID(context.Background(), tenantID)
+	u := user.New("Test", "User", internet.MustParseEmail("logs@example.com"), user.UILanguageEN, user.WithTenantID(tenantID))
+	ctx = composables.WithUser(ctx, u)
+
+	authorizeLoggingFn = func(ctx context.Context, action string, opts ...authz.RequestOption) error {
+		require.Equal(t, "view", action)
+		return nil
+	}
+
+	_, _, err := svc.ListActionLogs(ctx, nil)
+	require.NoError(t, err)
+	require.True(t, actionRepo.calledList)
 }

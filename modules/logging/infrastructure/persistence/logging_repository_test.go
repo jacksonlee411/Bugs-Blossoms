@@ -107,6 +107,24 @@ func TestAuthenticationLogRepository_Create_FillsTenantAndTimestamp(t *testing.T
 	require.Equal(t, uint(0), logEntry.UserID)
 }
 
+func TestAuthenticationLogRepository_ReturnsErrorWithoutTenant(t *testing.T) {
+	tx := &stubTx{}
+	ctx := context.WithValue(context.Background(), constants.TxKey, tx)
+	repo := NewAuthenticationLogRepository()
+
+	_, err := repo.List(ctx, nil)
+	require.Error(t, err)
+	require.False(t, tx.queryInvoked)
+
+	_, err = repo.Count(ctx, nil)
+	require.Error(t, err)
+	require.False(t, tx.queryRowInvoked)
+
+	err = repo.Create(ctx, &authenticationlog.AuthenticationLog{})
+	require.Error(t, err)
+	require.False(t, tx.queryRowInvoked)
+}
+
 func TestActionLogRepository_List_UsesTenantAndMapsRows(t *testing.T) {
 	tenantID := uuid.New()
 	now := time.Now()
@@ -197,9 +215,29 @@ func TestActionLogRepository_Create_FillsTenantAndTimestamp(t *testing.T) {
 	require.NotZero(t, logEntry.CreatedAt)
 }
 
+func TestActionLogRepository_ReturnsErrorWithoutTenant(t *testing.T) {
+	tx := &stubTx{}
+	ctx := context.WithValue(context.Background(), constants.TxKey, tx)
+	repo := NewActionLogRepository()
+
+	_, err := repo.List(ctx, nil)
+	require.Error(t, err)
+	require.False(t, tx.queryInvoked)
+
+	_, err = repo.Count(ctx, nil)
+	require.Error(t, err)
+	require.False(t, tx.queryRowInvoked)
+
+	err = repo.Create(ctx, &actionlog.ActionLog{})
+	require.Error(t, err)
+	require.False(t, tx.queryRowInvoked)
+}
+
 type stubTx struct {
-	queryFunc    func(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-	queryRowFunc func(ctx context.Context, sql string, args ...any) pgx.Row
+	queryFunc       func(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	queryRowFunc    func(ctx context.Context, sql string, args ...any) pgx.Row
+	queryInvoked    bool
+	queryRowInvoked bool
 }
 
 func (s *stubTx) CopyFrom(ctx context.Context, tableName pgx.Identifier, columnNames []string, rowSrc pgx.CopyFromSource) (int64, error) {
@@ -216,6 +254,7 @@ func (s *stubTx) Exec(ctx context.Context, sql string, arguments ...any) (pgconn
 }
 
 func (s *stubTx) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	s.queryInvoked = true
 	if s.queryFunc == nil {
 		return nil, errors.New("query not implemented")
 	}
@@ -223,6 +262,7 @@ func (s *stubTx) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, 
 }
 
 func (s *stubTx) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	s.queryRowInvoked = true
 	if s.queryRowFunc == nil {
 		return stubRow{scan: func(dest ...any) error { return errors.New("query row not implemented") }}
 	}
