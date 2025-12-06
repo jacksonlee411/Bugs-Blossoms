@@ -114,6 +114,12 @@ modules/{module}/
 ## Tool use
 - DO NOT USE `sed` for file manipulation
 
+### Code Quality & Format (与 CI 对齐)
+- 推送前必须运行与 CI 相同的检查，避免远程 Quality Gates 报红。
+- 必跑：`make check lint`（包含 golangci-lint + cleanarch 等规则，例如 canonicalheader/errchkjson/testifylint），以及相关路径的 `go test`（例如 `go test ./modules/logging/...`）。
+- 根据改动范围追加：模板/样式改动跑 `templ generate && make css`；多语言改动跑 `make check tr`；authz 相关跑 `make authz-test`/`make authz-lint`。
+- 不要仅依赖 `gofmt` 或单纯的 `go test`，它们覆盖不到 CI 的 lint 规则。
+
 ## HRM sqlc 指南
 - HRM SQL 与 schema 必须通过 `scripts/db/export_hrm_schema.sh` 更新（可设置 `SKIP_MIGRATE=1` 仅导出 schema）。
 - 任意影响 `sqlc.yaml`、`modules/hrm/infrastructure/sqlc/**`、`modules/hrm/infrastructure/persistence/**/*.sql` 或 `docs/dev-records/hrm-sql-inventory.md` 的改动都要运行 `make sqlc-generate`。`make generate` 会自动调用该目标。
