@@ -15,17 +15,26 @@ import (
 
 type SessionEventsHandler struct {
 	app     application.Application
-	service *services.LogsService
+	service logsService
 	logger  *logrus.Logger
 }
 
 func RegisterSessionEventHandlers(app application.Application) {
-	handler := &SessionEventsHandler{
+	handler := NewSessionEventsHandler(app, app.Service(services.LogsService{}).(logsService))
+	app.EventPublisher().Subscribe(handler.onSessionCreated)
+}
+
+// NewSessionEventsHandler is separated for testability; avoids pulling the singleton configuration in tests.
+func NewSessionEventsHandler(app application.Application, svc logsService) *SessionEventsHandler {
+	return &SessionEventsHandler{
 		app:     app,
-		service: app.Service(services.LogsService{}).(*services.LogsService),
+		service: svc,
 		logger:  configuration.Use().Logger(),
 	}
-	app.EventPublisher().Subscribe(handler.onSessionCreated)
+}
+
+type logsService interface {
+	CreateAuthenticationLog(ctx context.Context, log *authenticationlog.AuthenticationLog) error
 }
 
 func (h *SessionEventsHandler) onSessionCreated(event session.CreatedEvent) {
