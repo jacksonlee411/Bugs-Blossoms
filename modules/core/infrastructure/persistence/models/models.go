@@ -127,15 +127,6 @@ type Session struct {
 	CreatedAt time.Time
 }
 
-type AuthenticationLog struct {
-	ID        uint
-	TenantID  string // UUID stored as string
-	UserID    uint
-	IP        string
-	UserAgent string
-	CreatedAt time.Time
-}
-
 type Passport struct {
 	ID                  string
 	TenantID            string
