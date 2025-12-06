@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 	"path/filepath"
 	"testing"
 
@@ -22,7 +21,7 @@ func TestAuthorizeLogging_ReturnsForbiddenWhenTenantMissing(t *testing.T) {
 	require.Error(t, err)
 
 	var serr *serrors.BaseError
-	require.True(t, errors.As(err, &serr))
+	require.ErrorAs(t, err, &serr)
 	require.Equal(t, "AUTHZ_FORBIDDEN", serr.Code)
 }
 
@@ -34,7 +33,7 @@ func TestAuthorizeLogging_ReturnsForbiddenWhenUserMissing(t *testing.T) {
 	require.Error(t, err)
 
 	var serr *serrors.BaseError
-	require.True(t, errors.As(err, &serr))
+	require.ErrorAs(t, err, &serr)
 	require.Equal(t, "AUTHZ_FORBIDDEN", serr.Code)
 }
 
