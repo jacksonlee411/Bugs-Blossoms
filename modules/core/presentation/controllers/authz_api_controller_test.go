@@ -230,6 +230,48 @@ func TestAuthzAPIController_RequestAccessEmptyDiff(t *testing.T) {
 		ExpectField("status", "pending_review")
 }
 
+func TestAuthzAPIController_RequestAccessMissingObject(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	suite.POST("/core/api/authz/requests").
+		HTMX().
+		FormFields(map[string]interface{}{
+			"action":         "update",
+			"domain":         "global",
+			"diff":           "[]",
+			"request_access": "1",
+		}).
+		Assert(t).
+		ExpectBadRequest().
+		ExpectHTMXTrigger("notify")
+}
+
+func TestAuthzAPIController_CreateRequest_BaseRevisionMismatch(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	suite.POST("/core/api/authz/requests").
+		JSON(dtos.PolicyDraftRequest{
+			Object:       "core.users",
+			Action:       "read",
+			Diff:         json.RawMessage(`[{"op":"add","path":"/p","value":["role:test","core.users","read","global","allow"]}]`),
+			BaseRevision: "bogus",
+		}).
+		Expect(t).
+		Status(http.StatusBadRequest)
+}
+
 func extractStageID(t *testing.T, body string) string {
 	t.Helper()
 	var parsed dtos.StagePolicyResponse

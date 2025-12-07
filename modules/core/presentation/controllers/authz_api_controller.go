@@ -190,12 +190,6 @@ func (c *AuthzAPIController) createRequest(
 		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
 		return
 	}
-	if payload.RequestAccess && len(payload.Diff) == 0 {
-		payload.Diff = json.RawMessage("[]")
-		if strings.TrimSpace(payload.Reason) == "" {
-			payload.Reason = "请求编辑角色策略"
-		}
-	}
 	tenantID := tenantIDFromContext(r)
 	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	logger.WithFields(logrus.Fields{
@@ -206,12 +200,26 @@ func (c *AuthzAPIController) createRequest(
 		"action":   payload.Action,
 	}).Debug("authz api: create draft payload")
 	diffStr := strings.TrimSpace(string(payload.Diff))
-	if diffStr == "" || strings.EqualFold(diffStr, "null") {
+	if !payload.RequestAccess && (diffStr == "" || strings.EqualFold(diffStr, "null")) {
 		payload, err = c.buildDraftFromStage(r.Context(), tenantID, currentUser, payload)
 		if err != nil {
 			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_EMPTY", err.Error())
 			return
 		}
+	}
+	if payload.RequestAccess && len(payload.Diff) == 0 {
+		payload.Diff = json.RawMessage("[]")
+		if strings.TrimSpace(payload.Reason) == "" {
+			payload.Reason = "请求编辑角色策略"
+		}
+	}
+	if strings.TrimSpace(payload.Object) == "" {
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "object is required")
+		return
+	}
+	if strings.TrimSpace(payload.Action) == "" {
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "action is required")
+		return
 	}
 	params := services.CreatePolicyDraftParams{
 		RequesterID:  requesterID,

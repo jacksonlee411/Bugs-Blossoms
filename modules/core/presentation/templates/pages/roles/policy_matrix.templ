@@ -113,6 +113,8 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							hx-post="/core/api/authz/requests"
 							hx-target="body"
 							hx-swap="none"
+							hx-on::before-request="this.querySelector('button').disabled=true; this.querySelector('button').dataset.originalText=this.querySelector('button').innerText; this.querySelector('button').innerText='请求中...';"
+							hx-on::after-request="this.querySelector('button').disabled=false; if(this.querySelector('button').dataset.originalText){this.querySelector('button').innerText=this.querySelector('button').dataset.originalText;}"
 						>
 							<input type="hidden" name="object" value="core.roles"/>
 							<input type="hidden" name="action" value="update"/>
@@ -123,6 +125,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							<button class="btn btn-sm btn-primary" type="submit">
 								请求权限
 							</button>
+							<span class="text-xs text-secondary-300">当前为只读，可发送权限申请。</span>
 						</form>
 					} else {
 						<span class="text-sm text-secondary-300">暂无编辑权限，可联系管理员开通。</span>
