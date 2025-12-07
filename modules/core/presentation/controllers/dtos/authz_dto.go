@@ -17,12 +17,14 @@ type APIError struct {
 
 // PolicyDraftRequest captures incoming payloads for draft creation.
 type PolicyDraftRequest struct {
-	Object       string          `json:"object"`
-	Action       string          `json:"action"`
-	Reason       string          `json:"reason"`
-	Diff         json.RawMessage `json:"diff"`
-	BaseRevision string          `json:"base_revision"`
-	Domain       string          `json:"domain"`
+	Object        string          `json:"object"`
+	Action        string          `json:"action"`
+	Reason        string          `json:"reason"`
+	Diff          json.RawMessage `json:"diff"`
+	BaseRevision  string          `json:"base_revision"`
+	Domain        string          `json:"domain"`
+	Subject       string          `json:"subject"`
+	RequestAccess bool            `json:"request_access"`
 }
 
 // PolicyDraftResponse serializes drafts for API responses.
@@ -66,6 +68,38 @@ type PolicyEntryResponse struct {
 	Object  string `json:"object"`
 	Action  string `json:"action"`
 	Effect  string `json:"effect"`
+}
+
+// PolicyListResponse wraps paginated policies.
+type PolicyListResponse struct {
+	Data  []PolicyEntryResponse `json:"data"`
+	Total int                   `json:"total"`
+	Page  int                   `json:"page"`
+	Limit int                   `json:"limit"`
+}
+
+// StagePolicyRequest captures payloads for staging a policy diff.
+type StagePolicyRequest struct {
+	Type      string `json:"type"`
+	Subject   string `json:"subject"`
+	Domain    string `json:"domain"`
+	Object    string `json:"object"`
+	Action    string `json:"action"`
+	Effect    string `json:"effect"`
+	StageKind string `json:"stage_kind,omitempty"`
+}
+
+// StagedPolicyEntry represents a staged policy change with a client-side id.
+type StagedPolicyEntry struct {
+	ID        string `json:"id"`
+	StageKind string `json:"stage_kind,omitempty"`
+	PolicyEntryResponse
+}
+
+// StagePolicyResponse returns the current staged entries.
+type StagePolicyResponse struct {
+	Data  []StagedPolicyEntry `json:"data"`
+	Total int                 `json:"total"`
 }
 
 // DebugResponse provides a detailed Authz.Debug output.
