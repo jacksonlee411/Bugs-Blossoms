@@ -135,6 +135,14 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					<span class="text-sm text-error-400">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
 				}
 			</div>
+			<div class="w-full flex items-center justify-between text-xs text-secondary-300">
+				<span>暂存仅作用于当前角色与域，提交后自动清空。</span>
+				if props.StageTotal > 0 {
+					<span class="text-secondary-100">{ fmt.Sprintf("已暂存 %d 条，提交草稿后清空", props.StageTotal) }</span>
+				} else {
+					<span>未有暂存规则，直接提交将按表单/暂存构建 diff。</span>
+				}
+			</div>
 		</div>
 		<form
 			class="flex flex-wrap gap-3 items-center"
