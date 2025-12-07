@@ -184,9 +184,9 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					@button.Secondary(button.Props{
 						Size: button.SizeSM,
 						Attrs: templ.Attributes{
-							"type":   "button",
+							"type":           "button",
 							"formnovalidate": "true",
-							"@click":          "$dispatch('open-stage-policy')",
+							"@click":         "$dispatch('open-stage-policy')",
 						},
 					}) {
 						{ pageCtx.T("Cancel") }
@@ -251,20 +251,20 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						@base.TableCell(base.TableCellProps{}) {
 							{ entry.Action }
 						}
-							@base.TableCell(base.TableCellProps{}) {
-								<div class="flex items-center gap-2">
-									<span>{ entry.Effect }</span>
-									if entry.Staged {
-										{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
-										if entry.StageKind == "remove" {
-											{{ badgeClass = "text-[11px] px-2 py-0.5 rounded-full border bg-red-700 border-red-500 text-white" }}
-										}
-										<span class={ badgeClass }>
-											暂存
-										</span>
+						@base.TableCell(base.TableCellProps{}) {
+							<div class="flex items-center gap-2">
+								<span>{ entry.Effect }</span>
+								if entry.Staged {
+									{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
+									if entry.StageKind == "remove" {
+										{{ badgeClass = "text-[11px] px-2 py-0.5 rounded-full border bg-red-700 border-red-500 text-white" }}
 									}
-								</div>
-							}
+									<span class={ badgeClass }>
+										暂存
+									</span>
+								}
+							</div>
+						}
 						@base.TableCell(base.TableCellProps{
 							Classes: templ.Classes("text-right"),
 						}) {
