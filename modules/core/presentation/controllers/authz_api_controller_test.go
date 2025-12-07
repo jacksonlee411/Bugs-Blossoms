@@ -73,6 +73,45 @@ func TestAuthzAPIController_Debug(t *testing.T) {
 	require.Equal(t, "role:core.superadmin", payload.Request.Subject)
 }
 
+func TestAuthzAPIController_StagePolicy(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	payload := dtos.StagePolicyRequest{
+		Type:    "p",
+		Subject: "role:test",
+		Domain:  "global",
+		Object:  "core.users",
+		Action:  "read",
+		Effect:  "allow",
+	}
+
+	resp := suite.POST("/core/api/authz/policies/stage").
+		JSON(payload).
+		Expect(t).
+		Status(http.StatusCreated)
+
+	require.Contains(t, resp.Body(), "\"total\":1")
+
+	resp = suite.DELETE("/core/api/authz/policies/stage?id=" + extractStageID(t, resp.Body())).
+		Expect(t).
+		Status(http.StatusOK)
+	require.Contains(t, resp.Body(), "\"total\":0")
+}
+
+func extractStageID(t *testing.T, body string) string {
+	t.Helper()
+	var parsed dtos.StagePolicyResponse
+	require.NoError(t, json.Unmarshal([]byte(body), &parsed))
+	require.NotEmpty(t, parsed.Data)
+	return parsed.Data[0].ID
+}
+
 func setupAuthzAPISuite(t *testing.T) *itf.Suite {
 	t.Helper()
 	suite := itf.HTTP(t, core.NewModule(&core.ModuleOptions{

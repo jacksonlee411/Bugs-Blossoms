@@ -4,9 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,15 +34,17 @@ import (
 
 // AuthzAPIController exposes REST APIs for policy drafts and policy listings.
 type AuthzAPIController struct {
-	app      application.Application
-	basePath string
+	app        application.Application
+	basePath   string
+	stageStore *policyStageStore
 }
 
 // NewAuthzAPIController wires the controller into the router.
 func NewAuthzAPIController(app application.Application) application.Controller {
 	return &AuthzAPIController{
-		app:      app,
-		basePath: "/core/api/authz",
+		app:        app,
+		basePath:   "/core/api/authz",
+		stageStore: newPolicyStageStore(),
 	}
 }
 
@@ -66,6 +72,7 @@ func (c *AuthzAPIController) Register(r *mux.Router) {
 	router.HandleFunc("/requests/{id}/cancel", di.H(c.cancelRequest)).Methods(http.MethodPost)
 	router.HandleFunc("/requests/{id}/trigger-bot", di.H(c.triggerBot)).Methods(http.MethodPost)
 	router.HandleFunc("/requests/{id}/revert", di.H(c.revertRequest)).Methods(http.MethodPost)
+	router.HandleFunc("/policies/stage", di.H(c.stagePolicy)).Methods(http.MethodPost, http.MethodDelete)
 	router.Handle(
 		"/debug",
 		middleware.RateLimit(middleware.RateLimitConfig{
@@ -85,15 +92,30 @@ func (c *AuthzAPIController) listPolicies(
 	if !c.ensurePermission(w, r, permissions.AuthzDebug) {
 		return
 	}
+	params, err := parsePolicyListParams(r.URL.Query())
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", err.Error())
+		return
+	}
 	entries, err := svc.Policies(r.Context())
 	if err != nil {
 		logger.WithError(err).Error("authz api: list policies failed")
 		writeJSONError(w, http.StatusInternalServerError, "AUTHZ_POLICIES_ERROR", "failed to read policies")
 		return
 	}
-	data := make([]dtos.PolicyEntryResponse, 0, len(entries))
-	for _, entry := range entries {
-		data = append(data, dtos.PolicyEntryResponse{
+	filtered := filterPolicies(entries, params)
+	sorted := sortPolicies(filtered, params.SortField, params.SortAsc)
+	start := params.Offset()
+	end := start + params.Limit
+	if start > len(sorted) {
+		start = len(sorted)
+	}
+	if end > len(sorted) {
+		end = len(sorted)
+	}
+	pageData := make([]dtos.PolicyEntryResponse, 0, end-start)
+	for _, entry := range sorted[start:end] {
+		pageData = append(pageData, dtos.PolicyEntryResponse{
 			Type:    entry.Type,
 			Subject: entry.Subject,
 			Domain:  entry.Domain,
@@ -102,7 +124,12 @@ func (c *AuthzAPIController) listPolicies(
 			Effect:  entry.Effect,
 		})
 	}
-	writeJSON(w, http.StatusOK, data)
+	writeJSON(w, http.StatusOK, dtos.PolicyListResponse{
+		Data:  pageData,
+		Total: len(sorted),
+		Page:  params.Page,
+		Limit: params.Limit,
+	})
 }
 
 func (c *AuthzAPIController) listRequests(
@@ -191,6 +218,62 @@ func (c *AuthzAPIController) createRequest(
 		return
 	}
 	writeJSON(w, http.StatusCreated, dtos.NewPolicyDraftResponse(draft))
+}
+
+func (c *AuthzAPIController) stagePolicy(
+	w http.ResponseWriter,
+	r *http.Request,
+	logger *logrus.Entry,
+) {
+	if !c.ensurePermission(w, r, permissions.AuthzRequestsWrite) {
+		return
+	}
+	currentUser, err := composables.UseUser(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusUnauthorized, "AUTHZ_NO_USER", "user not found in context")
+		return
+	}
+	tenantID, err := composables.UseTenantID(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "AUTHZ_NO_TENANT", "tenant not found in context")
+		return
+	}
+	key := policyStageKey(currentUser.ID(), tenantID)
+
+	switch r.Method {
+	case http.MethodPost:
+		var payload dtos.StagePolicyRequest
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "unable to parse request body")
+			return
+		}
+		entries, err := c.stageStore.Add(key, payload)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusCreated, dtos.StagePolicyResponse{
+			Data:  entries,
+			Total: len(entries),
+		})
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", "id is required")
+			return
+		}
+		entries, err := c.stageStore.Delete(key, id)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, dtos.StagePolicyResponse{
+			Data:  entries,
+			Total: len(entries),
+		})
+	default:
+		writeJSONError(w, http.StatusMethodNotAllowed, "AUTHZ_METHOD_NOT_ALLOWED", "method not allowed")
+	}
 }
 
 func (c *AuthzAPIController) approveRequest(
@@ -446,6 +529,120 @@ func parseListParams(r *http.Request) (services.ListPolicyDraftsParams, error) {
 	return params, nil
 }
 
+type policyListParams struct {
+	Subject   string
+	Domain    string
+	Type      string
+	Search    string
+	Page      int
+	Limit     int
+	SortField string
+	SortAsc   bool
+}
+
+func (p policyListParams) Offset() int {
+	if p.Page <= 1 {
+		return 0
+	}
+	return (p.Page - 1) * p.Limit
+}
+
+func parsePolicyListParams(values url.Values) (policyListParams, error) {
+	params := policyListParams{
+		Page:      1,
+		Limit:     50,
+		SortField: "object",
+		SortAsc:   true,
+	}
+	if subject := strings.TrimSpace(values.Get("subject")); subject != "" {
+		params.Subject = subject
+	}
+	if domain := strings.TrimSpace(values.Get("domain")); domain != "" {
+		params.Domain = domain
+	}
+	if typ := strings.TrimSpace(values.Get("type")); typ != "" {
+		params.Type = typ
+	}
+	if search := strings.TrimSpace(values.Get("q")); search != "" {
+		params.Search = search
+	}
+	if page := values.Get("page"); page != "" {
+		val, err := strconv.Atoi(page)
+		if err != nil || val < 1 {
+			return params, errors.New("page must be a positive integer")
+		}
+		params.Page = val
+	}
+	if limit := values.Get("limit"); limit != "" {
+		val, err := strconv.Atoi(limit)
+		if err != nil || val < 1 {
+			return params, errors.New("limit must be a positive integer")
+		}
+		if val > 500 {
+			val = 500
+		}
+		params.Limit = val
+	}
+	if sort := values.Get("sort"); sort != "" {
+		parts := strings.Split(sort, ":")
+		field := strings.TrimSpace(parts[0])
+		if field != "" {
+			params.SortField = field
+		}
+		if len(parts) > 1 && strings.EqualFold(parts[1], "desc") {
+			params.SortAsc = false
+		}
+	}
+	return params, nil
+}
+
+func filterPolicies(entries []services.PolicyEntry, params policyListParams) []services.PolicyEntry {
+	results := make([]services.PolicyEntry, 0, len(entries))
+	for _, entry := range entries {
+		if params.Subject != "" && entry.Subject != params.Subject {
+			continue
+		}
+		if params.Domain != "" && entry.Domain != params.Domain {
+			continue
+		}
+		if params.Type != "" && entry.Type != params.Type {
+			continue
+		}
+		if params.Search != "" {
+			search := strings.ToLower(params.Search)
+			if !strings.Contains(strings.ToLower(entry.Object), search) &&
+				!strings.Contains(strings.ToLower(entry.Action), search) {
+				continue
+			}
+		}
+		results = append(results, entry)
+	}
+	return results
+}
+
+func sortPolicies(entries []services.PolicyEntry, field string, asc bool) []services.PolicyEntry {
+	less := func(i, j int) bool { return entries[i].Object < entries[j].Object }
+	switch field {
+	case "subject":
+		less = func(i, j int) bool { return entries[i].Subject < entries[j].Subject }
+	case "domain":
+		less = func(i, j int) bool { return entries[i].Domain < entries[j].Domain }
+	case "type":
+		less = func(i, j int) bool { return entries[i].Type < entries[j].Type }
+	case "action":
+		less = func(i, j int) bool { return entries[i].Action < entries[j].Action }
+	}
+	sorted := make([]services.PolicyEntry, len(entries))
+	copy(sorted, entries)
+	sort.Slice(sorted, func(i, j int) bool {
+		if asc {
+			return less(i, j)
+		}
+		return less(j, i)
+	})
+	return sorted
+}
+
 func requestIDFromHeader(r *http.Request) string {
 	if id := r.Header.Get("X-Request-Id"); id != "" {
 		return id
@@ -455,4 +652,84 @@ func requestIDFromHeader(r *http.Request) string {
 
 func parseUUID(raw string) (uuid.UUID, error) {
 	return uuid.Parse(strings.TrimSpace(raw))
+}
+
+type policyStageStore struct {
+	mu   sync.Mutex
+	data map[string][]dtos.StagedPolicyEntry
+}
+
+func newPolicyStageStore() *policyStageStore {
+	return &policyStageStore{
+		data: make(map[string][]dtos.StagedPolicyEntry),
+	}
+}
+
+func policyStageKey(userID uint, tenantID uuid.UUID) string {
+	return fmt.Sprintf("%d:%s", userID, tenantID.String())
+}
+
+func (s *policyStageStore) Add(key string, payload dtos.StagePolicyRequest) ([]dtos.StagedPolicyEntry, error) {
+	if strings.TrimSpace(payload.Type) == "" {
+		return nil, errors.New("type is required")
+	}
+	if strings.TrimSpace(payload.Object) == "" {
+		return nil, errors.New("object is required")
+	}
+	if strings.TrimSpace(payload.Action) == "" {
+		return nil, errors.New("action is required")
+	}
+	if strings.TrimSpace(payload.Effect) == "" {
+		return nil, errors.New("effect is required")
+	}
+	if strings.TrimSpace(payload.Domain) == "" {
+		return nil, errors.New("domain is required")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entries := s.data[key]
+	if len(entries) >= 50 {
+		return nil, errors.New("stage limit reached (50)")
+	}
+	id := uuid.New().String()
+	entry := dtos.StagedPolicyEntry{
+		ID: id,
+		PolicyEntryResponse: dtos.PolicyEntryResponse{
+			Type:    payload.Type,
+			Subject: payload.Subject,
+			Domain:  payload.Domain,
+			Object:  payload.Object,
+			Action:  authz.NormalizeAction(payload.Action),
+			Effect:  payload.Effect,
+		},
+	}
+	entries = append(entries, entry)
+	s.data[key] = entries
+	return entries, nil
+}
+
+func (s *policyStageStore) Delete(key string, id string) ([]dtos.StagedPolicyEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entries, ok := s.data[key]
+	if !ok {
+		return []dtos.StagedPolicyEntry{}, nil
+	}
+	next := make([]dtos.StagedPolicyEntry, 0, len(entries))
+	found := false
+	for _, entry := range entries {
+		if entry.ID == id {
+			found = true
+			continue
+		}
+		next = append(next, entry)
+	}
+	if !found {
+		return nil, errors.New("stage entry not found")
+	}
+	s.data[key] = next
+	return next, nil
 }

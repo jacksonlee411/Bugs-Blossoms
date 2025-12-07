@@ -15,6 +15,12 @@
 4. [ ] 分页与性能 —— `GET /core/api/authz/policies` 支持分页/排序/过滤参数：`subject=role:<id>&domain=<d>&type=<p|g>&page=<n>&limit=<m>&sort=<field:asc|desc>`，默认 limit=50，最大 200；分页控件用 `hx-get`/`hx-target` 局部刷新，可选列表尾 `hx-trigger="revealed"` 追加“加载更多”。
 5. [ ] 只读体验 —— 无编辑权限时矩阵锁定，保留“请求权限”按钮（提交空 diff 草稿）。
 
+## 分阶段交付
+1. [ ] 后端接口扩展（阶段 1）—— 为 `/core/api/authz/policies` 补充 subject/domain/type/page/limit/sort 过滤契约；新增 `/core/api/authz/policies/stage`（POST/DELETE）基于 Session 的暂存实现（按 subject/domain 分区，上限 50 条，刷新不丢）。补充控制器/服务与单元测试。
+2. [ ] 基础矩阵 UI（阶段 2）—— 角色详情页新增策略矩阵，接入分页/过滤，授权不足时只读；HTMX 部分渲染与 loader/空态。
+3. [ ] 暂存交互（阶段 3）—— 新增规则模态/抽屉表单，HTMX 提交到 stage 接口；矩阵展示暂存高亮（淡绿/淡红+删除线/“暂存”标签）；支持删除暂存项。
+4. [ ] 草稿提交串联（阶段 4）—— 提交按钮从暂存区构建 `suggested_diff` 调用 `/core/api/authz/requests`，成功后清空暂存；增加错误反馈、授权校验与必要的集成测试。
+
 ## 依赖
 - 015A API/`/core/api/authz/policies|requests` 已可用。
 - Session 存储可用，HTMX/templ 构建链路正常。
