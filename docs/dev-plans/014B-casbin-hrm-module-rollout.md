@@ -1,6 +1,6 @@
 # DEV-PLAN-014B：HRM 模块 Casbin 改造细化计划
 
-**状态**: 进行中（2025-12-05 18:30）
+**状态**: 已完成（以 dev-records 登记时间为准）
 
 ## 背景
 - DEV-PLAN-014 主计划要求 HRM 模块与 Core/Logging 一起完成 Casbin 授权改造，并通过 `AUTHZ_ENFORCE` 灰度。Core 已在 DEV-PLAN-014A 中完成服务层兜底、模板注入等基础工作，HRM 需要在此基线之上复制能力。
@@ -13,12 +13,12 @@
 - HRM SQLC、Atlas、schema 导出流程（DEV-PLAN-010/011）必须保持可运行，以便在授权改造期间新增字段/索引时可随时生成迁移。
 
 ## 前置准备清单（进入实施前需完成并记录）
-- [ ] 重新执行并登记 012/013 readiness：`make authz-test authz-lint`、`go test ./pkg/authz/...`，结果写入 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
-- [ ] 确认 HRM 基线可测：`go test ./modules/hrm/...`。
-- [ ] 验证 SQLC/Atlas 链路：`make sqlc-generate`（完成后确保 `git status --short` 干净），可选 `make db plan HRM_MIGRATIONS=1` 以确认 Atlas diff 无报错。
-- [ ] 验证策略打包：`make authz-pack` 能正常生成 `config/access/policy.csv`/`.rev` 且无意外 diff。
-- [ ] 验证 shadow 运行：`AUTHZ_ENFORCE=0 make run`（或等效 dev 启动）可启动，日志无 authz 报错。
-- [ ] 更新本文档状态为“准备就绪/已批准”，补充 readiness 命令时间戳及结果。
+- [x] 重新执行并登记 012/013 readiness：`make authz-test authz-lint`、`go test ./pkg/authz/...`，结果写入 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
+- [x] 确认 HRM 基线可测：`go test ./modules/hrm/...`。
+- [x] 验证 SQLC/Atlas 链路：`make sqlc-generate`（完成后确保 `git status --short` 干净），可选 `make db plan HRM_MIGRATIONS=1` 以确认 Atlas diff 无报错。
+- [x] 验证策略打包：`make authz-pack` 能正常生成 `config/access/policy.csv`/`.rev` 且无意外 diff。
+- [x] 验证 shadow 运行：`AUTHZ_ENFORCE=0 make run`（或等效 dev 启动）可启动，日志无 authz 报错。
+- [x] 更新本文档状态为“准备就绪/已批准”，补充 readiness 命令时间戳及结果。
 
 ## 范围
 - `modules/hrm/presentation/controllers/employee_controller.go` 及未来 HRM 控制器。
