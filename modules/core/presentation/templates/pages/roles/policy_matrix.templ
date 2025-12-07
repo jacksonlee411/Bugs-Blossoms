@@ -105,12 +105,24 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 				}
 				for _, entry := range props.Entries {
 					@base.TableRow(base.TableRowProps{}) {
-						@base.TableCell(base.TableCellProps{}) { { entry.Type } }
-						@base.TableCell(base.TableCellProps{}) { { entry.Subject } }
-						@base.TableCell(base.TableCellProps{}) { { entry.Domain } }
-						@base.TableCell(base.TableCellProps{}) { { entry.Object } }
-						@base.TableCell(base.TableCellProps{}) { { entry.Action } }
-						@base.TableCell(base.TableCellProps{}) { { entry.Effect } }
+						@base.TableCell(base.TableCellProps{}) {
+							{ entry.Type }
+						}
+						@base.TableCell(base.TableCellProps{}) {
+							{ entry.Subject }
+						}
+						@base.TableCell(base.TableCellProps{}) {
+							{ entry.Domain }
+						}
+						@base.TableCell(base.TableCellProps{}) {
+							{ entry.Object }
+						}
+						@base.TableCell(base.TableCellProps{}) {
+							{ entry.Action }
+						}
+						@base.TableCell(base.TableCellProps{}) {
+							{ entry.Effect }
+						}
 					}
 				}
 			}
