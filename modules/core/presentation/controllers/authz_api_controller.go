@@ -163,13 +163,13 @@ func (c *AuthzAPIController) getRequest(
 	}
 	id, err := parseUUID(mux.Vars(r)["id"])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
 		return
 	}
 	tenantID := tenantIDFromContext(r)
 	draft, err := svc.Get(r.Context(), tenantID, id)
 	if err != nil {
-		c.respondServiceError(w, err)
+		c.respondServiceError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, dtos.NewPolicyDraftResponse(draft))
@@ -187,7 +187,7 @@ func (c *AuthzAPIController) createRequest(
 	}
 	payload, err := decodePolicyDraftRequest(r)
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
 		return
 	}
 	tenantID := tenantIDFromContext(r)
@@ -203,8 +203,7 @@ func (c *AuthzAPIController) createRequest(
 	if diffStr == "" || strings.EqualFold(diffStr, "null") {
 		payload, err = c.buildDraftFromStage(r.Context(), tenantID, currentUser, payload)
 		if err != nil {
-			htmx.TriggerToast(w, htmx.ToastVariantError, "提交失败", err.Error())
-			writeJSONError(w, http.StatusBadRequest, "AUTHZ_STAGE_EMPTY", err.Error())
+			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_EMPTY", err.Error())
 			return
 		}
 	}
@@ -220,7 +219,7 @@ func (c *AuthzAPIController) createRequest(
 	draft, err := svc.Create(r.Context(), tenantID, params)
 	if err != nil {
 		logger.WithError(err).Error("authz api: create draft failed")
-		c.respondServiceError(w, err)
+		c.respondServiceError(w, r, err)
 		return
 	}
 	if htmx.IsHxRequest(r) {
@@ -240,12 +239,12 @@ func (c *AuthzAPIController) stagePolicy(
 	}
 	currentUser, err := composables.UseUser(r.Context())
 	if err != nil {
-		writeJSONError(w, http.StatusUnauthorized, "AUTHZ_NO_USER", "user not found in context")
+		c.writeHTMXError(w, r, http.StatusUnauthorized, "AUTHZ_NO_USER", "user not found in context")
 		return
 	}
 	tenantID, err := composables.UseTenantID(r.Context())
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_NO_TENANT", "tenant not found in context")
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_NO_TENANT", "tenant not found in context")
 		return
 	}
 	key := policyStageKey(currentUser.ID(), tenantID)
@@ -254,12 +253,12 @@ func (c *AuthzAPIController) stagePolicy(
 	case http.MethodPost:
 		payload, err := decodeStagePolicyRequest(r)
 		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
+			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
 			return
 		}
 		entries, err := c.stageStore.Add(key, payload)
 		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
+			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
 			return
 		}
 		htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(entries)))
@@ -270,12 +269,12 @@ func (c *AuthzAPIController) stagePolicy(
 	case http.MethodDelete:
 		id := r.URL.Query().Get("id")
 		if id == "" {
-			writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", "id is required")
+			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", "id is required")
 			return
 		}
 		entries, err := c.stageStore.Delete(key, id)
 		if err != nil {
-			writeJSONError(w, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
+			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
 			return
 		}
 		htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(entries)))
@@ -319,13 +318,13 @@ func (c *AuthzAPIController) cancelRequest(
 	}
 	id, err := parseUUID(mux.Vars(r)["id"])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
 		return
 	}
 	tenantID := tenantIDFromContext(r)
 	draft, err := svc.Cancel(r.Context(), tenantID, id)
 	if err != nil {
-		c.respondServiceError(w, err)
+		c.respondServiceError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, dtos.NewPolicyDraftResponse(draft))
@@ -342,14 +341,14 @@ func (c *AuthzAPIController) triggerBot(
 	}
 	id, err := parseUUID(mux.Vars(r)["id"])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
 		return
 	}
 	locker := r.URL.Query().Get("locker")
 	tenantID := tenantIDFromContext(r)
 	draft, err := svc.TriggerBot(r.Context(), tenantID, id, locker)
 	if err != nil {
-		c.respondServiceError(w, err)
+		c.respondServiceError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, dtos.NewPolicyDraftResponse(draft))
@@ -367,14 +366,14 @@ func (c *AuthzAPIController) revertRequest(
 	}
 	id, err := parseUUID(mux.Vars(r)["id"])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
 		return
 	}
 	tenantID := tenantIDFromContext(r)
 	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	draft, err := svc.Revert(r.Context(), tenantID, id, requesterID)
 	if err != nil {
-		c.respondServiceError(w, err)
+		c.respondServiceError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, dtos.NewPolicyDraftResponse(draft))
@@ -471,14 +470,14 @@ func (c *AuthzAPIController) reviewRequest(
 	}
 	id, err := parseUUID(mux.Vars(r)["id"])
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
 		return
 	}
 	tenantID := tenantIDFromContext(r)
 	approverID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	draft, err := reviewFunc(r.Context(), tenantID, id, approverID)
 	if err != nil {
-		c.respondServiceError(w, err)
+		c.respondServiceError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, dtos.NewPolicyDraftResponse(draft))
@@ -490,27 +489,40 @@ func (c *AuthzAPIController) ensurePermission(
 	perm *permissionEntity.Permission,
 ) bool {
 	if err := composables.CanUser(r.Context(), perm); err != nil {
-		writeJSONError(w, http.StatusForbidden, "AUTHZ_FORBIDDEN", "permission denied")
+		c.writeHTMXError(w, r, http.StatusForbidden, "AUTHZ_FORBIDDEN", "permission denied")
 		return false
 	}
 	return true
 }
 
-func (c *AuthzAPIController) respondServiceError(w http.ResponseWriter, err error) {
+func (c *AuthzAPIController) writeHTMXError(
+	w http.ResponseWriter,
+	r *http.Request,
+	status int,
+	code string,
+	message string,
+) {
+	if htmx.IsHxRequest(r) {
+		htmx.TriggerToast(w, htmx.ToastVariantError, "操作失败", message)
+	}
+	writeJSONError(w, status, code, message)
+}
+
+func (c *AuthzAPIController) respondServiceError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, services.ErrPolicyDraftNotFound):
-		writeJSONError(w, http.StatusNotFound, "AUTHZ_NOT_FOUND", "request not found")
+		c.writeHTMXError(w, r, http.StatusNotFound, "AUTHZ_NOT_FOUND", "request not found")
 	case errors.Is(err, services.ErrInvalidDiff),
 		errors.Is(err, services.ErrRevisionMismatch):
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_REQUEST", err.Error())
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_REQUEST", err.Error())
 	case errors.Is(err, services.ErrInvalidStatusTransition):
-		writeJSONError(w, http.StatusConflict, "AUTHZ_INVALID_STATE", err.Error())
+		c.writeHTMXError(w, r, http.StatusConflict, "AUTHZ_INVALID_STATE", err.Error())
 	case errors.Is(err, services.ErrMissingSnapshot):
-		writeJSONError(w, http.StatusConflict, "AUTHZ_NO_SNAPSHOT", err.Error())
+		c.writeHTMXError(w, r, http.StatusConflict, "AUTHZ_NO_SNAPSHOT", err.Error())
 	case errors.Is(err, services.ErrTenantMismatch):
-		writeJSONError(w, http.StatusForbidden, "AUTHZ_FORBIDDEN", "tenant mismatch")
+		c.writeHTMXError(w, r, http.StatusForbidden, "AUTHZ_FORBIDDEN", "tenant mismatch")
 	default:
-		writeJSONError(w, http.StatusInternalServerError, "AUTHZ_ERROR", "internal error")
+		c.writeHTMXError(w, r, http.StatusInternalServerError, "AUTHZ_ERROR", "internal error")
 	}
 }
 

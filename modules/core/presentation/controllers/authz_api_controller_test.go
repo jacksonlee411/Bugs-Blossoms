@@ -147,6 +147,63 @@ func TestAuthzAPIController_CreateRequestFromStage(t *testing.T) {
 		Status(http.StatusBadRequest)
 }
 
+func TestAuthzAPIController_CreateRequest_HTMXForbiddenToast(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(permissions.AuthzDebug)
+	suite.AsUser(user)
+
+	payload := dtos.PolicyDraftRequest{
+		Object: "core.users",
+		Action: "read",
+		Diff:   json.RawMessage(`[{"op":"add","path":"/p","value":["role:test","core.users","read","global","allow"]}]`),
+	}
+	suite.POST("/core/api/authz/requests").
+		HTMX().
+		JSON(payload).
+		Assert(t).
+		ExpectStatus(http.StatusForbidden).
+		ExpectHTMXTrigger("notify")
+}
+
+func TestAuthzAPIController_StagePolicy_HTMXValidationToast(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	suite.POST("/core/api/authz/policies/stage").
+		HTMX().
+		JSON(dtos.StagePolicyRequest{
+			Type:    "p",
+			Subject: "role:test",
+			Domain:  "global",
+			Effect:  "allow",
+		}).
+		Assert(t).
+		ExpectBadRequest().
+		ExpectHTMXTrigger("notify")
+}
+
+func TestAuthzAPIController_CreateRequestFromStage_HTMXEmptyToast(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	suite.POST("/core/api/authz/requests").
+		HTMX().
+		JSON(dtos.PolicyDraftRequest{}).
+		Assert(t).
+		ExpectBadRequest().
+		ExpectHTMXTrigger("notify")
+}
+
 func extractStageID(t *testing.T, body string) string {
 	t.Helper()
 	var parsed dtos.StagePolicyResponse
