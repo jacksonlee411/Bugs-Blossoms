@@ -34,8 +34,9 @@ type PolicyMatrixProps struct {
 	Type    string
 	Search  string
 
-	CanDebug bool
-	CanStage bool
+	CanDebug   bool
+	CanStage   bool
+	CanRequest bool
 }
 
 func totalPages(total, limit int) int {
@@ -105,6 +106,27 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							</button>
 						</form>
 					</div>
+				} else {
+					if props.CanRequest {
+						<form
+							class="flex items-center gap-2"
+							hx-post="/core/api/authz/requests"
+							hx-target="body"
+							hx-swap="none"
+						>
+							<input type="hidden" name="object" value="core.roles"/>
+							<input type="hidden" name="action" value="update"/>
+							<input type="hidden" name="domain" value={ props.Domain }/>
+							<input type="hidden" name="diff" value="[]"/>
+							<input type="hidden" name="request_access" value="1"/>
+							<input type="hidden" name="reason" value="请求编辑角色策略"/>
+							<button class="btn btn-sm btn-primary" type="submit">
+								请求权限
+							</button>
+						</form>
+					} else {
+						<span class="text-sm text-secondary-300">暂无编辑权限，可联系管理员开通。</span>
+					}
 				}
 				if !props.CanDebug {
 					<span class="text-sm text-error-400">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>

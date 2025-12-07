@@ -204,6 +204,32 @@ func TestAuthzAPIController_CreateRequestFromStage_HTMXEmptyToast(t *testing.T) 
 		ExpectHTMXTrigger("notify")
 }
 
+func TestAuthzAPIController_RequestAccessEmptyDiff(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	suite.POST("/core/api/authz/requests").
+		HTMX().
+		FormFields(map[string]interface{}{
+			"object":         "core.roles",
+			"action":         "update",
+			"domain":         "global",
+			"diff":           "[]",
+			"request_access": "1",
+			"reason":         "请求编辑角色策略",
+		}).
+		Assert(t).
+		ExpectCreated().
+		ExpectHTMXTrigger("policies:staged").
+		ExpectJSON().
+		ExpectField("status", "pending_review")
+}
+
 func extractStageID(t *testing.T, body string) string {
 	t.Helper()
 	var parsed dtos.StagePolicyResponse

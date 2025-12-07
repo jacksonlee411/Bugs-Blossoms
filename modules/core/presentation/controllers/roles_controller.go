@@ -415,6 +415,7 @@ func (c *RolesController) buildPolicyMatrixProps(
 	}
 	var stagedEntries []dtos.StagedPolicyEntry
 	var canStage bool
+	var canRequest bool
 	if currentUser, err := composables.UseUser(ctx); err == nil && currentUser != nil {
 		if tenantID, tenantErr := composables.UseTenantID(ctx); tenantErr == nil {
 			stagedEntries = c.stageStore.List(
@@ -425,21 +426,25 @@ func (c *RolesController) buildPolicyMatrixProps(
 		}
 	}
 	if err := composables.CanUser(ctx, permissions.AuthzRequestsWrite); err == nil {
-		canStage = true
+		canRequest = true
+	}
+	if canRequest {
+		canStage = composables.CanUser(ctx, permissions.RoleUpdate) == nil
 	}
 	matrixEntries, total := mergePolicyMatrixEntries(entries, stagedEntries, params)
 	return &roles.PolicyMatrixProps{
-		RoleID:   fmt.Sprintf("%d", roleEntity.ID()),
-		Entries:  matrixEntries,
-		Total:    total,
-		Page:     params.Page,
-		Limit:    params.Limit,
-		Subject:  params.Subject,
-		Domain:   params.Domain,
-		Type:     params.Type,
-		Search:   params.Search,
-		CanDebug: true,
-		CanStage: canStage,
+		RoleID:     fmt.Sprintf("%d", roleEntity.ID()),
+		Entries:    matrixEntries,
+		Total:      total,
+		Page:       params.Page,
+		Limit:      params.Limit,
+		Subject:    params.Subject,
+		Domain:     params.Domain,
+		Type:       params.Type,
+		Search:     params.Search,
+		CanDebug:   true,
+		CanStage:   canStage,
+		CanRequest: canRequest,
 		StageTotal: func() int {
 			if stagedEntries == nil {
 				return 0

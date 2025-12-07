@@ -1,6 +1,6 @@
 # DEV-PLAN-015B1：Core 角色管理 UI
 
-**状态**: 进行中（2025-12-07 12:55 UTC）  
+**状态**: 进行中（2025-12-07 13:25 UTC）  
 **范围**: `modules/core` 角色页面的策略可视化、编辑暂存与草稿提交
 
 ## 目标
@@ -13,7 +13,7 @@
 2. [X] 新增规则交互 —— 采用模态或抽屉形式的表单，字段：Domain（下拉/默认）、Object（下拉或搜索）、Action（下拉或自由文本，标准化为 normalize 结果）、Effect（allow/deny 单选）；提交 HTMX 到 `POST /core/api/authz/policies/stage`，成功后局部刷新矩阵。
 3. [X] 暂存与提交链路 —— `POST/DELETE /core/api/authz/policies/stage`（按 subject/domain 隔离，最多 50 条）；HTMX 返回最新 partial，高亮暂存状态（淡绿新增、淡红删除线+“暂存”标签）；`POST /core/api/authz/requests` 可在 `diff` 缺省时从暂存构建 `suggested_diff` 并清空，切换 subject/domain 自动 reset，刷新不丢暂存；新增集成测试验证成功链路。
 4. [X] 分页与性能 —— `GET /core/api/authz/policies` 支持分页/排序/过滤参数：`subject=role:<id>&domain=<d>&type=<p|g>&page=<n>&limit=<m>&sort=<field:asc|desc>`，默认 limit=50，最大 200；分页控件用 `hx-get`/`hx-target` 局部刷新，可选列表尾 `hx-trigger="revealed"` 追加“加载更多”。
-5. [ ] 只读体验 —— 无编辑权限时矩阵锁定，保留“请求权限”按钮（提交空 diff 草稿）。
+5. [X] 只读体验 —— 无编辑权限时矩阵锁定，保留“请求权限”按钮（提交空 diff 草稿、空 diff 转为 [] 并弹 toast）；缺权限用户可通过 HX 表单提交访问申请，保留只读文案提示。
 
 ## 分阶段交付
 1. [X] 后端接口扩展（阶段 1）—— 为 `/core/api/authz/policies` 补充 subject/domain/type/page/limit/sort 过滤契约；新增 `/core/api/authz/policies/stage`（POST/DELETE）基于 Session 的暂存实现（按 subject/domain 分区，上限 50 条，刷新不丢）。补充控制器/服务与单元测试。

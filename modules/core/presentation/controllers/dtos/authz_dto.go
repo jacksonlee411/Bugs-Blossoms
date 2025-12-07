@@ -17,13 +17,14 @@ type APIError struct {
 
 // PolicyDraftRequest captures incoming payloads for draft creation.
 type PolicyDraftRequest struct {
-	Object       string          `json:"object"`
-	Action       string          `json:"action"`
-	Reason       string          `json:"reason"`
-	Diff         json.RawMessage `json:"diff"`
-	BaseRevision string          `json:"base_revision"`
-	Domain       string          `json:"domain"`
-	Subject      string          `json:"subject"`
+	Object        string          `json:"object"`
+	Action        string          `json:"action"`
+	Reason        string          `json:"reason"`
+	Diff          json.RawMessage `json:"diff"`
+	BaseRevision  string          `json:"base_revision"`
+	Domain        string          `json:"domain"`
+	Subject       string          `json:"subject"`
+	RequestAccess bool            `json:"request_access"`
 }
 
 // PolicyDraftResponse serializes drafts for API responses.

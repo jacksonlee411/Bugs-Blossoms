@@ -190,6 +190,12 @@ func (c *AuthzAPIController) createRequest(
 		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
 		return
 	}
+	if payload.RequestAccess && len(payload.Diff) == 0 {
+		payload.Diff = json.RawMessage("[]")
+		if strings.TrimSpace(payload.Reason) == "" {
+			payload.Reason = "请求编辑角色策略"
+		}
+	}
 	tenantID := tenantIDFromContext(r)
 	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	logger.WithFields(logrus.Fields{
@@ -598,13 +604,20 @@ func decodePolicyDraftRequest(r *http.Request) (dtos.PolicyDraftRequest, error) 
 	if err := r.ParseForm(); err != nil {
 		return dtos.PolicyDraftRequest{}, err
 	}
+	diff := strings.TrimSpace(r.FormValue("diff"))
+	var diffMsg json.RawMessage
+	if diff != "" {
+		diffMsg = json.RawMessage(diff)
+	}
 	return dtos.PolicyDraftRequest{
-		Object:       r.FormValue("object"),
-		Action:       r.FormValue("action"),
-		Reason:       r.FormValue("reason"),
-		BaseRevision: r.FormValue("base_revision"),
-		Domain:       r.FormValue("domain"),
-		Subject:      r.FormValue("subject"),
+		Object:        r.FormValue("object"),
+		Action:        r.FormValue("action"),
+		Reason:        r.FormValue("reason"),
+		BaseRevision:  r.FormValue("base_revision"),
+		Domain:        r.FormValue("domain"),
+		Subject:       r.FormValue("subject"),
+		Diff:          diffMsg,
+		RequestAccess: r.FormValue("request_access") == "1" || strings.EqualFold(r.FormValue("request_access"), "true"),
 	}, nil
 }
 
