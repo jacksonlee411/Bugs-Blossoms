@@ -499,7 +499,11 @@ func mergePolicyMatrixEntries(
 		}
 		if stagedEntry, ok := stageOverlay[key]; ok {
 			row.Staged = true
-			row.StageKind = "add"
+			if stagedEntry.StageKind != "" {
+				row.StageKind = stagedEntry.StageKind
+			} else {
+				row.StageKind = "add"
+			}
 			row.StageID = stagedEntry.ID
 			row.StageOnly = false
 			delete(stageOverlay, key)
@@ -510,7 +514,7 @@ func mergePolicyMatrixEntries(
 		rows = append(rows, roles.PolicyMatrixEntry{
 			PolicyEntryResponse: stagedEntry.PolicyEntryResponse,
 			StageID:             stagedEntry.ID,
-			StageKind:           "add",
+			StageKind:           stagedEntry.StageKind,
 			Staged:              true,
 			StageOnly:           true,
 		})

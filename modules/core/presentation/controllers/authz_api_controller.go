@@ -591,12 +591,13 @@ func decodeStagePolicyRequest(r *http.Request) (dtos.StagePolicyRequest, error) 
 		return dtos.StagePolicyRequest{}, err
 	}
 	return dtos.StagePolicyRequest{
-		Type:    r.FormValue("type"),
-		Subject: r.FormValue("subject"),
-		Domain:  r.FormValue("domain"),
-		Object:  r.FormValue("object"),
-		Action:  r.FormValue("action"),
-		Effect:  r.FormValue("effect"),
+		Type:      r.FormValue("type"),
+		Subject:   r.FormValue("subject"),
+		Domain:    r.FormValue("domain"),
+		Object:    r.FormValue("object"),
+		Action:    r.FormValue("action"),
+		Effect:    r.FormValue("effect"),
+		StageKind: r.FormValue("stage_kind"),
 	}, nil
 }
 

@@ -51,6 +51,14 @@ func (s *policyStageStore) Add(key string, payload dtos.StagePolicyRequest) ([]d
 		return nil, errors.New("domain is required")
 	}
 
+	stageKind := strings.ToLower(strings.TrimSpace(payload.StageKind))
+	if stageKind == "" {
+		stageKind = "add"
+	}
+	if stageKind != "add" && stageKind != "remove" {
+		return nil, errors.New("stage_kind must be add or remove")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -61,7 +69,7 @@ func (s *policyStageStore) Add(key string, payload dtos.StagePolicyRequest) ([]d
 	id := uuid.New().String()
 	entry := dtos.StagedPolicyEntry{
 		ID:        id,
-		StageKind: "add",
+		StageKind: stageKind,
 		PolicyEntryResponse: dtos.PolicyEntryResponse{
 			Type:    payload.Type,
 			Subject: payload.Subject,

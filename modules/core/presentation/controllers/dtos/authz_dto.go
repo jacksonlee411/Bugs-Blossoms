@@ -80,12 +80,13 @@ type PolicyListResponse struct {
 
 // StagePolicyRequest captures payloads for staging a policy diff.
 type StagePolicyRequest struct {
-	Type    string `json:"type"`
-	Subject string `json:"subject"`
-	Domain  string `json:"domain"`
-	Object  string `json:"object"`
-	Action  string `json:"action"`
-	Effect  string `json:"effect"`
+	Type      string `json:"type"`
+	Subject   string `json:"subject"`
+	Domain    string `json:"domain"`
+	Object    string `json:"object"`
+	Action    string `json:"action"`
+	Effect    string `json:"effect"`
+	StageKind string `json:"stage_kind,omitempty"`
 }
 
 // StagedPolicyEntry represents a staged policy change with a client-side id.

@@ -147,6 +147,44 @@ func TestAuthzAPIController_CreateRequestFromStage(t *testing.T) {
 		Status(http.StatusBadRequest)
 }
 
+func TestAuthzAPIController_CreateRequestFromStage_Remove(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	stagePayload := dtos.StagePolicyRequest{
+		Type:      "p",
+		Subject:   "role:test",
+		Domain:    "global",
+		Object:    "core.users",
+		Action:    "read",
+		Effect:    "allow",
+		StageKind: "remove",
+	}
+	suite.POST("/core/api/authz/policies/stage").
+		JSON(stagePayload).
+		Expect(t).
+		Status(http.StatusCreated)
+
+	resp := suite.POST("/core/api/authz/requests").
+		JSON(dtos.PolicyDraftRequest{
+			Domain: "global",
+		}).
+		Expect(t).
+		Status(http.StatusCreated)
+
+	var draft dtos.PolicyDraftResponse
+	require.NoError(t, json.Unmarshal([]byte(resp.Body()), &draft))
+	require.NotEmpty(t, draft.Diff)
+	var patch []map[string]any
+	require.NoError(t, json.Unmarshal(draft.Diff, &patch))
+	require.Equal(t, "remove", patch[0]["op"])
+}
+
 func TestAuthzAPIController_CreateRequest_HTMXForbiddenToast(t *testing.T) {
 	suite := setupAuthzAPISuite(t)
 	user := itf.User(permissions.AuthzDebug)

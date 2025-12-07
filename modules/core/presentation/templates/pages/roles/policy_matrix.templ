@@ -325,6 +325,25 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 								}) {
 									{ pageCtx.T("Delete") }
 								}
+							} else if props.CanStage && !entry.Staged {
+								@button.Secondary(button.Props{
+									Size: button.SizeXS,
+									Attrs: templ.Attributes{
+										"type":      "button",
+										"hx-post":   "/core/api/authz/policies/stage",
+										"hx-target": "body",
+										"hx-swap":   "none",
+									},
+								}) {
+									<input type="hidden" name="type" value={ entry.Type }/>
+									<input type="hidden" name="subject" value={ entry.Subject }/>
+									<input type="hidden" name="domain" value={ entry.Domain }/>
+									<input type="hidden" name="object" value={ entry.Object }/>
+									<input type="hidden" name="action" value={ entry.Action }/>
+									<input type="hidden" name="effect" value={ entry.Effect }/>
+									<input type="hidden" name="stage_kind" value="remove"/>
+									{ pageCtx.T("Delete") }
+								}
 							}
 						}
 					}
