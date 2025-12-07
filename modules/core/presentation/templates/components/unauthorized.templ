@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/iota-uz/iota-sdk/pkg/authz"
@@ -14,6 +15,9 @@ type UnauthorizedProps struct {
 	Action    string
 	Operation string
 	Request   string
+	Subject   string
+	Domain    string
+	DebugURL  string
 }
 
 func normalizePolicies(state *authz.ViewState, object, action string) []authz.MissingPolicy {
@@ -48,20 +52,49 @@ templ Unauthorized(props *UnauthorizedProps) {
 	if state == nil {
 		state = pageCtx.AuthzState()
 	}
+	{{ object := strings.ToLower(strings.TrimSpace(props.Object)) }}
+	{{ normalizedAction := authz.NormalizeAction(props.Action) }}
 	{{ requestURL := strings.TrimSpace(props.Request) }}
 	if requestURL == "" {
 		requestURL = "/core/api/authz/requests"
 	}
 	{{ safeRequestURL := templ.URL(requestURL) }}
+	{{ subject := strings.TrimSpace(props.Subject) }}
+	if subject == "" && state != nil {
+		subject = state.Subject
+	}
+	{{ domain := strings.TrimSpace(props.Domain) }}
+	if domain == "" && state != nil {
+		domain = state.Tenant
+	}
+	{{ debugURL := strings.TrimSpace(props.DebugURL) }}
+	if debugURL == "" && subject != "" && object != "" && normalizedAction != "" {
+		{{ q := url.Values{} }}
+		{{ q.Set("subject", subject) }}
+		{{ q.Set("object", object) }}
+		{{ q.Set("action", normalizedAction) }}
+		if domain != "" {
+			{{ q.Set("domain", domain) }}
+		}
+		{{ debugURL = fmt.Sprintf("/core/api/authz/debug?%s", q.Encode()) }}
+	}
 	{{ operation := strings.TrimSpace(props.Operation) }}
 	if operation == "" {
-		operation = strings.TrimSpace(fmt.Sprintf("%s %s", props.Object, props.Action))
+		operation = strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction))
 		if operation == "" {
 			operation = pageCtx.T("Actions")
 		}
 	}
-	{{ policies := normalizePolicies(state, props.Object, props.Action) }}
-	<section class="rounded-lg border border-primary bg-surface-600/80 p-6 text-left shadow">
+	{{ policies := normalizePolicies(state, object, normalizedAction) }}
+	<section
+		class="rounded-lg border border-primary bg-surface-600/80 p-6 text-left shadow"
+		data-action={ normalizedAction }
+		data-domain={ domain }
+		data-object={ object }
+		data-request-url={ requestURL }
+		data-subject={ subject }
+		data-debug-url={ debugURL }
+	>
 		<div class="space-y-2">
 			<h2 class="text-lg font-semibold text-white">
 				{ pageCtx.T("Authz.Unauthorized.Title") }

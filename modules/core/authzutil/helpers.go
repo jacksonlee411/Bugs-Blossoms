@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/iota-uz/iota-sdk/pkg/authz"
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
-	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
@@ -50,6 +50,28 @@ func EnsureViewState(ctx context.Context, tenantID uuid.UUID, u user.User) (cont
 	ctxWithState := authz.WithViewState(ctx, viewState)
 	syncPageContext(ctxWithState, viewState)
 	return ctxWithState, viewState
+}
+
+// EnsureViewStateOrAnonymous guarantees a view state exists even when user is nil.
+func EnsureViewStateOrAnonymous(ctx context.Context, tenantID uuid.UUID, u user.User) (context.Context, *authz.ViewState) {
+	if u != nil {
+		return EnsureViewState(ctx, tenantID, u)
+	}
+
+	state := authz.ViewStateFromContext(ctx)
+	if state == nil {
+		state = authz.NewViewState(authz.SubjectForUserID(tenantID, "anonymous"), authz.DomainFromTenant(tenantID))
+		ctx = authz.WithViewState(ctx, state)
+	} else {
+		if state.Subject == "" {
+			state.Subject = authz.SubjectForUserID(tenantID, "anonymous")
+		}
+		if state.Tenant == "" {
+			state.Tenant = authz.DomainFromTenant(tenantID)
+		}
+	}
+	syncPageContext(ctx, state)
+	return ctx, state
 }
 
 // CheckCapability evaluates the authz capability for the supplied object/action.
@@ -103,4 +125,18 @@ func syncPageContext(ctx context.Context, state *authz.ViewState) {
 		return
 	}
 	pageCtx.SetAuthzState(state)
+}
+
+// TenantIDFromContext extracts tenant id or returns uuid.Nil if missing.
+func TenantIDFromContext(ctx context.Context) uuid.UUID {
+	tenantID, err := composables.UseTenantID(ctx)
+	if err != nil {
+		return uuid.Nil
+	}
+	return tenantID
+}
+
+// DomainFromContext returns casbin domain string derived from tenant in context.
+func DomainFromContext(ctx context.Context) string {
+	return authz.DomainFromTenant(TenantIDFromContext(ctx))
 }

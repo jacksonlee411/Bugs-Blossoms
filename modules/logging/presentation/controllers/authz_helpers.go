@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -37,7 +36,10 @@ func ensureLoggingAuthz(
 	capKey := authzutil.CapabilityKey(logsAuthzObject, action)
 	tenantID := tenantIDFromContext(r)
 	currentUser, err := composables.UseUser(r.Context())
-	state := ensureLoggingViewState(r, tenantID, currentUser)
+	ctxWithState, state := authzutil.EnsureViewStateOrAnonymous(r.Context(), tenantID, currentUser)
+	if ctxWithState != r.Context() {
+		*r = *r.WithContext(ctxWithState)
+	}
 	subject := resolveLoggingSubject(tenantID, currentUser)
 	req := authz.NewRequest(
 		subject,
@@ -105,57 +107,11 @@ func enforceRequest(ctx context.Context, svc *authz.Service, req authz.Request, 
 }
 
 func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, action string) {
-	msg := fmt.Sprintf("Forbidden: %s %s. 如需申请权限，请访问 /core/api/authz/requests。", object, action)
-
 	state := authz.ViewStateFromContext(r.Context())
-	normalizedAction := authz.NormalizeAction(action)
-	requestURL := "/core/api/authz/requests"
-	debugURL := "/core/api/authz/debug"
-	subject := ""
-	domain := authzDomainFromContext(r)
-	var missingPolicies []authz.MissingPolicy
-	var suggestDiff []authz.PolicySuggestion
-
-	if state != nil {
-		subject = state.Subject
-		domain = state.Tenant
-		missingPolicies = state.MissingPolicies
-		for _, policy := range state.MissingPolicies {
-			suggestDiff = append(suggestDiff, state.SuggestDiff(policy)...)
-		}
-	}
-	if len(missingPolicies) == 0 && object != "" && normalizedAction != "" {
-		missingPolicies = []authz.MissingPolicy{{
-			Domain: domain,
-			Object: object,
-			Action: normalizedAction,
-		}}
-	}
-	if subject != "" && object != "" && normalizedAction != "" {
-		q := url.Values{}
-		q.Set("subject", subject)
-		q.Set("object", object)
-		q.Set("action", normalizedAction)
-		if domain != "" {
-			q.Set("domain", domain)
-		}
-		debugURL = fmt.Sprintf("/core/api/authz/debug?%s", q.Encode())
-	}
+	payload := authzutil.BuildForbiddenPayload(r, state, object, action)
 
 	accept := strings.ToLower(r.Header.Get("Accept"))
 	if strings.Contains(accept, "application/json") {
-		payload := map[string]interface{}{
-			"error":            "forbidden",
-			"message":          msg,
-			"object":           object,
-			"action":           normalizedAction,
-			"subject":          subject,
-			"domain":           domain,
-			"missing_policies": missingPolicies,
-			"suggest_diff":     suggestDiff,
-			"request_url":      requestURL,
-			"debug_url":        debugURL,
-		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		if err := json.NewEncoder(w).Encode(payload); err != nil {
@@ -170,30 +126,28 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 	}
 	if _, ok := composables.TryUsePageCtx(r.Context()); ok {
 		props := &corecomponents.UnauthorizedProps{
-			Object:    object,
-			Action:    normalizedAction,
-			Operation: fmt.Sprintf("%s %s", object, normalizedAction),
+			Object:    payload.Object,
+			Action:    payload.Action,
+			Operation: fmt.Sprintf("%s %s", payload.Object, payload.Action),
 			State:     state,
-			Request:   requestURL,
+			Request:   payload.RequestURL,
+			Subject:   payload.Subject,
+			Domain:    payload.Domain,
+			DebugURL:  payload.DebugURL,
 		}
 		w.WriteHeader(http.StatusForbidden)
 		templ.Handler(corecomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
-	http.Error(w, msg, http.StatusForbidden)
+	http.Error(w, payload.Message, http.StatusForbidden)
 }
 
 func tenantIDFromContext(r *http.Request) uuid.UUID {
-	tenantID, err := composables.UseTenantID(r.Context())
-	if err != nil {
-		return uuid.Nil
-	}
-	return tenantID
+	return authzutil.TenantIDFromContext(r.Context())
 }
 
 func authzDomainFromContext(r *http.Request) string {
-	tenantID := tenantIDFromContext(r)
-	return authz.DomainFromTenant(tenantID)
+	return authzutil.DomainFromContext(r.Context())
 }
 
 func recordForbiddenCapability(state *authz.ViewState, r *http.Request, object, action, capKey string) {
@@ -297,26 +251,6 @@ func logUnauthorizedAccess(r *http.Request, req authz.Request, mode authz.Mode, 
 		return
 	}
 	committed = true
-}
-
-func ensureLoggingViewState(r *http.Request, tenantID uuid.UUID, currentUser user.User) *authz.ViewState {
-	if currentUser != nil {
-		ctxWithState, state := authzutil.EnsureViewState(r.Context(), tenantID, currentUser)
-		if ctxWithState != r.Context() {
-			*r = *r.WithContext(ctxWithState)
-		}
-		return state
-	}
-
-	state := authz.ViewStateFromContext(r.Context())
-	if state == nil {
-		state = authz.NewViewState(authz.SubjectForUserID(tenantID, "anonymous"), authz.DomainFromTenant(tenantID))
-		ctxWithState := authz.WithViewState(r.Context(), state)
-		*r = *r.WithContext(ctxWithState)
-	} else if state.Tenant == "" {
-		state.Tenant = authz.DomainFromTenant(tenantID)
-	}
-	return state
 }
 
 func resolveLoggingSubject(tenantID uuid.UUID, currentUser user.User) string {

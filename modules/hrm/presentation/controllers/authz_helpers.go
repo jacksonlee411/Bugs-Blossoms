@@ -2,12 +2,12 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/a-h/templ"
-
 	"github.com/google/uuid"
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
@@ -29,17 +29,17 @@ func ensureHRMAuthz(
 ) bool {
 	capKey := authzutil.CapabilityKey(object, action)
 
-	currentUser, err := composables.UseUser(r.Context())
-	if err != nil || currentUser == nil {
-		recordForbiddenCapability(authz.ViewStateFromContext(r.Context()), r, object, action, capKey)
-		writeForbiddenResponse(w, r, object, action)
-		return false
-	}
-
 	tenantID := tenantIDFromContext(r)
-	ctxWithState, state := authzutil.EnsureViewState(r.Context(), tenantID, currentUser)
+	currentUser, err := composables.UseUser(r.Context())
+	ctxWithState, state := authzutil.EnsureViewStateOrAnonymous(r.Context(), tenantID, currentUser)
 	if ctxWithState != r.Context() {
 		*r = *r.WithContext(ctxWithState)
+	}
+
+	if err != nil || currentUser == nil {
+		recordForbiddenCapability(state, r, object, action, capKey)
+		writeForbiddenResponse(w, r, object, action)
+		return false
 	}
 
 	svc := authz.Use()
@@ -105,37 +105,48 @@ func enforceRequest(ctx context.Context, svc *authz.Service, req authz.Request, 
 }
 
 func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, action string) {
-	msg := fmt.Sprintf("Forbidden: %s %s. 如需申请权限，请访问 /core/api/authz/requests。", object, action)
+	state := authz.ViewStateFromContext(r.Context())
+	payload := authzutil.BuildForbiddenPayload(r, state, object, action)
+	if accept := strings.ToLower(r.Header.Get("Accept")); strings.Contains(accept, "application/json") {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		if err := json.NewEncoder(w).Encode(payload); err != nil {
+			composables.UseLogger(r.Context()).WithError(err).Warn("failed to encode forbidden response")
+		}
+		return
+	}
+
 	if htmx.IsHxRequest(r) {
 		w.Header().Set("Hx-Retarget", "body")
 		w.Header().Set("Hx-Reswap", "innerHTML")
 	}
 	if pageCtx, ok := composables.TryUsePageCtx(r.Context()); ok {
+		if state == nil {
+			state = pageCtx.AuthzState()
+		}
 		props := &corecomponents.UnauthorizedProps{
-			Object:    object,
-			Action:    action,
-			Operation: fmt.Sprintf("%s %s", object, action),
-			State:     pageCtx.AuthzState(),
-			Request:   "/core/api/authz/requests",
+			Object:    payload.Object,
+			Action:    payload.Action,
+			Operation: fmt.Sprintf("%s %s", payload.Object, payload.Action),
+			State:     state,
+			Request:   payload.RequestURL,
+			Subject:   payload.Subject,
+			Domain:    payload.Domain,
+			DebugURL:  payload.DebugURL,
 		}
 		w.WriteHeader(http.StatusForbidden)
 		templ.Handler(corecomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
-	http.Error(w, msg, http.StatusForbidden)
+	http.Error(w, payload.Message, http.StatusForbidden)
 }
 
 func tenantIDFromContext(r *http.Request) uuid.UUID {
-	tenantID, err := composables.UseTenantID(r.Context())
-	if err != nil {
-		return uuid.Nil
-	}
-	return tenantID
+	return authzutil.TenantIDFromContext(r.Context())
 }
 
 func authzDomainFromContext(r *http.Request) string {
-	tenantID := tenantIDFromContext(r)
-	return authz.DomainFromTenant(tenantID)
+	return authzutil.DomainFromContext(r.Context())
 }
 
 func recordForbiddenCapability(state *authz.ViewState, r *http.Request, object, action, capKey string) {
