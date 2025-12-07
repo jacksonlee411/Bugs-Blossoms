@@ -104,6 +104,49 @@ func TestAuthzAPIController_StagePolicy(t *testing.T) {
 	require.Contains(t, resp.Body(), "\"total\":0")
 }
 
+func TestAuthzAPIController_CreateRequestFromStage(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	stagePayload := dtos.StagePolicyRequest{
+		Type:    "p",
+		Subject: "role:test",
+		Domain:  "global",
+		Object:  "core.users",
+		Action:  "read",
+		Effect:  "allow",
+	}
+	stageResp := suite.POST("/core/api/authz/policies/stage").
+		JSON(stagePayload).
+		Expect(t).
+		Status(http.StatusCreated)
+	var staged dtos.StagePolicyResponse
+	require.NoError(t, json.Unmarshal([]byte(stageResp.Body()), &staged))
+	require.NotEmpty(t, staged.Data)
+	require.Equal(t, "core.users", staged.Data[0].Object)
+
+	requestPayload := dtos.PolicyDraftRequest{
+		Reason: "from stage",
+		Domain: "global",
+	}
+	resp := suite.POST("/core/api/authz/requests").
+		JSON(requestPayload).
+		Expect(t).
+		Status(http.StatusCreated)
+	require.Contains(t, resp.Body(), "\"status\"")
+
+	// stage should now be empty; submitting again without diff should fail
+	suite.POST("/core/api/authz/requests").
+		JSON(dtos.PolicyDraftRequest{}).
+		Expect(t).
+		Status(http.StatusBadRequest)
+}
+
 func extractStageID(t *testing.T, body string) string {
 	t.Helper()
 	var parsed dtos.StagePolicyResponse

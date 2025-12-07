@@ -23,6 +23,7 @@ type PolicyDraftRequest struct {
 	Diff         json.RawMessage `json:"diff"`
 	BaseRevision string          `json:"base_revision"`
 	Domain       string          `json:"domain"`
+	Subject      string          `json:"subject"`
 }
 
 // PolicyDraftResponse serializes drafts for API responses.
@@ -88,7 +89,8 @@ type StagePolicyRequest struct {
 
 // StagedPolicyEntry represents a staged policy change with a client-side id.
 type StagedPolicyEntry struct {
-	ID string `json:"id"`
+	ID        string `json:"id"`
+	StageKind string `json:"stage_kind,omitempty"`
 	PolicyEntryResponse
 }
 

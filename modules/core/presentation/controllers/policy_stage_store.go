@@ -60,7 +60,8 @@ func (s *policyStageStore) Add(key string, payload dtos.StagePolicyRequest) ([]d
 	}
 	id := uuid.New().String()
 	entry := dtos.StagedPolicyEntry{
-		ID: id,
+		ID:        id,
+		StageKind: "add",
 		PolicyEntryResponse: dtos.PolicyEntryResponse{
 			Type:    payload.Type,
 			Subject: payload.Subject,
@@ -97,6 +98,33 @@ func (s *policyStageStore) Delete(key string, id string) ([]dtos.StagedPolicyEnt
 	}
 	s.data[key] = next
 	return next, nil
+}
+
+func (s *policyStageStore) Clear(key string, subject, domain string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	entries, ok := s.data[key]
+	if !ok || len(entries) == 0 {
+		return 0
+	}
+	if strings.TrimSpace(subject) == "" && strings.TrimSpace(domain) == "" {
+		delete(s.data, key)
+		return 0
+	}
+	next := make([]dtos.StagedPolicyEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Subject == subject && entry.Domain == domain {
+			continue
+		}
+		next = append(next, entry)
+	}
+	if len(next) == 0 {
+		delete(s.data, key)
+		return 0
+	}
+	s.data[key] = next
+	return len(next)
 }
 
 func (s *policyStageStore) List(key string, subject, domain string) []dtos.StagedPolicyEntry {

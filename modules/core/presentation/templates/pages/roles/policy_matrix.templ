@@ -74,17 +74,37 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					</span>
 				}
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-3 flex-wrap">
 				if props.CanStage {
-					@button.Primary(button.Props{
-						Size: button.SizeSM,
-						Attrs: templ.Attributes{
-							"type":   "button",
-							"@click": "$dispatch('open-stage-policy')",
-						},
-					}) {
-						{ pageCtx.T("Create") }
-					}
+					<div class="flex items-center gap-2">
+						@button.Primary(button.Props{
+							Size: button.SizeSM,
+							Attrs: templ.Attributes{
+								"type":   "button",
+								"@click": "$dispatch('open-stage-policy')",
+							},
+						}) {
+							{ pageCtx.T("Create") }
+						}
+						<form
+							class="flex items-center gap-2"
+							hx-post="/core/api/authz/requests"
+							hx-target="body"
+							hx-swap="none"
+						>
+							<input type="hidden" name="subject" value={ props.Subject }/>
+							<input type="hidden" name="domain" value={ props.Domain }/>
+							<input type="hidden" name="object" value=""/>
+							<input type="hidden" name="action" value=""/>
+							<button
+								class="btn btn-sm"
+								type="submit"
+								disabled?={ props.StageTotal == 0 }
+							>
+								提交草稿
+							</button>
+						</form>
+					</div>
 				}
 				if !props.CanDebug {
 					<span class="text-sm text-error-400">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>

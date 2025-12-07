@@ -185,13 +185,29 @@ func (c *AuthzAPIController) createRequest(
 	if !c.ensurePermission(w, r, permissions.AuthzRequestsWrite) {
 		return
 	}
-	var payload dtos.PolicyDraftRequest
-	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "unable to parse request body")
+	payload, err := decodePolicyDraftRequest(r)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
 		return
 	}
 	tenantID := tenantIDFromContext(r)
 	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	logger.WithFields(logrus.Fields{
+		"diff_len": len(payload.Diff),
+		"subject":  payload.Subject,
+		"domain":   payload.Domain,
+		"object":   payload.Object,
+		"action":   payload.Action,
+	}).Debug("authz api: create draft payload")
+	diffStr := strings.TrimSpace(string(payload.Diff))
+	if diffStr == "" || strings.EqualFold(diffStr, "null") {
+		payload, err = c.buildDraftFromStage(r.Context(), tenantID, currentUser, payload)
+		if err != nil {
+			htmx.TriggerToast(w, htmx.ToastVariantError, "提交失败", err.Error())
+			writeJSONError(w, http.StatusBadRequest, "AUTHZ_STAGE_EMPTY", err.Error())
+			return
+		}
+	}
 	params := services.CreatePolicyDraftParams{
 		RequesterID:  requesterID,
 		Object:       payload.Object,
@@ -203,8 +219,13 @@ func (c *AuthzAPIController) createRequest(
 	}
 	draft, err := svc.Create(r.Context(), tenantID, params)
 	if err != nil {
+		logger.WithError(err).Error("authz api: create draft failed")
 		c.respondServiceError(w, err)
 		return
+	}
+	if htmx.IsHxRequest(r) {
+		htmx.SetTrigger(w, "policies:staged", `{"total":0}`)
+		htmx.TriggerToast(w, htmx.ToastVariantSuccess, "提交成功", "已提交策略草稿")
 	}
 	writeJSON(w, http.StatusCreated, dtos.NewPolicyDraftResponse(draft))
 }
@@ -551,4 +572,108 @@ func decodeStagePolicyRequest(r *http.Request) (dtos.StagePolicyRequest, error) 
 		Action:  r.FormValue("action"),
 		Effect:  r.FormValue("effect"),
 	}, nil
+}
+
+func decodePolicyDraftRequest(r *http.Request) (dtos.PolicyDraftRequest, error) {
+	contentType := strings.ToLower(r.Header.Get("Content-Type"))
+	if strings.Contains(contentType, "application/json") {
+		var payload dtos.PolicyDraftRequest
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			return dtos.PolicyDraftRequest{}, err
+		}
+		return payload, nil
+	}
+	if err := r.ParseForm(); err != nil {
+		return dtos.PolicyDraftRequest{}, err
+	}
+	return dtos.PolicyDraftRequest{
+		Object:       r.FormValue("object"),
+		Action:       r.FormValue("action"),
+		Reason:       r.FormValue("reason"),
+		BaseRevision: r.FormValue("base_revision"),
+		Domain:       r.FormValue("domain"),
+		Subject:      r.FormValue("subject"),
+	}, nil
+}
+
+func (c *AuthzAPIController) buildDraftFromStage(
+	ctx context.Context,
+	tenantID uuid.UUID,
+	currentUser user.User,
+	payload dtos.PolicyDraftRequest,
+) (dtos.PolicyDraftRequest, error) {
+	key := policyStageKey(currentUser.ID(), tenantID)
+	subject := strings.TrimSpace(payload.Subject)
+	domain := strings.TrimSpace(payload.Domain)
+	entries := c.stageStore.List(key, subject, domain)
+	if len(entries) == 0 {
+		return payload, errors.New("暂无可提交的暂存规则")
+	}
+	if subject == "" {
+		subject = entries[0].Subject
+	}
+	if domain == "" {
+		domain = entries[0].Domain
+	}
+	filtered := make([]dtos.StagedPolicyEntry, 0, len(entries))
+	for _, entry := range entries {
+		if entry.Subject == subject && entry.Domain == domain {
+			filtered = append(filtered, entry)
+		}
+	}
+	if len(filtered) == 0 {
+		return payload, errors.New("暂存规则与当前筛选不匹配")
+	}
+	first := filtered[0]
+	if strings.TrimSpace(first.Object) == "" || strings.TrimSpace(first.Action) == "" {
+		return payload, errors.New("暂存规则缺少对象或动作")
+	}
+	logrus.WithFields(logrus.Fields{
+		"stage_count": len(filtered),
+		"subject":     first.Subject,
+		"domain":      first.Domain,
+		"object":      first.Object,
+		"action":      first.Action,
+	}).Debug("authz stage draft build")
+	if logger := composables.UseLogger(ctx); logger != nil {
+		logger.WithFields(logrus.Fields{
+			"subject": first.Subject,
+			"domain":  first.Domain,
+			"object":  first.Object,
+			"action":  first.Action,
+		}).Info("authz stage draft build")
+	}
+	patches := make([]map[string]any, 0, len(filtered))
+	for _, entry := range filtered {
+		op := "add"
+		if entry.StageKind == "remove" {
+			op = "remove"
+		}
+		patches = append(patches, map[string]any{
+			"op":   op,
+			"path": "/p",
+			"value": []string{
+				entry.Subject,
+				entry.Object,
+				entry.Action,
+				entry.Domain,
+				entry.Effect,
+			},
+		})
+	}
+	diffBytes, err := json.Marshal(patches)
+	if err != nil {
+		return payload, err
+	}
+	payload.Subject = subject
+	payload.Domain = domain
+	if strings.TrimSpace(payload.Object) == "" {
+		payload.Object = first.Object
+	}
+	if strings.TrimSpace(payload.Action) == "" {
+		payload.Action = first.Action
+	}
+	payload.Diff = diffBytes
+	c.stageStore.Clear(key, subject, domain)
+	return payload, nil
 }
