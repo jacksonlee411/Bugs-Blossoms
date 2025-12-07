@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
@@ -33,6 +35,7 @@ type RolesController struct {
 	app              application.Application
 	basePath         string
 	permissionSchema *rbac.PermissionSchema
+	stageStore       *policyStageStore
 }
 
 var rolesAuthzObject = authz.ObjectName("core", "roles")
@@ -72,6 +75,7 @@ func NewRolesController(app application.Application, opts *RolesControllerOption
 		app:              app,
 		basePath:         opts.BasePath,
 		permissionSchema: opts.PermissionSchema,
+		stageStore:       usePolicyStageStore(),
 	}
 }
 
@@ -190,7 +194,7 @@ func (c *RolesController) GetEdit(
 		http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
 		return
 	}
-	matrixProps, matrixErr := c.buildPolicyMatrixProps(r.Context(), policyService, roleEntity, PolicyListParams{})
+	matrixProps, matrixErr := c.buildPolicyMatrixProps(r.Context(), r, policyService, roleEntity, PolicyListParams{})
 	if matrixErr != nil {
 		logger.WithError(matrixErr).Error("Error building policy matrix")
 	}
@@ -377,7 +381,7 @@ func (c *RolesController) GetPolicies(
 		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", err.Error())
 		return
 	}
-	matrixProps, err := c.buildPolicyMatrixProps(r.Context(), policyService, roleEntity, params)
+	matrixProps, err := c.buildPolicyMatrixProps(r.Context(), r, policyService, roleEntity, params)
 	if err != nil {
 		logger.WithError(err).Error("failed to build policy matrix")
 		writeJSONError(w, http.StatusInternalServerError, "AUTHZ_POLICIES_ERROR", "failed to load policies")
@@ -388,6 +392,7 @@ func (c *RolesController) GetPolicies(
 
 func (c *RolesController) buildPolicyMatrixProps(
 	ctx context.Context,
+	r *http.Request,
 	policyService *services.PolicyDraftService,
 	roleEntity role.Role,
 	params PolicyListParams,
@@ -408,21 +413,24 @@ func (c *RolesController) buildPolicyMatrixProps(
 	if params.Domain == "" {
 		params.Domain = authz.DomainFromTenant(roleEntity.TenantID())
 	}
-	pageEntries, total := paginatePolicies(entries, params)
-	data := make([]dtos.PolicyEntryResponse, 0, len(pageEntries))
-	for _, entry := range pageEntries {
-		data = append(data, dtos.PolicyEntryResponse{
-			Type:    entry.Type,
-			Subject: entry.Subject,
-			Domain:  entry.Domain,
-			Object:  entry.Object,
-			Action:  entry.Action,
-			Effect:  entry.Effect,
-		})
+	var stagedEntries []dtos.StagedPolicyEntry
+	var canStage bool
+	if currentUser, err := composables.UseUser(ctx); err == nil && currentUser != nil {
+		if tenantID, tenantErr := composables.UseTenantID(ctx); tenantErr == nil {
+			stagedEntries = c.stageStore.List(
+				policyStageKey(currentUser.ID(), tenantID),
+				params.Subject,
+				params.Domain,
+			)
+		}
 	}
+	if err := composables.CanUser(ctx, permissions.AuthzRequestsWrite); err == nil {
+		canStage = true
+	}
+	matrixEntries, total := mergePolicyMatrixEntries(entries, stagedEntries, params)
 	return &roles.PolicyMatrixProps{
 		RoleID:   fmt.Sprintf("%d", roleEntity.ID()),
-		Entries:  data,
+		Entries:  matrixEntries,
 		Total:    total,
 		Page:     params.Page,
 		Limit:    params.Limit,
@@ -431,5 +439,120 @@ func (c *RolesController) buildPolicyMatrixProps(
 		Type:     params.Type,
 		Search:   params.Search,
 		CanDebug: true,
+		CanStage: canStage,
+		StageTotal: func() int {
+			if stagedEntries == nil {
+				return 0
+			}
+			return len(stagedEntries)
+		}(),
 	}, nil
+}
+
+func mergePolicyMatrixEntries(
+	baseEntries []services.PolicyEntry,
+	staged []dtos.StagedPolicyEntry,
+	params PolicyListParams,
+) ([]roles.PolicyMatrixEntry, int) {
+	filtered := filterPolicies(baseEntries, params)
+
+	stagePolicies := make([]services.PolicyEntry, 0, len(staged))
+	stageMeta := make(map[string]dtos.StagedPolicyEntry, len(staged))
+	for _, entry := range staged {
+		policy := services.PolicyEntry{
+			Type:    entry.Type,
+			Subject: entry.Subject,
+			Domain:  entry.Domain,
+			Object:  entry.Object,
+			Action:  entry.Action,
+			Effect:  entry.Effect,
+		}
+		stageMeta[policyEntryKey(policy)] = entry
+		stagePolicies = append(stagePolicies, policy)
+	}
+	filteredStage := filterPolicies(stagePolicies, params)
+	stageOverlay := make(map[string]dtos.StagedPolicyEntry, len(filteredStage))
+	for _, entry := range filteredStage {
+		key := policyEntryKey(entry)
+		if stagedEntry, ok := stageMeta[key]; ok {
+			stageOverlay[key] = stagedEntry
+		}
+	}
+
+	rows := make([]roles.PolicyMatrixEntry, 0, len(filtered)+len(stageOverlay))
+	for _, entry := range filtered {
+		key := policyEntryKey(entry)
+		row := roles.PolicyMatrixEntry{
+			PolicyEntryResponse: dtos.PolicyEntryResponse{
+				Type:    entry.Type,
+				Subject: entry.Subject,
+				Domain:  entry.Domain,
+				Object:  entry.Object,
+				Action:  entry.Action,
+				Effect:  entry.Effect,
+			},
+		}
+		if stagedEntry, ok := stageOverlay[key]; ok {
+			row.Staged = true
+			row.StageKind = "add"
+			row.StageID = stagedEntry.ID
+			row.StageOnly = false
+			delete(stageOverlay, key)
+		}
+		rows = append(rows, row)
+	}
+	for _, stagedEntry := range stageOverlay {
+		rows = append(rows, roles.PolicyMatrixEntry{
+			PolicyEntryResponse: stagedEntry.PolicyEntryResponse,
+			StageID:             stagedEntry.ID,
+			StageKind:           "add",
+			Staged:              true,
+			StageOnly:           true,
+		})
+	}
+
+	sortPolicyMatrixEntries(rows, params.SortField, params.SortAsc)
+	total := len(rows)
+	start := params.Offset()
+	end := start + params.Limit
+	if start > total {
+		start = total
+	}
+	if end > total {
+		end = total
+	}
+	return rows[start:end], total
+}
+
+func sortPolicyMatrixEntries(entries []roles.PolicyMatrixEntry, field string, asc bool) {
+	less := func(i, j int) bool { return entries[i].Object < entries[j].Object }
+	switch field {
+	case "subject":
+		less = func(i, j int) bool { return entries[i].Subject < entries[j].Subject }
+	case "domain":
+		less = func(i, j int) bool { return entries[i].Domain < entries[j].Domain }
+	case "type":
+		less = func(i, j int) bool { return entries[i].Type < entries[j].Type }
+	case "action":
+		less = func(i, j int) bool { return entries[i].Action < entries[j].Action }
+	case "effect":
+		less = func(i, j int) bool { return entries[i].Effect < entries[j].Effect }
+	}
+	sort.SliceStable(entries, func(i, j int) bool {
+		if asc {
+			return less(i, j)
+		}
+		return less(j, i)
+	})
+}
+
+func policyEntryKey(entry services.PolicyEntry) string {
+	return strings.Join([]string{
+		entry.Type,
+		entry.Subject,
+		entry.Domain,
+		entry.Object,
+		entry.Action,
+		entry.Effect,
+	}, "|")
 }

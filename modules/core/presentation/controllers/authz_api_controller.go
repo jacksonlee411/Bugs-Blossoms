@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,6 +22,7 @@ import (
 	authzPersistence "github.com/iota-uz/iota-sdk/pkg/authz/persistence"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/di"
+	"github.com/iota-uz/iota-sdk/pkg/htmx"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
 
 	"github.com/iota-uz/iota-sdk/modules/core/permissions"
@@ -42,7 +42,7 @@ func NewAuthzAPIController(app application.Application) application.Controller {
 	return &AuthzAPIController{
 		app:        app,
 		basePath:   "/core/api/authz",
-		stageStore: newPolicyStageStore(),
+		stageStore: usePolicyStageStore(),
 	}
 }
 
@@ -231,9 +231,9 @@ func (c *AuthzAPIController) stagePolicy(
 
 	switch r.Method {
 	case http.MethodPost:
-		var payload dtos.StagePolicyRequest
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "unable to parse request body")
+		payload, err := decodeStagePolicyRequest(r)
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
 			return
 		}
 		entries, err := c.stageStore.Add(key, payload)
@@ -241,6 +241,7 @@ func (c *AuthzAPIController) stagePolicy(
 			writeJSONError(w, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
 			return
 		}
+		htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(entries)))
 		writeJSON(w, http.StatusCreated, dtos.StagePolicyResponse{
 			Data:  entries,
 			Total: len(entries),
@@ -256,6 +257,7 @@ func (c *AuthzAPIController) stagePolicy(
 			writeJSONError(w, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
 			return
 		}
+		htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(entries)))
 		writeJSON(w, http.StatusOK, dtos.StagePolicyResponse{
 			Data:  entries,
 			Total: len(entries),
@@ -529,82 +531,24 @@ func parseUUID(raw string) (uuid.UUID, error) {
 	return uuid.Parse(strings.TrimSpace(raw))
 }
 
-type policyStageStore struct {
-	mu   sync.Mutex
-	data map[string][]dtos.StagedPolicyEntry
-}
-
-func newPolicyStageStore() *policyStageStore {
-	return &policyStageStore{
-		data: make(map[string][]dtos.StagedPolicyEntry),
-	}
-}
-
-func policyStageKey(userID uint, tenantID uuid.UUID) string {
-	return fmt.Sprintf("%d:%s", userID, tenantID.String())
-}
-
-func (s *policyStageStore) Add(key string, payload dtos.StagePolicyRequest) ([]dtos.StagedPolicyEntry, error) {
-	if strings.TrimSpace(payload.Type) == "" {
-		return nil, errors.New("type is required")
-	}
-	if strings.TrimSpace(payload.Object) == "" {
-		return nil, errors.New("object is required")
-	}
-	if strings.TrimSpace(payload.Action) == "" {
-		return nil, errors.New("action is required")
-	}
-	if strings.TrimSpace(payload.Effect) == "" {
-		return nil, errors.New("effect is required")
-	}
-	if strings.TrimSpace(payload.Domain) == "" {
-		return nil, errors.New("domain is required")
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	entries := s.data[key]
-	if len(entries) >= 50 {
-		return nil, errors.New("stage limit reached (50)")
-	}
-	id := uuid.New().String()
-	entry := dtos.StagedPolicyEntry{
-		ID: id,
-		PolicyEntryResponse: dtos.PolicyEntryResponse{
-			Type:    payload.Type,
-			Subject: payload.Subject,
-			Domain:  payload.Domain,
-			Object:  payload.Object,
-			Action:  authz.NormalizeAction(payload.Action),
-			Effect:  payload.Effect,
-		},
-	}
-	entries = append(entries, entry)
-	s.data[key] = entries
-	return entries, nil
-}
-
-func (s *policyStageStore) Delete(key string, id string) ([]dtos.StagedPolicyEntry, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	entries, ok := s.data[key]
-	if !ok {
-		return []dtos.StagedPolicyEntry{}, nil
-	}
-	next := make([]dtos.StagedPolicyEntry, 0, len(entries))
-	found := false
-	for _, entry := range entries {
-		if entry.ID == id {
-			found = true
-			continue
+func decodeStagePolicyRequest(r *http.Request) (dtos.StagePolicyRequest, error) {
+	contentType := strings.ToLower(r.Header.Get("Content-Type"))
+	if strings.Contains(contentType, "application/json") {
+		var payload dtos.StagePolicyRequest
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			return dtos.StagePolicyRequest{}, err
 		}
-		next = append(next, entry)
+		return payload, nil
 	}
-	if !found {
-		return nil, errors.New("stage entry not found")
+	if err := r.ParseForm(); err != nil {
+		return dtos.StagePolicyRequest{}, err
 	}
-	s.data[key] = next
-	return next, nil
+	return dtos.StagePolicyRequest{
+		Type:    r.FormValue("type"),
+		Subject: r.FormValue("subject"),
+		Domain:  r.FormValue("domain"),
+		Object:  r.FormValue("object"),
+		Action:  r.FormValue("action"),
+		Effect:  r.FormValue("effect"),
+	}, nil
 }
