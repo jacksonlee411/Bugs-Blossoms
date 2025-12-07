@@ -1,6 +1,6 @@
 # DEV-PLAN-014D：Casbin 公共层与 UI 接口落地计划
 
-**状态**: 规划中（2025-12-06 05:05 UTC） — 对应 DEV-PLAN-014 "公共层与 UI 接口" 子任务，聚焦 ViewState/UI 契约与文档/导航一致性。
+**状态**: 完成（2025-12-07 00:00 UTC） — 对应 DEV-PLAN-014 "公共层与 UI 接口" 子任务，聚焦 ViewState/UI 契约与文档/导航一致性。
 
 ## 背景
 - DEV-PLAN-014 在步骤 4 要求统一公共层与 UI 接口：去除模板内 `user.Can`、通过 controller 注入 `authz.ViewState`、导航/Quick Links 依赖 Casbin，可为 015A/015B 的 Unauthorized/PolicyInspector 组件提供数据契约。
