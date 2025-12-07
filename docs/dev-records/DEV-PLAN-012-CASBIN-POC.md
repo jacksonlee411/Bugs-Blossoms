@@ -18,5 +18,9 @@
 | 2025-12-07 06:58 | `go test ./pkg/spotlight/... ./modules/core/presentation/controllers/... ./modules/hrm/presentation/controllers/... ./modules/logging/presentation/controllers/...` | 验证导航/Quick Links/Unauthorized 契约，新增 QuickLinks capability 单测 | 所有相关用例通过 | ✅ |
 | 2025-12-07 09:30 | `GOCACHE=/tmp/go-cache go test ./modules/logging/...` | Logging 控制器/服务/仓储单测覆盖无 Session/无租户/无权限/成功路径 | 所有 logging 包用例通过（含 action log 开关降级场景） | ✅ |
 | 2025-12-07 09:30 | `GOCACHE=/tmp/go-cache make authz-lint` | readiness 补充：policy 打包 + fixtures parity（含 logging.view 基线） | `authz-pack` + fixtures parity 通过 | ✅ |
+| 2025-12-07 01:05 | `GOCACHE=/tmp/go-cache go test ./pkg/authz/...` | readiness 补充：`pkg/authz` 主包在当前基线上全量通过 | 所有 `pkg/authz` 子包用例通过 | ✅ |
+| 2025-12-07 01:05 | `AUTHZ_ENFORCE=1 GOCACHE=/tmp/go-cache go test ./modules/core/...` | Core 在 enforce 路径下 controller/service/nav/spotlight 授权链路应全部通过 | 所有 Core 包用例通过（含 controller/service enforce 覆盖） | ✅ |
+| 2025-12-07 01:05 | `AUTHZ_ENFORCE=1 GOCACHE=/tmp/go-cache go test ./modules/hrm/...` | HRM 在 enforce 路径下 controller/service/模板授权应通过 | 所有 HRM 包用例通过（包含 controller/service enforce 路径） | ✅ |
+| 2025-12-07 01:05 | `AUTHZ_ENFORCE=1 GOCACHE=/tmp/go-cache go test ./modules/logging/...` | Logging enforce 路径下的 controller/service/repo 授权链路应通过 | 所有 Logging 包用例通过（含 enforce/缺权场景单测） | ✅ |
 
 > 提示：若命令失败，请先记录“❌ + 原因/堆栈”，完成修复后再追加新的“✅”行，确保整个 014 改造期间具备可追踪的 readiness 审计链路。
