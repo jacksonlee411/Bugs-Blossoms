@@ -18,6 +18,7 @@ type EditFormProps struct {
 	Role                   *viewmodels.Role
 	ModulePermissionGroups []*viewmodels.ModulePermissionGroup
 	Errors                 map[string]string
+	PolicyMatrix           *PolicyMatrixProps
 }
 
 templ EditForm(props *EditFormProps) {
@@ -114,6 +115,13 @@ templ EditForm(props *EditFormProps) {
 							</div>
 						}
 					}
+				}
+			}
+			if props.PolicyMatrix != nil {
+				@card.Card(card.Props{
+					Class: "space-y-3",
+				}) {
+					@PolicyMatrix(props.PolicyMatrix)
 				}
 			}
 		</div>

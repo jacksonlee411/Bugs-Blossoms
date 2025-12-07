@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
@@ -92,6 +94,7 @@ func (c *RolesController) Register(r *mux.Router) {
 	router.HandleFunc("", di.H(c.List)).Methods(http.MethodGet)
 	router.HandleFunc("/new", di.H(c.GetNew)).Methods(http.MethodGet)
 	router.HandleFunc("/{id:[0-9]+}", di.H(c.GetEdit)).Methods(http.MethodGet)
+	router.HandleFunc("/{id:[0-9]+}/policies", di.H(c.GetPolicies)).Methods(http.MethodGet)
 
 	router.HandleFunc("", di.H(c.Create)).Methods(http.MethodPost)
 	router.HandleFunc("/{id:[0-9]+}", di.H(c.Update)).Methods(http.MethodPost)
@@ -167,6 +170,7 @@ func (c *RolesController) GetEdit(
 	w http.ResponseWriter,
 	logger *logrus.Entry,
 	roleService *services.RoleService,
+	policyService *services.PolicyDraftService,
 ) {
 	if !ensureRolesAuthz(w, r, "view") {
 		return
@@ -186,10 +190,15 @@ func (c *RolesController) GetEdit(
 		http.Error(w, "Error retrieving roles", http.StatusInternalServerError)
 		return
 	}
+	matrixProps, matrixErr := c.buildPolicyMatrixProps(r.Context(), policyService, roleEntity, PolicyListParams{})
+	if matrixErr != nil {
+		logger.WithError(matrixErr).Error("Error building policy matrix")
+	}
 	props := &roles.EditFormProps{
 		Role:                   mappers.RoleToViewModel(roleEntity),
 		ModulePermissionGroups: c.modulePermissionGroups(roleEntity.Permissions()...),
 		Errors:                 map[string]string{},
+		PolicyMatrix:           matrixProps,
 	}
 	templ.Handler(roles.Edit(props), templ.WithStreaming()).ServeHTTP(w, r)
 }
@@ -338,4 +347,89 @@ func (c *RolesController) Create(
 	}
 
 	shared.Redirect(w, r, c.basePath)
+}
+
+func (c *RolesController) GetPolicies(
+	r *http.Request,
+	w http.ResponseWriter,
+	logger *logrus.Entry,
+	roleService *services.RoleService,
+	policyService *services.PolicyDraftService,
+) {
+	if !ensureRolesAuthz(w, r, "view") {
+		return
+	}
+	if !ensureAuthz(w, r, authz.ObjectName("core", "authz"), "debug", nil) {
+		return
+	}
+	id, err := shared.ParseID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	roleEntity, err := roleService.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "Error retrieving role", http.StatusInternalServerError)
+		return
+	}
+	params, err := parsePolicyListParams(r.URL.Query())
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", err.Error())
+		return
+	}
+	matrixProps, err := c.buildPolicyMatrixProps(r.Context(), policyService, roleEntity, params)
+	if err != nil {
+		logger.WithError(err).Error("failed to build policy matrix")
+		writeJSONError(w, http.StatusInternalServerError, "AUTHZ_POLICIES_ERROR", "failed to load policies")
+		return
+	}
+	templ.Handler(roles.PolicyMatrix(matrixProps), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *RolesController) buildPolicyMatrixProps(
+	ctx context.Context,
+	policyService *services.PolicyDraftService,
+	roleEntity role.Role,
+	params PolicyListParams,
+) (*roles.PolicyMatrixProps, error) {
+	entries, err := policyService.Policies(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if params.Page == 0 {
+		params.Page = 1
+	}
+	if params.Limit == 0 {
+		params.Limit = 20
+	}
+	if params.Subject == "" {
+		params.Subject = authz.SubjectForRole(roleEntity.Name())
+	}
+	if params.Domain == "" {
+		params.Domain = authz.DomainFromTenant(roleEntity.TenantID())
+	}
+	pageEntries, total := paginatePolicies(entries, params)
+	data := make([]dtos.PolicyEntryResponse, 0, len(pageEntries))
+	for _, entry := range pageEntries {
+		data = append(data, dtos.PolicyEntryResponse{
+			Type:    entry.Type,
+			Subject: entry.Subject,
+			Domain:  entry.Domain,
+			Object:  entry.Object,
+			Action:  entry.Action,
+			Effect:  entry.Effect,
+		})
+	}
+	return &roles.PolicyMatrixProps{
+		RoleID:   fmt.Sprintf("%d", roleEntity.ID()),
+		Entries:  data,
+		Total:    total,
+		Page:     params.Page,
+		Limit:    params.Limit,
+		Subject:  params.Subject,
+		Domain:   params.Domain,
+		Type:     params.Type,
+		Search:   params.Search,
+		CanDebug: true,
+	}, nil
 }
