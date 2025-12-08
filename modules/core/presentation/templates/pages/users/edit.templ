@@ -12,7 +12,6 @@ import (
 	usercomponents "github.com/iota-uz/iota-sdk/components/user"
 	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
-	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/roles"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
@@ -24,6 +23,7 @@ type EditFormProps struct {
 	ResourcePermissionGroups []*viewmodels.ResourcePermissionGroup
 	Errors                   map[string]string
 	CanDelete                bool
+	PolicyBoard              *UserPolicyBoardProps
 }
 
 func useUploads(u *viewmodels.User) []*viewmodels.Upload {
@@ -172,17 +172,13 @@ templ EditForm(props *EditFormProps) {
 					}
 				</div>
 				<div x-show="selectedTab === 'permissions'" class="mt-5 flex flex-col gap-5">
-					{{ pageCtx := composables.UsePageCtx(ctx) }}
-					for i, group := range props.ResourcePermissionGroups {
-						@card.Card(card.Props{
-							Class: "space-y-3",
-						}) {
-							@roles.ResourceGroup(roles.ResourceGroupProps{
-								PageContext:   pageCtx,
-								ResourceGroup: group,
-								GroupIndex:    i,
-							})
-						}
+					if props.PolicyBoard != nil {
+						@UserPolicyBoard(props.PolicyBoard)
+					} else {
+						@corecomponents.Unauthorized(&corecomponents.UnauthorizedProps{
+							Object: "core.authz",
+							Action: "debug",
+						})
 					}
 				</div>
 			}

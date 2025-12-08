@@ -7,10 +7,10 @@
 - DEV-PLAN-014 的模块改造要求页面提供策略申请按钮、调试信息、统一 403 空态；若缺少 015B 的界面与本地化支持，授权改造将缺乏用户入口。
 
 ## 前置条件
-- DEV-PLAN-015A 的 API、`policy_change_requests` 表、Authz.Debug、UI→Git bot 已在 dev 环境可用，并提供稳定契约。
-- Core/HRM/Logging 控制器已集成 `authz.Authorize` 并在 403 响应中可注入 `MissingPolicies`/`authz.ViewState`。
-- 前端构建链路（`templ generate && make css`、Tailwind、htmx）正常；翻译校验 `make check tr` 可执行。
-- 具备 `feature/dev-plan-015` 分支或等效工作分支，供 UI 迭代。
+- [x] DEV-PLAN-015A 的 API、`policy_change_requests` 表、Authz.Debug、UI→Git bot 已在 dev 环境可用，并提供稳定契约。
+- [x] Core/HRM/Logging 控制器已集成 `authz.Authorize` 并在 403 响应中可注入 `MissingPolicies`/`authz.ViewState`。
+- [x] 前端构建链路（`templ generate && make css`、Tailwind、htmx）正常；翻译校验 `make check tr` 可执行。
+- [x] 具备 `feature/dev-plan-015` 分支或等效工作分支，供 UI 迭代。
 
 ## 目标
 1. 为角色与用户管理页面提供 Casbin policy 可视化、过滤、编辑/草稿提交流程，支持只读模式与权限申请按钮。
@@ -31,7 +31,6 @@
 ### 015B4：UI 串联与反馈
 - 子文档：`docs/dev-plans/015B4-ui-integration-feedback.md`
 
-5. **[ ] 文档与翻译**
 5. **[ ] 文档与翻译**
    - 更新 README/CONTRIBUTING/AGENTS：新增“从 UI 发起策略草稿”“PolicyInspector 使用方法”“HRM/Logging 授权提示”章节。
    - `modules/*/presentation/locales/{en,ru,uz}.json` 增加 Unauthorized、PolicyInspector、SLA、按钮文案；提交前运行 `make check tr`。

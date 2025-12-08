@@ -544,6 +544,12 @@ func parseListParams(r *http.Request) (services.ListPolicyDraftsParams, error) {
 	query := r.URL.Query()
 	params := services.ListPolicyDraftsParams{}
 
+	if subject := strings.TrimSpace(query.Get("subject")); subject != "" {
+		params.Subject = subject
+	}
+	if domain := strings.TrimSpace(query.Get("domain")); domain != "" {
+		params.Domain = domain
+	}
 	if limit := query.Get("limit"); limit != "" {
 		value, err := strconv.Atoi(limit)
 		if err != nil {
