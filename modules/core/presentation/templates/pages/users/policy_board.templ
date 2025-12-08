@@ -157,12 +157,12 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 			<div class="flex items-center gap-2">
 				<h4 class="text-base font-semibold">
 					switch props.Column {
-					case "inherited":
-						{ pageCtx.T("Users.Permissions.Inherited") }
-					case "direct":
-						{ pageCtx.T("Users.Permissions.Direct") }
-					default:
-						{ pageCtx.T("Users.Permissions.Overrides") }
+						case "inherited":
+							{ pageCtx.T("Users.Permissions.Inherited") }
+						case "direct":
+							{ pageCtx.T("Users.Permissions.Direct") }
+						default:
+							{ pageCtx.T("Users.Permissions.Overrides") }
 					}
 				</h4>
 				if props.StageTotal > 0 {
@@ -271,7 +271,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 					@input.Text(&input.Props{
 						Label: "Domain",
 						Attrs: templ.Attributes{
-							"name":  "domain",
+							"name": "domain",
 							"value": func() string {
 								if props.DomainFilter != "" {
 									return props.DomainFilter
