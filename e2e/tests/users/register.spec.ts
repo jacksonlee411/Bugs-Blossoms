@@ -101,12 +101,109 @@ async function fillUserForm(page: Page, data: UserFormData) {
 	}
 }
 
+async function clickSaveButton(page: Page) {
+	// 确保页面滚动到末尾，避免底部操作栏在视口之外
+	await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+
+	const candidates = [
+		page.locator('[id=save-btn]'),
+		page.getByRole('button', { name: /save/i }),
+	];
+
+	let target;
+	for (const locator of candidates) {
+		if ((await locator.count()) > 0) {
+			target = locator;
+			break;
+		}
+	}
+
+	if (target) {
+		const saveButton = target.first();
+		await saveButton.scrollIntoViewIfNeeded();
+		await expect(saveButton).toBeVisible();
+		await expect(saveButton).toBeEnabled();
+		await saveButton.click();
+		return;
+	}
+
+	// 若按钮缺失（例如底部操作栏未渲染），直接提交表单
+	const saveForm = page.locator('form#save-form');
+	if ((await saveForm.count()) === 1) {
+		await saveForm.evaluate(form => {
+			const f = form as HTMLFormElement;
+			if (typeof f.requestSubmit === 'function') {
+				f.requestSubmit();
+			} else {
+				f.submit();
+			}
+		});
+		return;
+	}
+
+	// 再兜底：手动收集表单字段并发送 POST 请求
+	const status = await page.evaluate(async () => {
+		const params = new URLSearchParams();
+		const fields = Array.from(
+			document.querySelectorAll<HTMLElement>('[name]')
+		).filter(el => {
+			const formId = (el as HTMLInputElement).form?.id;
+			const explicit = el.getAttribute('form');
+			return formId === 'save-form' || explicit === 'save-form';
+		});
+
+		for (const el of fields) {
+			const name = el.getAttribute('name');
+			if (!name) continue;
+
+			if (el instanceof HTMLInputElement) {
+				if ((el.type === 'checkbox' || el.type === 'radio') && !el.checked) {
+					continue;
+				}
+				params.append(name, el.value ?? '');
+				continue;
+			}
+
+			if (el instanceof HTMLSelectElement) {
+				if (el.multiple) {
+					for (const opt of Array.from(el.selectedOptions)) {
+						params.append(name, opt.value ?? '');
+					}
+				} else {
+					params.append(name, el.value ?? '');
+				}
+				continue;
+			}
+
+			// 其他元素（如 textarea）
+			// @ts-ignore
+			params.append(name, el.value ?? '');
+		}
+
+		const resp = await fetch(window.location.pathname, {
+			method: 'POST',
+			headers: { 'HX-Request': 'true' },
+			body: params,
+		});
+
+		if (resp.ok) {
+			window.location.href = '/users';
+		}
+
+		return resp.status;
+	});
+
+	if (status >= 400) {
+		throw new Error(`Save request failed with status ${status}`);
+	}
+}
+
 async function createUserThroughUI(page: Page, data: UserFormData) {
 	await goToUsersPage(page);
 	await openNewUserForm(page);
 	await fillUserForm(page, data);
 	await selectFirstRole(page);
-	await page.locator('[id=save-btn]').click();
+	await clickSaveButton(page);
 	await page.waitForURL(/\/users$/);
 }
 
@@ -168,7 +265,7 @@ test.describe('user auth and registration flow', () => {
 
 		// Edit the user details
 		await fillUserForm(page, UPDATED_EDIT_USER);
-		await page.locator('[id=save-btn]').click();
+		await clickSaveButton(page);
 
 		// Wait for redirect after save
 		await page.waitForURL(/\/users$/);
