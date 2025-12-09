@@ -88,16 +88,24 @@ async function selectFirstRole(page: Page) {
 }
 
 async function fillUserForm(page: Page, data: UserFormData) {
-	await page.locator('[name=FirstName]').fill(data.firstName);
-	await page.locator('[name=LastName]').fill(data.lastName);
-	await page.locator('[name=MiddleName]').fill(data.middleName);
-	await page.locator('[name=Email]').fill(data.email);
-	await page.locator('[name=Phone]').fill(data.phone);
+	const form = page.locator('form#save-form');
+	await expect(form).toBeVisible({ timeout: 15_000 });
+
+	const firstNameInput = page.locator('[name=FirstName]').first();
+	await firstNameInput.waitFor({ state: 'visible', timeout: 15_000 });
+	await firstNameInput.fill(data.firstName);
+
+	await page.locator('[name=LastName]').first().fill(data.lastName);
+	await page.locator('[name=MiddleName]').first().fill(data.middleName);
+	await page.locator('[name=Email]').first().fill(data.email);
+	await page.locator('[name=Phone]').first().fill(data.phone);
 	if (data.password) {
-		await page.locator('[name=Password]').fill(data.password);
+		await page.locator('[name=Password]').first().fill(data.password);
 	}
 	if (data.languageCode) {
-		await page.locator('[name=Language]').selectOption(data.languageCode);
+		const languageSelect = page.locator('[name=Language]').first();
+		await languageSelect.waitFor({ state: 'visible', timeout: 15_000 });
+		await languageSelect.selectOption(data.languageCode);
 	}
 }
 
