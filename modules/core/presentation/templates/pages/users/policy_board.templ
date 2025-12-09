@@ -86,11 +86,12 @@ func totalPages(total, limit int) int {
 
 templ UserPolicyBoard(props *UserPolicyBoardProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	{{ boardState, _ := templ.JSONString(map[string]any{
-		"subject":  props.Subject,
-		"domain":   props.DefaultDomain,
-		"requests": props.Requests,
-	}) }}
+	{{boardState, _ := templ.JSONString(map[string]any{
+	"subject":  props.Subject,
+	"domain":   props.DefaultDomain,
+	"requests": props.Requests,
+})
+	}}
 	<div
 		class="space-y-4"
 		id="user-policy-board"
@@ -569,15 +570,16 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 			if props.CanStage {
 				{{ columns = append(columns, &base.TableColumn{Label: "", Key: "select", Class: "w-10"}) }}
 			}
-			{{ columns = append(columns,
-				&base.TableColumn{Label: "Type", Key: "type", Class: "w-14"},
-				&base.TableColumn{Label: "Subject", Key: "subject"},
-				&base.TableColumn{Label: "Domain", Key: "domain"},
-				&base.TableColumn{Label: "Object", Key: "object"},
-				&base.TableColumn{Label: "Action", Key: "action"},
-				&base.TableColumn{Label: "Effect", Key: "effect", Class: "w-28"},
-				&base.TableColumn{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-32"},
-			) }}
+			{{columns = append(columns,
+	&base.TableColumn{Label: "Type", Key: "type", Class: "w-14"},
+	&base.TableColumn{Label: "Subject", Key: "subject"},
+	&base.TableColumn{Label: "Domain", Key: "domain"},
+	&base.TableColumn{Label: "Object", Key: "object"},
+	&base.TableColumn{Label: "Action", Key: "action"},
+	&base.TableColumn{Label: "Effect", Key: "effect", Class: "w-28"},
+	&base.TableColumn{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-32"},
+)
+			}}
 			@base.Table(base.TableProps{
 				Columns: columns,
 			}) {
