@@ -18,6 +18,8 @@ const ADMIN_CREDENTIALS = {
 	password: 'TestPass123!',
 };
 
+const USER_FORM_SELECTOR = 'form#save-form, form[hx-post="/users"], form[hx-post^="/users/"]';
+
 const CREATE_USER: UserFormData = {
 	firstName: 'E2ECreate',
 	lastName: 'User',
@@ -91,8 +93,13 @@ async function selectFirstRole(page: Page) {
 }
 
 async function fillUserForm(page: Page, data: UserFormData) {
-	const form = page.locator('form#save-form');
-	await expect(form).toBeVisible({ timeout: 15_000 });
+	const form = page.locator(USER_FORM_SELECTOR).first();
+	if ((await form.count()) > 0) {
+		await expect(form).toBeVisible({ timeout: 15_000 });
+	} else {
+		// 回退到直接等待关键输入可见，兼容无 id 的创建表单
+		await expect(page.locator('[name=FirstName]').first()).toBeVisible({ timeout: 15_000 });
+	}
 
 	const firstNameInput = page.locator('[name=FirstName]').first();
 	await firstNameInput.waitFor({ state: 'visible', timeout: 15_000 });
@@ -139,7 +146,7 @@ async function clickSaveButton(page: Page) {
 	}
 
 	// 若按钮缺失（例如底部操作栏未渲染），直接提交表单
-	const saveForm = page.locator('form#save-form');
+	const saveForm = page.locator(USER_FORM_SELECTOR).first();
 	if ((await saveForm.count()) === 1) {
 		await saveForm.evaluate(form => {
 			const f = form as HTMLFormElement;
@@ -153,15 +160,12 @@ async function clickSaveButton(page: Page) {
 	}
 
 	// 再兜底：手动收集表单字段并发送 POST 请求
-	const status = await page.evaluate(async () => {
+	const status = await page.evaluate(async selector => {
+		const form = document.querySelector(selector);
 		const params = new URLSearchParams();
-		const fields = Array.from(
-			document.querySelectorAll<HTMLElement>('[name]')
-		).filter(el => {
-			const formId = (el as HTMLInputElement).form?.id;
-			const explicit = el.getAttribute('form');
-			return formId === 'save-form' || explicit === 'save-form';
-		});
+		const fields = form
+			? Array.from(form.querySelectorAll<HTMLElement>('[name]'))
+			: Array.from(document.querySelectorAll<HTMLElement>('[name]'));
 
 		for (const el of fields) {
 			const name = el.getAttribute('name');
@@ -191,7 +195,8 @@ async function clickSaveButton(page: Page) {
 			params.append(name, el.value ?? '');
 		}
 
-		const resp = await fetch(window.location.pathname, {
+		const target = form?.getAttribute('hx-post') ?? window.location.pathname;
+		const resp = await fetch(target, {
 			method: 'POST',
 			headers: { 'HX-Request': 'true' },
 			body: params,
@@ -202,7 +207,7 @@ async function clickSaveButton(page: Page) {
 		}
 
 		return resp.status;
-	});
+	}, USER_FORM_SELECTOR);
 
 	if (status >= 400) {
 		throw new Error(`Save request failed with status ${status}`);
