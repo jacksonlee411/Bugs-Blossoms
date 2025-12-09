@@ -968,7 +968,6 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		baseURL,
 		requestMap,
 		canStage,
-		canRequest,
 		canDebug,
 	)
 	if err != nil {
@@ -983,7 +982,6 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		baseURL,
 		requestMap,
 		canStage,
-		canRequest,
 		canDebug,
 	)
 	if err != nil {
@@ -998,7 +996,6 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		baseURL,
 		requestMap,
 		canStage,
-		canRequest,
 		canDebug,
 	)
 	if err != nil {
@@ -1013,6 +1010,10 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		Inherited:     inheritedColumn,
 		Direct:        directColumn,
 		Overrides:     overrideColumn,
+		BaseURL:       baseURL,
+		RequestObject: "core.users",
+		RequestAction: "update",
+		RequestReason: "请求编辑用户策略",
 		CanStage:      canStage,
 		CanRequest:    canRequest,
 		CanDebug:      canDebug,
@@ -1028,7 +1029,6 @@ func (c *UsersController) buildUserPolicyColumnProps(
 	baseURL string,
 	requestMap map[string]requestStatusInfo,
 	canStage bool,
-	canRequest bool,
 	canDebug bool,
 ) (users.UserPolicyColumnProps, error) {
 	filteredBase := filterUserPolicyEntriesByColumn(baseEntries, column, defaultDomain, params)
@@ -1055,11 +1055,6 @@ func (c *UsersController) buildUserPolicyColumnProps(
 		})
 	}
 
-	domainFilter := params.Domain
-	if column == userPolicyColumnOverrides && domainFilter == "" {
-		domainFilter = ""
-	}
-
 	return users.UserPolicyColumnProps{
 		Column:        column,
 		Entries:       entries,
@@ -1072,14 +1067,10 @@ func (c *UsersController) buildUserPolicyColumnProps(
 		DefaultDomain: defaultDomain,
 		Type:          params.Type,
 		Search:        params.Search,
-		DomainFilter:  domainFilter,
+		DomainFilter:  params.Domain,
 		CanDebug:      canDebug,
 		CanStage:      canStage,
-		CanRequest:    canRequest,
 		BaseURL:       baseURL,
-		RequestObject: "core.users",
-		RequestAction: "update",
-		RequestReason: "请求编辑用户策略",
 	}, nil
 }
 
@@ -1232,6 +1223,7 @@ func mapDraftStatuses(
 			Domain: draft.Domain,
 			Object: draft.Object,
 			Action: draft.Action,
+			State:  string(draft.Status),
 		}
 		statuses = append(statuses, status)
 		key := requestStatusKey(draft.Domain, draft.Object, draft.Action)

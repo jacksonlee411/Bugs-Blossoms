@@ -411,7 +411,22 @@
       "Apply": "申请权限",
       "ApplyDescription": "携带建议的策略变更调用 /core/api/authz/requests 接口提交申请。",
       "ApplyHint": "您没有执行此操作的权限"
-    }
+    },
+    "Stage": {
+      "Badge": "暂存 %d",
+      "BadgeShort": "暂存",
+      "SubmitDraft": "提交草稿",
+      "BulkRemove": "批量撤销",
+      "SelectAll": "全选"
+    },
+    "SLA": {
+      "Expected": "预计 ≤5 分钟回写",
+      "Polling": "已提交草稿，正在轮询状态...",
+      "Timeout": "超时未回写，请复制 request_id 并重试查询",
+      "Retry": "重试查询",
+      "Copy": "复制 request_id"
+    },
+    "Domain": "域"
   },
   "Home": {
     "Meta": {

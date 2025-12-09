@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -33,7 +34,7 @@ func TestAuthzAPIController_CreateApprove(t *testing.T) {
 		Object:       "core.users",
 		Action:       "read",
 		Reason:       "integration test",
-		Diff:         json.RawMessage(`[{"op":"add","path":"/p","value":["role:test","core.users","read","global","allow"]}]`),
+		Diff:         json.RawMessage(`[{"op":"add","path":"/p/-","value":["role:test","global","core.users","read","allow"]}]`),
 		BaseRevision: revision,
 	}
 	resp := suite.POST("/core/api/authz/requests").JSON(payload).Expect(t).Status(http.StatusCreated)
@@ -104,6 +105,42 @@ func TestAuthzAPIController_StagePolicy(t *testing.T) {
 	require.Contains(t, resp.Body(), "\"total\":0")
 }
 
+func TestAuthzAPIController_StagePolicy_Bulk(t *testing.T) {
+	suite := setupAuthzAPISuite(t)
+	user := itf.User(
+		permissions.AuthzRequestsWrite,
+		permissions.AuthzRequestsRead,
+		permissions.AuthzDebug,
+	)
+	suite.AsUser(user)
+
+	resp := suite.POST("/core/api/authz/policies/stage").
+		JSON([]dtos.StagePolicyRequest{
+			{
+				Type:    "p",
+				Subject: "role:test",
+				Domain:  "global",
+				Object:  "core.users",
+				Action:  "read",
+				Effect:  "allow",
+			},
+			{
+				Type:      "g",
+				Subject:   "tenant:00000000-0000-0000-0000-000000000001:user:bulk",
+				Domain:    "00000000-0000-0000-0000-000000000001",
+				Object:    "role:core.superadmin",
+				Action:    "*",
+				Effect:    "allow",
+				StageKind: "add",
+			},
+		}).
+		Expect(t).
+		Status(http.StatusCreated)
+	var staged dtos.StagePolicyResponse
+	require.NoError(t, json.Unmarshal([]byte(resp.Body()), &staged))
+	require.Len(t, staged.Data, 2)
+}
+
 func TestAuthzAPIController_CreateRequestFromStage(t *testing.T) {
 	suite := setupAuthzAPISuite(t)
 	user := itf.User(
@@ -138,7 +175,15 @@ func TestAuthzAPIController_CreateRequestFromStage(t *testing.T) {
 		JSON(requestPayload).
 		Expect(t).
 		Status(http.StatusCreated)
-	require.Contains(t, resp.Body(), "\"status\"")
+	var draft dtos.PolicyDraftResponse
+	require.NoError(t, json.Unmarshal([]byte(resp.Body()), &draft))
+	require.NotEmpty(t, draft.Diff)
+	var patch []map[string]any
+	require.NoError(t, json.Unmarshal(draft.Diff, &patch))
+	require.NotEmpty(t, patch)
+	require.Equal(t, "add", patch[0]["op"])
+	path, _ := patch[0]["path"].(string)
+	require.True(t, strings.HasPrefix(path, "/p/"))
 
 	// stage should now be empty; submitting again without diff should fail
 	suite.POST("/core/api/authz/requests").
@@ -158,10 +203,10 @@ func TestAuthzAPIController_CreateRequestFromStage_Remove(t *testing.T) {
 
 	stagePayload := dtos.StagePolicyRequest{
 		Type:      "p",
-		Subject:   "role:test",
-		Domain:    "global",
-		Object:    "core.users",
-		Action:    "read",
+		Subject:   "role:bot-dev-2",
+		Domain:    "core.users",
+		Object:    "list",
+		Action:    "global",
 		Effect:    "allow",
 		StageKind: "remove",
 	}
@@ -172,7 +217,7 @@ func TestAuthzAPIController_CreateRequestFromStage_Remove(t *testing.T) {
 
 	resp := suite.POST("/core/api/authz/requests").
 		JSON(dtos.PolicyDraftRequest{
-			Domain: "global",
+			Domain: "core.users",
 		}).
 		Expect(t).
 		Status(http.StatusCreated)
@@ -183,6 +228,8 @@ func TestAuthzAPIController_CreateRequestFromStage_Remove(t *testing.T) {
 	var patch []map[string]any
 	require.NoError(t, json.Unmarshal(draft.Diff, &patch))
 	require.Equal(t, "remove", patch[0]["op"])
+	path, _ := patch[0]["path"].(string)
+	require.True(t, strings.HasPrefix(path, "/p/"))
 }
 
 func TestAuthzAPIController_CreateRequest_HTMXForbiddenToast(t *testing.T) {
@@ -193,7 +240,7 @@ func TestAuthzAPIController_CreateRequest_HTMXForbiddenToast(t *testing.T) {
 	payload := dtos.PolicyDraftRequest{
 		Object: "core.users",
 		Action: "read",
-		Diff:   json.RawMessage(`[{"op":"add","path":"/p","value":["role:test","core.users","read","global","allow"]}]`),
+		Diff:   json.RawMessage(`[{"op":"add","path":"/p/-","value":["role:test","global","core.users","read","allow"]}]`),
 	}
 	suite.POST("/core/api/authz/requests").
 		HTMX().
@@ -303,7 +350,7 @@ func TestAuthzAPIController_CreateRequest_BaseRevisionMismatch(t *testing.T) {
 		JSON(dtos.PolicyDraftRequest{
 			Object:       "core.users",
 			Action:       "read",
-			Diff:         json.RawMessage(`[{"op":"add","path":"/p","value":["role:test","core.users","read","global","allow"]}]`),
+			Diff:         json.RawMessage(`[{"op":"add","path":"/p/-","value":["role:test","global","core.users","read","allow"]}]`),
 			BaseRevision: "bogus",
 		}).
 		Expect(t).
