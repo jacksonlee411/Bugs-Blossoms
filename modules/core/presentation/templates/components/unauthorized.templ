@@ -71,23 +71,27 @@ func suggestedDiff(state *authz.ViewState, policies []authz.MissingPolicy) strin
 templ Unauthorized(props *UnauthorizedProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ state := props.State }}
-	{{ if state == nil {
+	{{if state == nil {
 	state = pageCtx.AuthzState()
-} }}
+}
+	}}
 	{{ object := strings.ToLower(strings.TrimSpace(props.Object)) }}
 	{{ normalizedAction := authz.NormalizeAction(props.Action) }}
 	{{ requestURL := strings.TrimSpace(props.Request) }}
-	{{ if requestURL == "" {
+	{{if requestURL == "" {
 	requestURL = "/core/api/authz/requests"
-} }}
+}
+	}}
 	{{ subject := strings.TrimSpace(props.Subject) }}
-	{{ if subject == "" && state != nil {
+	{{if subject == "" && state != nil {
 	subject = state.Subject
-} }}
+}
+	}}
 	{{ domain := strings.TrimSpace(props.Domain) }}
-	{{ if domain == "" && state != nil {
+	{{if domain == "" && state != nil {
 	domain = state.Tenant
-} }}
+}
+	}}
 	{{ debugURL := strings.TrimSpace(props.DebugURL) }}
 	{{if debugURL == "" && subject != "" && object != "" && normalizedAction != "" {
 	q := url.Values{}
@@ -110,9 +114,10 @@ templ Unauthorized(props *UnauthorizedProps) {
 }
 	}}
 	{{ baseRevision := strings.TrimSpace(props.BaseRevision) }}
-	{{ if baseRevision == "" {
+	{{if baseRevision == "" {
 	baseRevision = authzutil.BaseRevision(ctx)
-} }}
+}
+	}}
 	{{ requestID := strings.TrimSpace(props.RequestID) }}
 	{{ policies := normalizePolicies(state, object, normalizedAction) }}
 	{{ diffJSON := suggestedDiff(state, policies) }}
