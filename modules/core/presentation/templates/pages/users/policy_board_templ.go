@@ -126,7 +126,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(props.BaseURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 97, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 98, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -139,7 +139,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("userPolicyBoardState(%s)", boardState))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 101, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 102, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -152,7 +152,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Users.Tabs.Permissions"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 107, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 108, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -165,7 +165,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("Subject: %s · Domain: %s", props.Subject, props.DefaultDomain))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 109, Col: 83}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 110, Col: 83}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -183,7 +183,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 115, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 116, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -202,7 +202,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subject)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 127, Col: 63}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 128, Col: 63}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -215,7 +215,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(props.RequestObject)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 128, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 129, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -228,7 +228,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.RequestAction)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 129, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 130, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -241,7 +241,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(props.RequestReason)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 130, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 131, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -264,7 +264,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Stage.SubmitDraft"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 136, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 137, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -282,7 +282,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(props.RequestObject)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 148, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 149, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -295,7 +295,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(props.RequestAction)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 149, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 150, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -308,7 +308,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(props.DefaultDomain)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 150, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 151, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -321,7 +321,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(props.RequestReason)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 153, Col: 68}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 154, Col: 68}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -334,7 +334,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.Apply"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 155, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 156, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -352,7 +352,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var17 string
 			templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ApplyHint"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 159, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 160, Col: 89}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 			if templ_7745c5c3_Err != nil {
@@ -370,7 +370,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Expected"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 164, Col: 68}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 165, Col: 68}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -383,7 +383,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Polling"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 173, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 174, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -396,7 +396,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Timeout"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 179, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 180, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
@@ -409,7 +409,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Retry"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 182, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 183, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -422,7 +422,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Copy"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 185, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 186, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -440,7 +440,7 @@ func UserPolicyBoard(props *UserPolicyBoardProps) templ.Component {
 			var templ_7745c5c3_Var23 string
 			templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ApplyHint"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 192, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 193, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 			if templ_7745c5c3_Err != nil {
@@ -542,7 +542,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(columnID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 403, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 404, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
@@ -555,7 +555,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var27 string
 		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(refreshURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 405, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 406, Col: 21}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
@@ -568,7 +568,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var28 string
 		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%s", columnID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 407, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 408, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
@@ -583,7 +583,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 			var templ_7745c5c3_Var29 string
 			templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Users.Permissions.Inherited"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 416, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 417, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 			if templ_7745c5c3_Err != nil {
@@ -593,7 +593,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Users.Permissions.Direct"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 418, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 419, Col: 46}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -603,7 +603,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Users.Permissions.Overrides"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 420, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 421, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -622,7 +622,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 			var templ_7745c5c3_Var32 string
 			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 425, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 426, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 			if templ_7745c5c3_Err != nil {
@@ -641,7 +641,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Stage.SelectAll"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 432, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 433, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -672,7 +672,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 				var templ_7745c5c3_Var35 string
 				templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Create"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 446, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 447, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 				if templ_7745c5c3_Err != nil {
@@ -697,7 +697,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Stage.BulkRemove"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 454, Col: 43}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 455, Col: 43}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -715,7 +715,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var37 string
 		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(baseURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 461, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 462, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
@@ -728,7 +728,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var38 string
 		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%s", columnID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 462, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 463, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
@@ -741,7 +741,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var39 string
 		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(props.Column)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 466, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 467, Col: 58}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 		if templ_7745c5c3_Err != nil {
@@ -754,7 +754,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var40 string
 		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.Limit))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 468, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 469, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
 		if templ_7745c5c3_Err != nil {
@@ -815,7 +815,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 			var templ_7745c5c3_Var42 string
 			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(props.Type)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 503, Col: 55}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 504, Col: 55}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 			if templ_7745c5c3_Err != nil {
@@ -828,7 +828,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 			var templ_7745c5c3_Var43 string
 			templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(props.Subject)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 504, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 505, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 			if templ_7745c5c3_Err != nil {
@@ -901,7 +901,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 				var templ_7745c5c3_Var45 string
 				templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Cancel"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 554, Col: 27}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 555, Col: 27}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 				if templ_7745c5c3_Err != nil {
@@ -935,7 +935,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 				var templ_7745c5c3_Var47 string
 				templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Save"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 562, Col: 25}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 563, Col: 25}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 				if templ_7745c5c3_Err != nil {
@@ -1027,7 +1027,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 						var templ_7745c5c3_Var51 string
 						templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 590, Col: 28}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 592, Col: 28}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
 						if templ_7745c5c3_Err != nil {
@@ -1096,7 +1096,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var54 string
 							templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s|%s|%s|%s|%s", entry.Type, entry.Subject, entry.Domain, entry.Object, entry.Action))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 611, Col: 115}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 613, Col: 115}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 							if templ_7745c5c3_Err != nil {
@@ -1109,7 +1109,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var55 string
 							templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Type)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 613, Col: 31}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 615, Col: 31}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 							if templ_7745c5c3_Err != nil {
@@ -1122,7 +1122,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var56 string
 							templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Subject)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 614, Col: 37}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 616, Col: 37}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 							if templ_7745c5c3_Err != nil {
@@ -1135,7 +1135,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var57 string
 							templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Domain)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 615, Col: 35}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 617, Col: 35}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 							if templ_7745c5c3_Err != nil {
@@ -1148,7 +1148,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var58 string
 							templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Object)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 616, Col: 35}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 618, Col: 35}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 							if templ_7745c5c3_Err != nil {
@@ -1161,7 +1161,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var59 string
 							templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Action)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 617, Col: 35}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 619, Col: 35}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 							if templ_7745c5c3_Err != nil {
@@ -1174,7 +1174,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var60 string
 							templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Effect)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 618, Col: 35}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 620, Col: 35}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 							if templ_7745c5c3_Err != nil {
@@ -1220,7 +1220,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 						var templ_7745c5c3_Var62 string
 						templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Type)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 625, Col: 19}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 627, Col: 19}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 						if templ_7745c5c3_Err != nil {
@@ -1251,7 +1251,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 						var templ_7745c5c3_Var64 string
 						templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Subject)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 628, Col: 22}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 630, Col: 22}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 						if templ_7745c5c3_Err != nil {
@@ -1282,7 +1282,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 						var templ_7745c5c3_Var66 string
 						templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Domain)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 631, Col: 21}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 633, Col: 21}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
 						if templ_7745c5c3_Err != nil {
@@ -1313,7 +1313,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 						var templ_7745c5c3_Var68 string
 						templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Object)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 634, Col: 21}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 636, Col: 21}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 						if templ_7745c5c3_Err != nil {
@@ -1344,7 +1344,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 						var templ_7745c5c3_Var70 string
 						templ_7745c5c3_Var70, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Action)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 637, Col: 21}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 639, Col: 21}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var70))
 						if templ_7745c5c3_Err != nil {
@@ -1379,7 +1379,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 						var templ_7745c5c3_Var72 string
 						templ_7745c5c3_Var72, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Effect)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 641, Col: 28}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 643, Col: 28}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var72))
 						if templ_7745c5c3_Err != nil {
@@ -1423,7 +1423,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var75 string
 							templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Stage.BadgeShort"))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 648, Col: 47}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 650, Col: 47}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 							if templ_7745c5c3_Err != nil {
@@ -1442,7 +1442,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var76 string
 							templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(entry.RequestStatus)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 653, Col: 31}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 655, Col: 31}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 							if templ_7745c5c3_Err != nil {
@@ -1495,7 +1495,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 								var templ_7745c5c3_Var79 string
 								templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Delete"))
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 671, Col: 30}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 673, Col: 30}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 								if templ_7745c5c3_Err != nil {
@@ -1535,7 +1535,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 								var templ_7745c5c3_Var81 string
 								templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Type)
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 683, Col: 60}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 685, Col: 60}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 								if templ_7745c5c3_Err != nil {
@@ -1548,7 +1548,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 								var templ_7745c5c3_Var82 string
 								templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Subject)
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 684, Col: 66}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 686, Col: 66}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 								if templ_7745c5c3_Err != nil {
@@ -1561,7 +1561,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 								var templ_7745c5c3_Var83 string
 								templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Domain)
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 685, Col: 64}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 687, Col: 64}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 								if templ_7745c5c3_Err != nil {
@@ -1574,7 +1574,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 								var templ_7745c5c3_Var84 string
 								templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Object)
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 686, Col: 64}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 688, Col: 64}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 								if templ_7745c5c3_Err != nil {
@@ -1587,7 +1587,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 								var templ_7745c5c3_Var85 string
 								templ_7745c5c3_Var85, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Action)
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 687, Col: 64}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 689, Col: 64}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var85))
 								if templ_7745c5c3_Err != nil {
@@ -1600,7 +1600,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 								var templ_7745c5c3_Var86 string
 								templ_7745c5c3_Var86, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Effect)
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 688, Col: 64}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 690, Col: 64}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var86))
 								if templ_7745c5c3_Err != nil {
@@ -1613,7 +1613,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 								var templ_7745c5c3_Var87 string
 								templ_7745c5c3_Var87, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Delete"))
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 690, Col: 30}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 692, Col: 30}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var87))
 								if templ_7745c5c3_Err != nil {
@@ -1641,7 +1641,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 							var templ_7745c5c3_Var88 string
 							templ_7745c5c3_Var88, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ApplyHint"))
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 693, Col: 92}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 695, Col: 92}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var88))
 							if templ_7745c5c3_Err != nil {
@@ -1684,7 +1684,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var89 string
 		templ_7745c5c3_Var89, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf(pageCtx.T("Pagination.Status"), props.Page, pages, props.Total))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 701, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 703, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var89))
 		if templ_7745c5c3_Err != nil {
@@ -1707,7 +1707,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var90 string
 		templ_7745c5c3_Var90, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s&page=%d&limit=%d&domain=%s&q=%s", baseURL, props.Page-1, props.Limit, url.QueryEscape(props.DomainFilter), url.QueryEscape(props.Search)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 706, Col: 167}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 708, Col: 167}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var90))
 		if templ_7745c5c3_Err != nil {
@@ -1720,7 +1720,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var91 string
 		templ_7745c5c3_Var91, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%s", columnID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 707, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 709, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var91))
 		if templ_7745c5c3_Err != nil {
@@ -1733,7 +1733,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var92 string
 		templ_7745c5c3_Var92, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Pagination.Prev"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 710, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 712, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var92))
 		if templ_7745c5c3_Err != nil {
@@ -1756,7 +1756,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var93 string
 		templ_7745c5c3_Var93, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s&page=%d&limit=%d&domain=%s&q=%s", baseURL, props.Page+1, props.Limit, url.QueryEscape(props.DomainFilter), url.QueryEscape(props.Search)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 715, Col: 167}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 717, Col: 167}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var93))
 		if templ_7745c5c3_Err != nil {
@@ -1769,7 +1769,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var94 string
 		templ_7745c5c3_Var94, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("#%s", columnID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 716, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 718, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var94))
 		if templ_7745c5c3_Err != nil {
@@ -1782,7 +1782,7 @@ func UserPolicyColumn(props *UserPolicyColumnProps) templ.Component {
 		var templ_7745c5c3_Var95 string
 		templ_7745c5c3_Var95, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Pagination.Next"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 719, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/pages/users/policy_board.templ`, Line: 721, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var95))
 		if templ_7745c5c3_Err != nil {
