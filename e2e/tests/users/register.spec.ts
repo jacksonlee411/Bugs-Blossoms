@@ -143,8 +143,10 @@ async function fillUserForm(page: Page, data: UserFormData) {
 	}
 	if (data.languageCode) {
 		const languageSelect = page.locator('[name=Language]').first();
-		await languageSelect.waitFor({ state: 'visible', timeout: 15_000 });
-		await languageSelect.selectOption(data.languageCode);
+		if ((await languageSelect.count()) > 0) {
+			await languageSelect.waitFor({ state: 'visible', timeout: 15_000 });
+			await languageSelect.selectOption(data.languageCode);
+		}
 	}
 }
 
