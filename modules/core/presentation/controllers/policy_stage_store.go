@@ -30,45 +30,41 @@ func newPolicyStageStore() *policyStageStore {
 	}
 }
 
-func policyStageKey(userID uint, tenantID uuid.UUID) string {
-	return fmt.Sprintf("%d:%s", userID, tenantID.String())
+func normalizeStageKind(stageKind string) (string, error) {
+	kind := strings.ToLower(strings.TrimSpace(stageKind))
+	if kind == "" {
+		kind = "add"
+	}
+	if kind != "add" && kind != "remove" {
+		return "", errors.New("stage_kind must be add or remove")
+	}
+	return kind, nil
 }
 
-func (s *policyStageStore) Add(key string, payload dtos.StagePolicyRequest) ([]dtos.StagedPolicyEntry, error) {
+func (s *policyStageStore) buildEntry(payload dtos.StagePolicyRequest) (dtos.StagedPolicyEntry, error) {
 	if strings.TrimSpace(payload.Type) == "" {
-		return nil, errors.New("type is required")
+		return dtos.StagedPolicyEntry{}, errors.New("type is required")
 	}
 	if strings.TrimSpace(payload.Object) == "" {
-		return nil, errors.New("object is required")
+		return dtos.StagedPolicyEntry{}, errors.New("object is required")
 	}
 	if strings.TrimSpace(payload.Action) == "" {
-		return nil, errors.New("action is required")
+		return dtos.StagedPolicyEntry{}, errors.New("action is required")
 	}
 	if strings.TrimSpace(payload.Effect) == "" {
-		return nil, errors.New("effect is required")
+		return dtos.StagedPolicyEntry{}, errors.New("effect is required")
 	}
 	if strings.TrimSpace(payload.Domain) == "" {
-		return nil, errors.New("domain is required")
+		return dtos.StagedPolicyEntry{}, errors.New("domain is required")
 	}
 
-	stageKind := strings.ToLower(strings.TrimSpace(payload.StageKind))
-	if stageKind == "" {
-		stageKind = "add"
-	}
-	if stageKind != "add" && stageKind != "remove" {
-		return nil, errors.New("stage_kind must be add or remove")
+	stageKind, err := normalizeStageKind(payload.StageKind)
+	if err != nil {
+		return dtos.StagedPolicyEntry{}, err
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	entries := s.data[key]
-	if len(entries) >= 50 {
-		return nil, errors.New("stage limit reached (50)")
-	}
-	id := uuid.New().String()
-	entry := dtos.StagedPolicyEntry{
-		ID:        id,
+	return dtos.StagedPolicyEntry{
+		ID:        uuid.New().String(),
 		StageKind: stageKind,
 		PolicyEntryResponse: dtos.PolicyEntryResponse{
 			Type:    payload.Type,
@@ -78,8 +74,47 @@ func (s *policyStageStore) Add(key string, payload dtos.StagePolicyRequest) ([]d
 			Action:  authz.NormalizeAction(payload.Action),
 			Effect:  payload.Effect,
 		},
+	}, nil
+}
+
+func policyStageKey(userID uint, tenantID uuid.UUID) string {
+	return fmt.Sprintf("%d:%s", userID, tenantID.String())
+}
+
+func (s *policyStageStore) Add(key string, payload dtos.StagePolicyRequest) ([]dtos.StagedPolicyEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.addAllLocked(key, []dtos.StagePolicyRequest{payload})
+}
+
+func (s *policyStageStore) AddMany(key string, payloads []dtos.StagePolicyRequest) ([]dtos.StagedPolicyEntry, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.addAllLocked(key, payloads)
+}
+
+func (s *policyStageStore) addAllLocked(key string, payloads []dtos.StagePolicyRequest) ([]dtos.StagedPolicyEntry, error) {
+	if len(payloads) == 0 {
+		return nil, errors.New("at least one staged policy is required")
 	}
-	entries = append(entries, entry)
+
+	current := s.data[key]
+	if len(current)+len(payloads) > 50 {
+		return nil, errors.New("stage limit reached (50)")
+	}
+
+	entries := make([]dtos.StagedPolicyEntry, 0, len(current)+len(payloads))
+	entries = append(entries, current...)
+
+	for _, payload := range payloads {
+		entry, err := s.buildEntry(payload)
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, entry)
+	}
 	s.data[key] = entries
 	return entries, nil
 }

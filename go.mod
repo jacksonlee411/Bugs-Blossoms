@@ -55,6 +55,7 @@ require (
 	github.com/twilio/twilio-go v1.23.11
 	github.com/ulule/limiter/v3 v3.11.2
 	github.com/vektah/gqlparser/v2 v2.5.20
+	github.com/wI2L/jsondiff v0.7.0
 	github.com/xuri/excelize/v2 v2.9.1
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.35.0
@@ -141,7 +142,6 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tiendc/go-deepcopy v1.6.0 // indirect
 	github.com/urfave/cli/v2 v2.27.6 // indirect
-	github.com/wI2L/jsondiff v0.7.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
 	github.com/xuri/nfp v0.0.1 // indirect

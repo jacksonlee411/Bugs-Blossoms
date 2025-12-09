@@ -408,7 +408,22 @@
       "Apply": "Request access",
       "ApplyDescription": "Submit a policy change request via /core/api/authz/requests with the suggested policy diff.",
       "ApplyHint": "You do not have permission to perform this action"
-    }
+    },
+    "Stage": {
+      "Badge": "Stage %d",
+      "BadgeShort": "Staged",
+      "SubmitDraft": "Submit Draft",
+      "BulkRemove": "Bulk Remove",
+      "SelectAll": "Select all"
+    },
+    "SLA": {
+      "Expected": "SLA: expect updates within 5 minutes",
+      "Polling": "Polling request status...",
+      "Timeout": "Timed out waiting for status, copy request_id and retry",
+      "Retry": "Retry",
+      "Copy": "Copy request_id"
+    },
+    "Domain": "Domain"
   },
   "Home": {
     "Meta": {

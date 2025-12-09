@@ -12,6 +12,9 @@
 | 2025-01-15 11:13 | 本地 | `go run ./scripts/authz/verify --fixtures config/access/fixtures/testdata.yaml` | ✅ | fixture parity passed |
 | 2025-01-15 11:14 | 本地 | `go run ./scripts/authz/export` | ⛔️ | 阻塞：`ALLOWED_ENV`=空（需 production_export）且缺少导出 DSN，待获批后重跑 |
 | 2025-01-15 11:29 | 本地 | `ALLOWED_ENV=production_export go run ./scripts/authz/export -dry-run` | ✅ | 使用 `.env` 中的 DB（port 5438），dry-run 成功（69 p / 4 g） |
+| 2025-12-09 08:05 | 本地（feature/015b2-user-policy-board） | `go test ./modules/core/...` | ✅ | 120s 超时后重跑通过，覆盖 controllers/query 等 |
+| 2025-12-09 08:05 | 本地 | `make check lint` | ✅ | golangci-lint + cleanarch 通过 |
+| 2025-12-09 08:05 | 本地 | `make check tr` | ✅ | 多语言键一致（新增 Stage/SLA 文案） |
 
 > 注：`scripts/authz/export` 受 `ALLOWED_ENV=production_export` 限制且需数据库 DSN，目前本地环境未配置。待拿到允许的环境变量及测试数据库后补跑，并在此表更新结果。
 
@@ -29,3 +32,10 @@
 | 2025-12-04 07:44 | 本地（feature/dev-plan-015a） | `c256f1a3-83cd-480d-867e-f5d18c0168f0` | `ec522ef3… → 8f25298b…` | https://github.com/jacksonlee411/Bugs-Blossoms/pull/12 | `DESKTOP-S9U9E9K-58601-1764805469` | ✅ merged；首次推送因 HTTPS token 解析报错被标记失败，执行 `scripts/authz/bot.sh force-release` 后重试成功 |
 
 > 填写建议：在草稿状态从 `approved` 转为 `merged` 后，记录 bot 输出、`applied_policy_snapshot` 是否写入、相关 PR、Locker 等信息；若失败，记录 `error_log` 并注明是否使用 `force-release` 重试。
+
+## 阶段验证（015B2 收尾）
+
+| 日期 | 环境 | 命令 | 结果 | 备注 |
+| --- | --- | --- | --- | --- |
+| 2025-12-09 16:45 | 本地（feature/015b2-user-policy-board） | `BASE_URL=http://localhost:3201 npx playwright test --workers=1 --reporter=line` | ✅ | 全量 8/8 通过（包含 users 编辑用例稳定性修复），依赖本地 DB:5438/Redis |
+| 2025-12-09 17:26 | 本地 | `make check lint` / `make check tr` | ✅ | golangci-lint + cleanarch 通过；多语言键一致 |

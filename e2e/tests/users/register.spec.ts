@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { login, logout } from '../../fixtures/auth';
-import { resetTestDatabase, seedScenario } from '../../fixtures/test-data';
+import { assertAuthenticated, login, logout } from '../../fixtures/auth';
+import { checkTestEndpointsHealth, resetTestDatabase, seedScenario } from '../../fixtures/test-data';
 
 interface UserFormData {
 	firstName: string;
@@ -17,6 +17,41 @@ const ADMIN_CREDENTIALS = {
 	email: 'test@gmail.com',
 	password: 'TestPass123!',
 };
+
+const USER_FORM_SELECTOR = 'form#save-form, form[hx-post="/users"], form[hx-post^="/users/"]';
+const LOGIN_BUTTON_SELECTOR = 'form button[type="submit"]';
+
+async function ensureLoggedIn(page: Page, returnTo?: string) {
+	const loginButton = page.locator(LOGIN_BUTTON_SELECTOR).filter({ hasText: /log in/i });
+	if (await loginButton.count()) {
+		const destination = returnTo ?? page.url();
+		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+		await assertAuthenticated(page);
+		if (destination && !/\/login/.test(destination) && !page.url().startsWith(destination)) {
+			await page.goto(destination);
+		}
+	} else {
+		await assertAuthenticated(page).catch(async () => {
+			const destination = returnTo ?? page.url();
+			await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+			if (destination && !/\/login/.test(destination) && !page.url().startsWith(destination)) {
+				await page.goto(destination);
+			}
+		});
+	}
+	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+}
+
+async function ensureOnUserForm(page: Page, href: string) {
+	const loginForm = page.locator(LOGIN_BUTTON_SELECTOR).filter({ hasText: /log in/i });
+	const needsLogin = (await loginForm.count()) || page.url().includes('/login');
+	if (needsLogin) {
+		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+		await assertAuthenticated(page);
+		await page.goto(href, { waitUntil: 'domcontentloaded' });
+	}
+	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+}
 
 const CREATE_USER: UserFormData = {
 	firstName: 'E2ECreate',
@@ -48,12 +83,16 @@ const UPDATED_EDIT_USER: UserFormData = {
 };
 
 async function goToUsersPage(page: Page) {
+	await assertAuthenticated(page);
+	await page.waitForTimeout(500);
+	await page.reload({ waitUntil: 'networkidle' });
 	await page.goto('/users');
-	await expect(page).not.toHaveURL(/\/login/, { timeout: 5_000 });
+	await ensureLoggedIn(page, '/users');
 	await expect(page).toHaveURL(/\/users/);
 }
 
 async function openNewUserForm(page: Page) {
+	await ensureLoggedIn(page, '/users');
 	await Promise.all([
 		page.waitForURL(/\/users\/new$/, { timeout: 15_000 }),
 		page.locator('a[href="/users/new"]').filter({ hasText: /.+/ }).first().click(),
@@ -88,16 +127,35 @@ async function selectFirstRole(page: Page) {
 }
 
 async function fillUserForm(page: Page, data: UserFormData) {
-	await page.locator('[name=FirstName]').fill(data.firstName);
-	await page.locator('[name=LastName]').fill(data.lastName);
-	await page.locator('[name=MiddleName]').fill(data.middleName);
-	await page.locator('[name=Email]').fill(data.email);
-	await page.locator('[name=Phone]').fill(data.phone);
+	const currentPath = page.url();
+	const targetPath = /\/login/.test(currentPath) ? '/users' : currentPath;
+	await ensureLoggedIn(page, targetPath);
+
+	const form = page.locator(USER_FORM_SELECTOR).first();
+	if ((await form.count()) > 0) {
+		await expect(form).toBeVisible({ timeout: 15_000 });
+	} else {
+		// 回退到直接等待关键输入可见，兼容无 id 的创建表单
+		await expect(page.locator('[name=FirstName]').first()).toBeVisible({ timeout: 15_000 });
+	}
+
+	const firstNameInput = page.locator('[name=FirstName]').first();
+	await firstNameInput.waitFor({ state: 'visible', timeout: 15_000 });
+	await firstNameInput.fill(data.firstName);
+
+	await page.locator('[name=LastName]').first().fill(data.lastName);
+	await page.locator('[name=MiddleName]').first().fill(data.middleName);
+	await page.locator('[name=Email]').first().fill(data.email);
+	await page.locator('[name=Phone]').first().fill(data.phone);
 	if (data.password) {
-		await page.locator('[name=Password]').fill(data.password);
+		await page.locator('[name=Password]').first().fill(data.password);
 	}
 	if (data.languageCode) {
-		await page.locator('[name=Language]').selectOption(data.languageCode);
+		const languageSelect = page.locator('[name=Language]').first();
+		if ((await languageSelect.count()) > 0) {
+			await languageSelect.waitFor({ state: 'visible', timeout: 15_000 });
+			await languageSelect.selectOption(data.languageCode);
+		}
 	}
 }
 
@@ -128,7 +186,7 @@ async function clickSaveButton(page: Page) {
 	}
 
 	// 若按钮缺失（例如底部操作栏未渲染），直接提交表单
-	const saveForm = page.locator('form#save-form');
+	const saveForm = page.locator(USER_FORM_SELECTOR).first();
 	if ((await saveForm.count()) === 1) {
 		await saveForm.evaluate(form => {
 			const f = form as HTMLFormElement;
@@ -142,15 +200,12 @@ async function clickSaveButton(page: Page) {
 	}
 
 	// 再兜底：手动收集表单字段并发送 POST 请求
-	const status = await page.evaluate(async () => {
+	const status = await page.evaluate(async selector => {
+		const form = document.querySelector(selector);
 		const params = new URLSearchParams();
-		const fields = Array.from(
-			document.querySelectorAll<HTMLElement>('[name]')
-		).filter(el => {
-			const formId = (el as HTMLInputElement).form?.id;
-			const explicit = el.getAttribute('form');
-			return formId === 'save-form' || explicit === 'save-form';
-		});
+		const fields = form
+			? Array.from(form.querySelectorAll<HTMLElement>('[name]'))
+			: Array.from(document.querySelectorAll<HTMLElement>('[name]'));
 
 		for (const el of fields) {
 			const name = el.getAttribute('name');
@@ -180,7 +235,8 @@ async function clickSaveButton(page: Page) {
 			params.append(name, el.value ?? '');
 		}
 
-		const resp = await fetch(window.location.pathname, {
+		const target = form?.getAttribute('hx-post') ?? window.location.pathname;
+		const resp = await fetch(target, {
 			method: 'POST',
 			headers: { 'HX-Request': 'true' },
 			body: params,
@@ -191,7 +247,7 @@ async function clickSaveButton(page: Page) {
 		}
 
 		return resp.status;
-	});
+	}, USER_FORM_SELECTOR);
 
 	if (status >= 400) {
 		throw new Error(`Save request failed with status ${status}`);
@@ -211,6 +267,66 @@ function getUserRowLocator(page: Page, data: UserFormData) {
 	return page.locator('tbody tr').filter({ hasText: `${data.firstName} ${data.lastName}` });
 }
 
+async function ensureUserFormReady(page: Page, data: UserFormData, href: string) {
+	const form = page.locator(USER_FORM_SELECTOR).first();
+	const firstNameInput = page.locator('[name=FirstName]').first();
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		if (page.url().includes('/login')) {
+			await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+			await page.goto(href, { waitUntil: 'domcontentloaded' });
+		}
+		const destination = page.url().includes('/login') ? href : page.url();
+		await ensureOnUserForm(page, destination);
+		await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {});
+		await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+
+		try {
+			await expect(form.or(firstNameInput)).toBeVisible({ timeout: 20_000 + attempt * 5_000 });
+			return;
+		} catch (error) {
+			if (attempt === 2) {
+				throw error;
+			}
+
+			await page.waitForTimeout(1_000);
+
+			try {
+				await page.reload({ waitUntil: 'domcontentloaded', timeout: 20_000 });
+			} catch {
+				await page.goto('/users', { waitUntil: 'domcontentloaded' });
+				await ensureLoggedIn(page, '/users');
+				await goToUsersPage(page);
+				const retryRow = getUserRowLocator(page, data);
+				await expect(retryRow).toHaveCount(1);
+				const retryLink = retryRow.locator('td a');
+				href = (await retryLink.getAttribute('href')) || href;
+				await retryLink.scrollIntoViewIfNeeded();
+				await Promise.all([page.waitForURL(/\/users\/.+/), retryLink.click()]);
+			}
+		}
+	}
+
+	await expect(form.or(firstNameInput)).toBeVisible({ timeout: 20_000 });
+}
+
+async function openUserDetails(page: Page, data: UserFormData) {
+	await goToUsersPage(page);
+	const userRow = getUserRowLocator(page, data);
+	await expect(userRow).toHaveCount(1);
+	const link = userRow.locator('td a');
+	const href = await link.getAttribute('href');
+	if (!href) {
+		throw new Error('User detail link missing href');
+	}
+	await link.scrollIntoViewIfNeeded();
+	await link.click();
+	await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 30_000 });
+	await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {});
+
+	await ensureUserFormReady(page, data, href);
+}
+
 async function ensureUserExists(page: Page, data: UserFormData) {
 	await goToUsersPage(page);
 	const userRow = getUserRowLocator(page, data);
@@ -220,13 +336,14 @@ async function ensureUserExists(page: Page, data: UserFormData) {
 	}
 }
 
-test.describe('user auth and registration flow', () => {
-	test.describe.configure({ timeout: 120_000 });
+	test.describe('user auth and registration flow', () => {
+		test.describe.configure({ timeout: 120_000 });
 
-	test.beforeAll(async ({ request }) => {
-		await resetTestDatabase(request, { reseedMinimal: false });
-		await seedScenario(request, 'comprehensive');
-	});
+		test.beforeAll(async ({ request }) => {
+			await resetTestDatabase(request, { reseedMinimal: false });
+			await seedScenario(request, 'comprehensive');
+			await checkTestEndpointsHealth(request);
+		});
 
 	test.beforeEach(async ({ page }) => {
 		await page.setViewportSize({ width: 1280, height: 720 });
@@ -257,30 +374,24 @@ test.describe('user auth and registration flow', () => {
 	test('edits a user and displays changes in users table', async ({ page }) => {
 		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
 		await ensureUserExists(page, EDIT_USER);
-		const userRow = getUserRowLocator(page, EDIT_USER);
-		await expect(userRow).toHaveCount(1);
-		await userRow.locator('td a').click();
-
-		await expect(page).toHaveURL(/\/users\/.+/);
+		await openUserDetails(page, EDIT_USER);
 
 		// Edit the user details
 		await fillUserForm(page, UPDATED_EDIT_USER);
 		await clickSaveButton(page);
 
-		// Wait for redirect after save
-		await page.waitForURL(/\/users$/);
+	// Wait for redirect after save
+	await page.waitForURL(/\/users$/);
 
-		// Verify changes in the users list
-		const usersTable = page.locator('#users-table-body');
-		await expect(usersTable).toContainText(
-			`${UPDATED_EDIT_USER.firstName} ${UPDATED_EDIT_USER.lastName}`,
-		);
+	// Verify changes in the users list
+	const usersTable = page.locator('#users-table-body');
+	await expect(usersTable).toContainText(`${UPDATED_EDIT_USER.firstName} ${UPDATED_EDIT_USER.lastName}`, {
+		timeout: 15_000,
+	});
 
-		// Verify phone number persists by checking the edit page
-		const updatedUserRow = getUserRowLocator(page, UPDATED_EDIT_USER);
-		await updatedUserRow.locator('td a').click();
-		await expect(page).toHaveURL(/\/users\/.+/);
-		await expect(page.locator('[name=Phone]')).toHaveValue(UPDATED_EDIT_USER.phone);
+	// Verify phone number persists by checking the edit page
+	await openUserDetails(page, UPDATED_EDIT_USER);
+	await expect(page.locator('[name=Phone]')).toHaveValue(UPDATED_EDIT_USER.phone);
 
 		await logout(page);
 

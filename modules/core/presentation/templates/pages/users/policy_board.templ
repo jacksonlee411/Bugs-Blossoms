@@ -19,6 +19,7 @@ type UserPolicyRequestStatus struct {
 	Domain string
 	Object string
 	Action string
+	State  string
 }
 
 type UserPolicyEntry struct {
@@ -47,11 +48,7 @@ type UserPolicyColumnProps struct {
 	DomainFilter  string
 	CanDebug      bool
 	CanStage      bool
-	CanRequest    bool
 	BaseURL       string
-	RequestObject string
-	RequestAction string
-	RequestReason string
 }
 
 type UserPolicyBoardProps struct {
@@ -62,10 +59,16 @@ type UserPolicyBoardProps struct {
 	Inherited     UserPolicyColumnProps
 	Direct        UserPolicyColumnProps
 	Overrides     UserPolicyColumnProps
+	BaseURL       string
+	RequestObject string
+	RequestAction string
+	RequestReason string
 	CanStage      bool
 	CanRequest    bool
 	CanDebug      bool
 }
+
+var userPolicyBoardScriptOnce = templ.NewOnceHandle()
 
 func totalPages(total, limit int) int {
 	if limit <= 0 {
@@ -83,15 +86,24 @@ func totalPages(total, limit int) int {
 
 templ UserPolicyBoard(props *UserPolicyBoardProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{boardState, _ := templ.JSONString(map[string]any{
+	"subject":  props.Subject,
+	"domain":   props.DefaultDomain,
+	"requests": props.Requests,
+})
+	}}
 	<div
 		class="space-y-4"
 		id="user-policy-board"
-		hx-get={ props.Inherited.BaseURL }
+		hx-get={ props.BaseURL }
 		hx-trigger="policies:staged from:body"
 		hx-target="#user-policy-board"
 		hx-swap="outerHTML"
+		x-data={ fmt.Sprintf("userPolicyBoardState(%s)", boardState) }
+		x-on:authz:request-created.window="onRequestCreated($event)"
+		x-init="init()"
 	>
-		<div class="flex items-center justify-between flex-wrap gap-3">
+		<div class="flex items-start justify-between flex-wrap gap-3">
 			<div class="space-y-1">
 				<h3 class="text-lg font-semibold">{ pageCtx.T("Users.Tabs.Permissions") }</h3>
 				<p class="text-sm text-secondary-300">
@@ -104,20 +116,78 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 						{ fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal) }
 					</span>
 				}
-				if !props.CanDebug {
+				if props.CanStage {
+					<form
+						class="flex items-center gap-2"
+						hx-post="/core/api/authz/requests"
+						hx-target="body"
+						hx-swap="none"
+						hx-on::before-request="this.querySelector('button').disabled=true;"
+						hx-on::after-request="this.querySelector('button').disabled=false;"
+					>
+						<input type="hidden" name="subject" value={ props.Subject }/>
+						<input type="hidden" name="object" value={ props.RequestObject }/>
+						<input type="hidden" name="action" value={ props.RequestAction }/>
+						<input type="hidden" name="reason" value={ props.RequestReason }/>
+						<button
+							class="btn btn-xs btn-primary"
+							type="submit"
+							disabled?={ props.StageTotal == 0 }
+						>
+							{ pageCtx.T("Authz.Stage.SubmitDraft") }
+						</button>
+					</form>
+				} else if props.CanRequest {
+					<form
+						class="flex items-center gap-2"
+						hx-post="/core/api/authz/requests"
+						hx-target="body"
+						hx-swap="none"
+						hx-on::before-request="this.querySelector('button').disabled=true;"
+						hx-on::after-request="this.querySelector('button').disabled=false;"
+					>
+						<input type="hidden" name="object" value={ props.RequestObject }/>
+						<input type="hidden" name="action" value={ props.RequestAction }/>
+						<input type="hidden" name="domain" value={ props.DefaultDomain }/>
+						<input type="hidden" name="diff" value="[]"/>
+						<input type="hidden" name="request_access" value="1"/>
+						<input type="hidden" name="reason" value={ props.RequestReason }/>
+						<button class="btn btn-xs btn-primary" type="submit">
+							{ pageCtx.T("Authz.Unauthorized.Apply") }
+						</button>
+					</form>
+				} else {
 					<span class="text-xs text-secondary-200">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
 				}
 			</div>
 		</div>
-		if len(props.Requests) > 0 {
-			<div class="flex flex-wrap gap-2 text-xs">
-				for _, req := range props.Requests {
-					<span class="px-2 py-1 rounded border border-primary text-primary-foreground bg-primary/20">
-						{ fmt.Sprintf("%s · %s/%s · %s", req.Status, req.Object, req.Action, req.ID) }
-					</span>
-				}
+		<div class="space-y-2 text-xs">
+			<div class="text-secondary-200">{ pageCtx.T("Authz.SLA.Expected") }</div>
+			<template x-if="requests.length > 0">
+				<div class="flex flex-wrap gap-2">
+					<template x-for="req in requests" :key="req.id">
+						<span class="px-2 py-1 rounded border border-primary text-primary-foreground bg-primary/20" x-text="formatRequest(req)"></span>
+					</template>
+				</div>
+			</template>
+			<div x-show="polling" class="text-secondary-100">
+				{ pageCtx.T("Authz.SLA.Polling") }
 			</div>
-		}
+			<div
+				x-show="timeout"
+				class="flex flex-wrap items-center gap-3 rounded-md border border-amber-500/40 bg-amber-900/40 px-3 py-2 text-amber-100"
+			>
+				<span>{ pageCtx.T("Authz.SLA.Timeout") }</span>
+				<div class="flex items-center gap-2">
+					<button class="btn btn-xs btn-warning" type="button" @click="retryPolling()">
+						{ pageCtx.T("Authz.SLA.Retry") }
+					</button>
+					<button class="btn btn-xs" type="button" @click="copyRequestId()">
+						{ pageCtx.T("Authz.SLA.Copy") }
+					</button>
+				</div>
+			</div>
+		</div>
 		if !props.CanDebug {
 			<div class="rounded-lg border border-dashed border-secondary-400 p-4 text-sm text-secondary-200">
 				{ pageCtx.T("Authz.Unauthorized.ApplyHint") }
@@ -130,6 +200,191 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 			</div>
 		}
 	</div>
+	@userPolicyBoardScriptOnce.Once() {
+		<script>
+			const authzStatusLabels = {
+				pending_review: "Awaiting PR",
+				approved: "Pending Deploy",
+				merged: "Active",
+				draft: "Draft",
+				rejected: "Rejected",
+				failed: "Failed",
+				canceled: "Canceled",
+			};
+
+			function normalizeRequests(list) {
+				return (list || []).map((item) => {
+					const rawStatus = item.status || item.State || "";
+					const statusValue = rawStatus || item.Status || "";
+					const label = rawStatus
+						? authzStatusLabels[rawStatus] || rawStatus
+						: statusValue;
+					const state = rawStatus;
+					return {
+						id: item.id || item.ID || "",
+						label: label,
+						state: state,
+						domain: item.domain || item.Domain || "",
+						object: item.object || item.Object || "",
+						action: item.action || item.Action || "",
+					};
+				});
+			}
+
+			function userPolicyBoardState(opts) {
+				return {
+					subject: opts?.subject || "",
+					domain: opts?.domain || "",
+					activeDomain: opts?.domain || "",
+					requests: normalizeRequests(opts?.requests || []),
+					polling: false,
+					timeout: false,
+					lastRequestId: "",
+					timer: null,
+					deadline: null,
+					init() {
+						const pending = (this.requests || []).find(
+							(req) => req.state && !this.isTerminal(req.state),
+						);
+						if (pending && pending.id) {
+							this.lastRequestId = pending.id;
+							this.activeDomain = pending.domain || this.domain;
+							this.startPolling(pending.id);
+						}
+						return () => {
+							this.stopPolling();
+						};
+					},
+					formatRequest(req) {
+						const label = req.label || req.state || "";
+						return `${label} · ${req.object || ""}/${req.action || ""} · ${req.id || ""}`;
+					},
+					onRequestCreated(event) {
+						let detail = event?.detail?.value ?? event?.detail ?? {};
+						if (typeof detail === "string") {
+							try {
+								detail = JSON.parse(detail);
+							} catch (_) {
+								detail = {};
+							}
+						}
+						if (!detail) return;
+						const normalized = normalizeRequests([detail])[0];
+						if (!normalized || !normalized.id) return;
+						this.lastRequestId = normalized.id;
+						this.activeDomain = normalized.domain || this.domain;
+						this.requests = [normalized].concat(this.requests || []);
+						this.startPolling(normalized.id);
+					},
+					startPolling(id) {
+						if (!id) return;
+						this.lastRequestId = id;
+						this.polling = true;
+						this.timeout = false;
+						this.deadline = Date.now() + 5 * 60 * 1000;
+						this.stopTimer();
+						this.timer = setInterval(() => this.poll(), 10000);
+						this.poll();
+					},
+					async poll() {
+						if (!this.polling) return;
+						if (this.deadline && Date.now() > this.deadline) {
+							this.stopTimer();
+							this.timeout = true;
+							this.polling = false;
+							return;
+						}
+						const params = new URLSearchParams({
+							subject: this.subject,
+							domain: this.activeDomain || this.domain,
+							limit: "10",
+							sort: "desc",
+						});
+						let data;
+						try {
+							const resp = await fetch(`/core/api/authz/requests?${params.toString()}`);
+							if (!resp.ok) return;
+							data = await resp.json();
+						} catch (_) {
+							return;
+						}
+						const normalized = normalizeRequests(data?.data || []);
+						if (normalized.length > 0) {
+							this.requests = normalized;
+						}
+						const latest = normalized.find((item) => item.id === this.lastRequestId);
+						const state = latest?.state || latest?.label;
+						if (state && this.isTerminal(state)) {
+							this.stopTimer();
+							this.polling = false;
+						}
+					},
+					retryPolling() {
+						if (!this.lastRequestId) return;
+						this.timeout = false;
+						this.startPolling(this.lastRequestId);
+					},
+					copyRequestId() {
+						if (!this.lastRequestId || !navigator?.clipboard) return;
+						navigator.clipboard.writeText(this.lastRequestId);
+					},
+					stopTimer() {
+						if (this.timer) {
+							clearInterval(this.timer);
+							this.timer = null;
+						}
+					},
+					stopPolling() {
+						this.stopTimer();
+						this.polling = false;
+					},
+					isTerminal(status) {
+						const value = (status || "").toLowerCase();
+						return ["merged", "failed", "rejected", "canceled"].includes(value);
+					},
+				};
+			}
+
+			function userPolicyColumnState() {
+				return {
+					selected: [],
+					toggleAll(event) {
+						const checked = event.target.checked;
+						this.selected = [];
+						this.$el.querySelectorAll('input[data-entry]').forEach((input) => {
+							if (input.disabled) return;
+							input.checked = checked;
+							if (checked) {
+								this.selected.push(input.value);
+							}
+						});
+					},
+					bulkRemove() {
+						const inputs = Array.from(this.$el.querySelectorAll('input[data-entry]:checked'));
+						if (!inputs.length) return;
+						const payload = inputs.map((input) => ({
+							type: input.dataset.type,
+							subject: input.dataset.subject,
+							domain: input.dataset.domain,
+							object: input.dataset.object,
+							action: input.dataset.action,
+							effect: input.dataset.effect,
+							stage_kind: "remove",
+						}));
+						this.selected = [];
+						if (typeof htmx !== "undefined") {
+							htmx.ajax("POST", "/core/api/authz/policies/stage", {
+								headers: { "Content-Type": "application/json" },
+								target: "body",
+								swap: "none",
+								body: JSON.stringify(payload),
+							});
+						}
+					},
+				};
+			}
+		</script>
+	}
 }
 
 templ UserPolicyColumn(props *UserPolicyColumnProps) {
@@ -152,6 +407,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 		hx-trigger="policies:staged from:body"
 		hx-target={ fmt.Sprintf("#%s", columnID) }
 		hx-swap="outerHTML"
+		x-data="userPolicyColumnState()"
 	>
 		<div class="flex items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
@@ -170,6 +426,14 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 						{ fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal) }
 					</span>
 				}
+				if props.CanStage {
+					<input
+						type="checkbox"
+						class="checkbox checkbox-xs border-primary bg-surface-500"
+						aria-label={ pageCtx.T("Authz.Stage.SelectAll") }
+						x-on:change="toggleAll($event)"
+					/>
+				}
 			</div>
 			<div class="flex items-center gap-2">
 				if props.CanStage {
@@ -182,46 +446,14 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 					}) {
 						{ pageCtx.T("Create") }
 					}
-					<form
-						class="flex items-center gap-2"
-						hx-post="/core/api/authz/requests"
-						hx-target="body"
-						hx-swap="none"
+					<button
+						type="button"
+						class="btn btn-xs btn-warning"
+						x-show="selected.length > 0"
+						@click="bulkRemove()"
 					>
-						<input type="hidden" name="subject" value={ props.Subject }/>
-						<input type="hidden" name="domain" value={ props.Domain }/>
-						<input type="hidden" name="object" value={ props.RequestObject }/>
-						<input type="hidden" name="action" value={ props.RequestAction }/>
-						<input type="hidden" name="reason" value={ props.RequestReason }/>
-						<button
-							class="btn btn-xs"
-							type="submit"
-							disabled?={ props.StageTotal == 0 }
-						>
-							{ pageCtx.T("Authz.Stage.SubmitDraft") }
-						</button>
-					</form>
-				} else if props.CanRequest {
-					<form
-						class="flex items-center gap-2"
-						hx-post="/core/api/authz/requests"
-						hx-target="body"
-						hx-swap="none"
-						hx-on::before-request="this.querySelector('button').disabled=true;"
-						hx-on::after-request="this.querySelector('button').disabled=false;"
-					>
-						<input type="hidden" name="object" value={ props.RequestObject }/>
-						<input type="hidden" name="action" value={ props.RequestAction }/>
-						<input type="hidden" name="domain" value={ formDomain }/>
-						<input type="hidden" name="diff" value="[]"/>
-						<input type="hidden" name="request_access" value="1"/>
-						<input type="hidden" name="reason" value={ props.RequestReason }/>
-						<button class="btn btn-xs btn-primary" type="submit">
-							{ pageCtx.T("Authz.Unauthorized.Apply") }
-						</button>
-					</form>
-				} else {
-					<span class="text-xs text-secondary-300">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
+						{ pageCtx.T("Authz.Stage.BulkRemove") }
+					</button>
 				}
 			</div>
 		</div>
@@ -235,17 +467,21 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 			<input type="hidden" name="column" value={ props.Column }/>
 			<input type="hidden" name="page" value="1"/>
 			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", props.Limit) }/>
-			if props.Column == "overrides" {
-				@input.Text(&input.Props{
-					Placeholder: "Domain",
-					Attrs: templ.Attributes{
-						"name":  "domain",
-						"value": props.DomainFilter,
-					},
-				})
-			} else {
-				<input type="hidden" name="domain" value={ props.Domain }/>
-			}
+			@input.Text(&input.Props{
+				Placeholder: pageCtx.T("Authz.Domain"),
+				Attrs: templ.Attributes{
+					"name": "domain",
+					"value": func() string {
+						if props.DomainFilter != "" {
+							return props.DomainFilter
+						}
+						if props.Domain != "" {
+							return props.Domain
+						}
+						return props.DefaultDomain
+					}(),
+				},
+			})
 			@input.Text(&input.Props{
 				Placeholder: pageCtx.T("Search"),
 				Attrs: templ.Attributes{
@@ -330,16 +566,22 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 			</form>
 		}
 		<div class="border border-primary rounded-lg overflow-hidden">
+			{{ columns := []*base.TableColumn{} }}
+			if props.CanStage {
+				{{ columns = append(columns, &base.TableColumn{Label: "", Key: "select", Class: "w-10"}) }}
+			}
+			{{columns = append(columns,
+	&base.TableColumn{Label: "Type", Key: "type", Class: "w-14"},
+	&base.TableColumn{Label: "Subject", Key: "subject"},
+	&base.TableColumn{Label: "Domain", Key: "domain"},
+	&base.TableColumn{Label: "Object", Key: "object"},
+	&base.TableColumn{Label: "Action", Key: "action"},
+	&base.TableColumn{Label: "Effect", Key: "effect", Class: "w-28"},
+	&base.TableColumn{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-32"},
+)
+			}}
 			@base.Table(base.TableProps{
-				Columns: []*base.TableColumn{
-					{Label: "Type", Key: "type", Class: "w-14"},
-					{Label: "Subject", Key: "subject"},
-					{Label: "Domain", Key: "domain"},
-					{Label: "Object", Key: "object"},
-					{Label: "Action", Key: "action"},
-					{Label: "Effect", Key: "effect", Class: "w-28"},
-					{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-32"},
-				},
+				Columns: columns,
 			}) {
 				if len(props.Entries) == 0 {
 					@base.TableRow(base.TableRowProps{}) {
@@ -363,6 +605,24 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 					@base.TableRow(base.TableRowProps{
 						Attrs: templ.Attributes{"class": rowClass},
 					}) {
+						if props.CanStage {
+							@base.TableCell(base.TableCellProps{}) {
+								<input
+									type="checkbox"
+									class="checkbox checkbox-xs border-primary bg-surface-500"
+									value={ fmt.Sprintf("%s|%s|%s|%s|%s", entry.Type, entry.Subject, entry.Domain, entry.Object, entry.Action) }
+									data-entry="1"
+									data-type={ entry.Type }
+									data-subject={ entry.Subject }
+									data-domain={ entry.Domain }
+									data-object={ entry.Object }
+									data-action={ entry.Action }
+									data-effect={ entry.Effect }
+									disabled?={ entry.Staged }
+									x-model="selected"
+								/>
+							}
+						}
 						@base.TableCell(base.TableCellProps{}) {
 							{ entry.Type }
 						}

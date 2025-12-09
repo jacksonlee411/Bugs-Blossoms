@@ -408,7 +408,22 @@
       "Apply": "Ruxsat so'rash",
       "ApplyDescription": "/core/api/authz/requests manziliga tavsiya etilgan siyosat bilan so'rov yuboring.",
       "ApplyHint": "Bu amal uchun ruxsatingiz yo'q"
-    }
+    },
+    "Stage": {
+      "Badge": "Qoralama %d",
+      "BadgeShort": "Qoralama",
+      "SubmitDraft": "Qoralamani yuborish",
+      "BulkRemove": "Ommaviy o'chirish",
+      "SelectAll": "Hammasini belgilash"
+    },
+    "SLA": {
+      "Expected": "Yangilanish ≤5 daqiqada kutiladi",
+      "Polling": "So'rov holati tekshirilmoqda...",
+      "Timeout": "Holat olinmadi, request_id ni nusxalab qayta urinib ko'ring",
+      "Retry": "Qayta tekshirish",
+      "Copy": "request_id nusxalash"
+    },
+    "Domain": "Domen"
   },
   "Home": {
     "Meta": {

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	jsondiff "github.com/wI2L/jsondiff"
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
@@ -201,7 +203,7 @@ func (c *AuthzAPIController) createRequest(
 	}).Debug("authz api: create draft payload")
 	diffStr := strings.TrimSpace(string(payload.Diff))
 	if !payload.RequestAccess && (diffStr == "" || strings.EqualFold(diffStr, "null")) {
-		payload, err = c.buildDraftFromStage(r.Context(), tenantID, currentUser, payload)
+		payload, err = c.buildDraftFromStage(r.Context(), tenantID, currentUser, payload, svc)
 		if err != nil {
 			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_EMPTY", err.Error())
 			return
@@ -236,11 +238,21 @@ func (c *AuthzAPIController) createRequest(
 		c.respondServiceError(w, r, err)
 		return
 	}
+	responsePayload := dtos.NewPolicyDraftResponse(draft)
 	if htmx.IsHxRequest(r) {
 		htmx.SetTrigger(w, "policies:staged", `{"total":0}`)
+		if triggerDetail, marshalErr := json.Marshal(map[string]string{
+			"id":     draft.ID.String(),
+			"status": string(draft.Status),
+			"domain": draft.Domain,
+			"object": draft.Object,
+			"action": draft.Action,
+		}); marshalErr == nil {
+			htmx.SetTrigger(w, "authz:request-created", string(triggerDetail))
+		}
 		htmx.TriggerToast(w, htmx.ToastVariantSuccess, "提交成功", "已提交策略草稿")
 	}
-	writeJSON(w, http.StatusCreated, dtos.NewPolicyDraftResponse(draft))
+	writeJSON(w, http.StatusCreated, responsePayload)
 }
 
 func (c *AuthzAPIController) stagePolicy(
@@ -265,12 +277,12 @@ func (c *AuthzAPIController) stagePolicy(
 
 	switch r.Method {
 	case http.MethodPost:
-		payload, err := decodeStagePolicyRequest(r)
+		payloads, err := decodeStagePolicyRequests(r)
 		if err != nil {
 			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
 			return
 		}
-		entries, err := c.stageStore.Add(key, payload)
+		entries, err := c.stageStore.AddMany(key, payloads)
 		if err != nil {
 			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
 			return
@@ -584,6 +596,41 @@ func parseUUID(raw string) (uuid.UUID, error) {
 	return uuid.Parse(strings.TrimSpace(raw))
 }
 
+func decodeStagePolicyRequests(r *http.Request) ([]dtos.StagePolicyRequest, error) {
+	contentType := strings.ToLower(r.Header.Get("Content-Type"))
+	if strings.Contains(contentType, "application/json") {
+		var raw json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+			return nil, err
+		}
+		trimmed := bytes.TrimSpace(raw)
+		if len(trimmed) == 0 {
+			return nil, errors.New("stage payload is empty")
+		}
+		if trimmed[0] == '[' {
+			var payloads []dtos.StagePolicyRequest
+			if err := json.Unmarshal(trimmed, &payloads); err != nil {
+				return nil, err
+			}
+			if len(payloads) == 0 {
+				return nil, errors.New("stage payload is empty")
+			}
+			return payloads, nil
+		}
+		var payload dtos.StagePolicyRequest
+		if err := json.Unmarshal(trimmed, &payload); err != nil {
+			return nil, err
+		}
+		return []dtos.StagePolicyRequest{payload}, nil
+	}
+
+	payload, err := decodeStagePolicyRequest(r)
+	if err != nil {
+		return nil, err
+	}
+	return []dtos.StagePolicyRequest{payload}, nil
+}
+
 func decodeStagePolicyRequest(r *http.Request) (dtos.StagePolicyRequest, error) {
 	contentType := strings.ToLower(r.Header.Get("Content-Type"))
 	if strings.Contains(contentType, "application/json") {
@@ -641,6 +688,7 @@ func (c *AuthzAPIController) buildDraftFromStage(
 	tenantID uuid.UUID,
 	currentUser user.User,
 	payload dtos.PolicyDraftRequest,
+	policyService *services.PolicyDraftService,
 ) (dtos.PolicyDraftRequest, error) {
 	key := policyStageKey(currentUser.ID(), tenantID)
 	subject := strings.TrimSpace(payload.Subject)
@@ -668,6 +716,20 @@ func (c *AuthzAPIController) buildDraftFromStage(
 	if strings.TrimSpace(first.Object) == "" || strings.TrimSpace(first.Action) == "" {
 		return payload, errors.New("暂存规则缺少对象或动作")
 	}
+
+	basePolicies, err := policyService.Policies(ctx)
+	if err != nil {
+		return payload, err
+	}
+	baseDoc := buildPolicyDocument(basePolicies)
+	updatedDoc, err := applyStageEntries(baseDoc, filtered)
+	if err != nil {
+		return payload, err
+	}
+	diffBytes, err := diffPolicyDocuments(baseDoc, updatedDoc)
+	if err != nil {
+		return payload, err
+	}
 	logrus.WithFields(logrus.Fields{
 		"stage_count": len(filtered),
 		"subject":     first.Subject,
@@ -683,28 +745,6 @@ func (c *AuthzAPIController) buildDraftFromStage(
 			"action":  first.Action,
 		}).Info("authz stage draft build")
 	}
-	patches := make([]map[string]any, 0, len(filtered))
-	for _, entry := range filtered {
-		op := "add"
-		if entry.StageKind == "remove" {
-			op = "remove"
-		}
-		patches = append(patches, map[string]any{
-			"op":   op,
-			"path": "/p",
-			"value": []string{
-				entry.Subject,
-				entry.Object,
-				entry.Action,
-				entry.Domain,
-				entry.Effect,
-			},
-		})
-	}
-	diffBytes, err := json.Marshal(patches)
-	if err != nil {
-		return payload, err
-	}
 	payload.Subject = subject
 	payload.Domain = domain
 	if strings.TrimSpace(payload.Object) == "" {
@@ -716,4 +756,150 @@ func (c *AuthzAPIController) buildDraftFromStage(
 	payload.Diff = diffBytes
 	c.stageStore.Clear(key, subject, domain)
 	return payload, nil
+}
+
+func buildPolicyDocument(entries []services.PolicyEntry) map[string][][]string {
+	doc := map[string][][]string{}
+	ensurePolicyType(doc, "p")
+	ensurePolicyType(doc, "g")
+	for _, entry := range entries {
+		values := policyValuesFromService(entry)
+		ensurePolicyType(doc, entry.Type)
+		doc[entry.Type] = append(doc[entry.Type], values)
+	}
+	return doc
+}
+
+func applyStageEntries(baseDoc map[string][][]string, staged []dtos.StagedPolicyEntry) (map[string][][]string, error) {
+	updated := clonePolicyDocument(baseDoc)
+	index := buildPolicyIndex(updated)
+
+	for _, entry := range staged {
+		values := policyValuesFromDTO(entry.PolicyEntryResponse)
+		typ := entry.Type
+		if typ == "" {
+			typ = "p"
+		}
+		ensurePolicyType(updated, typ)
+		ensurePolicyIndex(index, typ)
+		key := policyValueKey(values)
+
+		switch entry.StageKind {
+		case "remove":
+			idx, ok := index[typ][key]
+			if !ok {
+				return nil, errors.New("待撤销的策略不存在")
+			}
+			updated[typ] = append(updated[typ][:idx], updated[typ][idx+1:]...)
+			index[typ] = buildIndexForType(updated[typ])
+		default:
+			if _, exists := index[typ][key]; exists {
+				continue
+			}
+			updated[typ] = append(updated[typ], values)
+			index[typ][key] = len(updated[typ]) - 1
+		}
+	}
+	return updated, nil
+}
+
+func diffPolicyDocuments(baseDoc, updatedDoc map[string][][]string) (json.RawMessage, error) {
+	before, err := json.Marshal(baseDoc)
+	if err != nil {
+		return nil, err
+	}
+	after, err := json.Marshal(updatedDoc)
+	if err != nil {
+		return nil, err
+	}
+	patch, err := jsondiff.CompareJSON(before, after)
+	if err != nil {
+		return nil, err
+	}
+	if len(patch) == 0 {
+		return nil, errors.New("暂无可提交的策略变更")
+	}
+	return json.Marshal(patch)
+}
+
+func policyValuesFromService(entry services.PolicyEntry) []string {
+	switch entry.Type {
+	case "g", "g2":
+		return []string{
+			entry.Subject,
+			entry.Object,
+			entry.Domain,
+		}
+	default:
+		return []string{
+			entry.Subject,
+			entry.Domain,
+			entry.Object,
+			entry.Action,
+			entry.Effect,
+		}
+	}
+}
+
+func policyValuesFromDTO(entry dtos.PolicyEntryResponse) []string {
+	switch entry.Type {
+	case "g", "g2":
+		return []string{
+			entry.Subject,
+			entry.Object,
+			entry.Domain,
+		}
+	default:
+		return []string{
+			entry.Subject,
+			entry.Domain,
+			entry.Object,
+			entry.Action,
+			entry.Effect,
+		}
+	}
+}
+
+func ensurePolicyType(doc map[string][][]string, typ string) {
+	if _, ok := doc[typ]; !ok {
+		doc[typ] = [][]string{}
+	}
+}
+
+func ensurePolicyIndex(index map[string]map[string]int, typ string) {
+	if _, ok := index[typ]; !ok {
+		index[typ] = map[string]int{}
+	}
+}
+
+func clonePolicyDocument(doc map[string][][]string) map[string][][]string {
+	cloned := make(map[string][][]string, len(doc))
+	for typ, rows := range doc {
+		items := make([][]string, 0, len(rows))
+		for _, row := range rows {
+			items = append(items, append([]string(nil), row...))
+		}
+		cloned[typ] = items
+	}
+	return cloned
+}
+
+func buildPolicyIndex(doc map[string][][]string) map[string]map[string]int {
+	index := map[string]map[string]int{}
+	for typ, rows := range doc {
+		index[typ] = buildIndexForType(rows)
+	}
+	return index
+}
+
+func buildIndexForType(rows [][]string) map[string]int {
+	lookup := map[string]int{}
+	for i, row := range rows {
+		lookup[policyValueKey(row)] = i
+	}
+	return lookup
+}
+
+func policyValueKey(values []string) string {
+	return strings.Join(values, "|")
 }
