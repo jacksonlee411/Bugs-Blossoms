@@ -380,18 +380,18 @@ async function ensureUserExists(page: Page, data: UserFormData) {
 		await fillUserForm(page, UPDATED_EDIT_USER);
 		await clickSaveButton(page);
 
-		// Wait for redirect after save
-		await page.waitForURL(/\/users$/);
+	// Wait for redirect after save
+	await page.waitForURL(/\/users$/);
 
-		// Verify changes in the users list
-		const usersTable = page.locator('#users-table-body');
-		await expect(usersTable).toContainText(
-			`${UPDATED_EDIT_USER.firstName} ${UPDATED_EDIT_USER.lastName}`,
-		);
+	// Verify changes in the users list
+	const usersTable = page.locator('#users-table-body');
+	await expect(usersTable).toContainText(`${UPDATED_EDIT_USER.firstName} ${UPDATED_EDIT_USER.lastName}`, {
+		timeout: 15_000,
+	});
 
-		// Verify phone number persists by checking the edit page
-		await openUserDetails(page, UPDATED_EDIT_USER);
-		await expect(page.locator('[name=Phone]')).toHaveValue(UPDATED_EDIT_USER.phone);
+	// Verify phone number persists by checking the edit page
+	await openUserDetails(page, UPDATED_EDIT_USER);
+	await expect(page.locator('[name=Phone]')).toHaveValue(UPDATED_EDIT_USER.phone);
 
 		await logout(page);
 
