@@ -9,10 +9,10 @@
 - 确保 403 时模板获得完整 `authz.ViewState/MissingPolicies`，导航/Quick Links 可依据授权过滤并可复制 `request_id`。
 
 ## 实施步骤
-1. [ ] Unauthorized 组件 —— 实现 `components/authorization/unauthorized.templ`，从 `authz.ViewState` 获取 `missing_policies` 构造 `suggested_diff`（g/p），携带 `subject/object/action/domain`、`base_revision`（渲染层读取 `config/access/policy.csv.rev` 注入），HTMX 调 `POST /core/api/authz/requests`；展示/复制已有 `request_id`（提交成功后更新，失败不覆盖旧值）；失败时用黄条提示原因，提供“重试一次”和“复制 request_id/trace”按钮，重试最多 1 次，失败保留 diff。
-2. [ ] PolicyInspector —— 仅 `Authz.Debug` 可见，调用 `GET /core/api/authz/debug?subject=&object=&action=&domain=` 展示命中规则/ABAC/latency/trace；处理 429 时提示“频率达上限，5s/10s 各重试一次后放弃”，403 时提示无权限；提供“一键生成草稿”按钮复用 Unauthorized 请求参数。
-3. [ ] 控制器契约 —— HRM/Logging 403 时注入 `MissingPolicies` 与 `authz.ViewState`（含 domain 映射）；渲染层注入最新 `base_revision`，HRM 页固定传 `domain=hrm`，Logging 页传 `domain=logging`（子域需显式传递）；Quick Links/Sidebar 根据授权过滤；Unauthorized/PolicyInspector 均可复制/显示当前 `request_id` 与 trace 链接。
-4. [ ] 测试 —— 补 e2e/集成测试覆盖“有权限 vs 无权限”“缺 `Authz.Debug`/429 降级”“申请失败重试/复制 request_id”。
+1. [ ] Unauthorized 组件 —— 实现 `components/authorization/unauthorized.templ`，从 `authz.ViewState` 获取 `missing_policies` 构造 `suggested_diff`（g/p），携带 `subject/object/action/domain`、`base_revision`（渲染层读取 `config/access/policy.csv.rev` 注入，`AUTHZ_INVALID_REQUEST` 且提示 base_revision 过期时自动刷新片段以获取新 rev，刷新后再允许 1 次提交，仍失败则提示刷新页面）；HTMX 调 `POST /core/api/authz/requests`；展示/复制已有 `request_id`（提交成功后更新，失败不覆盖旧值）；失败时用黄条提示原因，提供“重试一次”和“复制 request_id/trace”按钮，重试最多 1 次，失败保留 diff。
+2. [ ] PolicyInspector —— 仅 `Authz.Debug` 可见，调用 `GET /core/api/authz/debug?subject=&object=&action=&domain=` 展示命中规则/ABAC/latency/trace；处理 429 时提示“频率达上限，5s/10s 各重试一次后放弃”，403 时提示无权限；提供“一键生成草稿”按钮复用 Unauthorized 请求参数，并在 base_revision 过期时沿用 Unauthorized 的刷新逻辑。
+3. [ ] 控制器契约 —— HRM/Logging 403 时注入 `MissingPolicies` 与 `authz.ViewState`（含 domain 映射）；渲染层注入最新 `base_revision`，HRM 页固定传 `domain=hrm`，Logging 页传 `domain=logging`（子域需显式传递）；`subject` 统一从当前会话/tenant 上下文注入至 `authz.ViewState` 并透传给组件，UI 不允许手动修改以避免伪造；Quick Links/Sidebar 根据授权过滤；Unauthorized/PolicyInspector 均可复制/显示当前 `request_id` 与 trace 链接。
+4. [ ] 测试 —— 补 e2e/集成测试覆盖“有权限 vs 无权限”“缺 `Authz.Debug`/429 降级”“申请失败重试/复制 request_id”；补充单元/契约测试覆盖 diff 构造（含 domain/subject/base_revision 映射）、Quick Links 过滤、请求失败后不覆盖旧 `request_id`、base_revision 过期刷新路径与重试上限。
 5. [ ] 质量门禁/文档/多语言/a11y —— 模板/Tailwind 改动后跑 `templ generate && make css`，文案改动跑 `make check tr`，合入前跑 `make check lint`；更新 README/AGENTS 示例与 locales，记录键盘可达/ARIA/axe 巡检结果。
 
 ## 依赖
