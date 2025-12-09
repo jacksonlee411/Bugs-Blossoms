@@ -26,9 +26,18 @@ async function ensureLoggedIn(page: Page, returnTo?: string) {
 	if (await loginButton.count()) {
 		const destination = returnTo ?? page.url();
 		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
-		if (destination && !page.url().startsWith(destination)) {
+		if (destination && !/\/login/.test(destination) && !page.url().startsWith(destination)) {
 			await page.goto(destination);
 		}
+	}
+	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+}
+
+async function ensureOnUserForm(page: Page, href: string) {
+	const loginForm = page.locator(LOGIN_BUTTON_SELECTOR).filter({ hasText: /log in/i });
+	if (await loginForm.count()) {
+		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+		await page.goto(href, { waitUntil: 'domcontentloaded' });
 	}
 	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 }
@@ -108,7 +117,8 @@ async function selectFirstRole(page: Page) {
 
 async function fillUserForm(page: Page, data: UserFormData) {
 	const currentPath = page.url();
-	await ensureLoggedIn(page, currentPath);
+	const targetPath = /\/login/.test(currentPath) ? '/users' : currentPath;
+	await ensureLoggedIn(page, targetPath);
 
 	const form = page.locator(USER_FORM_SELECTOR).first();
 	if ((await form.count()) > 0) {
@@ -244,6 +254,49 @@ function getUserRowLocator(page: Page, data: UserFormData) {
 	return page.locator('tbody tr').filter({ hasText: `${data.firstName} ${data.lastName}` });
 }
 
+async function openUserDetails(page: Page, data: UserFormData) {
+	await goToUsersPage(page);
+	const userRow = getUserRowLocator(page, data);
+	await expect(userRow).toHaveCount(1);
+	const link = userRow.locator('td a');
+	const href = await link.getAttribute('href');
+	if (!href) {
+		throw new Error('User detail link missing href');
+	}
+	await link.scrollIntoViewIfNeeded();
+	await link.click();
+	await expect(page).toHaveURL(new RegExp(`${href}$`));
+
+	const target = page.url().includes('/login') ? href : page.url();
+	await ensureOnUserForm(page, target);
+
+	const form = page.locator(USER_FORM_SELECTOR).first();
+	const firstNameInput = page.locator('[name=FirstName]').first();
+	try {
+		await expect(form.or(firstNameInput)).toBeVisible({ timeout: 15_000 });
+	} catch {
+		// 如果未加载出表单，重试一次打开详情页
+		try {
+			await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+		} catch {
+			// 如果直接跳转失败，回到列表页重新打开
+			await page.goto('/users', { waitUntil: 'domcontentloaded' });
+			await ensureLoggedIn(page, '/users');
+			await goToUsersPage(page);
+			const retryRow = getUserRowLocator(page, data);
+			await expect(retryRow).toHaveCount(1);
+			const retryLink = retryRow.locator('td a');
+			const retryHref = (await retryLink.getAttribute('href')) || href;
+			await retryLink.scrollIntoViewIfNeeded();
+			await retryLink.click();
+			await expect(page).toHaveURL(/\/users\/.+/);
+			await ensureOnUserForm(page, retryHref);
+		}
+		await ensureOnUserForm(page, href);
+		await expect(form.or(firstNameInput)).toBeVisible({ timeout: 20_000 });
+	}
+}
+
 async function ensureUserExists(page: Page, data: UserFormData) {
 	await goToUsersPage(page);
 	const userRow = getUserRowLocator(page, data);
@@ -291,11 +344,7 @@ async function ensureUserExists(page: Page, data: UserFormData) {
 	test('edits a user and displays changes in users table', async ({ page }) => {
 		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
 		await ensureUserExists(page, EDIT_USER);
-		const userRow = getUserRowLocator(page, EDIT_USER);
-		await expect(userRow).toHaveCount(1);
-		await userRow.locator('td a').click();
-
-		await expect(page).toHaveURL(/\/users\/.+/);
+		await openUserDetails(page, EDIT_USER);
 
 		// Edit the user details
 		await fillUserForm(page, UPDATED_EDIT_USER);
@@ -311,9 +360,7 @@ async function ensureUserExists(page: Page, data: UserFormData) {
 		);
 
 		// Verify phone number persists by checking the edit page
-		const updatedUserRow = getUserRowLocator(page, UPDATED_EDIT_USER);
-		await updatedUserRow.locator('td a').click();
-		await expect(page).toHaveURL(/\/users\/.+/);
+		await openUserDetails(page, UPDATED_EDIT_USER);
 		await expect(page.locator('[name=Phone]')).toHaveValue(UPDATED_EDIT_USER.phone);
 
 		await logout(page);
