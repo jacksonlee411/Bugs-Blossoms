@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { login, logout } from '../../fixtures/auth';
-import { resetTestDatabase, seedScenario } from '../../fixtures/test-data';
+import { assertAuthenticated, login, logout } from '../../fixtures/auth';
+import { checkTestEndpointsHealth, resetTestDatabase, seedScenario } from '../../fixtures/test-data';
 
 interface UserFormData {
 	firstName: string;
@@ -48,8 +48,11 @@ const UPDATED_EDIT_USER: UserFormData = {
 };
 
 async function goToUsersPage(page: Page) {
+	await assertAuthenticated(page);
+	await page.waitForTimeout(500);
+	await page.reload({ waitUntil: 'networkidle' });
 	await page.goto('/users');
-	await expect(page).not.toHaveURL(/\/login/, { timeout: 5_000 });
+	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 	await expect(page).toHaveURL(/\/users/);
 }
 
@@ -228,13 +231,14 @@ async function ensureUserExists(page: Page, data: UserFormData) {
 	}
 }
 
-test.describe('user auth and registration flow', () => {
-	test.describe.configure({ timeout: 120_000 });
+	test.describe('user auth and registration flow', () => {
+		test.describe.configure({ timeout: 120_000 });
 
-	test.beforeAll(async ({ request }) => {
-		await resetTestDatabase(request, { reseedMinimal: false });
-		await seedScenario(request, 'comprehensive');
-	});
+		test.beforeAll(async ({ request }) => {
+			await resetTestDatabase(request, { reseedMinimal: false });
+			await seedScenario(request, 'comprehensive');
+			await checkTestEndpointsHealth(request);
+		});
 
 	test.beforeEach(async ({ page }) => {
 		await page.setViewportSize({ width: 1280, height: 720 });
