@@ -71,36 +71,48 @@ func suggestedDiff(state *authz.ViewState, policies []authz.MissingPolicy) strin
 templ Unauthorized(props *UnauthorizedProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ state := props.State }}
-	{{ if state == nil { state = pageCtx.AuthzState() } }}
+	{{ if state == nil {
+	state = pageCtx.AuthzState()
+} }}
 	{{ object := strings.ToLower(strings.TrimSpace(props.Object)) }}
 	{{ normalizedAction := authz.NormalizeAction(props.Action) }}
 	{{ requestURL := strings.TrimSpace(props.Request) }}
-	{{ if requestURL == "" { requestURL = "/core/api/authz/requests" } }}
+	{{ if requestURL == "" {
+	requestURL = "/core/api/authz/requests"
+} }}
 	{{ subject := strings.TrimSpace(props.Subject) }}
-	{{ if subject == "" && state != nil { subject = state.Subject } }}
+	{{ if subject == "" && state != nil {
+	subject = state.Subject
+} }}
 	{{ domain := strings.TrimSpace(props.Domain) }}
-	{{ if domain == "" && state != nil { domain = state.Tenant } }}
+	{{ if domain == "" && state != nil {
+	domain = state.Tenant
+} }}
 	{{ debugURL := strings.TrimSpace(props.DebugURL) }}
-	{{ if debugURL == "" && subject != "" && object != "" && normalizedAction != "" {
-		q := url.Values{}
-		q.Set("subject", subject)
-		q.Set("object", object)
-		q.Set("action", normalizedAction)
-		if domain != "" {
-			q.Set("domain", domain)
-		}
-		debugURL = fmt.Sprintf("/core/api/authz/debug?%s", q.Encode())
-	} }}
+	{{if debugURL == "" && subject != "" && object != "" && normalizedAction != "" {
+	q := url.Values{}
+	q.Set("subject", subject)
+	q.Set("object", object)
+	q.Set("action", normalizedAction)
+	if domain != "" {
+		q.Set("domain", domain)
+	}
+	debugURL = fmt.Sprintf("/core/api/authz/debug?%s", q.Encode())
+}
+	}}
 	{{ safeDebugURL := templ.URL(debugURL) }}
 	{{ operation := strings.TrimSpace(props.Operation) }}
-	{{ if operation == "" {
-		operation = strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction))
-		if operation == "" {
-			operation = pageCtx.T("Actions")
-		}
-	} }}
+	{{if operation == "" {
+	operation = strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction))
+	if operation == "" {
+		operation = pageCtx.T("Actions")
+	}
+}
+	}}
 	{{ baseRevision := strings.TrimSpace(props.BaseRevision) }}
-	{{ if baseRevision == "" { baseRevision = authzutil.BaseRevision(ctx) } }}
+	{{ if baseRevision == "" {
+	baseRevision = authzutil.BaseRevision(ctx)
+} }}
 	{{ requestID := strings.TrimSpace(props.RequestID) }}
 	{{ policies := normalizePolicies(state, object, normalizedAction) }}
 	{{ diffJSON := suggestedDiff(state, policies) }}
