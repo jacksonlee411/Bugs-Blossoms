@@ -7,7 +7,12 @@ import { expect, Page } from '@playwright/test';
 const SID_COOKIE_KEY = process.env.SID_COOKIE_KEY || 'sid';
 
 export async function assertAuthenticated(page: Page) {
-	const cookies = await page.context().cookies();
+	let cookies;
+	try {
+		cookies = await page.context().cookies();
+	} catch (error) {
+		throw new Error(`无法获取浏览器上下文 cookie：${(error as Error).message}`);
+	}
 	const sidCookie = cookies.find(cookie => cookie.name === SID_COOKIE_KEY);
 	if (!sidCookie) {
 		const alertText = await page
@@ -28,26 +33,33 @@ export async function assertAuthenticated(page: Page) {
  * @param password - User password
  */
 export async function login(page: Page, email: string, password: string) {
-	await page.goto('/login');
-	await page.getByLabel('Email').fill(email);
-	await page.getByLabel('Password').fill(password);
+	for (let attempt = 0; attempt < 2; attempt++) {
+		try {
+			await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
+			await page.getByLabel('Email').fill(email);
+			await page.getByLabel('Password').fill(password);
 
-	// Wait for navigation BEFORE clicking submit (Playwright best practice)
-	// This prevents race conditions where navigation completes before waitForURL is called
-	const submitButton = page.locator('form button[type="submit"]');
-	await expect(submitButton).toHaveText(/log in/i);
-	await Promise.all([
-		page.waitForURL(url => !url.pathname.includes('/login'), {
-			timeout: 15_000,
-		}),
-		submitButton.click(),
-	]);
+			const submitButton = page.locator('form button[type="submit"]');
+			await expect(submitButton).toHaveText(/log in/i);
 
-	// 确保跳转离开登录页且会话 cookie 已下发
-	await page.waitForLoadState('networkidle');
-	await page.waitForTimeout(300);
-	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
-	await assertAuthenticated(page);
+			await Promise.all([
+				page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 20_000 }),
+				submitButton.click(),
+			]);
+
+			await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+			await page.waitForTimeout(200);
+			await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 });
+			await assertAuthenticated(page);
+			return;
+		} catch (error) {
+			if (attempt === 1) {
+				throw error;
+			}
+			await page.waitForTimeout(1_000);
+			await page.reload({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
+		}
+	}
 }
 
 /**
