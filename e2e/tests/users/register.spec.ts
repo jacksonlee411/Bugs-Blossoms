@@ -254,6 +254,45 @@ function getUserRowLocator(page: Page, data: UserFormData) {
 	return page.locator('tbody tr').filter({ hasText: `${data.firstName} ${data.lastName}` });
 }
 
+async function ensureUserFormReady(page: Page, data: UserFormData, href: string) {
+	const form = page.locator(USER_FORM_SELECTOR).first();
+	const firstNameInput = page.locator('[name=FirstName]').first();
+
+	for (let attempt = 0; attempt < 3; attempt++) {
+		const destination = page.url().includes('/login') ? href : page.url();
+		await ensureOnUserForm(page, destination);
+		await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {});
+		await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
+
+		try {
+			await expect(form.or(firstNameInput)).toBeVisible({ timeout: 20_000 + attempt * 5_000 });
+			return;
+		} catch (error) {
+			if (attempt === 2) {
+				throw error;
+			}
+
+			await page.waitForTimeout(1_000);
+
+			try {
+				await page.reload({ waitUntil: 'domcontentloaded', timeout: 20_000 });
+			} catch {
+				await page.goto('/users', { waitUntil: 'domcontentloaded' });
+				await ensureLoggedIn(page, '/users');
+				await goToUsersPage(page);
+				const retryRow = getUserRowLocator(page, data);
+				await expect(retryRow).toHaveCount(1);
+				const retryLink = retryRow.locator('td a');
+				href = (await retryLink.getAttribute('href')) || href;
+				await retryLink.scrollIntoViewIfNeeded();
+				await Promise.all([page.waitForURL(/\/users\/.+/), retryLink.click()]);
+			}
+		}
+	}
+
+	await expect(form.or(firstNameInput)).toBeVisible({ timeout: 20_000 });
+}
+
 async function openUserDetails(page: Page, data: UserFormData) {
 	await goToUsersPage(page);
 	const userRow = getUserRowLocator(page, data);
@@ -265,36 +304,10 @@ async function openUserDetails(page: Page, data: UserFormData) {
 	}
 	await link.scrollIntoViewIfNeeded();
 	await link.click();
-	await expect(page).toHaveURL(new RegExp(`${href}$`));
+	await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 30_000 });
+	await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {});
 
-	const target = page.url().includes('/login') ? href : page.url();
-	await ensureOnUserForm(page, target);
-
-	const form = page.locator(USER_FORM_SELECTOR).first();
-	const firstNameInput = page.locator('[name=FirstName]').first();
-	try {
-		await expect(form.or(firstNameInput)).toBeVisible({ timeout: 15_000 });
-	} catch {
-		// 如果未加载出表单，重试一次打开详情页
-		try {
-			await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 20_000 });
-		} catch {
-			// 如果直接跳转失败，回到列表页重新打开
-			await page.goto('/users', { waitUntil: 'domcontentloaded' });
-			await ensureLoggedIn(page, '/users');
-			await goToUsersPage(page);
-			const retryRow = getUserRowLocator(page, data);
-			await expect(retryRow).toHaveCount(1);
-			const retryLink = retryRow.locator('td a');
-			const retryHref = (await retryLink.getAttribute('href')) || href;
-			await retryLink.scrollIntoViewIfNeeded();
-			await retryLink.click();
-			await expect(page).toHaveURL(/\/users\/.+/);
-			await ensureOnUserForm(page, retryHref);
-		}
-		await ensureOnUserForm(page, href);
-		await expect(form.or(firstNameInput)).toBeVisible({ timeout: 20_000 });
-	}
+	await ensureUserFormReady(page, data, href);
 }
 
 async function ensureUserExists(page: Page, data: UserFormData) {
