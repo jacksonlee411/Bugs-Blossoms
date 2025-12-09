@@ -93,6 +93,15 @@ async function selectFirstRole(page: Page) {
 }
 
 async function fillUserForm(page: Page, data: UserFormData) {
+	const currentPath = page.url();
+	const loginSubmit = page.locator('form button[type="submit"]').filter({ hasText: /log in/i });
+	if (await loginSubmit.count()) {
+		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+		if (!currentPath.includes('/login')) {
+			await page.goto(currentPath);
+		}
+	}
+
 	const form = page.locator(USER_FORM_SELECTOR).first();
 	if ((await form.count()) > 0) {
 		await expect(form).toBeVisible({ timeout: 15_000 });
