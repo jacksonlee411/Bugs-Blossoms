@@ -30,16 +30,25 @@ async function ensureLoggedIn(page: Page, returnTo?: string) {
 		if (destination && !/\/login/.test(destination) && !page.url().startsWith(destination)) {
 			await page.goto(destination);
 		}
+	} else {
+		await assertAuthenticated(page).catch(async () => {
+			const destination = returnTo ?? page.url();
+			await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+			if (destination && !/\/login/.test(destination) && !page.url().startsWith(destination)) {
+				await page.goto(destination);
+			}
+		});
 	}
 	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 }
 
 async function ensureOnUserForm(page: Page, href: string) {
 	const loginForm = page.locator(LOGIN_BUTTON_SELECTOR).filter({ hasText: /log in/i });
-	if (await loginForm.count()) {
+	const needsLogin = (await loginForm.count()) || page.url().includes('/login');
+	if (needsLogin) {
 		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
-		await page.goto(href, { waitUntil: 'domcontentloaded' });
 		await assertAuthenticated(page);
+		await page.goto(href, { waitUntil: 'domcontentloaded' });
 	}
 	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 }
@@ -263,6 +272,10 @@ async function ensureUserFormReady(page: Page, data: UserFormData, href: string)
 	const firstNameInput = page.locator('[name=FirstName]').first();
 
 	for (let attempt = 0; attempt < 3; attempt++) {
+		if (page.url().includes('/login')) {
+			await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+			await page.goto(href, { waitUntil: 'domcontentloaded' });
+		}
 		const destination = page.url().includes('/login') ? href : page.url();
 		await ensureOnUserForm(page, destination);
 		await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {});

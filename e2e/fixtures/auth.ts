@@ -33,33 +33,35 @@ export async function assertAuthenticated(page: Page) {
  * @param password - User password
  */
 export async function login(page: Page, email: string, password: string) {
-	for (let attempt = 0; attempt < 3; attempt++) {
+	for (let attempt = 0; attempt < 4; attempt++) {
 		try {
 			await page.context().clearCookies();
-			await page.goto('/logout').catch(() => {});
-			await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
-			await page.getByLabel('Email').fill(email);
-			await page.getByLabel('Password').fill(password);
+			await page.goto('/logout', { timeout: 5_000 }).catch(() => {});
+			await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 15_000 });
+			await page.getByLabel('Email').fill(email, { timeout: 10_000 });
+			await page.getByLabel('Password').fill(password, { timeout: 10_000 });
 
 			const submitButton = page.locator('form button[type="submit"]');
 			await expect(submitButton).toHaveText(/log in/i);
 
 			await Promise.all([
-				page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 25_000 }),
+				page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 15_000 }),
 				submitButton.click(),
 			]);
 
-			await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => {});
-			await page.waitForTimeout(300);
-			await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 });
+			await page.waitForLoadState('networkidle', { timeout: 6_000 }).catch(() => {});
+			if (page.url().includes('/login')) {
+				throw new Error('仍在登录页，疑似未通过认证');
+			}
+			await page.waitForTimeout(200);
+			await expect(page).not.toHaveURL(/\/login/, { timeout: 5_000 });
 			await assertAuthenticated(page);
 			return;
 		} catch (error) {
-			if (attempt === 2) {
-				throw error;
+			if (attempt === 3) {
+				throw new Error(`登录失败（已重试 ${attempt + 1} 次）：${(error as Error).message}`);
 			}
-			await page.waitForTimeout(1_000);
-			await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
+			await page.waitForTimeout(500);
 		}
 	}
 }
