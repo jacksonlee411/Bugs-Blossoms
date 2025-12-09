@@ -21,10 +21,14 @@ const ADMIN_CREDENTIALS = {
 const USER_FORM_SELECTOR = 'form#save-form, form[hx-post="/users"], form[hx-post^="/users/"]';
 const LOGIN_BUTTON_SELECTOR = 'form button[type="submit"]';
 
-async function ensureLoggedIn(page: Page) {
+async function ensureLoggedIn(page: Page, returnTo?: string) {
 	const loginButton = page.locator(LOGIN_BUTTON_SELECTOR).filter({ hasText: /log in/i });
 	if (await loginButton.count()) {
+		const destination = returnTo ?? page.url();
 		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+		if (destination && !page.url().startsWith(destination)) {
+			await page.goto(destination);
+		}
 	}
 	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 }
@@ -63,12 +67,12 @@ async function goToUsersPage(page: Page) {
 	await page.waitForTimeout(500);
 	await page.reload({ waitUntil: 'networkidle' });
 	await page.goto('/users');
-	await ensureLoggedIn(page);
+	await ensureLoggedIn(page, '/users');
 	await expect(page).toHaveURL(/\/users/);
 }
 
 async function openNewUserForm(page: Page) {
-	await ensureLoggedIn(page);
+	await ensureLoggedIn(page, '/users');
 	await Promise.all([
 		page.waitForURL(/\/users\/new$/, { timeout: 15_000 }),
 		page.locator('a[href="/users/new"]').filter({ hasText: /.+/ }).first().click(),
@@ -104,7 +108,7 @@ async function selectFirstRole(page: Page) {
 
 async function fillUserForm(page: Page, data: UserFormData) {
 	const currentPath = page.url();
-	await ensureLoggedIn(page);
+	await ensureLoggedIn(page, currentPath);
 
 	const form = page.locator(USER_FORM_SELECTOR).first();
 	if ((await form.count()) > 0) {
