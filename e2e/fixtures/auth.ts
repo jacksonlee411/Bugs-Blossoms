@@ -33,8 +33,10 @@ export async function assertAuthenticated(page: Page) {
  * @param password - User password
  */
 export async function login(page: Page, email: string, password: string) {
-	for (let attempt = 0; attempt < 2; attempt++) {
+	for (let attempt = 0; attempt < 3; attempt++) {
 		try {
+			await page.context().clearCookies();
+			await page.goto('/logout').catch(() => {});
 			await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 30_000 });
 			await page.getByLabel('Email').fill(email);
 			await page.getByLabel('Password').fill(password);
@@ -43,21 +45,21 @@ export async function login(page: Page, email: string, password: string) {
 			await expect(submitButton).toHaveText(/log in/i);
 
 			await Promise.all([
-				page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 20_000 }),
+				page.waitForURL(url => !url.pathname.includes('/login'), { timeout: 25_000 }),
 				submitButton.click(),
 			]);
 
-			await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
-			await page.waitForTimeout(200);
+			await page.waitForLoadState('networkidle', { timeout: 12_000 }).catch(() => {});
+			await page.waitForTimeout(300);
 			await expect(page).not.toHaveURL(/\/login/, { timeout: 10_000 });
 			await assertAuthenticated(page);
 			return;
 		} catch (error) {
-			if (attempt === 1) {
+			if (attempt === 2) {
 				throw error;
 			}
 			await page.waitForTimeout(1_000);
-			await page.reload({ waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
+			await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 15_000 }).catch(() => {});
 		}
 	}
 }

@@ -26,6 +26,7 @@ async function ensureLoggedIn(page: Page, returnTo?: string) {
 	if (await loginButton.count()) {
 		const destination = returnTo ?? page.url();
 		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+		await assertAuthenticated(page);
 		if (destination && !/\/login/.test(destination) && !page.url().startsWith(destination)) {
 			await page.goto(destination);
 		}
@@ -38,6 +39,7 @@ async function ensureOnUserForm(page: Page, href: string) {
 	if (await loginForm.count()) {
 		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
 		await page.goto(href, { waitUntil: 'domcontentloaded' });
+		await assertAuthenticated(page);
 	}
 	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
 }
