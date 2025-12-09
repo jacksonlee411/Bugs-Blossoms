@@ -404,13 +404,20 @@
     }
   },
   "Authz": {
+    "Debug": "Authz 调试",
     "Unauthorized": {
       "Title": "需要权限",
       "_Description": "您没有执行“{{.Operation}}”的权限。请发送权限申请或联系管理员。",
       "MissingPolicies": "缺失的策略",
       "Apply": "申请权限",
       "ApplyDescription": "携带建议的策略变更调用 /core/api/authz/requests 接口提交申请。",
-      "ApplyHint": "您没有执行此操作的权限"
+      "ApplyHint": "您没有执行此操作的权限",
+      "SuggestedDiff": "建议 diff",
+      "Reason": "申请理由",
+      "RetryOnce": "重试一次",
+      "CopyRequestID": "复制 request_id",
+      "LastRequest": "最近 request_id",
+      "SubmitSuccess": "提交成功"
     },
     "Stage": {
       "Badge": "暂存 %d",

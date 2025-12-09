@@ -11,8 +11,9 @@ import (
 
 // APIError standardizes JSON error responses.
 type APIError struct {
-	Message string `json:"message"`
-	Code    string `json:"code"`
+	Message string            `json:"message"`
+	Code    string            `json:"code"`
+	Meta    map[string]string `json:"meta,omitempty"`
 }
 
 // PolicyDraftRequest captures incoming payloads for draft creation.

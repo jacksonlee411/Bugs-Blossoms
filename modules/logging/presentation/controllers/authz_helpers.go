@@ -126,14 +126,16 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 	}
 	if _, ok := composables.TryUsePageCtx(r.Context()); ok {
 		props := &corecomponents.UnauthorizedProps{
-			Object:    payload.Object,
-			Action:    payload.Action,
-			Operation: fmt.Sprintf("%s %s", payload.Object, payload.Action),
-			State:     state,
-			Request:   payload.RequestURL,
-			Subject:   payload.Subject,
-			Domain:    payload.Domain,
-			DebugURL:  payload.DebugURL,
+			Object:       payload.Object,
+			Action:       payload.Action,
+			Operation:    fmt.Sprintf("%s %s", payload.Object, payload.Action),
+			State:        state,
+			Request:      payload.RequestURL,
+			Subject:      payload.Subject,
+			Domain:       payload.Domain,
+			DebugURL:     payload.DebugURL,
+			BaseRevision: payload.BaseRevision,
+			RequestID:    payload.RequestID,
 		}
 		w.WriteHeader(http.StatusForbidden)
 		templ.Handler(corecomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)

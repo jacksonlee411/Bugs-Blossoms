@@ -401,13 +401,20 @@
     }
   },
   "Authz": {
+    "Debug": "Authz Debug",
     "Unauthorized": {
       "Title": "Требуется разрешение",
       "_Description": "У вас нет прав на операцию «{{.Operation}}». Отправьте запрос на доступ или обратитесь к администратору.",
       "MissingPolicies": "Отсутствующие правила",
       "Apply": "Запросить доступ",
       "ApplyDescription": "Отправьте запрос на изменение политики через /core/api/authz/requests вместе с предложенным правилом.",
-      "ApplyHint": "Недостаточно прав для выполнения действия"
+      "ApplyHint": "Недостаточно прав для выполнения действия",
+      "SuggestedDiff": "Предложенный diff",
+      "Reason": "Причина",
+      "RetryOnce": "Повторить один раз",
+      "CopyRequestID": "Скопировать request_id",
+      "LastRequest": "Последний request_id",
+      "SubmitSuccess": "Отправлено"
     },
     "Stage": {
       "Badge": "Черновиков %d",

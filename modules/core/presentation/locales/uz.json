@@ -401,13 +401,20 @@
     }
   },
   "Authz": {
+    "Debug": "Authz Debug",
     "Unauthorized": {
       "Title": "Ruxsat talab qilinadi",
       "_Description": "{{.Operation}} bajarish uchun ruxsatingiz yo'q. Ruxsat so'rang yoki administratorga murojaat qiling.",
       "MissingPolicies": "Yetishmayotgan siyosatlar",
       "Apply": "Ruxsat so'rash",
       "ApplyDescription": "/core/api/authz/requests manziliga tavsiya etilgan siyosat bilan so'rov yuboring.",
-      "ApplyHint": "Bu amal uchun ruxsatingiz yo'q"
+      "ApplyHint": "Bu amal uchun ruxsatingiz yo'q",
+      "SuggestedDiff": "Tavsiya etilgan diff",
+      "Reason": "Sabab",
+      "RetryOnce": "Bir marta qayta urinib ko'rish",
+      "CopyRequestID": "request_id ni nusxalash",
+      "LastRequest": "Oxirgi request_id",
+      "SubmitSuccess": "Yuborildi"
     },
     "Stage": {
       "Badge": "Qoralama %d",
