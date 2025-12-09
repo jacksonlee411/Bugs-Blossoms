@@ -14,7 +14,7 @@
 2. [x] 变更与状态 —— 各列“添加”对话框生成 `g/p` diff；支持批量撤销与 domain 筛选，操作落地草稿并触发申请入口。
 3. [x] 授权、申请与测试 —— Tab 顶部统一“提交草稿/申请权限”按钮；各列“添加”仅收集 diff；接入 PolicyInspector/Unauthorized，共有/无权限、申请触发与 request_id 展示测试补齐。
 4. [x] 暂存/分页 —— 复用 `POST/DELETE /core/api/authz/policies/stage` 与分页接口，Tab 切换保留暂存，刷新后差异不丢。
-5. [ ] 文档、翻译与可访问性 —— 补 README/AGENTS 示例，更新 locales（运行 `make check tr`），确保对话框/抽屉具备 ARIA/键盘可达性，并用 axe+键盘巡检记录结果。
+5. [x] 文档、翻译与可访问性 —— 补 README/AGENTS 示例，更新 locales（运行 `make check tr`），确保对话框/抽屉具备 ARIA/键盘可达性，并用 axe+键盘巡检记录结果。
 6. [x] SLA 观测 —— UI 轮询 `/core/api/authz/requests` 最长 5 分钟，顶部提示“预计 ≤5 分钟回写”；超时用黄条提示并提供 request_id 复制与“重试查询”，可跳转 015A 日志链接。
 
 ## 依赖
@@ -39,4 +39,4 @@
 ## 最新进展（2025-12-09）
 - 暂存草稿生成 g/p JSONPatch，支持批量撤销与域筛选，Tab 顶部统一提交/申请入口。
 - 提交后轮询 `/core/api/authz/requests`（SLA 5 分钟），黄条兜底 + request_id 复制/重试按钮落地；Stage/SLA 文案完成多语言。
-- Policy Board 继续复用暂存/分页，刷新后暂存保持；后续专注文档、a11y 与记录补齐。
+- Policy Board 继续复用暂存/分页，刷新后暂存保持；README/AGENTS 示例与 locales 已更新（`make check tr` 通过）；用户详情对话框/抽屉完成键盘巡检与 axe smoke，未发现阻塞级别的 a11y 问题。
