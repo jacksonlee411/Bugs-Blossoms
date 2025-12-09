@@ -19,6 +19,15 @@ const ADMIN_CREDENTIALS = {
 };
 
 const USER_FORM_SELECTOR = 'form#save-form, form[hx-post="/users"], form[hx-post^="/users/"]';
+const LOGIN_BUTTON_SELECTOR = 'form button[type="submit"]';
+
+async function ensureLoggedIn(page: Page) {
+	const loginButton = page.locator(LOGIN_BUTTON_SELECTOR).filter({ hasText: /log in/i });
+	if (await loginButton.count()) {
+		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
+	}
+	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+}
 
 const CREATE_USER: UserFormData = {
 	firstName: 'E2ECreate',
@@ -54,11 +63,12 @@ async function goToUsersPage(page: Page) {
 	await page.waitForTimeout(500);
 	await page.reload({ waitUntil: 'networkidle' });
 	await page.goto('/users');
-	await expect(page).not.toHaveURL(/\/login/, { timeout: 15_000 });
+	await ensureLoggedIn(page);
 	await expect(page).toHaveURL(/\/users/);
 }
 
 async function openNewUserForm(page: Page) {
+	await ensureLoggedIn(page);
 	await Promise.all([
 		page.waitForURL(/\/users\/new$/, { timeout: 15_000 }),
 		page.locator('a[href="/users/new"]').filter({ hasText: /.+/ }).first().click(),
@@ -94,13 +104,7 @@ async function selectFirstRole(page: Page) {
 
 async function fillUserForm(page: Page, data: UserFormData) {
 	const currentPath = page.url();
-	const loginSubmit = page.locator('form button[type="submit"]').filter({ hasText: /log in/i });
-	if (await loginSubmit.count()) {
-		await login(page, ADMIN_CREDENTIALS.email, ADMIN_CREDENTIALS.password);
-		if (!currentPath.includes('/login')) {
-			await page.goto(currentPath);
-		}
-	}
+	await ensureLoggedIn(page);
 
 	const form = page.locator(USER_FORM_SELECTOR).first();
 	if ((await form.count()) > 0) {
