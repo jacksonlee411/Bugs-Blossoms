@@ -62,6 +62,12 @@
       "SelectAll": "Barchasini tanlash"
     }
   },
+  "Empty": "Bo'sh",
+  "Pagination": {
+    "Status": "Sahifa %d / %d · %d ta yozuv",
+    "Prev": "Oldingi",
+    "Next": "Keyingi"
+  },
   "Spotlight": {
     "Placeholder": "Qidirish...",
     "NothingFound": "Hech narsa topilmadi",
@@ -203,6 +209,11 @@
       "UserInfo": "Ma'lumotlar",
       "Permissions": "Ruxsatlar"
     },
+    "Permissions": {
+      "Inherited": "Meros qilingan",
+      "Direct": "To'g'ridan-to'g'ri",
+      "Overrides": "Bekor qiluvchi"
+    },
     "Single": {
       "EditUser": "Foydalanuvchini tahrirlash",
       "FirstName": "Ism",
@@ -232,6 +243,7 @@
       "NotAllowed": "O'chirib bo'lmaydi: Siz ushbu tenantdagi yagona foydalanuvchisiz"
     }
   },
+  "Create": "Yaratish",
   "Roles": {
     "Meta": {
       "List": {
@@ -419,6 +431,7 @@
     "Stage": {
       "Badge": "Qoralama %d",
       "BadgeShort": "Qoralama",
+      "AddRule": "Qoida qo'shish",
       "SubmitDraft": "Qoralamani yuborish",
       "BulkRemove": "Ommaviy o'chirish",
       "SelectAll": "Hammasini belgilash"

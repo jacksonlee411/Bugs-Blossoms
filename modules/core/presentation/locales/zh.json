@@ -62,6 +62,12 @@
       "SelectAll": "全选"
     }
   },
+  "Empty": "暂无数据",
+  "Pagination": {
+    "Status": "第 %d / %d 页 · 共 %d 条",
+    "Prev": "上一页",
+    "Next": "下一页"
+  },
   "Spotlight": {
     "Placeholder": "搜索...",
     "NothingFound": "未找到任何内容",
@@ -206,6 +212,11 @@
       "UserInfo": "用户信息",
       "Permissions": "权限"
     },
+    "Permissions": {
+      "Inherited": "继承权限",
+      "Direct": "直接权限",
+      "Overrides": "覆盖权限"
+    },
     "Single": {
       "EditUser": "编辑用户",
       "FirstName": "名",
@@ -235,6 +246,7 @@
       "NotAllowed": "无法删除：您是此租户中的唯一用户"
     }
   },
+  "Create": "创建",
   "Roles": {
     "Meta": {
       "List": {
@@ -422,6 +434,7 @@
     "Stage": {
       "Badge": "暂存 %d",
       "BadgeShort": "暂存",
+      "AddRule": "新增策略",
       "SubmitDraft": "提交草稿",
       "BulkRemove": "批量撤销",
       "SelectAll": "全选"

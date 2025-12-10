@@ -62,6 +62,12 @@
       "SelectAll": "Выбрать все"
     }
   },
+  "Empty": "Пусто",
+  "Pagination": {
+    "Status": "Страница %d из %d · %d записей",
+    "Prev": "Назад",
+    "Next": "Вперёд"
+  },
   "Spotlight": {
     "Placeholder": "Поиск...",
     "NothingFound": "Ничего не найдено",
@@ -275,6 +281,11 @@
       "UserInfo": "Информация",
       "Permissions": "Разрешения"
     },
+    "Permissions": {
+      "Inherited": "Наследованные",
+      "Direct": "Прямые",
+      "Overrides": "Переопределения"
+    },
     "Single": {
       "EditUser": "Редактировать пользователя",
       "FirstName": "Имя",
@@ -304,6 +315,7 @@
       "NotAllowed": "Нельзя удалить: Вы единственный пользователь в этом клиенте"
     }
   },
+  "Create": "Создать",
   "Projects": {
     "Meta": {
       "List": {
@@ -419,6 +431,7 @@
     "Stage": {
       "Badge": "Черновиков %d",
       "BadgeShort": "Черновик",
+      "AddRule": "Добавить правило",
       "SubmitDraft": "Отправить черновик",
       "BulkRemove": "Массовое удаление",
       "SelectAll": "Выбрать все"

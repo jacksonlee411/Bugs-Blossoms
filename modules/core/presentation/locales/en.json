@@ -62,6 +62,12 @@
       "SelectAll": "Select All"
     }
   },
+  "Empty": "Empty",
+  "Pagination": {
+    "Status": "Page %d of %d · %d items",
+    "Prev": "Previous",
+    "Next": "Next"
+  },
   "Spotlight": {
     "Placeholder": "Search...",
     "NothingFound": "Nothing found",
@@ -203,6 +209,11 @@
       "UserInfo": "User Info",
       "Permissions": "Permissions"
     },
+    "Permissions": {
+      "Inherited": "Inherited",
+      "Direct": "Direct",
+      "Overrides": "Overrides"
+    },
     "Single": {
       "EditUser": "Edit user",
       "FirstName": "First name",
@@ -232,6 +243,7 @@
       "NotAllowed": "Cannot delete: You are the only user in this tenant"
     }
   },
+  "Create": "Create",
   "Roles": {
     "Meta": {
       "List": {
@@ -419,6 +431,7 @@
     "Stage": {
       "Badge": "Stage %d",
       "BadgeShort": "Staged",
+      "AddRule": "Add rule",
       "SubmitDraft": "Submit Draft",
       "BulkRemove": "Bulk Remove",
       "SelectAll": "Select all"
