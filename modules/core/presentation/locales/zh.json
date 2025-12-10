@@ -240,6 +240,7 @@
       "NotAllowed": "无法删除：您是此租户中的唯一用户"
     }
   },
+  "Create": "创建",
   "Roles": {
     "Meta": {
       "List": {

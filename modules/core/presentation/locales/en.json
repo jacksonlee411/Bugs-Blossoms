@@ -237,6 +237,7 @@
       "NotAllowed": "Cannot delete: You are the only user in this tenant"
     }
   },
+  "Create": "Create",
   "Roles": {
     "Meta": {
       "List": {
