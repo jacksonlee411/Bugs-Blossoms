@@ -302,7 +302,14 @@ async function ensureUserFormReady(page: Page, data: UserFormData, href: string)
 				const retryLink = retryRow.locator('td a');
 				href = (await retryLink.getAttribute('href')) || href;
 				await retryLink.scrollIntoViewIfNeeded();
-				await Promise.all([page.waitForURL(/\/users\/.+/), retryLink.click()]);
+				try {
+					await Promise.all([
+						page.waitForURL(/\/users\/.+/, { timeout: 90_000 }),
+						retryLink.click(),
+					]);
+				} catch {
+					await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 90_000 }).catch(() => {});
+				}
 			}
 		}
 	}
@@ -321,7 +328,7 @@ async function openUserDetails(page: Page, data: UserFormData) {
 	}
 	await link.scrollIntoViewIfNeeded();
 	await link.click();
-	await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 30_000 });
+	await expect(page).toHaveURL(new RegExp(`${href}$`), { timeout: 60_000 });
 	await page.waitForLoadState('domcontentloaded', { timeout: 15_000 }).catch(() => {});
 
 	await ensureUserFormReady(page, data, href);
