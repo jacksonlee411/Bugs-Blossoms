@@ -401,13 +401,20 @@
     }
   },
   "Authz": {
+    "Debug": "Authz Debug",
     "Unauthorized": {
       "Title": "Permission required",
       "_Description": "You do not have permission to {{.Operation}}. Request access or contact an administrator.",
       "MissingPolicies": "Missing policies",
       "Apply": "Request access",
       "ApplyDescription": "Submit a policy change request via /core/api/authz/requests with the suggested policy diff.",
-      "ApplyHint": "You do not have permission to perform this action"
+      "ApplyHint": "You do not have permission to perform this action",
+      "SuggestedDiff": "Suggested diff",
+      "Reason": "Reason",
+      "RetryOnce": "Retry once",
+      "CopyRequestID": "Copy request_id",
+      "LastRequest": "Last request_id",
+      "SubmitSuccess": "Submitted"
     },
     "Stage": {
       "Badge": "Stage %d",

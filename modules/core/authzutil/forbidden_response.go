@@ -20,6 +20,8 @@ type ForbiddenPayload struct {
 	SuggestDiff     []authz.PolicySuggestion `json:"suggest_diff"`
 	RequestURL      string                   `json:"request_url"`
 	DebugURL        string                   `json:"debug_url"`
+	BaseRevision    string                   `json:"base_revision,omitempty"`
+	RequestID       string                   `json:"request_id,omitempty"`
 }
 
 // BuildForbiddenPayload constructs a forbidden payload using view state and request context.
@@ -29,6 +31,8 @@ func BuildForbiddenPayload(r *http.Request, state *authz.ViewState, object, acti
 	subject := ""
 	var missingPolicies []authz.MissingPolicy
 	var suggestDiff []authz.PolicySuggestion
+	baseRevision := BaseRevision(r.Context())
+	requestID := RequestIDFromRequest(r)
 
 	if state != nil {
 		subject = state.Subject
@@ -72,5 +76,7 @@ func BuildForbiddenPayload(r *http.Request, state *authz.ViewState, object, acti
 		SuggestDiff:     suggestDiff,
 		RequestURL:      "/core/api/authz/requests",
 		DebugURL:        debugURL,
+		BaseRevision:    baseRevision,
+		RequestID:       requestID,
 	}
 }

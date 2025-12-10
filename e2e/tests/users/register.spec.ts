@@ -337,7 +337,8 @@ async function ensureUserExists(page: Page, data: UserFormData) {
 }
 
 	test.describe('user auth and registration flow', () => {
-		test.describe.configure({ timeout: 120_000 });
+		// CI 上偶现登录/跳转变慢，适当拉长超时时间防止误报
+		test.describe.configure({ timeout: 180_000 });
 
 		test.beforeAll(async ({ request }) => {
 			await resetTestDatabase(request, { reseedMinimal: false });

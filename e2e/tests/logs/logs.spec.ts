@@ -48,7 +48,12 @@ test.describe('logging authz gating', () => {
 			expect([401, 403]).toContain(response.status());
 		}
 		await expect(page.getByText(/Permission required/i)).toBeVisible();
-		await expect(page.getByRole('link', { name: /Request access/i })).toBeVisible();
+		const applyButton = page.getByRole('button', { name: /Request access/i });
+		if (await applyButton.count()) {
+			await expect(applyButton).toBeVisible();
+		} else {
+			await expect(page.getByRole('link', { name: /Request access/i })).toBeVisible();
+		}
 
 		const apiResponse = await page.request.get('/logs', {
 			headers: { Accept: 'application/json' },

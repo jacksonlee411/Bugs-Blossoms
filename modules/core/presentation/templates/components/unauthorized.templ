@@ -1,23 +1,27 @@
 package components
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
 
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
 type UnauthorizedProps struct {
-	State     *authz.ViewState
-	Object    string
-	Action    string
-	Operation string
-	Request   string
-	Subject   string
-	Domain    string
-	DebugURL  string
+	State        *authz.ViewState
+	Object       string
+	Action       string
+	Operation    string
+	Request      string
+	Subject      string
+	Domain       string
+	DebugURL     string
+	BaseRevision string
+	RequestID    string
 }
 
 func normalizePolicies(state *authz.ViewState, object, action string) []authz.MissingPolicy {
@@ -46,99 +50,300 @@ func normalizePolicies(state *authz.ViewState, object, action string) []authz.Mi
 	return matched
 }
 
+func suggestedDiff(state *authz.ViewState, policies []authz.MissingPolicy) string {
+	if state == nil || len(policies) == 0 {
+		return "[]"
+	}
+	suggestions := make([]authz.PolicySuggestion, 0, len(policies))
+	for _, policy := range policies {
+		suggestions = append(suggestions, state.SuggestDiff(policy)...)
+	}
+	if len(suggestions) == 0 {
+		return "[]"
+	}
+	data, err := json.Marshal(suggestions)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
 templ Unauthorized(props *UnauthorizedProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ state := props.State }}
-	if state == nil {
-		state = pageCtx.AuthzState()
-	}
+	{{if state == nil {
+	state = pageCtx.AuthzState()
+}
+	}}
 	{{ object := strings.ToLower(strings.TrimSpace(props.Object)) }}
 	{{ normalizedAction := authz.NormalizeAction(props.Action) }}
 	{{ requestURL := strings.TrimSpace(props.Request) }}
-	if requestURL == "" {
-		requestURL = "/core/api/authz/requests"
-	}
-	{{ safeRequestURL := templ.URL(requestURL) }}
+	{{if requestURL == "" {
+	requestURL = "/core/api/authz/requests"
+}
+	}}
 	{{ subject := strings.TrimSpace(props.Subject) }}
-	if subject == "" && state != nil {
-		subject = state.Subject
-	}
+	{{if subject == "" && state != nil {
+	subject = state.Subject
+}
+	}}
 	{{ domain := strings.TrimSpace(props.Domain) }}
-	if domain == "" && state != nil {
-		domain = state.Tenant
-	}
+	{{if domain == "" && state != nil {
+	domain = state.Tenant
+}
+	}}
 	{{ debugURL := strings.TrimSpace(props.DebugURL) }}
-	if debugURL == "" && subject != "" && object != "" && normalizedAction != "" {
-		{{ q := url.Values{} }}
-		{{ q.Set("subject", subject) }}
-		{{ q.Set("object", object) }}
-		{{ q.Set("action", normalizedAction) }}
-		if domain != "" {
-			{{ q.Set("domain", domain) }}
-		}
-		{{ debugURL = fmt.Sprintf("/core/api/authz/debug?%s", q.Encode()) }}
+	{{if debugURL == "" && subject != "" && object != "" && normalizedAction != "" {
+	q := url.Values{}
+	q.Set("subject", subject)
+	q.Set("object", object)
+	q.Set("action", normalizedAction)
+	if domain != "" {
+		q.Set("domain", domain)
 	}
+	debugURL = fmt.Sprintf("/core/api/authz/debug?%s", q.Encode())
+}
+	}}
+	{{ safeDebugURL := templ.URL(debugURL) }}
 	{{ operation := strings.TrimSpace(props.Operation) }}
+	{{if operation == "" {
+	operation = strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction))
 	if operation == "" {
-		operation = strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction))
-		if operation == "" {
-			operation = pageCtx.T("Actions")
-		}
+		operation = pageCtx.T("Actions")
 	}
+}
+	}}
+	{{ baseRevision := strings.TrimSpace(props.BaseRevision) }}
+	{{if baseRevision == "" {
+	baseRevision = authzutil.BaseRevision(ctx)
+}
+	}}
+	{{ requestID := strings.TrimSpace(props.RequestID) }}
 	{{ policies := normalizePolicies(state, object, normalizedAction) }}
+	{{ diffJSON := suggestedDiff(state, policies) }}
 	<section
-		class="rounded-lg border border-primary bg-surface-600/80 p-6 text-left shadow"
+		class="rounded-lg border border-primary bg-surface-600/80 p-6 text-left shadow space-y-4"
 		data-action={ normalizedAction }
 		data-domain={ domain }
 		data-object={ object }
 		data-request-url={ requestURL }
 		data-subject={ subject }
 		data-debug-url={ debugURL }
+		data-base-revision={ baseRevision }
+		data-request-id={ requestID }
+		data-retry-count="0"
+		data-authz-unauthorized
 	>
-		<div class="space-y-2">
-			<h2 class="text-lg font-semibold text-white">
-				{ pageCtx.T("Authz.Unauthorized.Title") }
-			</h2>
-			<p class="text-sm text-surface-100">
-				{ pageCtx.T("Authz.Unauthorized._Description", map[string]interface{}{"Operation": operation}) }
-			</p>
+		<div class="flex items-start justify-between gap-3">
+			<div class="space-y-2">
+				<h2 class="text-lg font-semibold text-white">
+					{ pageCtx.T("Authz.Unauthorized.Title") }
+				</h2>
+				<p class="text-sm text-surface-100">
+					{ pageCtx.T("Authz.Unauthorized._Description", map[string]interface{}{"Operation": operation}) }
+				</p>
+				<p class="text-xs text-surface-200">
+					{ pageCtx.T("Authz.Unauthorized.ApplyDescription") }
+				</p>
+			</div>
+			<div class="text-right text-xs text-surface-200 space-y-1">
+				if baseRevision != "" {
+					<div>{ fmt.Sprintf("base_revision: %s", baseRevision) }</div>
+				}
+				if requestID != "" {
+					<div>{ fmt.Sprintf("request_id: %s", requestID) }</div>
+				}
+				if debugURL != "" {
+					<a class="text-primary hover:underline" href={ safeDebugURL } target="_blank" rel="noreferrer">
+						{ pageCtx.T("Authz.Debug") }
+					</a>
+				}
+			</div>
 		</div>
-		if len(policies) > 0 {
-			<div class="mt-4 space-y-3">
-				<h3 class="text-xs font-semibold uppercase tracking-wide text-surface-200">
+		<div class="rounded-md border border-dashed border-surface-400/60 bg-surface-500/30 p-3">
+			if len(policies) > 0 {
+				<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-200">
 					{ pageCtx.T("Authz.Unauthorized.MissingPolicies") }
-				</h3>
+				</div>
 				<ul class="space-y-2">
 					for _, policy := range policies {
 						<li class="rounded-md border border-surface-400/60 bg-surface-500/50 p-3 text-xs font-mono text-surface-50">
 							{ fmt.Sprintf("%s → %s / %s", policy.Domain, policy.Object, policy.Action) }
-							{{ suggestions := state.SuggestDiff(policy) }}
-							if len(suggestions) > 0 {
-								<div class="mt-2 rounded bg-surface-400/40 p-2 text-[11px] text-surface-50">
-									for _, suggestion := range suggestions {
-										<div>
-											{ fmt.Sprintf("%s %s %s %s", suggestion.Effect, suggestion.Subject, suggestion.Object, suggestion.Action) }
-										</div>
-									}
-								</div>
-							}
 						</li>
 					}
 				</ul>
-			</div>
-		}
-		<div class="mt-4 space-y-2">
-			<p class="text-xs text-surface-200">
-				{ pageCtx.T("Authz.Unauthorized.ApplyDescription") }
-			</p>
-			<a
-				class="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
-				href={ safeRequestURL }
-				target="_blank"
-				rel="noreferrer"
-			>
-				{ pageCtx.T("Authz.Unauthorized.Apply") }
-			</a>
+			} else {
+				<p class="text-xs text-surface-200">{ pageCtx.T("Authz.Unauthorized.MissingPolicies") }: { pageCtx.T("Empty") }</p>
+			}
 		</div>
+		<form
+			class="space-y-3"
+			hx-post={ requestURL }
+			hx-swap="none"
+			hx-encoding="urlencoded"
+			hx-on::after-request="window.authzUnauthorizedHandler && window.authzUnauthorizedHandler(event)"
+		>
+			<input type="hidden" name="object" value={ object }/>
+			<input type="hidden" name="action" value={ normalizedAction }/>
+			<input type="hidden" name="domain" value={ domain }/>
+			<input type="hidden" name="subject" value={ subject }/>
+			<input type="hidden" name="base_revision" value={ baseRevision }/>
+			<input type="hidden" name="request_access" value="true"/>
+			<label class="block text-xs font-semibold text-surface-200" for="authz-diff">
+				{ pageCtx.T("Authz.Unauthorized.SuggestedDiff") }
+			</label>
+			<textarea
+				id="authz-diff"
+				name="diff"
+				rows="4"
+				class="w-full rounded-md border border-surface-400/60 bg-surface-500/40 p-2 text-xs font-mono text-surface-50"
+				readonly
+			>{ diffJSON }</textarea>
+			<div class="space-y-2">
+				<label class="block text-xs font-semibold text-surface-200" for="authz-reason">
+					{ pageCtx.T("Authz.Unauthorized.Reason") }
+				</label>
+				<input
+					id="authz-reason"
+					name="reason"
+					type="text"
+					class="w-full rounded-md border border-surface-400/60 bg-surface-500/40 p-2 text-sm text-white"
+					value={ fmt.Sprintf("申请 %s", operation) }
+					required
+				/>
+			</div>
+			<div class="flex flex-wrap items-center gap-3">
+				<button
+					type="submit"
+					class="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+				>
+					{ pageCtx.T("Authz.Unauthorized.Apply") }
+				</button>
+				<button
+					type="submit"
+					class="inline-flex items-center rounded-md border border-amber-400/80 px-3 py-2 text-xs font-medium text-amber-100 hover:bg-amber-500/20 hidden"
+					data-authz-retry-button
+				>
+					{ pageCtx.T("Authz.Unauthorized.RetryOnce") }
+				</button>
+				<button
+					type="button"
+					class="inline-flex items-center rounded-md border border-surface-300/80 px-3 py-2 text-xs font-medium text-surface-50 hover:bg-surface-400/40"
+					data-authz-copy-button
+				>
+					{ pageCtx.T("Authz.Unauthorized.CopyRequestID") }
+				</button>
+			</div>
+			<div class="text-xs text-amber-200" data-authz-error></div>
+			<div class="text-xs text-surface-100">
+				{ pageCtx.T("Authz.Unauthorized.LastRequest") }：
+				<span class="font-mono text-surface-50" data-authz-request-id>{ requestID }</span>
+			</div>
+			<div class="text-xs text-surface-200" data-authz-status></div>
+		</form>
+		<script>
+			if (!window.authzUnauthorizedHandler) {
+				window.authzUnauthorizedHandler = function (evt) {
+					var container = evt.target.closest("[data-authz-unauthorized]");
+					if (!container || !evt.detail || !evt.detail.xhr) {
+						return;
+					}
+					var xhr = evt.detail.xhr;
+					var statusEl = container.querySelector("[data-authz-status]");
+					var errEl = container.querySelector("[data-authz-error]");
+					var retryBtn = container.querySelector("[data-authz-retry-button]");
+					var copyBtn = container.querySelector("[data-authz-copy-button]");
+					var requestIdEl = container.querySelector("[data-authz-request-id]");
+					var requestId = xhr.getResponseHeader("X-Request-ID") || container.dataset.requestId || "";
+					var baseRev = xhr.getResponseHeader("X-Authz-Base-Revision");
+					if (baseRev) {
+						var revInput = container.querySelector('input[name="base_revision"]');
+						if (revInput) {
+							revInput.value = baseRev;
+						}
+						container.dataset.baseRevision = baseRev;
+					}
+					var payload = {};
+					try {
+						payload = JSON.parse(xhr.responseText || "{}");
+					} catch (e) {
+						payload = {};
+					}
+					if (payload.id) {
+						requestId = payload.id;
+					}
+					if (payload.request_id && !requestId) {
+						requestId = payload.request_id;
+					}
+					if (errEl) {
+						errEl.textContent = "";
+					}
+					if (xhr.status >= 200 && xhr.status < 300 && payload.id) {
+						if (statusEl) {
+							statusEl.textContent = '{{ pageCtx.T("Authz.Unauthorized.SubmitSuccess") }}';
+						}
+						container.dataset.requestId = requestId;
+						container.dataset.retryCount = "0";
+						if (requestIdEl) {
+							requestIdEl.textContent = requestId;
+						}
+						if (copyBtn) {
+							copyBtn.disabled = requestId === "";
+						}
+						if (retryBtn) {
+							retryBtn.classList.add("hidden");
+							retryBtn.disabled = false;
+						}
+						return;
+					}
+					if (statusEl) {
+						statusEl.textContent = "";
+					}
+					var message = (payload && payload.message) || "提交失败";
+					if (errEl) {
+						errEl.textContent = message;
+					}
+					if (requestId) {
+						container.dataset.requestId = requestId;
+						if (requestIdEl) {
+							requestIdEl.textContent = requestId;
+						}
+						if (copyBtn) {
+							copyBtn.disabled = false;
+						}
+					}
+					if (retryBtn) {
+						retryBtn.classList.remove("hidden");
+						var retries = parseInt(container.dataset.retryCount || "0", 10);
+						if (retries >= 1) {
+							retryBtn.disabled = true;
+						} else {
+							container.dataset.retryCount = String(retries + 1);
+						}
+					}
+				};
+				document.addEventListener("click", function (evt) {
+					var btn = evt.target.closest("[data-authz-copy-button]");
+					if (!btn) {
+						return;
+					}
+					var container = btn.closest("[data-authz-unauthorized]");
+					if (!container) {
+						return;
+					}
+					var requestIdEl = container.querySelector("[data-authz-request-id]");
+					if (!requestIdEl) {
+						return;
+					}
+					var text = requestIdEl.textContent || "";
+					if (!text.trim()) {
+						return;
+					}
+					if (navigator.clipboard && navigator.clipboard.writeText) {
+						navigator.clipboard.writeText(text.trim());
+					}
+				});
+			}
+		</script>
 	</section>
 }

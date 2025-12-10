@@ -18,9 +18,13 @@ func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
 	}
 }
 
-func writeJSONError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, &dtos.APIError{
+func writeJSONError(w http.ResponseWriter, status int, code, message string, meta ...map[string]string) {
+	payload := &dtos.APIError{
 		Code:    code,
 		Message: message,
-	})
+	}
+	if len(meta) > 0 && meta[0] != nil {
+		payload.Meta = meta[0]
+	}
+	writeJSON(w, status, payload)
 }

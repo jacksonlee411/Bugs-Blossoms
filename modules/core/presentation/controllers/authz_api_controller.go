@@ -449,7 +449,7 @@ func (c *AuthzAPIController) debugRequest(
 	}
 	tenantID := tenantIDFromContext(r)
 	logFields := logrus.Fields{
-		"request_id": requestIDFromHeader(r),
+		"request_id": authzutil.RequestIDFromRequest(r),
 		"subject":    result.OriginalRequest.Subject,
 		"domain":     result.OriginalRequest.Domain,
 		"object":     result.OriginalRequest.Object,
@@ -538,9 +538,18 @@ func (c *AuthzAPIController) respondServiceError(w http.ResponseWriter, r *http.
 	switch {
 	case errors.Is(err, services.ErrPolicyDraftNotFound):
 		c.writeHTMXError(w, r, http.StatusNotFound, "AUTHZ_NOT_FOUND", "request not found")
-	case errors.Is(err, services.ErrInvalidDiff),
-		errors.Is(err, services.ErrRevisionMismatch):
+	case errors.Is(err, services.ErrInvalidDiff):
 		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_REQUEST", err.Error())
+	case errors.Is(err, services.ErrRevisionMismatch):
+		meta := map[string]string{}
+		if rev := authzutil.BaseRevision(r.Context()); rev != "" {
+			w.Header().Set("X-Authz-Base-Revision", rev)
+			meta["base_revision"] = rev
+		}
+		if htmx.IsHxRequest(r) {
+			htmx.TriggerToast(w, htmx.ToastVariantError, "基线已更新", "请刷新重试，已回填最新版本号")
+		}
+		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_REQUEST", err.Error(), meta)
 	case errors.Is(err, services.ErrInvalidStatusTransition):
 		c.writeHTMXError(w, r, http.StatusConflict, "AUTHZ_INVALID_STATE", err.Error())
 	case errors.Is(err, services.ErrMissingSnapshot):
@@ -583,13 +592,6 @@ func parseListParams(r *http.Request) (services.ListPolicyDraftsParams, error) {
 		params.Statuses = append(params.Statuses, authzPersistence.PolicyChangeStatus(status))
 	}
 	return params, nil
-}
-
-func requestIDFromHeader(r *http.Request) string {
-	if id := r.Header.Get("X-Request-Id"); id != "" {
-		return id
-	}
-	return r.Header.Get("X-Request-ID")
 }
 
 func parseUUID(raw string) (uuid.UUID, error) {
