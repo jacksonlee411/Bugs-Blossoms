@@ -425,6 +425,7 @@
     "Stage": {
       "Badge": "Черновиков %d",
       "BadgeShort": "Черновик",
+      "AddRule": "Добавить правило",
       "SubmitDraft": "Отправить черновик",
       "BulkRemove": "Массовое удаление",
       "SelectAll": "Выбрать все"

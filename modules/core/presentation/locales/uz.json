@@ -425,6 +425,7 @@
     "Stage": {
       "Badge": "Qoralama %d",
       "BadgeShort": "Qoralama",
+      "AddRule": "Qoida qo'shish",
       "SubmitDraft": "Qoralamani yuborish",
       "BulkRemove": "Ommaviy o'chirish",
       "SelectAll": "Hammasini belgilash"

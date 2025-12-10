@@ -428,6 +428,7 @@
     "Stage": {
       "Badge": "暂存 %d",
       "BadgeShort": "暂存",
+      "AddRule": "新增策略",
       "SubmitDraft": "提交草稿",
       "BulkRemove": "批量撤销",
       "SelectAll": "全选"

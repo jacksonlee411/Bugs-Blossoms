@@ -425,6 +425,7 @@
     "Stage": {
       "Badge": "Stage %d",
       "BadgeShort": "Staged",
+      "AddRule": "Add rule",
       "SubmitDraft": "Submit Draft",
       "BulkRemove": "Bulk Remove",
       "SelectAll": "Select all"
