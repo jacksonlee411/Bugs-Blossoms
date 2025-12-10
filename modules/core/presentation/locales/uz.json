@@ -62,6 +62,12 @@
       "SelectAll": "Barchasini tanlash"
     }
   },
+  "Empty": "Bo'sh",
+  "Pagination": {
+    "Status": "Sahifa %d / %d · %d ta yozuv",
+    "Prev": "Oldingi",
+    "Next": "Keyingi"
+  },
   "Spotlight": {
     "Placeholder": "Qidirish...",
     "NothingFound": "Hech narsa topilmadi",

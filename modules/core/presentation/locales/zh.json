@@ -62,6 +62,12 @@
       "SelectAll": "全选"
     }
   },
+  "Empty": "暂无数据",
+  "Pagination": {
+    "Status": "第 %d / %d 页 · 共 %d 条",
+    "Prev": "上一页",
+    "Next": "下一页"
+  },
   "Spotlight": {
     "Placeholder": "搜索...",
     "NothingFound": "未找到任何内容",
