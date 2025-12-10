@@ -9,9 +9,9 @@
 - 确保新增组件满足可访问性（a11y）要求。
 
 ## 实施步骤
-1. [ ] 反馈与跳转 —— 草稿操作返回 toast/HTMX snippet，包含 `request_id`、SLA 倒计时；提供“查看草稿”跳转 `/core/authz/requests/{id}`，展示 diff/审批状态/bot 日志。
-2. [ ] bot 联动 —— PolicyInspector/Unauthorized 显示 bot 状态，`status=failed` 时展示“重试 bot”链接。
-3. [ ] 错误处理 —— 后端 4xx/5xx 返回 `HX-Trigger: {"showErrorToast": {"message": "<具体原因>"}}`；表单校验失败用 422 + 带错误提示 partial；前端全局监听 `showErrorToast` 调用统一 toast。
+1. [ ] 反馈与跳转 —— 草稿操作（含 Unauthorized/PolicyInspector 提交）统一通过共享请求封装返回 toast/HTMX snippet，包含 `request_id`、SLA 倒计时；提供“查看草稿”跳转 `/core/authz/requests/{id}`，展示 diff/审批状态/bot 日志。
+2. [ ] bot 联动 —— PolicyInspector/Unauthorized 显示 bot 状态，`status=failed` 时展示“重试 bot”链接，沿用统一反馈封装，不新增组件内独立提示。
+3. [ ] 错误处理 —— 后端 4xx/5xx 返回 `HX-Trigger: {"showErrorToast": {"message": "<具体原因>"}}`；表单校验失败用 422 + 带错误提示 partial；前端全局监听 `showErrorToast` 调用统一 toast；`AUTHZ_INVALID_REQUEST`/base_revision 过期等也通过该通道提示，由后端携带最新 rev，前端不做额外重试或黄条。
 4. [ ] 可访问性 —— 新增弹窗/抽屉/按钮需键盘全程操作（Tab/Shift+Tab/Enter/Space/Esc），语义标签与 ARIA 齐备（如 `role="dialog"`, `aria-modal`, `aria-labelledby`）；弹出时聚焦首元素，关闭时焦点回到触发按钮；使用 axe 等工具确保无严重 a11y 问题。
 
 ## 依赖
