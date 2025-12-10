@@ -203,6 +203,11 @@
       "UserInfo": "User Info",
       "Permissions": "Permissions"
     },
+    "Permissions": {
+      "Inherited": "Inherited",
+      "Direct": "Direct",
+      "Overrides": "Overrides"
+    },
     "Single": {
       "EditUser": "Edit user",
       "FirstName": "First name",

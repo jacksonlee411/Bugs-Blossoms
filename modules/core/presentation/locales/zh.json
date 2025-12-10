@@ -206,6 +206,11 @@
       "UserInfo": "用户信息",
       "Permissions": "权限"
     },
+    "Permissions": {
+      "Inherited": "继承权限",
+      "Direct": "直接权限",
+      "Overrides": "覆盖权限"
+    },
     "Single": {
       "EditUser": "编辑用户",
       "FirstName": "名",

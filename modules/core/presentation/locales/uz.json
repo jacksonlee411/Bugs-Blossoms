@@ -203,6 +203,11 @@
       "UserInfo": "Ma'lumotlar",
       "Permissions": "Ruxsatlar"
     },
+    "Permissions": {
+      "Inherited": "Meros qilingan",
+      "Direct": "To'g'ridan-to'g'ri",
+      "Overrides": "Bekor qiluvchi"
+    },
     "Single": {
       "EditUser": "Foydalanuvchini tahrirlash",
       "FirstName": "Ism",

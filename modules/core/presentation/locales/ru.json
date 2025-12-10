@@ -275,6 +275,11 @@
       "UserInfo": "Информация",
       "Permissions": "Разрешения"
     },
+    "Permissions": {
+      "Inherited": "Наследованные",
+      "Direct": "Прямые",
+      "Overrides": "Переопределения"
+    },
     "Single": {
       "EditUser": "Редактировать пользователя",
       "FirstName": "Имя",
