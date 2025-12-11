@@ -45,3 +45,4 @@
 | 日期 | 环境 | 命令 | 结果 | 备注 |
 | --- | --- | --- | --- | --- |
 | 2025-12-11 08:35 | 本地 | `go test ./modules/logging/... ./modules/hrm/... ./modules/core/authzutil/... ./components/authorization/...` | ✅ | 覆盖 HRM/Logging 403 base_revision 域名映射与 Unauthorized helper；新增 e2e 无权态断言（未跑浏览器）。 |
+| 2025-12-11 10:39 | 本地（feature/015b3-business-authz-ui） | `BASE_URL=http://localhost:3201 npx playwright test tests/logs/logs.spec.ts tests/users/register.spec.ts --reporter=line` | ✅ | 修正 Logging 域授权与 g2 绑定后，超级管理员可访问 /logs，用户编辑表单稳定；未改 locales，模板经 `templ generate && make css`。 |
