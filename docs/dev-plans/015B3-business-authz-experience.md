@@ -1,6 +1,6 @@
 # DEV-PLAN-015B3：业务界面授权体验（HRM、Logging 等）
 
-**状态**: 进行中（2025-12-10 15:34 UTC）  
+**状态**: 已完成（2025-12-11 10:45 UTC）  
 **范围**: HRM 组织/员工详情、Logging 搜索/详情页及 Quick Links 的 Unauthorized 组件、PolicyInspector 与授权契约
 
 ## 目标
