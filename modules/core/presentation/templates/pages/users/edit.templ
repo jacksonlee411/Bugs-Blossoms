@@ -4,12 +4,12 @@ import (
 	"fmt"
 	icons "github.com/iota-uz/icons/phosphor"
 	"github.com/iota-uz/iota-sdk/components"
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/card"
 	"github.com/iota-uz/iota-sdk/components/base/dialog"
 	"github.com/iota-uz/iota-sdk/components/base/input"
 	"github.com/iota-uz/iota-sdk/components/base/tab"
-	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	usercomponents "github.com/iota-uz/iota-sdk/components/user"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
@@ -176,10 +176,10 @@ templ EditForm(props *EditFormProps) {
 						@UserPolicyBoard(props.PolicyBoard)
 					} else {
 						@authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{
-							Object: "core.authz",
-							Action: "debug",
-							State:  pageCtx.AuthzState(),
-							Domain: pageCtx.AuthzState().Tenant,
+							Object:        "core.authz",
+							Action:        "debug",
+							State:         pageCtx.AuthzState(),
+							Domain:        pageCtx.AuthzState().Tenant,
 							ShowInspector: pageCtx.CanAuthz("core.authz", "debug"),
 							CanDebug:      pageCtx.CanAuthz("core.authz", "debug"),
 						})
@@ -238,10 +238,10 @@ templ EditForm(props *EditFormProps) {
 		if !canUpdate {
 			<div class="mt-4">
 				@authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{
-					Object: "core.users",
-					Action: "update",
-					State:  pageCtx.AuthzState(),
-					Domain: pageCtx.AuthzState().Tenant,
+					Object:        "core.users",
+					Action:        "update",
+					State:         pageCtx.AuthzState(),
+					Domain:        pageCtx.AuthzState().Tenant,
 					ShowInspector: pageCtx.CanAuthz("core.authz", "debug"),
 					CanDebug:      pageCtx.CanAuthz("core.authz", "debug"),
 				})

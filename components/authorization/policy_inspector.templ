@@ -8,13 +8,14 @@ import (
 )
 
 templ PolicyInspector(props *PolicyInspectorProps) {
-	{{ if !props.CanDebug {
-		return
-	}
+	{{if !props.CanDebug {
+	return
+}
 	}}
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ _ = templ.URL("") }}
 	{{ state := props.State }}
-	{{ if state == nil {
+	{{if state == nil {
 	state = pageCtx.AuthzState()
 }
 	}}
@@ -25,14 +26,14 @@ templ PolicyInspector(props *PolicyInspectorProps) {
 	{{ baseRevision := resolveBaseRevision(ctx, props.BaseRevision) }}
 	{{ requestID := strings.TrimSpace(props.RequestID) }}
 	{{ debug := debugURL(subject, object, normalizedAction, domain, strings.TrimSpace(props.DebugURL)) }}
-	{{ if debug == "" {
-		return
-	}
+	{{if debug == "" {
+	return
+}
 	}}
 	{{ policies := normalizePolicies(state, object, normalizedAction) }}
 	{{ diffJSON := suggestedDiff(state, policies) }}
 	{{ reason := strings.TrimSpace(props.Reason) }}
-	{{ if reason == "" {
+	{{if reason == "" {
 	reason = fmt.Sprintf("授权调试 %s %s", object, normalizedAction)
 }
 	}}

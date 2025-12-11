@@ -42,13 +42,14 @@ func ensureLoggingAuthz(
 	if ctxWithState != r.Context() {
 		*r = *r.WithContext(ctxWithState)
 	}
+	authzDomain := authz.DomainFromTenant(tenantID)
 	if state != nil {
 		state.Tenant = loggingAuthzDomain
 	}
 	subject := resolveLoggingSubject(tenantID, currentUser)
 	req := authz.NewRequest(
 		subject,
-		loggingAuthzDomain,
+		authzDomain,
 		logsAuthzObject,
 		authz.NormalizeAction(action),
 		opts...,

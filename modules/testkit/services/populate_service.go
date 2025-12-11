@@ -320,6 +320,9 @@ func (s *PopulateService) assignCasbinRoles(ctx context.Context, tenantID uuid.U
 		if _, err := enforcer.AddGroupingPolicy(subject, roleSubject, domain); err != nil {
 			logger.WithError(err).Warnf("failed to assign casbin role %s to user %d", roleName, u.ID())
 		}
+		if _, err := enforcer.AddNamedGroupingPolicy("g2", subject, roleSubject); err != nil {
+			logger.WithError(err).Warnf("failed to assign global casbin role %s to user %d", roleName, u.ID())
+		}
 	}
 }
 

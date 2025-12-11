@@ -270,6 +270,7 @@ function getUserRowLocator(page: Page, data: UserFormData) {
 async function ensureUserFormReady(page: Page, data: UserFormData, href: string) {
 	const form = page.locator(USER_FORM_SELECTOR).first();
 	const firstNameInput = page.locator('[name=FirstName]').first();
+	const targetField = firstNameInput;
 
 	for (let attempt = 0; attempt < 3; attempt++) {
 		if (page.url().includes('/login')) {
@@ -282,7 +283,7 @@ async function ensureUserFormReady(page: Page, data: UserFormData, href: string)
 		await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {});
 
 		try {
-			await expect(form.or(firstNameInput)).toBeVisible({ timeout: 20_000 + attempt * 5_000 });
+			await expect(targetField).toBeVisible({ timeout: 20_000 + attempt * 5_000 });
 			return;
 		} catch (error) {
 			if (attempt === 2) {
@@ -314,7 +315,7 @@ async function ensureUserFormReady(page: Page, data: UserFormData, href: string)
 		}
 	}
 
-	await expect(form.or(firstNameInput)).toBeVisible({ timeout: 20_000 });
+	await expect(targetField).toBeVisible({ timeout: 20_000 });
 }
 
 async function openUserDetails(page: Page, data: UserFormData) {

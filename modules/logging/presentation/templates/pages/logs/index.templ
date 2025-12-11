@@ -6,10 +6,10 @@ import (
 
 	icons "github.com/iota-uz/icons/phosphor"
 
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/input"
-	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
@@ -41,12 +41,12 @@ templ Content(props *viewmodels.LogsPageProps) {
 	{{ canView := pageCtx != nil && pageCtx.CanAuthz("logging.logs", "view") }}
 	if !canView {
 		@authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{
-			Object:    "logging.logs",
-			Action:    "view",
-			Operation: "logging.logs view",
-			State:     pageCtx.AuthzState(),
-			Domain:    "logging",
-			RequestURL: "/core/api/authz/requests",
+			Object:        "logging.logs",
+			Action:        "view",
+			Operation:     "logging.logs view",
+			State:         pageCtx.AuthzState(),
+			Domain:        "logging",
+			RequestURL:    "/core/api/authz/requests",
 			ShowInspector: props.CanDebug,
 			CanDebug:      props.CanDebug,
 		})

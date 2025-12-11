@@ -5,8 +5,6 @@ import (
 	"net/url"
 	"strings"
 
-	templpkg "github.com/a-h/templ"
-
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
@@ -29,13 +27,14 @@ func debugURL(subject, object, action, domain, override string) string {
 
 templ requestForm(props RequestFormProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ _ = templ.URL("") }}
 	{{ requestURL := strings.TrimSpace(props.RequestURL) }}
-	{{ if requestURL == "" {
+	{{if requestURL == "" {
 	requestURL = "/core/api/authz/requests"
 }
 	}}
 	{{ submitLabel := strings.TrimSpace(props.SubmitLabel) }}
-	{{ if submitLabel == "" {
+	{{if submitLabel == "" {
 	submitLabel = pageCtx.T("Authz.Unauthorized.Apply")
 }
 	}}
@@ -101,14 +100,14 @@ templ requestForm(props RequestFormProps) {
 templ Unauthorized(props *UnauthorizedProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ state := props.State }}
-	{{ if state == nil {
+	{{if state == nil {
 	state = pageCtx.AuthzState()
 }
 	}}
 	{{ object := strings.ToLower(strings.TrimSpace(props.Object)) }}
 	{{ normalizedAction := normalizeAction(props.Action) }}
 	{{ operation := strings.TrimSpace(props.Operation) }}
-	{{ if operation == "" {
+	{{if operation == "" {
 	operation = strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction))
 	if operation == "" {
 		operation = pageCtx.T("Actions")
@@ -123,7 +122,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 	{{ diffJSON := suggestedDiff(state, policies) }}
 	{{ debug := debugURL(subject, object, normalizedAction, domain, strings.TrimSpace(props.DebugURL)) }}
 	{{ reason := strings.TrimSpace(props.Reason) }}
-	{{ if reason == "" {
+	{{if reason == "" {
 	reason = fmt.Sprintf("申请 %s", operation)
 }
 	}}
@@ -163,7 +162,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 					</div>
 				}
 				if debug != "" {
-					<a class="text-primary hover:underline" href={ templpkg.URL(debug) } target="_blank" rel="noreferrer">
+					<a class="text-primary hover:underline" href={ templ.URL(debug) } target="_blank" rel="noreferrer">
 						{ pageCtx.T("Authz.Debug") }
 					</a>
 				}
