@@ -572,3 +572,15 @@ func parsePolicyEntry(line string) (PolicyEntry, error) {
 	}
 	return entry, nil
 }
+
+var defaultSLADuration = 5 * time.Minute
+
+// EstimatedSLAExpiresAt returns a best-effort SLA deadline for UI.
+func EstimatedSLAExpiresAt(d PolicyDraft) *time.Time {
+	deadline := d.CreatedAt
+	if deadline.IsZero() {
+		return nil
+	}
+	value := deadline.Add(defaultSLADuration)
+	return &value
+}

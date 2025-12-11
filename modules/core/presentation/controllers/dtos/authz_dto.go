@@ -2,6 +2,7 @@ package dtos
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -53,6 +54,10 @@ type PolicyDraftResponse struct {
 	CreatedAt             time.Time       `json:"created_at"`
 	UpdatedAt             time.Time       `json:"updated_at"`
 	ReviewedAt            *time.Time      `json:"reviewed_at,omitempty"`
+	EstimatedSLAExpiresAt *time.Time      `json:"estimated_sla_expires_at,omitempty"`
+	ViewURL               string          `json:"view_url,omitempty"`
+	CanRetryBot           bool            `json:"can_retry_bot"`
+	RetryToken            string          `json:"retry_token,omitempty"`
 }
 
 // PolicyDraftListResponse wraps paginated drafts.
@@ -152,5 +157,7 @@ func NewPolicyDraftResponse(d services.PolicyDraft) PolicyDraftResponse {
 		CreatedAt:             d.CreatedAt,
 		UpdatedAt:             d.UpdatedAt,
 		ReviewedAt:            d.ReviewedAt,
+		EstimatedSLAExpiresAt: services.EstimatedSLAExpiresAt(d),
+		ViewURL:               fmt.Sprintf("/core/authz/requests/%s", d.ID),
 	}
 }

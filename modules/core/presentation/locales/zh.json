@@ -76,6 +76,7 @@
       "AddAccount": "添加账户"
     }
   },
+  "Status": "状态",
   "ErrorPages": {
     "NotFound": {
       "Title": "404",
@@ -431,7 +432,9 @@
       "LastRequest": "最近 request_id",
       "SubmitSuccess": "提交成功",
       "BaseRevision": "基线版本",
-      "RequestID": "请求 ID"
+      "RequestID": "请求 ID",
+      "ViewRequest": "查看草稿",
+      "RetryBot": "重试 bot"
     },
     "PolicyInspector": {
       "Title": "策略调试",
@@ -461,7 +464,17 @@
       "Polling": "已提交草稿，正在轮询状态...",
       "Timeout": "超时未回写，请复制 request_id 并重试查询",
       "Retry": "重试查询",
-      "Copy": "复制 request_id"
+      "Copy": "复制 request_id",
+      "Unknown": "SLA 未知"
+    },
+    "Status": {
+      "PendingReview": "待审批",
+      "Approved": "待部署",
+      "Merged": "已生效",
+      "Failed": "失败",
+      "Rejected": "已拒绝",
+      "Canceled": "已取消",
+      "Draft": "草稿"
     },
     "Domain": "域"
   },
