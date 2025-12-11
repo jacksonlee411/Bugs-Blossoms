@@ -76,6 +76,7 @@
       "AddAccount": "Hisob qo'shish"
     }
   },
+  "Status": "Holat",
   "ErrorPages": {
     "NotFound": {
       "Title": "404",
@@ -428,7 +429,9 @@
       "LastRequest": "Oxirgi request_id",
       "SubmitSuccess": "Yuborildi",
       "BaseRevision": "Bazaviy versiya",
-      "RequestID": "So'rov IDsi"
+      "RequestID": "So'rov IDsi",
+      "ViewRequest": "So'rovni ko'rish",
+      "RetryBot": "Botni qayta ishga tushirish"
     },
     "PolicyInspector": {
       "Title": "Siyosat tekshiruvchisi",
@@ -458,7 +461,17 @@
       "Polling": "So'rov holati tekshirilmoqda...",
       "Timeout": "Holat olinmadi, request_id ni nusxalab qayta urinib ko'ring",
       "Retry": "Qayta tekshirish",
-      "Copy": "request_id nusxalash"
+      "Copy": "request_id nusxalash",
+      "Unknown": "SLA noma'lum"
+    },
+    "Status": {
+      "PendingReview": "Ko'rib chiqish kutilmoqda",
+      "Approved": "Deploy kutilmoqda",
+      "Merged": "Faol",
+      "Failed": "Muvaffaqiyatsiz",
+      "Rejected": "Rad etilgan",
+      "Canceled": "Bekor qilingan",
+      "Draft": "Qoralama"
     },
     "Domain": "Domen"
   },

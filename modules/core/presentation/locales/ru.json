@@ -76,6 +76,7 @@
       "AddAccount": "Добавить счет"
     }
   },
+  "Status": "Статус",
   "ErrorPages": {
     "NotFound": {
       "Title": "404",
@@ -428,7 +429,9 @@
       "LastRequest": "Последний request_id",
       "SubmitSuccess": "Отправлено",
       "BaseRevision": "Базовая ревизия",
-      "RequestID": "Идентификатор запроса"
+      "RequestID": "Идентификатор запроса",
+      "ViewRequest": "Просмотреть запрос",
+      "RetryBot": "Повторить bot"
     },
     "PolicyInspector": {
       "Title": "Инспектор политик",
@@ -458,7 +461,17 @@
       "Polling": "Опрашиваем статус заявки...",
       "Timeout": "Время ожидания истекло, скопируйте request_id и повторите запрос",
       "Retry": "Повторить",
-      "Copy": "Скопировать request_id"
+      "Copy": "Скопировать request_id",
+      "Unknown": "SLA неизвестно"
+    },
+    "Status": {
+      "PendingReview": "Ожидает проверки",
+      "Approved": "Ожидает деплой",
+      "Merged": "Активна",
+      "Failed": "Неудачно",
+      "Rejected": "Отклонено",
+      "Canceled": "Отменено",
+      "Draft": "Черновик"
     },
     "Domain": "Домен"
   },

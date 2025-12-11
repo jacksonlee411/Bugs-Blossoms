@@ -76,6 +76,7 @@
       "AddAccount": "Add account"
     }
   },
+  "Status": "Status",
   "ErrorPages": {
     "NotFound": {
       "Title": "404",
@@ -428,7 +429,9 @@
       "LastRequest": "Last request_id",
       "SubmitSuccess": "Submitted",
       "BaseRevision": "Base revision",
-      "RequestID": "Request ID"
+      "RequestID": "Request ID",
+      "ViewRequest": "View request",
+      "RetryBot": "Retry bot"
     },
     "PolicyInspector": {
       "Title": "Policy Inspector",
@@ -458,7 +461,17 @@
       "Polling": "Polling request status...",
       "Timeout": "Timed out waiting for status, copy request_id and retry",
       "Retry": "Retry",
-      "Copy": "Copy request_id"
+      "Copy": "Copy request_id",
+      "Unknown": "SLA unknown"
+    },
+    "Status": {
+      "PendingReview": "Awaiting review",
+      "Approved": "Pending deploy",
+      "Merged": "Active",
+      "Failed": "Failed",
+      "Rejected": "Rejected",
+      "Canceled": "Canceled",
+      "Draft": "Draft"
     },
     "Domain": "Domain"
   },

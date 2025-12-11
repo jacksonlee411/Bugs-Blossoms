@@ -39,6 +39,8 @@ type AuthzAPIController struct {
 	stageStore *policyStageStore
 }
 
+const botRetryCooldown = time.Minute
+
 // NewAuthzAPIController wires the controller into the router.
 func NewAuthzAPIController(app application.Application) application.Controller {
 	return &AuthzAPIController{
@@ -149,7 +151,7 @@ func (c *AuthzAPIController) listRequests(
 		Total: total,
 	}
 	for _, draft := range drafts {
-		resp.Data = append(resp.Data, dtos.NewPolicyDraftResponse(draft))
+		resp.Data = append(resp.Data, c.decorateDraftResponse(r, draft))
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -174,7 +176,7 @@ func (c *AuthzAPIController) getRequest(
 		c.respondServiceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, dtos.NewPolicyDraftResponse(draft))
+	writeJSON(w, http.StatusOK, c.decorateDraftResponse(r, draft))
 }
 
 func (c *AuthzAPIController) createRequest(
@@ -238,19 +240,20 @@ func (c *AuthzAPIController) createRequest(
 		c.respondServiceError(w, r, err)
 		return
 	}
-	responsePayload := dtos.NewPolicyDraftResponse(draft)
+	responsePayload := c.decorateDraftResponse(r, draft)
 	if htmx.IsHxRequest(r) {
 		htmx.SetTrigger(w, "policies:staged", `{"total":0}`)
-		if triggerDetail, marshalErr := json.Marshal(map[string]string{
-			"id":     draft.ID.String(),
-			"status": string(draft.Status),
-			"domain": draft.Domain,
-			"object": draft.Object,
-			"action": draft.Action,
+		if triggerDetail, marshalErr := json.Marshal(map[string]any{
+			"id":                       draft.ID.String(),
+			"status":                   string(draft.Status),
+			"domain":                   draft.Domain,
+			"object":                   draft.Object,
+			"action":                   draft.Action,
+			"view_url":                 responsePayload.ViewURL,
+			"estimated_sla_expires_at": responsePayload.EstimatedSLAExpiresAt,
 		}); marshalErr == nil {
 			htmx.SetTrigger(w, "authz:request-created", string(triggerDetail))
 		}
-		htmx.TriggerToast(w, htmx.ToastVariantSuccess, "提交成功", "已提交策略草稿")
 	}
 	writeJSON(w, http.StatusCreated, responsePayload)
 }
@@ -353,7 +356,7 @@ func (c *AuthzAPIController) cancelRequest(
 		c.respondServiceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, dtos.NewPolicyDraftResponse(draft))
+	writeJSON(w, http.StatusOK, c.decorateDraftResponse(r, draft))
 }
 
 func (c *AuthzAPIController) triggerBot(
@@ -371,13 +374,26 @@ func (c *AuthzAPIController) triggerBot(
 		return
 	}
 	locker := r.URL.Query().Get("locker")
+	token := r.URL.Query().Get("retry_token")
+	if err := authzutil.ValidateRetryToken(token, id); err != nil {
+		c.writeHTMXErrorWithMeta(w, r, http.StatusUnauthorized, "AUTHZ_INVALID_TOKEN", "error.bot_retry_token_invalid", map[string]string{
+			"request_id": id.String(),
+		})
+		return
+	}
+	if !authzutil.AllowBotRetry(id.String(), time.Now(), botRetryCooldown) {
+		c.writeHTMXErrorWithMeta(w, r, http.StatusTooManyRequests, "E_BOT_RATE_LIMIT", "error.bot_rate_limit", map[string]string{
+			"request_id": id.String(),
+		})
+		return
+	}
 	tenantID := tenantIDFromContext(r)
 	draft, err := svc.TriggerBot(r.Context(), tenantID, id, locker)
 	if err != nil {
 		c.respondServiceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, dtos.NewPolicyDraftResponse(draft))
+	writeJSON(w, http.StatusOK, c.decorateDraftResponse(r, draft))
 }
 
 func (c *AuthzAPIController) revertRequest(
@@ -402,7 +418,7 @@ func (c *AuthzAPIController) revertRequest(
 		c.respondServiceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, dtos.NewPolicyDraftResponse(draft))
+	writeJSON(w, http.StatusCreated, c.decorateDraftResponse(r, draft))
 }
 
 func (c *AuthzAPIController) debugRequest(
@@ -506,7 +522,7 @@ func (c *AuthzAPIController) reviewRequest(
 		c.respondServiceError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, dtos.NewPolicyDraftResponse(draft))
+	writeJSON(w, http.StatusOK, c.decorateDraftResponse(r, draft))
 }
 
 func (c *AuthzAPIController) ensurePermission(
@@ -521,6 +537,12 @@ func (c *AuthzAPIController) ensurePermission(
 	return true
 }
 
+type errorTriggerPayload struct {
+	Message string            `json:"message"`
+	Code    string            `json:"code"`
+	Meta    map[string]string `json:"meta,omitempty"`
+}
+
 func (c *AuthzAPIController) writeHTMXError(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -528,10 +550,56 @@ func (c *AuthzAPIController) writeHTMXError(
 	code string,
 	message string,
 ) {
+	c.writeHTMXErrorWithMeta(w, r, status, code, message, nil)
+}
+
+func (c *AuthzAPIController) writeHTMXErrorWithMeta(
+	w http.ResponseWriter,
+	r *http.Request,
+	status int,
+	code string,
+	message string,
+	meta map[string]string,
+) {
+	msgKey := errorMessageKey(code, message)
 	if htmx.IsHxRequest(r) {
-		htmx.TriggerToast(w, htmx.ToastVariantError, "操作失败", message)
+		triggerErrorToast(w, msgKey, code, meta)
 	}
-	writeJSONError(w, status, code, message)
+	writeJSONError(w, status, code, msgKey, meta)
+}
+
+func triggerErrorToast(w http.ResponseWriter, message string, code string, meta map[string]string) {
+	payload := errorTriggerPayload{
+		Message: message,
+		Code:    code,
+	}
+	if len(meta) > 0 {
+		payload.Meta = meta
+	}
+	if detail, err := json.Marshal(payload); err == nil {
+		notify := fmt.Sprintf(`{"variant":"error","title":"%s","message":"%s"}`, code, message)
+		w.Header().Set("Hx-Trigger", fmt.Sprintf(`{"showErrorToast": %s, "notify": %s}`, string(detail), notify))
+	}
+}
+
+func errorMessageKey(code string, fallback string) string {
+	switch code {
+	case "AUTHZ_NOT_FOUND", "E_REQUEST_NOT_FOUND":
+		return "Request not found"
+	case "E_BOT_RATE_LIMIT":
+		return "Bot retry is rate limited, please wait and try again"
+	case "AUTHZ_INVALID_REQUEST", "AUTHZ_INVALID_BODY", "AUTHZ_INVALID_QUERY", "AUTHZ_INVALID_STATE":
+		return "Request validation failed"
+	case "AUTHZ_FORBIDDEN":
+		return "Permission denied"
+	case "AUTHZ_INVALID_TOKEN":
+		return "Retry link expired, please refresh and try again"
+	default:
+		if strings.TrimSpace(fallback) != "" {
+			return fallback
+		}
+		return "Request failed, please try again"
+	}
 }
 
 func (c *AuthzAPIController) respondServiceError(w http.ResponseWriter, r *http.Request, err error) {
@@ -546,10 +614,7 @@ func (c *AuthzAPIController) respondServiceError(w http.ResponseWriter, r *http.
 			w.Header().Set("X-Authz-Base-Revision", rev)
 			meta["base_revision"] = rev
 		}
-		if htmx.IsHxRequest(r) {
-			htmx.TriggerToast(w, htmx.ToastVariantError, "基线已更新", "请刷新重试，已回填最新版本号")
-		}
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_REQUEST", err.Error(), meta)
+		c.writeHTMXErrorWithMeta(w, r, http.StatusBadRequest, "AUTHZ_INVALID_REQUEST", "Policy base revision is stale, please refresh", meta)
 	case errors.Is(err, services.ErrInvalidStatusTransition):
 		c.writeHTMXError(w, r, http.StatusConflict, "AUTHZ_INVALID_STATE", err.Error())
 	case errors.Is(err, services.ErrMissingSnapshot):
@@ -559,6 +624,21 @@ func (c *AuthzAPIController) respondServiceError(w http.ResponseWriter, r *http.
 	default:
 		c.writeHTMXError(w, r, http.StatusInternalServerError, "AUTHZ_ERROR", "internal error")
 	}
+}
+
+func (c *AuthzAPIController) decorateDraftResponse(r *http.Request, draft services.PolicyDraft) dtos.PolicyDraftResponse {
+	resp := dtos.NewPolicyDraftResponse(draft)
+	canRetry := composables.CanUser(r.Context(), permissions.AuthzRequestsReview) == nil ||
+		composables.CanUser(r.Context(), permissions.AuthzRequestsWrite) == nil
+	if canRetry && draft.Status == authzPersistence.PolicyChangeStatusFailed {
+		resp.CanRetryBot = true
+		if token, err := authzutil.GenerateRetryToken(draft.ID, botRetryCooldown); err == nil {
+			resp.RetryToken = token
+		} else if logger := composables.UseLogger(r.Context()); logger != nil {
+			logger.WithError(err).WithField("request_id", draft.ID.String()).Warn("authz retry token generation failed")
+		}
+	}
+	return resp
 }
 
 func parseListParams(r *http.Request) (services.ListPolicyDraftsParams, error) {

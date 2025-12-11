@@ -1,6 +1,6 @@
 # DEV-PLAN-015B：Casbin 策略 UI 与授权体验
 
-**状态**: 草拟中（2025-01-15 10:30）
+**状态**: 进行中（2025-12-11 15:50，015B4 收尾中）
 
 ## 背景
 - DEV-PLAN-015A 将交付策略草稿 API、`policy_change_requests`、bot/CLI 与 Authz.Debug。为了让 Core/HRM/Logging 用户真正使用这些能力，需要一套覆盖角色/用户管理、业务页面以及 PolicyInspector/Unauthorized 组件的统一 UI 体验。
@@ -31,10 +31,10 @@
 ### 015B4：UI 串联与反馈
 - 子文档：`docs/dev-plans/015B4-ui-integration-feedback.md`
 
-5. **[ ] 文档与翻译**
-   - 更新 README/CONTRIBUTING/AGENTS：新增“从 UI 发起策略草稿”“PolicyInspector 使用方法”“HRM/Logging 授权提示”章节。
-   - `modules/*/presentation/locales/{en,ru,uz}.json` 增加 Unauthorized、PolicyInspector、SLA、按钮文案；提交前运行 `make check tr`。
-   - `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 记录 UI 里程碑、截图、命令、遇到的授权差异。
+5. **[ ] 文档与翻译**（部分完成）
+   - [ ] 更新 README/CONTRIBUTING/AGENTS：新增“从 UI 发起策略草稿”“PolicyInspector 使用方法”“HRM/Logging 授权提示”章节。
+   - [x] `modules/*/presentation/locales/{en,ru,uz}.json` 增加 Unauthorized、PolicyInspector、SLA、按钮文案；提交前运行 `make check tr`。
+   - [ ] `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 记录 UI 里程碑、截图、命令、遇到的授权差异。
 
 ## 里程碑
 - **M1**：角色/用户页面以 API 只读方式展示策略，Unauthorized 组件就绪。
