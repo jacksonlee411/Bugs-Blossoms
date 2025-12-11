@@ -93,9 +93,13 @@ func CheckCapability(
 		return allowed, true, nil
 	}
 
+	domain := authz.DomainFromTenant(tenantID)
+	if state != nil && strings.TrimSpace(state.Tenant) != "" {
+		domain = state.Tenant
+	}
 	req := authz.NewRequest(
 		SubjectForUser(tenantID, u),
-		authz.DomainFromTenant(tenantID),
+		domain,
 		object,
 		action,
 	)
@@ -107,7 +111,7 @@ func CheckCapability(
 		state.SetCapability(capKey, allowed)
 		if !allowed {
 			state.AddMissingPolicy(authz.MissingPolicy{
-				Domain: authz.DomainFromTenant(tenantID),
+				Domain: domain,
 				Object: object,
 				Action: action,
 			})
@@ -138,5 +142,8 @@ func TenantIDFromContext(ctx context.Context) uuid.UUID {
 
 // DomainFromContext returns casbin domain string derived from tenant in context.
 func DomainFromContext(ctx context.Context) string {
+	if state := authz.ViewStateFromContext(ctx); state != nil && strings.TrimSpace(state.Tenant) != "" {
+		return state.Tenant
+	}
 	return authz.DomainFromTenant(TenantIDFromContext(ctx))
 }

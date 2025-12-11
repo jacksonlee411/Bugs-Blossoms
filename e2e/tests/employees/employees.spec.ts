@@ -40,11 +40,30 @@ test.describe('employees CRUD operations', () => {
 			expect([401, 403]).toContain(response.status());
 		}
 		await expect(page.getByText('Permission required', { exact: false })).toBeVisible();
+		const container = page.locator('[data-authz-container]');
+		await expect(container).toBeVisible();
+		await expect(container).toHaveAttribute('data-domain', 'hrm');
+		await expect(container).toHaveAttribute('data-object', 'hrm.employees');
+		await expect(container).toHaveAttribute('data-action', 'list');
+		await expect(container).toHaveAttribute('data-request-url', '/core/api/authz/requests');
+		await expect(container).toHaveAttribute('data-base-revision', /.+/);
+		await expect(page.locator('[data-policy-inspector]')).toHaveCount(0);
 		const applyButton = page.getByRole('button', { name: /Request access/i });
 		if (await applyButton.count()) {
 			await expect(applyButton).toBeVisible();
 		} else {
 			await expect(page.getByRole('link', { name: /Request access/i })).toBeVisible();
 		}
+
+		const apiResponse = await page.request.get('/hrm/employees', {
+			headers: { Accept: 'application/json', 'X-Request-ID': 'e2e-hrm-req' },
+		});
+		expect(apiResponse.status()).toBe(403);
+		const body = await apiResponse.json();
+		expect(body.object).toBe('hrm.employees');
+		expect(body.action).toBe('list');
+		expect(body.domain).toBe('hrm');
+		expect(body.request_id).toBe('e2e-hrm-req');
+		expect(body.base_revision).toBeTruthy();
 	});
 });

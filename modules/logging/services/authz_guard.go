@@ -10,6 +10,7 @@ import (
 )
 
 const LogsAuthzObject = "logging.logs"
+const logsAuthzDomain = "logging"
 
 var authorizeLoggingFn = defaultAuthorizeLogging
 
@@ -26,7 +27,7 @@ func defaultAuthorizeLogging(ctx context.Context, action string, opts ...authz.R
 	if subject, ok := authzutil.SystemSubjectFromContext(ctx); ok {
 		req := authz.NewRequest(
 			subject,
-			authz.DomainFromTenant(tenantID),
+			logsAuthzDomain,
 			LogsAuthzObject,
 			authz.NormalizeAction(action),
 			opts...,
@@ -41,7 +42,7 @@ func defaultAuthorizeLogging(ctx context.Context, action string, opts ...authz.R
 
 	req := authz.NewRequest(
 		authzutil.SubjectForUser(tenantID, currentUser),
-		authz.DomainFromTenant(tenantID),
+		logsAuthzDomain,
 		LogsAuthzObject,
 		authz.NormalizeAction(action),
 		opts...,

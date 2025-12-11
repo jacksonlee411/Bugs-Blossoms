@@ -426,7 +426,24 @@
       "RetryOnce": "Bir marta qayta urinib ko'rish",
       "CopyRequestID": "request_id ni nusxalash",
       "LastRequest": "Oxirgi request_id",
-      "SubmitSuccess": "Yuborildi"
+      "SubmitSuccess": "Yuborildi",
+      "BaseRevision": "Bazaviy versiya",
+      "RequestID": "So'rov IDsi"
+    },
+    "PolicyInspector": {
+      "Title": "Siyosat tekshiruvchisi",
+      "_Description": "Ushbu amal uchun mos siyosatlar, atributlar va kechikishni ko'rsatadi.",
+      "Toggle": "Inspectorni ochish",
+      "RequestSummary": "So'rov",
+      "Refresh": "Yangilash",
+      "Allowed": "Ruxsat berilgan",
+      "Mode": "Rejim",
+      "Latency": "Kechikish",
+      "Request": "Baholanayotgan so'rov",
+      "MatchedPolicy": "Mos siyosatlar",
+      "Attributes": "Atributlar",
+      "GenerateDraft": "Loyiha yaratish",
+      "Loading": "Yuklanmoqda..."
     },
     "Stage": {
       "Badge": "Qoralama %d",

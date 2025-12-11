@@ -12,6 +12,7 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/currency"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/tax"
+	corepermissions "github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/hrm/domain/aggregates/employee"
 	"github.com/iota-uz/iota-sdk/modules/hrm/presentation/mappers"
 	"github.com/iota-uz/iota-sdk/modules/hrm/presentation/templates/pages/employees"
@@ -97,6 +98,7 @@ func (c *EmployeeController) List(w http.ResponseWriter, r *http.Request) {
 	pageCtx, _ := composables.TryUsePageCtx(r.Context())
 	canCreate := pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "create")
 	canUpdate := pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "update")
+	canDebug := composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil
 	employeesVM := mapping.MapViewModels(employeeEntities, mappers.EmployeeToViewModel)
 	for _, vm := range employeesVM {
 		vm.CanUpdate = canUpdate
@@ -105,6 +107,7 @@ func (c *EmployeeController) List(w http.ResponseWriter, r *http.Request) {
 		Employees: employeesVM,
 		NewURL:    fmt.Sprintf("%s/new", c.basePath),
 		CanCreate: canCreate,
+		CanDebug:  canDebug,
 	}
 	if isHxRequest {
 		templ.Handler(employees.EmployeesTable(props), templ.WithStreaming()).ServeHTTP(w, r)

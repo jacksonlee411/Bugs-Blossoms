@@ -426,7 +426,24 @@
       "RetryOnce": "Retry once",
       "CopyRequestID": "Copy request_id",
       "LastRequest": "Last request_id",
-      "SubmitSuccess": "Submitted"
+      "SubmitSuccess": "Submitted",
+      "BaseRevision": "Base revision",
+      "RequestID": "Request ID"
+    },
+    "PolicyInspector": {
+      "Title": "Policy Inspector",
+      "_Description": "Inspect matched policies, attributes, and latency for this action.",
+      "Toggle": "Open Inspector",
+      "RequestSummary": "Request",
+      "Refresh": "Refresh",
+      "Allowed": "Allowed",
+      "Mode": "Mode",
+      "Latency": "Latency",
+      "Request": "Evaluated request",
+      "MatchedPolicy": "Matched policies",
+      "Attributes": "Attributes",
+      "GenerateDraft": "Generate draft",
+      "Loading": "Loading..."
     },
     "Stage": {
       "Badge": "Stage %d",

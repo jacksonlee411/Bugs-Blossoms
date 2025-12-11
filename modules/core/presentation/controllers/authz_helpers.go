@@ -11,10 +11,11 @@ import (
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
 
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
-	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
+	corepermissions "github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
@@ -126,20 +127,23 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 		if state == nil {
 			state = pageCtx.AuthzState()
 		}
-		props := &components.UnauthorizedProps{
-			Object:       payload.Object,
-			Action:       payload.Action,
-			Operation:    fmt.Sprintf("%s %s", payload.Object, payload.Action),
-			State:        state,
-			Request:      payload.RequestURL,
-			Subject:      payload.Subject,
-			Domain:       payload.Domain,
-			DebugURL:     payload.DebugURL,
-			BaseRevision: payload.BaseRevision,
-			RequestID:    payload.RequestID,
+		canDebug := composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil
+		props := &authzcomponents.UnauthorizedProps{
+			Object:        payload.Object,
+			Action:        payload.Action,
+			Operation:     fmt.Sprintf("%s %s", payload.Object, payload.Action),
+			State:         state,
+			RequestURL:    payload.RequestURL,
+			Subject:       payload.Subject,
+			Domain:        payload.Domain,
+			DebugURL:      payload.DebugURL,
+			BaseRevision:  payload.BaseRevision,
+			RequestID:     payload.RequestID,
+			ShowInspector: canDebug,
+			CanDebug:      canDebug,
 		}
 		w.WriteHeader(http.StatusForbidden)
-		templ.Handler(components.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
+		templ.Handler(authzcomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
 	http.Error(w, payload.Message, http.StatusForbidden)

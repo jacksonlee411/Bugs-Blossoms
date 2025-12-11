@@ -14,6 +14,7 @@ import (
 // EmployeesAuthzObject represents the HRM employees capability object.
 const EmployeesAuthzObject = "hrm.employees"
 const PositionsAuthzObject = "hrm.positions"
+const hrmAuthzDomain = "hrm"
 
 var authorizeHRMFn = defaultAuthorizeHRM
 
@@ -30,7 +31,7 @@ func defaultAuthorizeHRM(ctx context.Context, object, action string, opts ...aut
 	if subject, ok := authzutil.SystemSubjectFromContext(ctx); ok {
 		req := authz.NewRequest(
 			subject,
-			authz.DomainFromTenant(tenantID),
+			hrmAuthzDomain,
 			object,
 			authz.NormalizeAction(action),
 			opts...,
@@ -51,7 +52,7 @@ func defaultAuthorizeHRM(ctx context.Context, object, action string, opts ...aut
 
 	req := authz.NewRequest(
 		authzutil.SubjectForUser(tenantID, currentUser),
-		authz.DomainFromTenant(tenantID),
+		hrmAuthzDomain,
 		object,
 		authz.NormalizeAction(action),
 		opts...,

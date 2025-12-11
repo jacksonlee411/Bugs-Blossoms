@@ -429,7 +429,24 @@
       "RetryOnce": "重试一次",
       "CopyRequestID": "复制 request_id",
       "LastRequest": "最近 request_id",
-      "SubmitSuccess": "提交成功"
+      "SubmitSuccess": "提交成功",
+      "BaseRevision": "基线版本",
+      "RequestID": "请求 ID"
+    },
+    "PolicyInspector": {
+      "Title": "策略调试",
+      "_Description": "查看当前操作的命中策略、属性与延迟。",
+      "Toggle": "打开调试",
+      "RequestSummary": "请求",
+      "Refresh": "刷新",
+      "Allowed": "是否允许",
+      "Mode": "模式",
+      "Latency": "延迟",
+      "Request": "评估请求",
+      "MatchedPolicy": "匹配策略",
+      "Attributes": "属性",
+      "GenerateDraft": "生成草稿",
+      "Loading": "加载中..."
     },
     "Stage": {
       "Badge": "暂存 %d",

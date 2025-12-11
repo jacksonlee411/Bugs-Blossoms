@@ -13,9 +13,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel/trace"
 
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
-	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
+	corepermissions "github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
@@ -26,6 +27,7 @@ import (
 )
 
 const logsAuthzObject = "logging.logs"
+const loggingAuthzDomain = "logging"
 
 func ensureLoggingAuthz(
 	w http.ResponseWriter,
@@ -40,10 +42,13 @@ func ensureLoggingAuthz(
 	if ctxWithState != r.Context() {
 		*r = *r.WithContext(ctxWithState)
 	}
+	if state != nil {
+		state.Tenant = loggingAuthzDomain
+	}
 	subject := resolveLoggingSubject(tenantID, currentUser)
 	req := authz.NewRequest(
 		subject,
-		authz.DomainFromTenant(tenantID),
+		loggingAuthzDomain,
 		logsAuthzObject,
 		authz.NormalizeAction(action),
 		opts...,
@@ -125,20 +130,23 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 		w.Header().Set("Hx-Reswap", "innerHTML")
 	}
 	if _, ok := composables.TryUsePageCtx(r.Context()); ok {
-		props := &corecomponents.UnauthorizedProps{
-			Object:       payload.Object,
-			Action:       payload.Action,
-			Operation:    fmt.Sprintf("%s %s", payload.Object, payload.Action),
-			State:        state,
-			Request:      payload.RequestURL,
-			Subject:      payload.Subject,
-			Domain:       payload.Domain,
-			DebugURL:     payload.DebugURL,
-			BaseRevision: payload.BaseRevision,
-			RequestID:    payload.RequestID,
+		canDebug := composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil
+		props := &authzcomponents.UnauthorizedProps{
+			Object:        payload.Object,
+			Action:        payload.Action,
+			Operation:     fmt.Sprintf("%s %s", payload.Object, payload.Action),
+			State:         state,
+			RequestURL:    payload.RequestURL,
+			Subject:       payload.Subject,
+			Domain:        payload.Domain,
+			DebugURL:      payload.DebugURL,
+			BaseRevision:  payload.BaseRevision,
+			RequestID:     payload.RequestID,
+			ShowInspector: canDebug,
+			CanDebug:      canDebug,
 		}
 		w.WriteHeader(http.StatusForbidden)
-		templ.Handler(corecomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
+		templ.Handler(authzcomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
 	http.Error(w, payload.Message, http.StatusForbidden)

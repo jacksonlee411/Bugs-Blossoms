@@ -57,4 +57,5 @@ type LogsPageProps struct {
 	ActiveTab      string
 	Authentication AuthenticationSection
 	Action         ActionSection
+	CanDebug       bool
 }
