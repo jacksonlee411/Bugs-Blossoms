@@ -28,7 +28,7 @@ func TestEnsureHRMAuthz_ForbiddenJSONContract(t *testing.T) {
 	require.Equal(t, "list", payload.Action)
 	require.Equal(t, "/core/api/authz/requests", payload.RequestURL)
 	require.NotEmpty(t, payload.DebugURL)
-	require.Equal(t, "global", payload.Domain)
+	require.Equal(t, hrmAuthzDomain, payload.Domain)
 	require.NotEmpty(t, payload.Subject)
 	require.NotEmpty(t, payload.MissingPolicies)
 

@@ -426,7 +426,24 @@
       "RetryOnce": "Повторить один раз",
       "CopyRequestID": "Скопировать request_id",
       "LastRequest": "Последний request_id",
-      "SubmitSuccess": "Отправлено"
+      "SubmitSuccess": "Отправлено",
+      "BaseRevision": "Базовая ревизия",
+      "RequestID": "Идентификатор запроса"
+    },
+    "PolicyInspector": {
+      "Title": "Инспектор политик",
+      "_Description": "Показывает совпавшие политики, атрибуты и задержку для действия.",
+      "Toggle": "Открыть инспектор",
+      "RequestSummary": "Запрос",
+      "Refresh": "Обновить",
+      "Allowed": "Разрешено",
+      "Mode": "Режим",
+      "Latency": "Задержка",
+      "Request": "Проверяемый запрос",
+      "MatchedPolicy": "Сопоставленные политики",
+      "Attributes": "Атрибуты",
+      "GenerateDraft": "Создать черновик",
+      "Loading": "Загрузка..."
     },
     "Stage": {
       "Badge": "Черновиков %d",

@@ -10,9 +10,9 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import (
 	"fmt"
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/input"
-	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
@@ -217,9 +217,13 @@ func EditForm(props *EditFormProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = corecomponents.Unauthorized(&corecomponents.UnauthorizedProps{
-				Object: "core.groups",
-				Action: "update",
+			templ_7745c5c3_Err = authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{
+				Object:        "core.groups",
+				Action:        "update",
+				State:         pageCtx.AuthzState(),
+				Domain:        pageCtx.AuthzState().Tenant,
+				ShowInspector: pageCtx.CanAuthz("core.authz", "debug"),
+				CanDebug:      pageCtx.CanAuthz("core.authz", "debug"),
 			}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

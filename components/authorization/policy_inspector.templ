@@ -1,0 +1,322 @@
+package authorization
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+templ PolicyInspector(props *PolicyInspectorProps) {
+	{{if !props.CanDebug {
+	return
+}
+	}}
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ _ = templ.URL("") }}
+	{{ state := props.State }}
+	{{if state == nil {
+	state = pageCtx.AuthzState()
+}
+	}}
+	{{ object := strings.ToLower(strings.TrimSpace(props.Object)) }}
+	{{ normalizedAction := normalizeAction(props.Action) }}
+	{{ subject := resolveSubject(state, props.Subject) }}
+	{{ domain := resolveDomain(state, props.Domain) }}
+	{{ baseRevision := resolveBaseRevision(ctx, props.BaseRevision) }}
+	{{ requestID := strings.TrimSpace(props.RequestID) }}
+	{{ debug := debugURL(subject, object, normalizedAction, domain, strings.TrimSpace(props.DebugURL)) }}
+	{{if debug == "" {
+	return
+}
+	}}
+	{{ policies := normalizePolicies(state, object, normalizedAction) }}
+	{{ diffJSON := suggestedDiff(state, policies) }}
+	{{ reason := strings.TrimSpace(props.Reason) }}
+	{{if reason == "" {
+	reason = fmt.Sprintf("授权调试 %s %s", object, normalizedAction)
+}
+	}}
+	{{ operation := strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction)) }}
+	{{ bodyID := fmt.Sprintf("policy-inspector-%s-%s", strings.ReplaceAll(object, ".", "-"), normalizedAction) }}
+	<section
+		class="rounded-lg border border-primary/70 bg-surface-600/70 p-4 space-y-3"
+		data-policy-inspector
+		data-authz-container
+		data-action={ normalizedAction }
+		data-domain={ domain }
+		data-object={ object }
+		data-request-url="/core/api/authz/requests"
+		data-subject={ subject }
+		data-debug-url={ debug }
+		data-base-revision={ baseRevision }
+		data-request-id={ requestID }
+		data-allowed-label={ pageCtx.T("Yes") }
+		data-denied-label={ pageCtx.T("No") }
+		data-empty-label={ pageCtx.T("Empty") }
+		data-loading-label={ pageCtx.T("Authz.PolicyInspector.Loading") }
+	>
+		<div class="flex items-center justify-between gap-3">
+			<div>
+				<div class="text-sm font-semibold text-white">
+					{ pageCtx.T("Authz.PolicyInspector.Title") }
+				</div>
+				<div class="text-xs text-surface-200">
+					{ pageCtx.T("Authz.PolicyInspector._Description") }
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				if debug != "" {
+					<a
+						class="text-xs text-primary hover:underline"
+						href={ templ.URL(debug) }
+						target="_blank"
+						rel="noreferrer"
+					>
+						{ pageCtx.T("Authz.Debug") }
+					</a>
+				}
+				<button
+					type="button"
+					class="rounded-md border border-primary/80 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10"
+					data-inspector-toggle
+					aria-expanded="false"
+					aria-controls={ bodyID }
+				>
+					{ pageCtx.T("Authz.PolicyInspector.Toggle") }
+				</button>
+			</div>
+		</div>
+		<div id={ bodyID } class="space-y-4 hidden" data-inspector-body tabindex="-1">
+			<div class="flex items-center justify-between gap-3">
+				<div class="text-xs text-surface-200">
+					{ pageCtx.T("Authz.PolicyInspector.RequestSummary") }: { fmt.Sprintf("%s · %s", domain, operation) }
+				</div>
+				<button
+					type="button"
+					class="rounded-md border border-surface-400/60 px-3 py-1 text-xs font-medium text-surface-50 hover:bg-surface-500/60"
+					data-inspector-refresh
+					hx-get={ debug }
+					hx-target="closest [data-policy-inspector]"
+					hx-swap="none"
+					hx-on::before-request="window.authzInspector && window.authzInspector.onRequest(event)"
+					hx-on::after-request="window.authzInspector && window.authzInspector.onResponse(event)"
+				>
+					{ pageCtx.T("Authz.PolicyInspector.Refresh") }
+				</button>
+			</div>
+			<div class="grid grid-cols-2 gap-3 text-xs text-surface-50">
+				<div class="rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1">
+					<div class="text-surface-200">{ pageCtx.T("Authz.PolicyInspector.Allowed") }</div>
+					<div class="font-semibold" data-inspector-allowed>{ pageCtx.T("Unknown") }</div>
+				</div>
+				<div class="rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1">
+					<div class="text-surface-200">{ pageCtx.T("Authz.PolicyInspector.Mode") }</div>
+					<div class="font-semibold" data-inspector-mode>{ pageCtx.T("Unknown") }</div>
+				</div>
+				<div class="rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1">
+					<div class="text-surface-200">{ pageCtx.T("Authz.PolicyInspector.Latency") }</div>
+					<div class="font-semibold" data-inspector-latency>—</div>
+				</div>
+				<div class="rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1">
+					<div class="text-surface-200">{ pageCtx.T("Authz.Unauthorized.RequestID") }</div>
+					<div class="font-mono" data-authz-request-id>{ requestID }</div>
+				</div>
+				<div class="rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1 col-span-2">
+					<div class="text-surface-200">{ pageCtx.T("Authz.PolicyInspector.Request") }</div>
+					<div class="font-mono text-surface-50" data-inspector-request>
+						{ fmt.Sprintf("%s · %s / %s", subject, domain, operation) }
+					</div>
+				</div>
+			</div>
+			<div class="space-y-2">
+				<div class="text-xs font-semibold text-surface-200">
+					{ pageCtx.T("Authz.PolicyInspector.MatchedPolicy") }
+				</div>
+				<ul class="space-y-1 text-xs text-surface-50" data-inspector-trace>
+					if len(policies) == 0 {
+						<li class="text-surface-200">{ pageCtx.T("Empty") }</li>
+					}
+				</ul>
+			</div>
+			<div class="space-y-2">
+				<div class="text-xs font-semibold text-surface-200">
+					{ pageCtx.T("Authz.PolicyInspector.Attributes") }
+				</div>
+				<dl class="grid grid-cols-2 gap-2 text-xs text-surface-50" data-inspector-attrs>
+					<dt class="col-span-2 text-surface-200">{ pageCtx.T("Empty") }</dt>
+				</dl>
+			</div>
+			<div class="flex items-center gap-2 text-xs text-surface-200">
+				{ pageCtx.T("Authz.Unauthorized.BaseRevision") }: <span class="font-mono" data-authz-base-revision>{ baseRevision }</span>
+			</div>
+			@requestForm(RequestFormProps{
+				RequestURL:   props.RequestURL,
+				Object:       object,
+				Action:       normalizedAction,
+				Domain:       domain,
+				Subject:      subject,
+				BaseRevision: baseRevision,
+				RequestID:    requestID,
+				Diff:         diffJSON,
+				Reason:       reason,
+				SubmitLabel:  pageCtx.T("Authz.PolicyInspector.GenerateDraft"),
+			})
+		</div>
+		<script>
+			if (!window.authzInspector) {
+				window.authzInspector = {
+					onRequest: function (evt) {
+						var container = evt.target.closest("[data-policy-inspector]");
+						if (!container) {
+							return;
+						}
+						var status = container.querySelector("[data-inspector-latency]");
+						if (status) {
+							status.textContent = container.dataset.loadingLabel || "";
+						}
+					},
+					onResponse: function (evt) {
+						if (!evt.detail || !evt.detail.xhr) {
+							return;
+						}
+						var container = evt.target.closest("[data-policy-inspector]");
+						if (!container) {
+							return;
+						}
+						var xhr = evt.detail.xhr;
+						var latencyEl = container.querySelector("[data-inspector-latency]");
+						if (latencyEl) {
+							latencyEl.textContent = "";
+						}
+						if (xhr.status < 200 || xhr.status >= 300) {
+							return;
+						}
+						var payload = {};
+						try {
+							payload = JSON.parse(xhr.responseText || "{}");
+						} catch (e) {
+							payload = {};
+						}
+						var allowedEl = container.querySelector("[data-inspector-allowed]");
+						if (allowedEl) {
+							if (payload.allowed === true) {
+								allowedEl.textContent = container.dataset.allowedLabel || "yes";
+								allowedEl.classList.remove("text-error-300");
+								allowedEl.classList.add("text-success-300");
+							} else if (payload.allowed === false) {
+								allowedEl.textContent = container.dataset.deniedLabel || "no";
+								allowedEl.classList.add("text-error-300");
+								allowedEl.classList.remove("text-success-300");
+							} else {
+								allowedEl.textContent = container.dataset.loadingLabel || "";
+								allowedEl.classList.remove("text-error-300");
+								allowedEl.classList.remove("text-success-300");
+							}
+						}
+						var modeEl = container.querySelector("[data-inspector-mode]");
+						if (modeEl) {
+							modeEl.textContent = payload.mode || container.dataset.emptyLabel || "";
+						}
+						if (latencyEl) {
+							if (payload.latency_ms) {
+								latencyEl.textContent = payload.latency_ms + " ms";
+							} else if (typeof payload.latency_ms === "number") {
+								latencyEl.textContent = payload.latency_ms + " ms";
+							} else {
+								latencyEl.textContent = container.dataset.emptyLabel || "";
+							}
+						}
+						var requestEl = container.querySelector("[data-inspector-request]");
+						if (requestEl && payload.request) {
+							var request = payload.request;
+							requestEl.textContent = [request.subject, request.domain, request.object, request.action].filter(Boolean).join(" · ");
+						}
+						var traceEl = container.querySelector("[data-inspector-trace]");
+						if (traceEl) {
+							traceEl.innerHTML = "";
+							if (payload.trace && payload.trace.matched_policy && payload.trace.matched_policy.length) {
+								payload.trace.matched_policy.forEach(function (rule) {
+									var li = document.createElement("li");
+									li.textContent = rule;
+									traceEl.appendChild(li);
+								});
+							} else {
+								var li = document.createElement("li");
+								li.textContent = container.dataset.emptyLabel || "";
+								li.className = "text-surface-200";
+								traceEl.appendChild(li);
+							}
+						}
+						var attrsEl = container.querySelector("[data-inspector-attrs]");
+						if (attrsEl) {
+							attrsEl.innerHTML = "";
+							if (payload.attributes) {
+								Object.keys(payload.attributes).forEach(function (key) {
+									var dt = document.createElement("dt");
+									dt.className = "font-semibold";
+									dt.textContent = key;
+									var dd = document.createElement("dd");
+									dd.className = "text-surface-200 break-all";
+									dd.textContent = String(payload.attributes[key]);
+									attrsEl.appendChild(dt);
+									attrsEl.appendChild(dd);
+								});
+							}
+							if (!attrsEl.children.length) {
+								var dt = document.createElement("dt");
+								dt.className = "col-span-2 text-surface-200";
+								dt.textContent = container.dataset.emptyLabel || "";
+								attrsEl.appendChild(dt);
+							}
+						}
+						var requestId = xhr.getResponseHeader("X-Request-ID") || "";
+						if (requestId) {
+							container.dataset.requestId = requestId;
+							var idEl = container.querySelector("[data-authz-request-id]");
+							if (idEl) {
+								idEl.textContent = requestId;
+							}
+						}
+						var baseRev = xhr.getResponseHeader("X-Authz-Base-Revision");
+						if (baseRev) {
+							container.dataset.baseRevision = baseRev;
+							var revDisplay = container.querySelector("[data-authz-base-revision]");
+							if (revDisplay) {
+								revDisplay.textContent = baseRev;
+							}
+							var revInputs = container.querySelectorAll('input[name="base_revision"]');
+							revInputs.forEach(function (input) {
+								input.value = baseRev;
+							});
+						}
+					},
+				};
+				document.addEventListener("click", function (evt) {
+					var toggle = evt.target.closest("[data-inspector-toggle]");
+					if (!toggle) {
+						return;
+					}
+					var container = toggle.closest("[data-policy-inspector]");
+					if (!container) {
+						return;
+					}
+					var body = container.querySelector("[data-inspector-body]");
+					if (!body) {
+						return;
+					}
+					var isHidden = body.classList.contains("hidden");
+					body.classList.toggle("hidden");
+					toggle.setAttribute("aria-expanded", isHidden ? "true" : "false");
+					if (isHidden) {
+						body.focus({ preventScroll: true });
+						var refresh = container.querySelector("[data-inspector-refresh]");
+						if (refresh) {
+							refresh.click();
+						}
+					}
+				});
+			}
+		</script>
+	</section>
+}

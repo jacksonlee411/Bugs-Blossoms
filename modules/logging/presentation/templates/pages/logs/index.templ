@@ -6,10 +6,10 @@ import (
 
 	icons "github.com/iota-uz/icons/phosphor"
 
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/input"
-	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
@@ -40,15 +40,28 @@ templ Content(props *viewmodels.LogsPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ canView := pageCtx != nil && pageCtx.CanAuthz("logging.logs", "view") }}
 	if !canView {
-		@corecomponents.Unauthorized(&corecomponents.UnauthorizedProps{
-			Object:    "logging.logs",
-			Action:    "view",
-			Operation: "logging.logs view",
-			State:     pageCtx.AuthzState(),
-			Request:   "/core/api/authz/requests",
+		@authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{
+			Object:        "logging.logs",
+			Action:        "view",
+			Operation:     "logging.logs view",
+			State:         pageCtx.AuthzState(),
+			Domain:        "logging",
+			RequestURL:    "/core/api/authz/requests",
+			ShowInspector: props.CanDebug,
+			CanDebug:      props.CanDebug,
 		})
 	} else {
 		<div class="m-6 space-y-4">
+			if props.CanDebug {
+				@authzcomponents.PolicyInspector(&authzcomponents.PolicyInspectorProps{
+					State:      pageCtx.AuthzState(),
+					Object:     "logging.logs",
+					Action:     "view",
+					Domain:     "logging",
+					RequestURL: "/core/api/authz/requests",
+					CanDebug:   props.CanDebug,
+				})
+			}
 			<div class="flex items-center justify-between">
 				<h1 class="text-2xl font-medium">{ pageCtx.T("NavigationLinks.Logs") }</h1>
 			</div>

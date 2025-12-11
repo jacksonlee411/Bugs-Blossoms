@@ -10,6 +10,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/gorilla/mux"
 
+	corepermissions "github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/authenticationlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/mappers"
@@ -91,6 +92,7 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	canDebug := composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil
 	props := &viewmodels.LogsPageProps{
 		BasePath:  c.basePath,
 		ActiveTab: tab,
@@ -108,6 +110,7 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 			Page:    pagination.Page,
 			PerPage: pagination.Limit,
 		},
+		CanDebug: canDebug,
 	}
 
 	if htmx.IsHxRequest(r) {

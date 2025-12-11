@@ -2,9 +2,9 @@ package groups
 
 import (
 	"fmt"
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/input"
-	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
@@ -108,9 +108,13 @@ templ EditForm(props *EditFormProps) {
 		</div>
 		if !canUpdate {
 			<div class="mt-4">
-				@corecomponents.Unauthorized(&corecomponents.UnauthorizedProps{
-					Object: "core.groups",
-					Action: "update",
+				@authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{
+					Object:        "core.groups",
+					Action:        "update",
+					State:         pageCtx.AuthzState(),
+					Domain:        pageCtx.AuthzState().Tenant,
+					ShowInspector: pageCtx.CanAuthz("core.authz", "debug"),
+					CanDebug:      pageCtx.CanAuthz("core.authz", "debug"),
 				})
 			</div>
 		}
