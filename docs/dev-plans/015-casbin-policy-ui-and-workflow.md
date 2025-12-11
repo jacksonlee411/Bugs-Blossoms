@@ -1,6 +1,6 @@
 # DEV-PLAN-015：Casbin 策略管理与 UI 工作流（母计划）
 
-**状态**: 拆分中（2025-01-15 10:35）
+**状态**: 进行中（015B 收尾中，2025-12-11 15:50）
 
 ## 拆分背景
 - 原 DEV-PLAN-015 同时涵盖策略草稿 API/bot 与角色、用户、业务页面等 UI 流程，导致与 DEV-PLAN-014（模块授权改造）存在交叉依赖：014 需要 API/组件才能交付良好体验，而 015 需要 014 的授权底座验证 UI 功能。
@@ -18,7 +18,7 @@
 | 子计划 | 关键交付 | 依赖 | 状态 |
 | --- | --- | --- | --- |
 | [DEV-PLAN-015A](015A-casbin-policy-platform.md) | `policy_change_requests`、REST API、Authz.Debug、PolicyDraftService、bot/CLI、README/AGENTS 更新 | 013 输出的 `pkg/authz`、Feature Flag、数据库迁移、Git bot 凭证 | ✅ 已完成（2025-12-04 08:18） |
-| [DEV-PLAN-015B](015B-casbin-policy-ui-and-experience.md) | 角色/用户策略 UI、Unauthorized 组件、PolicyInspector、HRM/Logging 体验、翻译/文档 | 015A API、014 模块授权、`authz.ViewState` 注入 | 草拟 |
+| [DEV-PLAN-015B](015B-casbin-policy-ui-and-experience.md) | 角色/用户策略 UI、Unauthorized 组件、PolicyInspector、HRM/Logging 体验、翻译/文档 | 015A API、014 模块授权、`authz.ViewState` 注入 | 进行中（015B4 收尾、文档/翻译补全） |
 
 ## 与 DEV-PLAN-014 的依赖解决方式
 - 014 需要的策略申请入口、PolicyInspector、统一 Unauthorized 组件由 015B 提供；在 015B 交付前，014 可先使用占位提示，并通过 015A 的 API 提供最小可用流程（例如直接跳转草稿列表）。
