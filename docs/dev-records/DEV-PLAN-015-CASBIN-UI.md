@@ -46,3 +46,11 @@
 | --- | --- | --- | --- | --- |
 | 2025-12-11 08:35 | 本地 | `go test ./modules/logging/... ./modules/hrm/... ./modules/core/authzutil/... ./components/authorization/...` | ✅ | 覆盖 HRM/Logging 403 base_revision 域名映射与 Unauthorized helper；新增 e2e 无权态断言（未跑浏览器）。 |
 | 2025-12-11 10:39 | 本地（feature/015b3-business-authz-ui） | `BASE_URL=http://localhost:3201 npx playwright test tests/logs/logs.spec.ts tests/users/register.spec.ts --reporter=line` | ✅ | 修正 Logging 域授权与 g2 绑定后，超级管理员可访问 /logs，用户编辑表单稳定；未改 locales，模板经 `templ generate && make css`。 |
+
+## 阶段验证（015B4 串联与反馈）
+
+| 日期 | 环境 | 命令/操作 | 结果 | 备注 |
+| --- | --- | --- | --- | --- |
+| 2025-12-11 15:21 | 本地（feature/015b4） | `GOFLAGS=-buildvcs=false make check lint` | ✅ | golangci-lint + cleanarch 通过，authz/templ 改动均已检查。 |
+| 2025-12-11 15:22 | 本地 | `GOFLAGS=-buildvcs=false go test ./modules/core/... ./components/authorization/...` | ✅ | 覆盖 AuthzAPIController 新增重试 token/限流、Unauthorized 轮询脚本等。 |
+| 2025-12-11 16:10 | 本地 | 键盘巡检 Unauthorized/PolicyInspector：Tab/Shift+Tab 聚焦提交、复制 request_id、触发 bot 重试 | ✅ | 无新增模态；按钮可用 Enter/Space 触发，重试按钮随终态隐藏；无额外 aria 需求。 |

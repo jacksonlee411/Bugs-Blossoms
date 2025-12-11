@@ -119,6 +119,12 @@ modules/{module}/
 - Use `go run ./scripts/authz/verify --sample 0.2` for on-demand parity checks against a live database (set `AUTHZ_MODE`/`AUTHZ_FLAG_CONFIG` as needed).
 - Authz Bot：使用 `scripts/authz/bot.sh run [--once]` 消化 `policy_change_requests`，需要注入 `AUTHZ_BOT_GITHUB_TOKEN`（PR 用 PAT）及可选 `AUTHZ_BOT_GIT_TOKEN`（推送用 PAT）；如遇死锁，执行 `scripts/authz/bot.sh force-release <request-id>` 清空 `bot_lock` 后重试。
 
+### 授权 UI/反馈使用提示
+- 403 场景统一渲染 `components/authorization/unauthorized.templ`，props 必须包含 `object/action/subject/domain/base_revision/missing_policies/suggest_diff/request_url/debug_url`；HTMX 提交 `/core/api/authz/requests` 后会在 HX-Trigger 中返回 `request_id`、SLA、view_url、重试 token。
+- 前端脚本每 15s 轮询 `/core/api/authz/requests/{id}`，终态或 30s 内缓存命中即暂停；失焦暂停、回到前台强制刷新一次；`status=failed` 时若有权限可携带 `retry_token` 调用 `/trigger-bot`，同 request 60s 冷却。
+- 后端错误统一用 `HX-Trigger: {"showErrorToast":{...},"notify":{...}}` 传递，`AUTHZ_INVALID_REQUEST` 会附带 `X-Authz-Base-Revision`/meta 提醒刷新；非 HTMX 场景返回 JSON/标准错误页并附错误码/i18n key。
+- 模板/locale 变更后运行 `templ generate && make css`、`make check tr`；authz 相关改动跑 `make check lint` 与 `go test ./modules/core/... ./components/authorization/...`。
+
 ## Tool use
 - DO NOT USE `sed` for file manipulation
 
