@@ -2,18 +2,23 @@ package components
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
 type AuthzWorkspaceProps struct {
-	Subject     string
-	Domain      string
-	StagedCount int
-	Summary     viewmodels.AuthzChangesSummary
-	SubmitURL   string
-	ClearURL    string
-	CSRFToken   string
+	Subject       string
+	Domain        string
+	DisplayDomain string
+	StagedCount   int
+	Summary       viewmodels.AuthzChangesSummary
+	SubmitURL     string
+	ClearURL      string
+	RequestObject string
+	RequestAction string
+	DefaultReason string
 }
 
 // AuthzWorkspace renders a sticky footer for managing staged policy changes.
@@ -22,53 +27,74 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 	if props.StagedCount <= 0 {
 		return
 	}
-	<div
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ displayDomain := strings.TrimSpace(props.DisplayDomain) }}
+	if displayDomain == "" {
+		{{ displayDomain = props.Domain }}
+	}
+	<form
 		id="authz-workspace"
 		class="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-400/60 bg-surface-700/90 backdrop-blur"
+		hx-post={ props.SubmitURL }
+		hx-target="body"
+		hx-swap="none"
 	>
-		<div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+		<input type="hidden" name="subject" value={ props.Subject }/>
+		if strings.TrimSpace(props.Domain) != "" {
+			<input type="hidden" name="domain" value={ props.Domain }/>
+		}
+		if strings.TrimSpace(props.RequestObject) != "" {
+			<input type="hidden" name="object" value={ props.RequestObject }/>
+		}
+		if strings.TrimSpace(props.RequestAction) != "" {
+			<input type="hidden" name="action" value={ props.RequestAction }/>
+		}
+		<div class="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
 			<div class="flex items-center gap-6">
 				<div class="flex flex-col">
-					<span class="text-[10px] font-bold uppercase tracking-wider text-surface-200">Context</span>
+					<span class="text-[10px] font-bold uppercase tracking-wider text-surface-200">{ pageCtx.T("Authz.Workspace.Context") }</span>
 					<div class="flex items-center gap-1 text-sm text-surface-50">
 						<span class="font-medium">{ props.Subject }</span>
 						<span class="text-surface-300">&#64;</span>
-						<span class="font-medium">{ props.Domain }</span>
+						<span class="font-medium">{ displayDomain }</span>
 					</div>
 				</div>
 				<div class="h-8 w-px bg-surface-400/60"></div>
 				<div class="flex items-center gap-3">
 					<span class="inline-flex items-center justify-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary-foreground">
-						{ fmt.Sprintf("%d", props.StagedCount) } Changes
+						{ fmt.Sprintf("%d", props.StagedCount) } { pageCtx.T("Authz.Workspace.Changes") }
 					</span>
 					<span class="text-xs text-surface-100">
 						(+{ fmt.Sprintf("%d", props.Summary.Added) } / -{ fmt.Sprintf("%d", props.Summary.Removed) })
 					</span>
 				</div>
 			</div>
-			<div class="flex items-center gap-3">
+			<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+				<input
+					type="text"
+					name="reason"
+					value={ props.DefaultReason }
+					placeholder={ pageCtx.T("Authz.Unauthorized.Reason") }
+					required
+					class="input input-sm w-full min-w-64 bg-surface-600/60 border border-surface-400/60 text-surface-50 placeholder:text-surface-200"
+				/>
 				<button
 					hx-delete={ props.ClearURL }
-					hx-target="#authz-workspace"
-					hx-swap="outerHTML"
-					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, props.CSRFToken) }
+					hx-target="body"
+					hx-swap="none"
 					class="rounded-md border border-surface-400/80 bg-transparent px-3 py-2 text-sm font-medium text-surface-50 hover:bg-surface-500/60"
 					type="button"
 				>
-					Discard draft
+					{ pageCtx.T("Authz.Workspace.Discard") }
 				</button>
 				<button
-					hx-post={ props.SubmitURL }
-					hx-target="#authz-workspace"
-					hx-swap="outerHTML"
-					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, props.CSRFToken) }
 					class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
 					type="submit"
 				>
-					Submit request
+					{ pageCtx.T("Authz.Stage.SubmitDraft") }
 				</button>
 			</div>
 		</div>
-	</div>
+	</form>
 	<div class="h-20"></div>
 }

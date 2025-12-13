@@ -59,7 +59,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		diffJSON := suggestedDiff(state, policies)
 		reason := strings.TrimSpace(props.Reason)
 		if reason == "" {
-			reason = fmt.Sprintf("授权调试 %s %s", object, normalizedAction)
+			reason = pageCtx.T("Authz.PolicyInspector.ReasonDefault", map[string]interface{}{"Object": object, "Action": normalizedAction})
 		}
 		operation := strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction))
 		bodyID := fmt.Sprintf("policy-inspector-%s-%s", strings.ReplaceAll(object, ".", "-"), normalizedAction)

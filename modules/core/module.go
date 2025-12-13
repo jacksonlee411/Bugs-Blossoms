@@ -3,6 +3,7 @@ package core
 import (
 	"embed"
 
+	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/validators"
 	"github.com/iota-uz/iota-sdk/pkg/rbac"
 	"github.com/iota-uz/iota-sdk/pkg/spotlight"
@@ -141,6 +142,12 @@ func (m *Module) Register(app application.Application) error {
 			RequireAuthz(RolesLink.AuthzObject, RolesLink.AuthzAction),
 		spotlight.NewQuickLink(GroupsLink.Icon, GroupsLink.Name, GroupsLink.Href).
 			RequireAuthz(GroupsLink.AuthzObject, GroupsLink.AuthzAction),
+		spotlight.NewQuickLink(
+			icons.List(icons.Props{Size: "24"}),
+			AuthzRequestsLink.Name,
+			AuthzRequestsLink.Href,
+		).RequireAuthz(AuthzRequestsLink.AuthzObject, AuthzRequestsLink.AuthzAction).
+			RequirePermissions(permissions.AuthzRequestsRead),
 		spotlight.NewQuickLink(
 			icons.PlusCircle(icons.Props{Size: "24"}),
 			"Users.List.New",

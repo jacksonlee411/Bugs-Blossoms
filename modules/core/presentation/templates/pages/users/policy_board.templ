@@ -11,6 +11,8 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
+	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 )
 
 type UserPolicyRequestStatus struct {
@@ -55,6 +57,7 @@ type UserPolicyBoardProps struct {
 	Subject       string
 	DefaultDomain string
 	StageTotal    int
+	StageSummary  viewmodels.AuthzChangesSummary
 	Requests      []UserPolicyRequestStatus
 	Inherited     UserPolicyColumnProps
 	Direct        UserPolicyColumnProps
@@ -92,6 +95,7 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 	"requests": props.Requests,
 })
 	}}
+	{{ clearURL := fmt.Sprintf("/core/api/authz/policies/stage?subject=%s", url.QueryEscape(props.Subject)) }}
 	<div
 		class="space-y-4"
 		id="user-policy-board"
@@ -102,12 +106,20 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 		x-data={ fmt.Sprintf("userPolicyBoardState(%s)", boardState) }
 		x-on:authz:request-created.window="onRequestCreated($event)"
 		x-init="init()"
+		data-status-unknown-label={ pageCtx.T("Unknown") }
+		data-status-pending-review={ pageCtx.T("Authz.Status.PendingReview") }
+		data-status-approved={ pageCtx.T("Authz.Status.Approved") }
+		data-status-merged={ pageCtx.T("Authz.Status.Merged") }
+		data-status-failed={ pageCtx.T("Authz.Status.Failed") }
+		data-status-rejected={ pageCtx.T("Authz.Status.Rejected") }
+		data-status-canceled={ pageCtx.T("Authz.Status.Canceled") }
+		data-status-draft={ pageCtx.T("Authz.Status.Draft") }
 	>
 		<div class="flex items-start justify-between flex-wrap gap-3">
 			<div class="space-y-1">
 				<h3 class="text-lg font-semibold">{ pageCtx.T("Users.Tabs.Permissions") }</h3>
 				<p class="text-sm text-secondary-300">
-					{ fmt.Sprintf("Subject: %s · Domain: %s", props.Subject, props.DefaultDomain) }
+					{ fmt.Sprintf("%s: %s · %s: %s", pageCtx.T("Authz.Subject"), props.Subject, pageCtx.T("Authz.Domain"), props.DefaultDomain) }
 				</p>
 			</div>
 			<div class="flex items-center gap-2 flex-wrap">
@@ -116,28 +128,7 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 						{ fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal) }
 					</span>
 				}
-				if props.CanStage {
-					<form
-						class="flex items-center gap-2"
-						hx-post="/core/api/authz/requests"
-						hx-target="body"
-						hx-swap="none"
-						hx-on::before-request="this.querySelector('button').disabled=true;"
-						hx-on::after-request="this.querySelector('button').disabled=false;"
-					>
-						<input type="hidden" name="subject" value={ props.Subject }/>
-						<input type="hidden" name="object" value={ props.RequestObject }/>
-						<input type="hidden" name="action" value={ props.RequestAction }/>
-						<input type="hidden" name="reason" value={ props.RequestReason }/>
-						<button
-							class="btn btn-xs btn-primary"
-							type="submit"
-							disabled?={ props.StageTotal == 0 }
-						>
-							{ pageCtx.T("Authz.Stage.SubmitDraft") }
-						</button>
-					</form>
-				} else if props.CanRequest {
+				if !props.CanStage && props.CanRequest {
 					<form
 						class="flex items-center gap-2"
 						hx-post="/core/api/authz/requests"
@@ -199,26 +190,41 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 				@UserPolicyColumn(&props.Overrides)
 			</div>
 		}
+		@corecomponents.AuthzWorkspace(corecomponents.AuthzWorkspaceProps{
+			Subject:       props.Subject,
+			Domain:        "",
+			DisplayDomain: props.DefaultDomain,
+			StagedCount:   props.StageTotal,
+			Summary:       props.StageSummary,
+			SubmitURL:     "/core/api/authz/requests",
+			ClearURL:      clearURL,
+			RequestObject: props.RequestObject,
+			RequestAction: props.RequestAction,
+			DefaultReason: props.RequestReason,
+		})
 	</div>
 	@userPolicyBoardScriptOnce.Once() {
 		<script>
-			const authzStatusLabels = {
-				pending_review: "Awaiting PR",
-				approved: "Pending Deploy",
-				merged: "Active",
-				draft: "Draft",
-				rejected: "Rejected",
-				failed: "Failed",
-				canceled: "Canceled",
-			};
+			function statusLabel(status, container) {
+				const labels = {
+					pending_review: container?.dataset?.statusPendingReview,
+					approved: container?.dataset?.statusApproved,
+					merged: container?.dataset?.statusMerged,
+					failed: container?.dataset?.statusFailed,
+					rejected: container?.dataset?.statusRejected,
+					canceled: container?.dataset?.statusCanceled,
+					draft: container?.dataset?.statusDraft,
+				};
+				const key = (status || "").toLowerCase();
+				return labels[key] || key || container?.dataset?.statusUnknownLabel || "";
+			}
 
 			function normalizeRequests(list) {
+				const container = document.getElementById("user-policy-board");
 				return (list || []).map((item) => {
 					const rawStatus = item.status || item.State || "";
 					const statusValue = rawStatus || item.Status || "";
-					const label = rawStatus
-						? authzStatusLabels[rawStatus] || rawStatus
-						: statusValue;
+					const label = rawStatus ? statusLabel(rawStatus, container) : statusValue;
 					const state = rawStatus;
 					return {
 						id: item.id || item.ID || "",

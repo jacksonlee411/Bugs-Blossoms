@@ -32,3 +32,27 @@ type AuthzRequestDetail struct {
 	BotLog      string
 	PRLink      string
 }
+
+type AuthzRequestListItem struct {
+	ID          string
+	Status      string
+	StatusClass string
+	Object      string
+	Action      string
+	Domain      string
+	Reason      string
+	CreatedAt   string
+	UpdatedAt   string
+	ViewURL     string
+}
+
+type AuthzRequestList struct {
+	Items    []AuthzRequestListItem
+	Total    int64
+	Page     int
+	Limit    int
+	Mine     bool
+	Statuses []string
+	Subject  string
+	Domain   string
+}

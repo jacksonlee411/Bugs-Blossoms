@@ -196,6 +196,12 @@
    - `RequestDetail` (templ): 请求详情页模板已实现，并支持结构化 diff + 原始 JSON 展示。
    - `AuthzRequestController`: 已接入 `PolicyDraftService.Get`，通过 `/core/authz/requests/{id}` 渲染只读请求详情。
    - `AuthzRequestController_test`: 通过集成测试验证从 `/core/api/authz/requests` 创建草稿后，`view_url` 能正确渲染详情页。
+3. **Requests Center 列表页与入口**：
+   - 新增 `/core/authz/requests` 最小列表页（状态过滤、我发起的、分页跳转），并与详情页打通。
+   - 侧边栏（Administration）与 Spotlight/Quick Links 补齐入口，默认按 `AuthzRequestsRead`/authz capability 隐藏。
+4. **体验与一致性**：
+   - 角色矩阵/用户权限页接入 `AuthzWorkspace`，统一暂存数量与提交入口，并要求 reason 输入。
+   - 403 payload 的 object/action 对齐为 `core.authz/read`（避免无效 missing policy），并补齐相关 i18n 文案与 toast 文案。
 
 ### 下一步计划
 1. **Workspace 接入**：在角色矩阵 / 用户权限页接入 `AuthzWorkspace`，统一暂存计数与“提交草稿”入口。

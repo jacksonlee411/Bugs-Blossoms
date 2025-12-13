@@ -296,16 +296,29 @@ func (c *AuthzAPIController) stagePolicy(
 			Total: len(entries),
 		})
 	case http.MethodDelete:
-		id := r.URL.Query().Get("id")
-		if id == "" {
-			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", "id is required")
+		id := strings.TrimSpace(r.URL.Query().Get("id"))
+		if id != "" {
+			entries, err := c.stageStore.Delete(key, id)
+			if err != nil {
+				c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
+				return
+			}
+			htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(entries)))
+			writeJSON(w, http.StatusOK, dtos.StagePolicyResponse{
+				Data:  entries,
+				Total: len(entries),
+			})
 			return
 		}
-		entries, err := c.stageStore.Delete(key, id)
-		if err != nil {
-			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
+
+		subject := strings.TrimSpace(r.URL.Query().Get("subject"))
+		domain := strings.TrimSpace(r.URL.Query().Get("domain"))
+		if subject == "" && domain == "" {
+			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", "id or subject/domain is required")
 			return
 		}
+		c.stageStore.Clear(key, subject, domain)
+		entries := c.stageStore.List(key, "", "")
 		htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(entries)))
 		writeJSON(w, http.StatusOK, dtos.StagePolicyResponse{
 			Data:  entries,
@@ -782,14 +795,15 @@ func (c *AuthzAPIController) buildDraftFromStage(
 	if subject == "" {
 		subject = entries[0].Subject
 	}
-	if domain == "" {
-		domain = entries[0].Domain
-	}
 	filtered := make([]dtos.StagedPolicyEntry, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Subject == subject && entry.Domain == domain {
-			filtered = append(filtered, entry)
+		if entry.Subject != subject {
+			continue
 		}
+		if domain != "" && entry.Domain != domain {
+			continue
+		}
+		filtered = append(filtered, entry)
 	}
 	if len(filtered) == 0 {
 		return payload, errors.New("暂存规则与当前筛选不匹配")

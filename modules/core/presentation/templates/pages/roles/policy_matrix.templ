@@ -11,6 +11,8 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
+	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 )
 
 type PolicyMatrixEntry struct {
@@ -22,11 +24,12 @@ type PolicyMatrixEntry struct {
 }
 
 type PolicyMatrixProps struct {
-	Entries    []PolicyMatrixEntry
-	Total      int
-	Page       int
-	Limit      int
-	StageTotal int
+	Entries      []PolicyMatrixEntry
+	Total        int
+	Page         int
+	Limit        int
+	StageTotal   int
+	StageSummary viewmodels.AuthzChangesSummary
 
 	RoleID  string
 	Subject string
@@ -58,6 +61,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 	{{ baseURL := fmt.Sprintf("/roles/%s/policies", url.PathEscape(props.RoleID)) }}
 	{{ pages := totalPages(props.Total, props.Limit) }}
 	{{ refreshURL := fmt.Sprintf("%s?subject=%s&page=%d&limit=%d&type=%s&domain=%s&q=%s", baseURL, url.QueryEscape(props.Subject), props.Page, props.Limit, url.QueryEscape(props.Type), url.QueryEscape(props.Domain), url.QueryEscape(props.Search)) }}
+	{{ clearURL := fmt.Sprintf("/core/api/authz/policies/stage?subject=%s&domain=%s", url.QueryEscape(props.Subject), url.QueryEscape(props.Domain)) }}
 	<div
 		class="space-y-4"
 		id="policy-matrix"
@@ -68,10 +72,10 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 	>
 		<div class="flex items-center justify-between gap-3 flex-wrap">
 			<div class="flex items-center gap-2">
-				<h2 class="text-lg font-semibold">Policy Matrix</h2>
+				<h2 class="text-lg font-semibold">{ pageCtx.T("Authz.PolicyMatrix.Title") }</h2>
 				if props.StageTotal > 0 {
 					<span class="text-xs px-2 py-1 rounded-full bg-primary text-primary-foreground border border-primary/70">
-						{ fmt.Sprintf("暂存 %d", props.StageTotal) }
+						{ fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal) }
 					</span>
 				}
 			</div>
@@ -87,24 +91,6 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						}) {
 							{ pageCtx.T("Create") }
 						}
-						<form
-							class="flex items-center gap-2"
-							hx-post="/core/api/authz/requests"
-							hx-target="body"
-							hx-swap="none"
-						>
-							<input type="hidden" name="subject" value={ props.Subject }/>
-							<input type="hidden" name="domain" value={ props.Domain }/>
-							<input type="hidden" name="object" value=""/>
-							<input type="hidden" name="action" value=""/>
-							<button
-								class="btn btn-sm"
-								type="submit"
-								disabled?={ props.StageTotal == 0 }
-							>
-								提交草稿
-							</button>
-						</form>
 					</div>
 				} else {
 					if props.CanRequest {
@@ -113,7 +99,8 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							hx-post="/core/api/authz/requests"
 							hx-target="body"
 							hx-swap="none"
-							hx-on::before-request="this.querySelector('button').disabled=true; this.querySelector('button').dataset.originalText=this.querySelector('button').innerText; this.querySelector('button').innerText='请求中...';"
+							data-loading-label={ pageCtx.T("Authz.PolicyInspector.Loading") }
+							hx-on::before-request="this.querySelector('button').disabled=true; this.querySelector('button').dataset.originalText=this.querySelector('button').innerText; this.querySelector('button').innerText=(this.dataset.loadingLabel||'Loading...');"
 							hx-on::after-request="this.querySelector('button').disabled=false; if(this.querySelector('button').dataset.originalText){this.querySelector('button').innerText=this.querySelector('button').dataset.originalText;}"
 						>
 							<input type="hidden" name="object" value="core.roles"/>
@@ -121,14 +108,14 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							<input type="hidden" name="domain" value={ props.Domain }/>
 							<input type="hidden" name="diff" value="[]"/>
 							<input type="hidden" name="request_access" value="1"/>
-							<input type="hidden" name="reason" value="请求编辑角色策略"/>
+							<input type="hidden" name="reason" value={ pageCtx.T("Authz.Requests.DefaultReason.Roles") }/>
 							<button class="btn btn-sm btn-primary" type="submit">
-								请求权限
+								{ pageCtx.T("Authz.Unauthorized.Apply") }
 							</button>
-							<span class="text-xs text-secondary-300">当前为只读，可发送权限申请。</span>
+							<span class="text-xs text-secondary-300">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
 						</form>
 					} else {
-						<span class="text-sm text-secondary-300">暂无编辑权限，可联系管理员开通。</span>
+						<span class="text-sm text-secondary-300">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
 					}
 				}
 				if !props.CanDebug {
@@ -136,11 +123,11 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 				}
 			</div>
 			<div class="w-full flex items-center justify-between text-xs text-secondary-300">
-				<span>暂存仅作用于当前角色与域，提交后自动清空。</span>
+				<span>{ pageCtx.T("Authz.Stage.RoleHint") }</span>
 				if props.StageTotal > 0 {
-					<span class="text-secondary-100">{ fmt.Sprintf("已暂存 %d 条，提交草稿后清空", props.StageTotal) }</span>
+					<span class="text-secondary-100">{ fmt.Sprintf(pageCtx.T("Authz.Stage.SubmitHint"), props.StageTotal) }</span>
 				} else {
-					<span>未有暂存规则，直接提交将按表单/暂存构建 diff。</span>
+					<span>{ pageCtx.T("Authz.Stage.EmptyHint") }</span>
 				}
 			</div>
 		</div>
@@ -155,14 +142,14 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 			<input type="hidden" name="page" value="1"/>
 			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", props.Limit) }/>
 			@input.Text(&input.Props{
-				Placeholder: "Domain",
+				Placeholder: pageCtx.T("Authz.Domain"),
 				Attrs: templ.Attributes{
 					"name":  "domain",
 					"value": props.Domain,
 				},
 			})
 			<select name="type" class="select select-sm bg-surface-500 border border-primary text-sm rounded">
-				<option value="">All</option>
+				<option value="">{ pageCtx.T("All") }</option>
 				<option value="p" selected?={ props.Type == "p" }>p</option>
 				<option value="g" selected?={ props.Type == "g" }>g</option>
 			</select>
@@ -176,7 +163,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 		</form>
 		@dialog.StdViewDrawer(dialog.StdDrawerProps{
 			ID:     "stage-policy-drawer",
-			Title:  "新增规则",
+			Title:  pageCtx.T("Authz.Stage.AddRule"),
 			Action: "open-stage-policy",
 		}) {
 			<form
@@ -188,7 +175,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 				<input type="hidden" name="subject" value={ props.Subject }/>
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 					@input.Text(&input.Props{
-						Label: "Domain",
+						Label: pageCtx.T("Authz.Domain"),
 						Attrs: templ.Attributes{
 							"name":  "domain",
 							"value": props.Domain,
@@ -209,7 +196,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						</select>
 					</div>
 					@input.Text(&input.Props{
-						Label: "Subject",
+						Label: pageCtx.T("Authz.Subject"),
 						Attrs: templ.Attributes{
 							"name":     "subject",
 							"value":    props.Subject,
@@ -218,7 +205,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					})
 				</div>
 				@input.Text(&input.Props{
-					Label:       "Object",
+					Label:       pageCtx.T("Authz.Object"),
 					Placeholder: "core.users",
 					Attrs: templ.Attributes{
 						"name":     "object",
@@ -226,7 +213,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					},
 				})
 				@input.Text(&input.Props{
-					Label:       "Action",
+					Label:       pageCtx.T("Authz.Action"),
 					Placeholder: "read",
 					Attrs: templ.Attributes{
 						"name":     "action",
@@ -259,10 +246,10 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 			@base.Table(base.TableProps{
 				Columns: []*base.TableColumn{
 					{Label: "Type", Key: "type", Class: "w-14"},
-					{Label: "Subject", Key: "subject"},
-					{Label: "Domain", Key: "domain"},
-					{Label: "Object", Key: "object"},
-					{Label: "Action", Key: "action"},
+					{Label: pageCtx.T("Authz.Subject"), Key: "subject"},
+					{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
+					{Label: pageCtx.T("Authz.Object"), Key: "object"},
+					{Label: pageCtx.T("Authz.Action"), Key: "action"},
 					{Label: "Effect", Key: "effect", Class: "w-28"},
 					{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-28"},
 				},
@@ -313,7 +300,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 										{{ badgeClass = "text-[11px] px-2 py-0.5 rounded-full border bg-red-700 border-red-500 text-white" }}
 									}
 									<span class={ badgeClass }>
-										暂存
+										{ pageCtx.T("Authz.Stage.BadgeShort") }
 									</span>
 								}
 							</div>
@@ -359,7 +346,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 			}
 		</div>
 		<div class="flex items-center justify-between text-sm">
-			<span>{ fmt.Sprintf("Page %d / %d · Total %d", props.Page, pages, props.Total) }</span>
+			<span>{ fmt.Sprintf(pageCtx.T("Pagination.Status"), props.Page, pages, props.Total) }</span>
 			<div class="flex gap-2">
 				<button
 					class="btn btn-sm"
@@ -368,7 +355,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					hx-target="#policy-matrix"
 					hx-swap="outerHTML"
 				>
-					Prev
+					{ pageCtx.T("Pagination.Prev") }
 				</button>
 				<button
 					class="btn btn-sm"
@@ -377,9 +364,21 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					hx-target="#policy-matrix"
 					hx-swap="outerHTML"
 				>
-					Next
+					{ pageCtx.T("Pagination.Next") }
 				</button>
 			</div>
 		</div>
+		@corecomponents.AuthzWorkspace(corecomponents.AuthzWorkspaceProps{
+			Subject:       props.Subject,
+			Domain:        props.Domain,
+			DisplayDomain: props.Domain,
+			StagedCount:   props.StageTotal,
+			Summary:       props.StageSummary,
+			SubmitURL:     "/core/api/authz/requests",
+			ClearURL:      clearURL,
+			RequestObject: "core.roles",
+			RequestAction: "update",
+			DefaultReason: pageCtx.T("Authz.Requests.DefaultReason.Roles"),
+		})
 	</div>
 }

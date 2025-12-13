@@ -298,7 +298,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 		debug := debugURL(subject, object, normalizedAction, domain, strings.TrimSpace(props.DebugURL))
 		reason := strings.TrimSpace(props.Reason)
 		if reason == "" {
-			reason = fmt.Sprintf("申请 %s", operation)
+			reason = pageCtx.T("Authz.Unauthorized.ReasonDefault", map[string]interface{}{"Operation": operation})
 		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<section class=\"rounded-lg border border-primary bg-surface-600/80 p-6 text-left shadow space-y-4\" data-authz-container data-action=\"")
 		if templ_7745c5c3_Err != nil {
@@ -508,219 +508,297 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\"><div class=\"flex items-start justify-between gap-3\"><div class=\"space-y-2\"><h2 class=\"text-lg font-semibold text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "\" data-toast-error-title=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var33 string
-		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.Title"))
+		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Toast.ErrorTitle"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 153, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 149, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</h2><p class=\"text-sm text-surface-100\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" data-toast-default-error=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var34 string
-		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized._Description", map[string]interface{}{"Operation": operation}))
+		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Toast.DefaultError"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 156, Col: 99}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 150, Col: 66}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</p><p class=\"text-xs text-surface-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "\" data-toast-stale-title=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ApplyDescription"))
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Toast.StaleRevisionTitle"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 159, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 151, Col: 70}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</p></div><div class=\"text-right text-xs text-surface-200 space-y-1\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "\" data-toast-stale-message=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var36 string
+		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Toast.StaleRevisionMessage"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 152, Col: 74}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "\" data-toast-submit-title=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var37 string
+		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.SubmitSuccess"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 153, Col: 73}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" data-toast-submitted-prefix=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var38 string
+		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Toast.SubmittedPrefix"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 154, Col: 72}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "\"><div class=\"flex items-start justify-between gap-3\"><div class=\"space-y-2\"><h2 class=\"text-lg font-semibold text-white\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var39 string
+		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.Title"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 159, Col: 44}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</h2><p class=\"text-sm text-surface-100\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var40 string
+		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized._Description", map[string]interface{}{"Operation": operation}))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 162, Col: 99}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</p><p class=\"text-xs text-surface-200\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var41 string
+		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ApplyDescription"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 165, Col: 55}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</p></div><div class=\"text-right text-xs text-surface-200 space-y-1\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if baseRevision != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var36 string
-			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.BaseRevision"))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 165, Col: 52}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, ": <span class=\"font-mono\" data-authz-base-revision>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var37 string
-			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(baseRevision)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 165, Col: 119}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</span></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		if requestID != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var38 string
-			templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.RequestID"))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 170, Col: 49}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, ": <span class=\"font-mono\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var39 string
-			templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(requestID)
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 170, Col: 88}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</span></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		if debug != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<a class=\"text-primary hover:underline\" href=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var40 templ.SafeURL = templ.URL(debug)
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var40)))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "\" target=\"_blank\" rel=\"noreferrer\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var41 string
-			templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Debug"))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 175, Col: 32}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</a>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div></div><div class=\"rounded-md border border-dashed border-surface-400/60 bg-surface-500/30 p-3\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if len(policies) > 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<div class=\"mb-2 text-xs font-semibold uppercase tracking-wide text-surface-200\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "<div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var42 string
-			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.MissingPolicies"))
+			templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.BaseRevision"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 183, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 171, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</div><ul class=\"space-y-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, ": <span class=\"font-mono\" data-authz-base-revision>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			for _, policy := range policies {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<li class=\"rounded-md border border-surface-400/60 bg-surface-500/50 p-3 text-xs font-mono text-surface-50\">")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				var templ_7745c5c3_Var43 string
-				templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s → %s / %s", policy.Domain, policy.Object, policy.Action))
-				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 188, Col: 83}
-				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</li>")
-				if templ_7745c5c3_Err != nil {
-					return templ_7745c5c3_Err
-				}
+			var templ_7745c5c3_Var43 string
+			templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(baseRevision)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 171, Col: 119}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</ul>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<p class=\"text-xs text-surface-200\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</span></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		if requestID != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var44 string
-			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.MissingPolicies"))
+			templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.RequestID"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 193, Col: 89}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 176, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, ": ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, ": <span class=\"font-mono\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var45 string
-			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
+			templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(requestID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 193, Col: 113}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 176, Col: 88}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</span></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</div>")
+		if debug != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<a class=\"text-primary hover:underline\" href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var46 templ.SafeURL = templ.URL(debug)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var46)))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "\" target=\"_blank\" rel=\"noreferrer\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var47 string
+			templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Debug"))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 181, Col: 32}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "</a>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</div></div><div class=\"rounded-md border border-dashed border-surface-400/60 bg-surface-500/30 p-3\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if len(policies) > 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div class=\"mb-2 text-xs font-semibold uppercase tracking-wide text-surface-200\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var48 string
+			templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.MissingPolicies"))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 189, Col: 54}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</div><ul class=\"space-y-2\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			for _, policy := range policies {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<li class=\"rounded-md border border-surface-400/60 bg-surface-500/50 p-3 text-xs font-mono text-surface-50\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				var templ_7745c5c3_Var49 string
+				templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s → %s / %s", policy.Domain, policy.Object, policy.Action))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 194, Col: 83}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</li>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</ul>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<p class=\"text-xs text-surface-200\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var50 string
+			templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.MissingPolicies"))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 199, Col: 89}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, ": ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var51 string
+			templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 199, Col: 113}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -738,72 +816,72 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<div class=\"space-y-2 text-xs text-surface-100\" data-authz-status-block><div class=\"flex items-center gap-2 flex-wrap\"><span>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<div class=\"space-y-2 text-xs text-surface-100\" data-authz-status-block><div class=\"flex items-center gap-2 flex-wrap\"><span>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var46 string
-		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Status"))
+		var templ_7745c5c3_Var52 string
+		templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Status"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 209, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 215, Col: 31}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, ":</span> <span class=\"font-semibold text-white\" data-authz-status>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var47 string
-		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Unknown"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 210, Col: 83}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, ":</span> <span class=\"font-semibold text-white\" data-authz-status>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</span> <span class=\"text-surface-200\" data-authz-sla>")
+		var templ_7745c5c3_Var53 string
+		templ_7745c5c3_Var53, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Unknown"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 216, Col: 83}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var53))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var48 string
-		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Unknown"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 211, Col: 82}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 63, "</span> <span class=\"text-surface-200\" data-authz-sla>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 58, "</span></div><div class=\"flex items-center gap-3 flex-wrap\"><a class=\"text-primary hover:underline hidden\" target=\"_blank\" rel=\"noreferrer\" data-authz-view>")
+		var templ_7745c5c3_Var54 string
+		templ_7745c5c3_Var54, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Unknown"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 217, Col: 82}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var54))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var49 string
-		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ViewRequest"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 220, Col: 50}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 64, "</span></div><div class=\"flex items-center gap-3 flex-wrap\"><a class=\"text-primary hover:underline hidden\" target=\"_blank\" rel=\"noreferrer\" data-authz-view>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 59, "</a> <button type=\"button\" class=\"hidden inline-flex items-center rounded-md border border-primary/70 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10\" data-authz-retry-bot>")
+		var templ_7745c5c3_Var55 string
+		templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ViewRequest"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 226, Col: 50}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var50 string
-		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.RetryBot"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 227, Col: 47}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 65, "</a> <button type=\"button\" class=\"hidden inline-flex items-center rounded-md border border-primary/70 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10\" data-authz-retry-bot>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 60, "</button></div></div>")
+		var templ_7745c5c3_Var56 string
+		templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.RetryBot"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 233, Col: 47}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 66, "</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -825,7 +903,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Var51 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var57 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -837,17 +915,17 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 61, "<script>\n\t\t\t\t(function () {\n\t\t\t\t\tif (window.authzRequestWatcher) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tconst terminalStatuses = new Set([\"merged\", \"failed\", \"rejected\", \"canceled\"]);\n\t\t\t\t\tconst cache = new Map();\n\t\t\t\t\tconst watchers = new Map();\n\n\t\t\t\t\tfunction isTerminal(status) {\n\t\t\t\t\t\treturn terminalStatuses.has((status || \"\").toLowerCase());\n\t\t\t\t\t}\n\n\tfunction statusLabel(status, container) {\n\t\tconst labels = {\n\t\t\tpending_review: container?.dataset?.statusPendingReview,\n\t\t\tapproved: container?.dataset?.statusApproved,\n\t\t\tmerged: container?.dataset?.statusMerged,\n\t\t\tfailed: container?.dataset?.statusFailed,\n\t\t\trejected: container?.dataset?.statusRejected,\n\t\t\tcanceled: container?.dataset?.statusCanceled,\n\t\t\tdraft: container?.dataset?.statusDraft,\n\t\t};\n\t\tconst key = (status || \"\").toLowerCase();\n\t\treturn labels[key] || key || container?.dataset?.statusUnknownLabel || \"\";\n\t}\n\n\t\t\t\t\tfunction parseDetail(detail) {\n\t\t\t\t\t\tlet data = detail || {};\n\t\t\t\t\t\tif (typeof data === \"string\") {\n\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\tdata = JSON.parse(data);\n\t\t\t\t\t\t\t} catch (_) {\n\t\t\t\t\t\t\t\tdata = {};\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (data && data.value) {\n\t\t\t\t\t\t\treturn parseDetail(data.value);\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn data || {};\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction normalize(detail) {\n\t\t\t\t\t\tconst data = parseDetail(detail);\n\t\t\t\t\t\tif (!data) {\n\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst id = data.id || data.ID || \"\";\n\t\t\t\t\t\tconst status = (data.status || data.Status || \"\").toLowerCase();\n\t\t\t\t\t\treturn {\n\t\t\t\t\t\t\tid: id,\n\t\t\t\t\t\t\tstatus: status,\n\t\t\t\t\t\t\tupdatedAt: data.updated_at || data.updatedAt || data.UpdatedAt,\n\t\t\t\t\t\t\testimatedSLA: data.estimated_sla_expires_at || data.EstimatedSLAExpiresAt,\n\t\t\t\t\t\t\tcanRetry: !!(data.can_retry_bot || data.CanRetryBot),\n\t\t\t\t\t\t\tretryToken: data.retry_token || data.RetryToken,\n\t\t\t\t\t\t\tviewUrl: data.view_url || data.ViewURL || (id ? \"/core/authz/requests/\" + id : \"\"),\n\t\t\t\t\t\t};\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction formatSLA(container, isoString) {\n\t\t\t\t\t\tconst unknown = (container?.dataset?.slaUnknown || \"\").trim();\n\t\t\t\t\t\tif (!isoString) {\n\t\t\t\t\t\t\treturn unknown;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst date = new Date(isoString);\n\t\t\t\t\t\tif (Number.isNaN(date.getTime())) {\n\t\t\t\t\t\t\treturn unknown;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst diff = date.getTime() - Date.now();\n\t\t\t\t\t\tif (diff <= 0) {\n\t\t\t\t\t\t\treturn unknown;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst mins = Math.floor(diff / 60000);\n\t\t\t\t\t\tconst secs = Math.floor((diff % 60000) / 1000);\n\t\t\t\t\t\treturn \"SLA \" + String(mins).padStart(2, \"0\") + \":\" + String(secs).padStart(2, \"0\");\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction findContainer(id) {\n\t\t\t\t\t\tif (!id) {\n\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn document.querySelector('[data-authz-container][data-request-id=\"' + id + '\"]');\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction render(container, data) {\n\t\t\t\t\t\tif (!container) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst statusEl = container.querySelector(\"[data-authz-status]\");\n\t\t\t\t\t\tif (statusEl) {\n\t\t\tstatusEl.textContent = data\n\t\t\t\t? statusLabel(data.status, container) || container.dataset.statusUnknownLabel || \"\"\n\t\t\t\t: container.dataset.statusUnknownLabel || \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst slaEl = container.querySelector(\"[data-authz-sla]\");\n\t\t\t\t\t\tif (slaEl) {\n\t\t\t\t\t\t\tslaEl.textContent = data\n\t\t\t\t\t\t\t\t? formatSLA(container, data.estimatedSLA)\n\t\t\t\t\t\t\t\t: container.dataset.slaUnknown || \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst viewLink = container.querySelector(\"[data-authz-view]\");\n\t\t\t\t\t\tif (viewLink) {\n\t\t\t\t\t\t\tif (data && data.id) {\n\t\t\t\t\t\t\t\tviewLink.href = data.viewUrl || \"#\";\n\t\t\t\t\t\t\t\tviewLink.classList.remove(\"hidden\");\n\t\t\t\t\t\t\t\tviewLink.dataset.requestId = data.id;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tviewLink.classList.add(\"hidden\");\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst retryBtn = container.querySelector(\"[data-authz-retry-bot]\");\n\t\t\t\t\t\tif (retryBtn) {\n\t\t\t\t\t\t\tif (data && data.status === \"failed\" && data.canRetry && data.retryToken) {\n\t\t\t\t\t\t\t\tretryBtn.dataset.requestId = data.id;\n\t\t\t\t\t\t\t\tretryBtn.dataset.retryToken = data.retryToken;\n\t\t\t\t\t\t\t\tretryBtn.classList.remove(\"hidden\");\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tretryBtn.classList.add(\"hidden\");\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst idEl = container.querySelector(\"[data-authz-request-id]\");\n\t\t\t\t\t\tif (idEl && data && data.id) {\n\t\t\t\t\t\t\tidEl.textContent = data.id;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tasync function fetchRequest(id, opts) {\n\t\t\t\t\t\tconst now = Date.now();\n\t\t\t\t\t\tconst cached = cache.get(id);\n\t\t\t\t\t\tif (!opts?.force && cached && !isTerminal(cached.status) && now-cached.fetchedAt < 30000) {\n\t\t\t\t\t\t\treturn cached.data;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst resp = await fetch(\"/core/api/authz/requests/\" + id);\n\t\t\t\t\t\tlet payload = null;\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tpayload = await resp.json();\n\t\t\t\t\t\t} catch (_) {\n\t\t\t\t\t\t\tpayload = null;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (!resp.ok) {\n\t\t\t\t\t\t\tthrow payload || { code: resp.status, message: \"请求失败，请重试\" };\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst data = normalize(payload);\n\t\t\t\t\t\tcache.set(id, { data, fetchedAt: Date.now(), status: data?.status || \"\" });\n\t\t\t\t\t\treturn data;\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction dispatchToast(variant, title, message) {\n\t\t\t\t\t\twindow.dispatchEvent(\n\t\t\t\t\t\t\tnew CustomEvent(\"notify\", {\n\t\t\t\t\t\t\t\tdetail: { variant, title, message },\n\t\t\t\t\t\t\t}),\n\t\t\t\t\t\t);\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction handleError(err) {\n\t\t\t\t\t\tconst detail = normalize(err) || parseDetail(err) || {};\n\t\t\t\t\t\tconst code = detail.code || detail.Code || \"\";\n\t\t\t\t\t\tconst message = detail.message || detail.Message || \"请求失败，请重试\";\n\t\t\t\t\t\tdispatchToast(\"error\", code || \"错误\", message);\n\t\t\t\t\t\tif (detail.meta && detail.meta.base_revision) {\n\t\t\t\t\t\t\tdispatchToast(\"warning\", \"权限基线已更新\", \"请刷新页面以同步最新权限基线\");\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (detail.meta && detail.meta.request_id) {\n\t\t\t\t\t\t\tconst container = findContainer(detail.meta.request_id);\n\t\t\t\t\t\t\tconst retry = container?.querySelector(\"[data-authz-retry-bot]\");\n\t\t\t\t\t\t\tif (retry) {\n\t\t\t\t\t\t\t\tretry.classList.add(\"hidden\");\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction tick(state, force) {\n\t\t\t\t\t\tif (!state || !state.id || state.paused) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst now = Date.now();\n\t\t\t\t\t\tconst forceFetch = !!force || state.forceNext || (state.lastFetched > 0 && now - state.lastFetched > 120000);\n\t\t\t\t\t\tstate.forceNext = false;\n\t\t\t\t\t\tfetchRequest(state.id, { force: forceFetch })\n\t\t\t\t\t\t\t.then(function (data) {\n\t\t\t\t\t\t\t\tstate.lastFetched = Date.now();\n\t\t\t\t\t\t\t\trender(state.container, data);\n\t\t\t\t\t\t\t\tif (data && isTerminal(data.status) && state.timer) {\n\t\t\t\t\t\t\t\t\tclearInterval(state.timer);\n\t\t\t\t\t\t\t\t\tstate.timer = null;\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t})\n\t\t\t\t\t\t\t.catch(handleError);\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction attach(container, id) {\n\t\t\t\t\t\tif (!container || !id) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tcontainer.dataset.requestId = id;\n\t\t\t\t\t\tconst existing = watchers.get(container) || { lastFetched: 0, paused: false, forceNext: true };\n\t\t\t\t\t\texisting.id = id;\n\t\t\t\t\t\texisting.container = container;\n\t\t\t\t\t\texisting.forceNext = true;\n\t\t\t\t\t\tif (existing.timer) {\n\t\t\t\t\t\t\tclearInterval(existing.timer);\n\t\t\t\t\t\t}\n\t\t\t\t\t\texisting.timer = setInterval(function () {\n\t\t\t\t\t\t\ttick(existing, false);\n\t\t\t\t\t\t}, 15000);\n\t\t\t\t\t\twatchers.set(container, existing);\n\t\t\t\t\t\ttick(existing, true);\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction handleUpdate(id, payload) {\n\t\t\t\t\t\tconst data = normalize(payload);\n\t\t\t\t\t\tif (data && data.id) {\n\t\t\t\t\t\t\tcache.set(data.id, { data, fetchedAt: Date.now(), status: data.status || \"\" });\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst container = findContainer(id);\n\t\t\t\t\t\tif (container) {\n\t\t\t\t\t\t\trender(container, data);\n\t\t\t\t\t\t\tattach(container, data?.id || id);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction handleCreated(event) {\n\t\t\t\t\t\tconst detail = normalize(event?.detail);\n\t\t\t\t\t\tif (!detail || !detail.id) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst slaMsg = detail.estimatedSLA ? formatSLA({ dataset: { slaUnknown: \"\" } }, detail.estimatedSLA) : \"\";\n\t\t\t\t\t\tconst message = slaMsg ? \"已提交草稿 \" + detail.id + \" · \" + slaMsg : \"已提交草稿 \" + detail.id;\n\t\t\t\t\t\tdispatchToast(\"success\", \"提交成功\", message);\n\t\t\t\t\t\thandleUpdate(detail.id, detail);\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction scan() {\n\t\t\t\t\t\tdocument.querySelectorAll(\"[data-authz-container]\").forEach(function (container) {\n\t\t\t\t\t\t\tconst id = container.dataset.requestId;\n\t\t\t\t\t\t\tif (id) {\n\t\t\t\t\t\t\t\tattach(container, id);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\twindow.addEventListener(\"focus\", function () {\n\t\t\t\t\t\twatchers.forEach(function (state) {\n\t\t\t\t\t\t\tstate.paused = false;\n\t\t\t\t\t\t\tstate.forceNext = true;\n\t\t\t\t\t\t\ttick(state, true);\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t\twindow.addEventListener(\"blur\", function () {\n\t\t\t\t\t\twatchers.forEach(function (state) {\n\t\t\t\t\t\t\tstate.paused = true;\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t\tdocument.addEventListener(\"authz:request-created\", handleCreated);\n\t\t\t\t\tdocument.addEventListener(\"showErrorToast\", function (evt) {\n\t\t\t\t\t\thandleError(parseDetail(evt.detail));\n\t\t\t\t\t});\n\t\t\t\t\tdocument.addEventListener(\"htmx:load\", function () {\n\t\t\t\t\t\tscan();\n\t\t\t\t\t});\n\t\t\t\t\tscan();\n\n\t\t\t\t\twindow.authzRequestWatcher = {\n\t\t\t\t\t\tattach: attach,\n\t\t\t\t\t\thandleUpdate: handleUpdate,\n\t\t\t\t\t\tscan: scan,\n\t\t\t\t\t\thandleCreated: handleCreated,\n\t\t\t\t\t};\n\t\t\t\t})();\n\t\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 67, "<script>\n\t\t\t\t(function () {\n\t\t\t\t\tif (window.authzRequestWatcher) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tconst terminalStatuses = new Set([\"merged\", \"failed\", \"rejected\", \"canceled\"]);\n\t\t\t\t\tconst cache = new Map();\n\t\t\t\t\tconst watchers = new Map();\n\n\t\t\t\t\tfunction isTerminal(status) {\n\t\t\t\t\t\treturn terminalStatuses.has((status || \"\").toLowerCase());\n\t\t\t\t\t}\n\n\tfunction statusLabel(status, container) {\n\t\tconst labels = {\n\t\t\tpending_review: container?.dataset?.statusPendingReview,\n\t\t\tapproved: container?.dataset?.statusApproved,\n\t\t\tmerged: container?.dataset?.statusMerged,\n\t\t\tfailed: container?.dataset?.statusFailed,\n\t\t\trejected: container?.dataset?.statusRejected,\n\t\t\tcanceled: container?.dataset?.statusCanceled,\n\t\t\tdraft: container?.dataset?.statusDraft,\n\t\t};\n\t\tconst key = (status || \"\").toLowerCase();\n\t\treturn labels[key] || key || container?.dataset?.statusUnknownLabel || \"\";\n\t}\n\n\t\t\t\t\tfunction toastLabels(container) {\n\t\t\t\t\t\tconst el = container || document.querySelector(\"[data-authz-container]\");\n\t\t\t\t\t\tconst ds = el?.dataset || {};\n\t\t\t\t\t\treturn {\n\t\t\t\t\t\t\terrorTitle: (ds.toastErrorTitle || \"\").trim(),\n\t\t\t\t\t\t\tdefaultError: (ds.toastDefaultError || \"\").trim(),\n\t\t\t\t\t\t\tstaleTitle: (ds.toastStaleTitle || \"\").trim(),\n\t\t\t\t\t\t\tstaleMessage: (ds.toastStaleMessage || \"\").trim(),\n\t\t\t\t\t\t\tsubmitTitle: (ds.toastSubmitTitle || \"\").trim(),\n\t\t\t\t\t\t\tsubmittedPrefix: (ds.toastSubmittedPrefix || \"\").trim(),\n\t\t\t\t\t\t};\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction parseDetail(detail) {\n\t\t\t\t\t\tlet data = detail || {};\n\t\t\t\t\t\tif (typeof data === \"string\") {\n\t\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\t\tdata = JSON.parse(data);\n\t\t\t\t\t\t\t} catch (_) {\n\t\t\t\t\t\t\t\tdata = {};\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (data && data.value) {\n\t\t\t\t\t\t\treturn parseDetail(data.value);\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn data || {};\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction normalize(detail) {\n\t\t\t\t\t\tconst data = parseDetail(detail);\n\t\t\t\t\t\tif (!data) {\n\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst id = data.id || data.ID || \"\";\n\t\t\t\t\t\tconst status = (data.status || data.Status || \"\").toLowerCase();\n\t\t\t\t\t\treturn {\n\t\t\t\t\t\t\tid: id,\n\t\t\t\t\t\t\tstatus: status,\n\t\t\t\t\t\t\tupdatedAt: data.updated_at || data.updatedAt || data.UpdatedAt,\n\t\t\t\t\t\t\testimatedSLA: data.estimated_sla_expires_at || data.EstimatedSLAExpiresAt,\n\t\t\t\t\t\t\tcanRetry: !!(data.can_retry_bot || data.CanRetryBot),\n\t\t\t\t\t\t\tretryToken: data.retry_token || data.RetryToken,\n\t\t\t\t\t\t\tviewUrl: data.view_url || data.ViewURL || (id ? \"/core/authz/requests/\" + id : \"\"),\n\t\t\t\t\t\t};\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction formatSLA(container, isoString) {\n\t\t\t\t\t\tconst unknown = (container?.dataset?.slaUnknown || \"\").trim();\n\t\t\t\t\t\tif (!isoString) {\n\t\t\t\t\t\t\treturn unknown;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst date = new Date(isoString);\n\t\t\t\t\t\tif (Number.isNaN(date.getTime())) {\n\t\t\t\t\t\t\treturn unknown;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst diff = date.getTime() - Date.now();\n\t\t\t\t\t\tif (diff <= 0) {\n\t\t\t\t\t\t\treturn unknown;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst mins = Math.floor(diff / 60000);\n\t\t\t\t\t\tconst secs = Math.floor((diff % 60000) / 1000);\n\t\t\t\t\t\treturn \"SLA \" + String(mins).padStart(2, \"0\") + \":\" + String(secs).padStart(2, \"0\");\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction findContainer(id) {\n\t\t\t\t\t\tif (!id) {\n\t\t\t\t\t\t\treturn null;\n\t\t\t\t\t\t}\n\t\t\t\t\t\treturn document.querySelector('[data-authz-container][data-request-id=\"' + id + '\"]');\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction render(container, data) {\n\t\t\t\t\t\tif (!container) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst statusEl = container.querySelector(\"[data-authz-status]\");\n\t\t\t\t\t\tif (statusEl) {\n\t\t\tstatusEl.textContent = data\n\t\t\t\t? statusLabel(data.status, container) || container.dataset.statusUnknownLabel || \"\"\n\t\t\t\t: container.dataset.statusUnknownLabel || \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst slaEl = container.querySelector(\"[data-authz-sla]\");\n\t\t\t\t\t\tif (slaEl) {\n\t\t\t\t\t\t\tslaEl.textContent = data\n\t\t\t\t\t\t\t\t? formatSLA(container, data.estimatedSLA)\n\t\t\t\t\t\t\t\t: container.dataset.slaUnknown || \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst viewLink = container.querySelector(\"[data-authz-view]\");\n\t\t\t\t\t\tif (viewLink) {\n\t\t\t\t\t\t\tif (data && data.id) {\n\t\t\t\t\t\t\t\tviewLink.href = data.viewUrl || \"#\";\n\t\t\t\t\t\t\t\tviewLink.classList.remove(\"hidden\");\n\t\t\t\t\t\t\t\tviewLink.dataset.requestId = data.id;\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tviewLink.classList.add(\"hidden\");\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst retryBtn = container.querySelector(\"[data-authz-retry-bot]\");\n\t\t\t\t\t\tif (retryBtn) {\n\t\t\t\t\t\t\tif (data && data.status === \"failed\" && data.canRetry && data.retryToken) {\n\t\t\t\t\t\t\t\tretryBtn.dataset.requestId = data.id;\n\t\t\t\t\t\t\t\tretryBtn.dataset.retryToken = data.retryToken;\n\t\t\t\t\t\t\t\tretryBtn.classList.remove(\"hidden\");\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tretryBtn.classList.add(\"hidden\");\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst idEl = container.querySelector(\"[data-authz-request-id]\");\n\t\t\t\t\t\tif (idEl && data && data.id) {\n\t\t\t\t\t\t\tidEl.textContent = data.id;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tasync function fetchRequest(id, opts) {\n\t\t\t\t\t\tconst now = Date.now();\n\t\t\t\t\t\tconst cached = cache.get(id);\n\t\t\t\t\t\tif (!opts?.force && cached && !isTerminal(cached.status) && now-cached.fetchedAt < 30000) {\n\t\t\t\t\t\t\treturn cached.data;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst resp = await fetch(\"/core/api/authz/requests/\" + id);\n\t\t\t\t\t\tlet payload = null;\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tpayload = await resp.json();\n\t\t\t\t\t\t} catch (_) {\n\t\t\t\t\t\t\tpayload = null;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (!resp.ok) {\n\t\t\t\t\t\t\tconst labels = toastLabels(null);\n\t\t\t\t\t\t\tthrow payload || { code: resp.status, message: labels.defaultError || \"Request failed, please try again\" };\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst data = normalize(payload);\n\t\t\t\t\t\tcache.set(id, { data, fetchedAt: Date.now(), status: data?.status || \"\" });\n\t\t\t\t\t\treturn data;\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction dispatchToast(variant, title, message) {\n\t\t\t\t\t\twindow.dispatchEvent(\n\t\t\t\t\t\t\tnew CustomEvent(\"notify\", {\n\t\t\t\t\t\t\t\tdetail: { variant, title, message },\n\t\t\t\t\t\t\t}),\n\t\t\t\t\t\t);\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction handleError(err) {\n\t\t\t\t\t\tconst detail = normalize(err) || parseDetail(err) || {};\n\t\t\t\t\t\tconst code = detail.code || detail.Code || \"\";\n\t\t\t\t\t\tconst container = (detail.meta && detail.meta.request_id) ? findContainer(detail.meta.request_id) : null;\n\t\t\t\t\t\tconst labels = toastLabels(container);\n\t\t\t\t\t\tconst message = detail.message || detail.Message || labels.defaultError || \"Request failed, please try again\";\n\t\t\t\t\t\tdispatchToast(\"error\", code || labels.errorTitle || \"Error\", message);\n\t\t\t\t\t\tif (detail.meta && detail.meta.base_revision) {\n\t\t\t\t\t\t\tdispatchToast(\"warning\", labels.staleTitle || \"Policy revision updated\", labels.staleMessage || \"Refresh the page to sync the latest policy revision\");\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (detail.meta && detail.meta.request_id) {\n\t\t\t\t\t\t\tconst retry = container?.querySelector(\"[data-authz-retry-bot]\");\n\t\t\t\t\t\t\tif (retry) {\n\t\t\t\t\t\t\t\tretry.classList.add(\"hidden\");\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction tick(state, force) {\n\t\t\t\t\t\tif (!state || !state.id || state.paused) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst now = Date.now();\n\t\t\t\t\t\tconst forceFetch = !!force || state.forceNext || (state.lastFetched > 0 && now - state.lastFetched > 120000);\n\t\t\t\t\t\tstate.forceNext = false;\n\t\t\t\t\t\tfetchRequest(state.id, { force: forceFetch })\n\t\t\t\t\t\t\t.then(function (data) {\n\t\t\t\t\t\t\t\tstate.lastFetched = Date.now();\n\t\t\t\t\t\t\t\trender(state.container, data);\n\t\t\t\t\t\t\t\tif (data && isTerminal(data.status) && state.timer) {\n\t\t\t\t\t\t\t\t\tclearInterval(state.timer);\n\t\t\t\t\t\t\t\t\tstate.timer = null;\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t})\n\t\t\t\t\t\t\t.catch(handleError);\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction attach(container, id) {\n\t\t\t\t\t\tif (!container || !id) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tcontainer.dataset.requestId = id;\n\t\t\t\t\t\tconst existing = watchers.get(container) || { lastFetched: 0, paused: false, forceNext: true };\n\t\t\t\t\t\texisting.id = id;\n\t\t\t\t\t\texisting.container = container;\n\t\t\t\t\t\texisting.forceNext = true;\n\t\t\t\t\t\tif (existing.timer) {\n\t\t\t\t\t\t\tclearInterval(existing.timer);\n\t\t\t\t\t\t}\n\t\t\t\t\t\texisting.timer = setInterval(function () {\n\t\t\t\t\t\t\ttick(existing, false);\n\t\t\t\t\t\t}, 15000);\n\t\t\t\t\t\twatchers.set(container, existing);\n\t\t\t\t\t\ttick(existing, true);\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction handleUpdate(id, payload) {\n\t\t\t\t\t\tconst data = normalize(payload);\n\t\t\t\t\t\tif (data && data.id) {\n\t\t\t\t\t\t\tcache.set(data.id, { data, fetchedAt: Date.now(), status: data.status || \"\" });\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst container = findContainer(id);\n\t\t\t\t\t\tif (container) {\n\t\t\t\t\t\t\trender(container, data);\n\t\t\t\t\t\t\tattach(container, data?.id || id);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction handleCreated(event) {\n\t\t\t\t\t\tconst detail = normalize(event?.detail);\n\t\t\t\t\t\tif (!detail || !detail.id) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tconst labels = toastLabels(null);\n\t\t\t\t\t\tconst slaMsg = detail.estimatedSLA ? formatSLA({ dataset: { slaUnknown: \"\" } }, detail.estimatedSLA) : \"\";\n\t\t\t\t\t\tconst prefix = labels.submittedPrefix || \"Submitted\";\n\t\t\t\t\t\tconst message = slaMsg ? prefix + \" \" + detail.id + \" · \" + slaMsg : prefix + \" \" + detail.id;\n\t\t\t\t\t\tdispatchToast(\"success\", labels.submitTitle || \"Submitted\", message);\n\t\t\t\t\t\thandleUpdate(detail.id, detail);\n\t\t\t\t\t}\n\n\t\t\t\t\tfunction scan() {\n\t\t\t\t\t\tdocument.querySelectorAll(\"[data-authz-container]\").forEach(function (container) {\n\t\t\t\t\t\t\tconst id = container.dataset.requestId;\n\t\t\t\t\t\t\tif (id) {\n\t\t\t\t\t\t\t\tattach(container, id);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\n\t\t\t\t\twindow.addEventListener(\"focus\", function () {\n\t\t\t\t\t\twatchers.forEach(function (state) {\n\t\t\t\t\t\t\tstate.paused = false;\n\t\t\t\t\t\t\tstate.forceNext = true;\n\t\t\t\t\t\t\ttick(state, true);\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t\twindow.addEventListener(\"blur\", function () {\n\t\t\t\t\t\twatchers.forEach(function (state) {\n\t\t\t\t\t\t\tstate.paused = true;\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t\tdocument.addEventListener(\"authz:request-created\", handleCreated);\n\t\t\t\t\tdocument.addEventListener(\"showErrorToast\", function (evt) {\n\t\t\t\t\t\thandleError(parseDetail(evt.detail));\n\t\t\t\t\t});\n\t\t\t\t\tdocument.addEventListener(\"htmx:load\", function () {\n\t\t\t\t\t\tscan();\n\t\t\t\t\t});\n\t\t\t\t\tscan();\n\n\t\t\t\t\twindow.authzRequestWatcher = {\n\t\t\t\t\t\tattach: attach,\n\t\t\t\t\t\thandleUpdate: handleUpdate,\n\t\t\t\t\t\tscan: scan,\n\t\t\t\t\t\thandleCreated: handleCreated,\n\t\t\t\t\t};\n\t\t\t\t})();\n\t\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = authzClientScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var51), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = authzClientScriptOnce.Once().Render(templ.WithChildren(ctx, templ_7745c5c3_Var57), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 62, "<script>\n\t\t\tif (!window.handleAuthzRequest) {\n\t\t\t\twindow.handleAuthzRequest = function (evt) {\n\t\t\t\t\tif (!evt || !evt.detail || !evt.detail.xhr) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar form = evt.target;\n\t\t\t\t\tvar xhr = evt.detail.xhr;\n\t\t\t\t\tvar container = form.closest(\"[data-authz-container]\");\n\t\t\t\t\tif (!container) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar baseRev = xhr.getResponseHeader(\"X-Authz-Base-Revision\");\n\t\t\t\t\tif (baseRev) {\n\t\t\t\t\t\tcontainer.dataset.baseRevision = baseRev;\n\t\t\t\t\t\tvar revInput = form.querySelector('input[name=\"base_revision\"]');\n\t\t\t\t\t\tif (revInput) {\n\t\t\t\t\t\t\trevInput.value = baseRev;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar revDisplay = container.querySelector(\"[data-authz-base-revision]\");\n\t\t\t\t\t\tif (revDisplay) {\n\t\t\t\t\t\t\trevDisplay.textContent = baseRev;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tif (xhr.status < 200 || xhr.status >= 300) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar payload = {};\n\t\t\t\t\ttry {\n\t\t\t\t\t\tpayload = JSON.parse(xhr.responseText || \"{}\");\n\t\t\t\t\t} catch (e) {\n\t\t\t\t\t\tpayload = {};\n\t\t\t\t\t}\n\t\t\t\t\tvar requestId = payload.id || payload.request_id || xhr.getResponseHeader(\"X-Request-ID\") || \"\";\n\t\t\t\t\tif (!requestId) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tcontainer.dataset.requestId = requestId;\n\t\t\t\t\tvar requestIdEl = container.querySelector(\"[data-authz-request-id]\");\n\t\t\t\t\tif (requestIdEl) {\n\t\t\t\t\t\trequestIdEl.textContent = requestId;\n\t\t\t\t\t}\n\t\t\t\t\tif (window.authzRequestWatcher) {\n\t\t\t\t\t\twindow.authzRequestWatcher.handleUpdate(requestId, payload);\n\t\t\t\t\t\twindow.authzRequestWatcher.attach(container, requestId);\n\t\t\t\t\t}\n\t\t\t\t};\n\t\t\t\tdocument.addEventListener(\"click\", function (evt) {\n\t\t\t\t\tvar btn = evt.target.closest(\"[data-authz-copy-request-id]\");\n\t\t\t\t\tif (!btn) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar container = btn.closest(\"[data-authz-container]\");\n\t\t\t\t\tif (!container) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar requestIdEl = container.querySelector(\"[data-authz-request-id]\");\n\t\t\t\t\tif (!requestIdEl) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar text = (requestIdEl.textContent || \"\").trim();\n\t\t\t\t\tif (!text) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tif (navigator.clipboard && navigator.clipboard.writeText) {\n\t\t\t\t\t\tnavigator.clipboard.writeText(text);\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t\tdocument.addEventListener(\"click\", function (evt) {\n\t\t\t\t\tvar retryBtn = evt.target.closest(\"[data-authz-retry-bot]\");\n\t\t\t\t\tif (!retryBtn) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar reqId = retryBtn.dataset.requestId;\n\t\t\t\t\tvar token = retryBtn.dataset.retryToken;\n\t\t\t\t\tif (!reqId || !token) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tretryBtn.disabled = true;\n\t\t\t\t\tfetch(\"/core/api/authz/requests/\" + reqId + \"/trigger-bot?retry_token=\" + encodeURIComponent(token), {\n\t\t\t\t\t\tmethod: \"POST\",\n\t\t\t\t\t})\n\t\t\t\t\t\t.then(function (resp) {\n\t\t\t\t\t\t\treturn resp\n\t\t\t\t\t\t\t\t.json()\n\t\t\t\t\t\t\t\t.catch(function () {\n\t\t\t\t\t\t\t\t\treturn {};\n\t\t\t\t\t\t\t\t})\n\t\t\t\t\t\t\t\t.then(function (body) {\n\t\t\t\t\t\t\t\t\treturn { ok: resp.ok, body: body };\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t})\n\t\t\t\t\t\t.then(function (result) {\n\t\t\t\t\t\t\tif (!result || !result.ok) {\n\t\t\t\t\t\t\t\tif (window.dispatchEvent) {\n\t\t\t\t\t\t\t\t\twindow.dispatchEvent(\n\t\t\t\t\t\t\t\t\t\tnew CustomEvent(\"showErrorToast\", {\n\t\t\t\t\t\t\t\t\t\t\tdetail: result?.body || { code: \"E_INTERNAL\", message: \"请求失败，请重试\", meta: { request_id: reqId } },\n\t\t\t\t\t\t\t\t\t\t}),\n\t\t\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (window.authzRequestWatcher) {\n\t\t\t\t\t\t\t\twindow.authzRequestWatcher.handleUpdate(reqId, result.body);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t})\n\t\t\t\t\t\t.catch(function () {\n\t\t\t\t\t\t\tif (window.dispatchEvent) {\n\t\t\t\t\t\t\t\twindow.dispatchEvent(\n\t\t\t\t\t\t\t\t\tnew CustomEvent(\"showErrorToast\", {\n\t\t\t\t\t\t\t\t\t\tdetail: { code: \"E_INTERNAL\", message: \"请求失败，请重试\", meta: { request_id: reqId } },\n\t\t\t\t\t\t\t\t\t}),\n\t\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t})\n\t\t\t\t\t\t.finally(function () {\n\t\t\t\t\t\t\tretryBtn.disabled = false;\n\t\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t}\n\t\t</script></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 68, "<script>\n\t\t\tif (!window.handleAuthzRequest) {\n\t\t\t\twindow.handleAuthzRequest = function (evt) {\n\t\t\t\t\tif (!evt || !evt.detail || !evt.detail.xhr) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar form = evt.target;\n\t\t\t\t\tvar xhr = evt.detail.xhr;\n\t\t\t\t\tvar container = form.closest(\"[data-authz-container]\");\n\t\t\t\t\tif (!container) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar baseRev = xhr.getResponseHeader(\"X-Authz-Base-Revision\");\n\t\t\t\t\tif (baseRev) {\n\t\t\t\t\t\tcontainer.dataset.baseRevision = baseRev;\n\t\t\t\t\t\tvar revInput = form.querySelector('input[name=\"base_revision\"]');\n\t\t\t\t\t\tif (revInput) {\n\t\t\t\t\t\t\trevInput.value = baseRev;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar revDisplay = container.querySelector(\"[data-authz-base-revision]\");\n\t\t\t\t\t\tif (revDisplay) {\n\t\t\t\t\t\t\trevDisplay.textContent = baseRev;\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t\tif (xhr.status < 200 || xhr.status >= 300) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar payload = {};\n\t\t\t\t\ttry {\n\t\t\t\t\t\tpayload = JSON.parse(xhr.responseText || \"{}\");\n\t\t\t\t\t} catch (e) {\n\t\t\t\t\t\tpayload = {};\n\t\t\t\t\t}\n\t\t\t\t\tvar requestId = payload.id || payload.request_id || xhr.getResponseHeader(\"X-Request-ID\") || \"\";\n\t\t\t\t\tif (!requestId) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tcontainer.dataset.requestId = requestId;\n\t\t\t\t\tvar requestIdEl = container.querySelector(\"[data-authz-request-id]\");\n\t\t\t\t\tif (requestIdEl) {\n\t\t\t\t\t\trequestIdEl.textContent = requestId;\n\t\t\t\t\t}\n\t\t\t\t\tif (window.authzRequestWatcher) {\n\t\t\t\t\t\twindow.authzRequestWatcher.handleUpdate(requestId, payload);\n\t\t\t\t\t\twindow.authzRequestWatcher.attach(container, requestId);\n\t\t\t\t\t}\n\t\t\t\t};\n\t\t\t\tdocument.addEventListener(\"click\", function (evt) {\n\t\t\t\t\tvar btn = evt.target.closest(\"[data-authz-copy-request-id]\");\n\t\t\t\t\tif (!btn) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar container = btn.closest(\"[data-authz-container]\");\n\t\t\t\t\tif (!container) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar requestIdEl = container.querySelector(\"[data-authz-request-id]\");\n\t\t\t\t\tif (!requestIdEl) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar text = (requestIdEl.textContent || \"\").trim();\n\t\t\t\t\tif (!text) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tif (navigator.clipboard && navigator.clipboard.writeText) {\n\t\t\t\t\t\tnavigator.clipboard.writeText(text);\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t\tdocument.addEventListener(\"click\", function (evt) {\n\t\t\t\t\tvar retryBtn = evt.target.closest(\"[data-authz-retry-bot]\");\n\t\t\t\t\tif (!retryBtn) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar reqId = retryBtn.dataset.requestId;\n\t\t\t\t\tvar token = retryBtn.dataset.retryToken;\n\t\t\t\t\tif (!reqId || !token) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar container = retryBtn.closest(\"[data-authz-container]\");\n\t\t\t\t\tvar defaultErrorMsg = (container && container.dataset && container.dataset.toastDefaultError) || \"Request failed, please try again\";\n\t\t\t\t\tretryBtn.disabled = true;\n\t\t\t\t\tfetch(\"/core/api/authz/requests/\" + reqId + \"/trigger-bot?retry_token=\" + encodeURIComponent(token), {\n\t\t\t\t\t\tmethod: \"POST\",\n\t\t\t\t\t})\n\t\t\t\t\t\t.then(function (resp) {\n\t\t\t\t\t\t\treturn resp\n\t\t\t\t\t\t\t\t.json()\n\t\t\t\t\t\t\t\t.catch(function () {\n\t\t\t\t\t\t\t\t\treturn {};\n\t\t\t\t\t\t\t\t})\n\t\t\t\t\t\t\t\t.then(function (body) {\n\t\t\t\t\t\t\t\t\treturn { ok: resp.ok, body: body };\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t})\n\t\t\t\t\t\t.then(function (result) {\n\t\t\t\t\t\t\tif (!result || !result.ok) {\n\t\t\t\t\t\t\t\tif (window.dispatchEvent) {\n\t\t\t\t\t\t\t\t\twindow.dispatchEvent(\n\t\t\t\t\t\t\t\t\t\tnew CustomEvent(\"showErrorToast\", {\n\t\t\t\t\t\t\t\t\t\t\tdetail: result?.body || { code: \"E_INTERNAL\", message: defaultErrorMsg, meta: { request_id: reqId } },\n\t\t\t\t\t\t\t\t\t\t}),\n\t\t\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (window.authzRequestWatcher) {\n\t\t\t\t\t\t\t\twindow.authzRequestWatcher.handleUpdate(reqId, result.body);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t})\n\t\t\t\t\t\t.catch(function () {\n\t\t\t\t\t\t\tif (window.dispatchEvent) {\n\t\t\t\t\t\t\t\twindow.dispatchEvent(\n\t\t\t\t\t\t\t\t\tnew CustomEvent(\"showErrorToast\", {\n\t\t\t\t\t\t\t\t\t\tdetail: { code: \"E_INTERNAL\", message: defaultErrorMsg, meta: { request_id: reqId } },\n\t\t\t\t\t\t\t\t\t}),\n\t\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t})\n\t\t\t\t\t\t.finally(function () {\n\t\t\t\t\t\t\tretryBtn.disabled = false;\n\t\t\t\t\t\t});\n\t\t\t\t});\n\t\t\t}\n\t\t</script></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

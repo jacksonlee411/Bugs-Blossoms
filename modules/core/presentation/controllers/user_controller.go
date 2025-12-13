@@ -32,6 +32,7 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/di"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
+	"github.com/iota-uz/iota-sdk/pkg/intl"
 	"github.com/iota-uz/iota-sdk/pkg/mapping"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
 	"github.com/iota-uz/iota-sdk/pkg/rbac"
@@ -932,7 +933,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 	if err != nil {
 		return nil, err
 	}
-	requestStatuses, requestMap := mapDraftStatuses(drafts)
+	requestStatuses, requestMap := mapDraftStatuses(ctx, drafts)
 
 	baseURL := fmt.Sprintf("%s/%d/policies", c.basePath, us.ID())
 	canRequest := composables.CanUser(ctx, permissions.AuthzRequestsWrite) == nil
@@ -1006,6 +1007,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		Subject:       subject,
 		DefaultDomain: defaultDomain,
 		StageTotal:    len(stagedEntries),
+		StageSummary:  summarizeStagedEntries(stagedEntries),
 		Requests:      requestStatuses,
 		Inherited:     inheritedColumn,
 		Direct:        directColumn,
@@ -1013,7 +1015,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		BaseURL:       baseURL,
 		RequestObject: "core.users",
 		RequestAction: "update",
-		RequestReason: "请求编辑用户策略",
+		RequestReason: intl.MustT(ctx, "Authz.Requests.DefaultReason.Users"),
 		CanStage:      canStage,
 		CanRequest:    canRequest,
 		CanDebug:      canDebug,
@@ -1210,12 +1212,13 @@ type requestStatusInfo struct {
 }
 
 func mapDraftStatuses(
+	ctx context.Context,
 	drafts []services.PolicyDraft,
 ) ([]users.UserPolicyRequestStatus, map[string]requestStatusInfo) {
 	statuses := make([]users.UserPolicyRequestStatus, 0, len(drafts))
 	lookup := make(map[string]requestStatusInfo, len(drafts))
 	for _, draft := range drafts {
-		label := displayDraftStatus(draft.Status)
+		label := displayDraftStatus(ctx, draft.Status)
 		id := draft.ID.String()
 		status := users.UserPolicyRequestStatus{
 			ID:     id,
@@ -1238,22 +1241,22 @@ func requestStatusKey(domain, object, action string) string {
 	return fmt.Sprintf("%s|%s|%s", domain, object, action)
 }
 
-func displayDraftStatus(status authzPersistence.PolicyChangeStatus) string {
+func displayDraftStatus(ctx context.Context, status authzPersistence.PolicyChangeStatus) string {
 	switch status {
 	case authzPersistence.PolicyChangeStatusPendingReview:
-		return "Awaiting PR"
+		return intl.MustT(ctx, "Authz.Status.PendingReview")
 	case authzPersistence.PolicyChangeStatusApproved:
-		return "Pending Deploy"
+		return intl.MustT(ctx, "Authz.Status.Approved")
 	case authzPersistence.PolicyChangeStatusMerged:
-		return "Active"
+		return intl.MustT(ctx, "Authz.Status.Merged")
 	case authzPersistence.PolicyChangeStatusDraft:
-		return "Draft"
+		return intl.MustT(ctx, "Authz.Status.Draft")
 	case authzPersistence.PolicyChangeStatusRejected:
-		return "Rejected"
+		return intl.MustT(ctx, "Authz.Status.Rejected")
 	case authzPersistence.PolicyChangeStatusFailed:
-		return "Failed"
+		return intl.MustT(ctx, "Authz.Status.Failed")
 	case authzPersistence.PolicyChangeStatusCanceled:
-		return "Canceled"
+		return intl.MustT(ctx, "Authz.Status.Canceled")
 	default:
 		return string(status)
 	}

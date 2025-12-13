@@ -154,6 +154,7 @@
     "Users": "用户",
     "Roles": "角色",
     "Groups": "组",
+    "AuthzRequests": "策略申请",
     "Settings": "设置",
     "KnowledgeBase": "知识库",
     "Operations": "运营",
@@ -418,6 +419,45 @@
   },
   "Authz": {
     "Debug": "Authz 调试",
+    "Requests": {
+      "Title": "策略变更申请",
+      "Mine": "我发起的",
+      "DefaultReason": {
+        "Roles": "请求编辑角色策略",
+        "Users": "请求编辑用户策略"
+      }
+    },
+    "PolicyMatrix": {
+      "Title": "策略矩阵"
+    },
+    "Object": "资源",
+    "Action": "动作",
+    "Subject": "主体",
+    "Workspace": {
+      "Context": "上下文",
+      "Changes": "变更",
+      "Discard": "丢弃草稿"
+    },
+    "RequestDetail": {
+      "Title": "策略变更申请",
+      "DiffTitle": "Diff",
+      "Op": "操作",
+      "Path": "路径",
+      "Value": "值",
+      "NoDiff": "无 diff 内容。",
+      "SummaryTitle": "摘要",
+      "ViewPR": "查看 PR",
+      "RawDiffTitle": "原始 diff",
+      "RawDiffFormat": "JSON",
+      "BotLogTitle": "Bot 日志"
+    },
+    "Toast": {
+      "ErrorTitle": "错误",
+      "DefaultError": "请求失败，请重试",
+      "StaleRevisionTitle": "权限基线已更新",
+      "StaleRevisionMessage": "请刷新页面以同步最新权限基线",
+      "SubmittedPrefix": "已提交草稿"
+    },
     "Unauthorized": {
       "Title": "需要权限",
       "_Description": "您没有执行“{{.Operation}}”的权限。请发送权限申请或联系管理员。",
@@ -427,6 +467,7 @@
       "ApplyHint": "您没有执行此操作的权限",
       "SuggestedDiff": "建议 diff",
       "Reason": "申请理由",
+      "ReasonDefault": "申请 {{.Operation}}",
       "RetryOnce": "重试一次",
       "CopyRequestID": "复制 request_id",
       "LastRequest": "最近 request_id",
@@ -449,7 +490,8 @@
       "MatchedPolicy": "匹配策略",
       "Attributes": "属性",
       "GenerateDraft": "生成草稿",
-      "Loading": "加载中..."
+      "Loading": "加载中...",
+      "ReasonDefault": "授权调试 {{.Object}} {{.Action}}"
     },
     "Stage": {
       "Badge": "暂存 %d",
@@ -457,7 +499,10 @@
       "AddRule": "新增策略",
       "SubmitDraft": "提交草稿",
       "BulkRemove": "批量撤销",
-      "SelectAll": "全选"
+      "SelectAll": "全选",
+      "RoleHint": "暂存仅作用于当前角色与域，提交后自动清空。",
+      "SubmitHint": "已暂存 %d 条，提交草稿后清空",
+      "EmptyHint": "未有暂存规则，提交将按表单/暂存构建 diff。"
     },
     "SLA": {
       "Expected": "预计 ≤5 分钟回写",
