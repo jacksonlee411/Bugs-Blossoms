@@ -74,7 +74,6 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 				<p class="text-sm text-surface-200">{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</p>
 			</div>
 		</header>
-
 		<form method="get" class="flex flex-wrap items-end gap-4 rounded-lg border border-surface-400/60 bg-surface-600/40 p-4">
 			<div class="space-y-1">
 				<label class="text-xs font-medium text-surface-200">{ pageCtx.T("Status") }</label>
@@ -104,7 +103,6 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 			<button type="submit" class="btn btn-sm btn-primary">{ pageCtx.T("Scaffold.Filters.Title") }</button>
 			<a href={ templ.URL(baseURL) } class="btn btn-sm">{ pageCtx.T("All") }</a>
 		</form>
-
 		<section class="rounded-lg border border-surface-400/60 bg-surface-600/40 overflow-hidden">
 			<table class="w-full table-auto border-collapse text-sm">
 				<thead class="border-b border-surface-400/60 text-left text-surface-200">
@@ -148,7 +146,6 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 				</tbody>
 			</table>
 		</section>
-
 		<div class="flex items-center justify-between text-sm text-surface-200">
 			<div>{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</div>
 			<div class="flex items-center gap-2">
