@@ -22,7 +22,7 @@
 
 ## 设计决策
 - 架构与权限：遵守 DDD/cleanarch，controller 负责 Session+租户校验（无 Session/tenant 直接 401/403），service 接口接受租户上下文，repo 强制 tenant 过滤，禁止跨层耦合。
-- 有效期与校验：所有写入接受 `effective_date`/`end_date`，缺省 `time.Now()`/`9999-12-31` 半开区间，复用 021 的无重叠/无环/父子一致校验；冻结窗口沿用 020 默认（月末+3 天，可租户覆盖），冻结期的写入应被拒绝并返回明确错误码。
+- 有效期与校验：M1 写入（Create/Update）仅接受 `effective_date`（缺省 `time.Now()`），`end_date` 由后端按 Insert 语义自动计算为“下一片段的 `effective_date`（若存在）或 `9999-12-31`”；Correct 不允许变更时间字段；仅数据迁移/初始化脚本可绕过该限制。复用 021 的无重叠/无环/父子一致校验；冻结窗口沿用 020 默认（月末+3 天，可租户覆盖），冻结期写入应被拒绝并返回明确错误码。
 - CRUD 行为：OrgNode/OrgEdge/Position/OrgAssignment 提供 Create/Update/Correct（原位更正需更高权限）/Rescind，默认 Update 截断旧时间片；Position 必须绑定 OrgNode，OrgAssignment 必须绑定 Position。Correct/Rescind 需审计标记并校验权限。
 - 自动 Position：当创建 Assignment 未显式提供 position_id 时，自动生成一对一空壳 Position（标记 is_auto_created），并绑定 OrgNode；重复请求以幂等键避免重复创建，可通过特性开关关闭自动创建以便回滚/管控。
 - Assignment 范围：仅允许 primary 写入，matrix/dotted 通过特性开关默认关闭；同一 subject+有效期内 primary 唯一，重叠拒绝。
@@ -32,7 +32,7 @@
 - 权限：接口按 020 最小集 `Org.Read/Org.Write/Org.Assign/Org.Admin` 判定，拒绝未授权访问；matrix/dotted 的写入口默认关闭。
 
 ## 任务清单与验收标准
-1. [ ] service/repo CRUD：实现 OrgNode/OrgEdge/Position/OrgAssignment 的 Create/Update/Correct/Rescind，repo 强制 tenant 过滤；支持 `effective_date` 默认值、无重叠/无环校验、OrgEdge 与 OrgNode 一致校验。验收：单元/集成测试覆盖租户隔离、有效期校验、Correct/Rescind 权限与冻结窗口拒绝。
+1. [ ] service/repo CRUD：实现 OrgNode/OrgEdge/Position/OrgAssignment 的 Create/Update/Correct/Rescind，repo 强制 tenant 过滤；service 层 `Update` 方法签名仅包含 `EffectiveDate`（移除 `EndDate`），并统一计算 `end_date`（下一片段 `effective_date` 或 `9999-12-31`）；支持 `effective_date` 默认值、无重叠/无环校验、OrgEdge 与 OrgNode 一致校验。验收：单元/集成测试覆盖租户隔离、有效期校验、Correct/Rescind 权限与冻结窗口拒绝。
 2. [ ] 自动 Position 与 Assignment 约束：在 Assignment 写入缺少 position_id 时自动创建空壳 Position 并绑定 OrgNode，幂等防重复；primary 唯一、matrix/dotted 写入拒绝或由特性开关保护。验收：测试覆盖有/无 position_id、重复请求、matrix/dotted 被拒绝、自动创建开关关闭场景。
 3. [ ] Controller/DTO/Mapper：实现 REST/HTMX 控制器与 DTO，强制 Session+租户校验，支持 `effective_date` 查询，按权限返回/拒绝；区分 Update 与 Correct，返回明确信息。验收：接口级测试覆盖无 Session/无租户/权限不足/冻结期写入被拒、有效请求。
 4. [ ] 事件发布与 outbox：对接 `OrgChanged` / `OrgAssignmentChanged` 契约，写操作生成事件并写入 outbox，含幂等键与 assignment_type。验收：事件 payload 字段与 022 契约对齐（event_id/event_version/sequence/effective_window/assignment_type），测试验证幂等键生成与重复写入行为。
