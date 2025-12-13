@@ -66,11 +66,16 @@
 - 校验分层：
   - DB 兜底：EXCLUDE/unique/trigger（021）。
   - Service 预检：tenant 过滤、外键存在性、`parent_hint` 与 edge 一致性、primary 唯一的业务口径、错误码稳定化（冻结窗口与无空档强校验在 025）。
+- 移动节点（MoveNode）：父节点变更是独立语义，禁止直接 `UPDATE parent_node_id`；必须通过“失效旧边 + 创建新边”（同一 `effective_date`）实现。由于 `ltree path` 的子树级联更新是重型操作，MoveNode 需单独的 Service 方法与更严格的锁顺序；并发/冻结窗口/审计口径在 025 加固，性能基线与优化在 027。
 
 ### 5. 自动创建空壳 Position（M1 必做）
 - 触发条件：创建 Assignment 且未提供 `position_id`（或提供 `org_node_id` 替代）。
 - 行为：在同事务内创建 `positions(is_auto_created=true)` 并继续创建 assignment；默认一人一岗仅作为写链路便捷，不视为编制体系。
-- 幂等与开关：需要幂等键避免重复创建（建议引入 `request_id`/`Idempotency-Key` 并在 025/026 统一）；提供特性开关可关闭自动创建以便回滚/管控。
+- 命名与元数据：
+  - `code`：使用保留前缀 `AUTO-` + 确定性短 hash（建议基于 `tenant_id/org_node_id/subject_type/subject_id`），用于并发去重与审计定位；M1 不要求对外可读。
+  - `title`：可为固定模板（如 `Member of {OrgNodeCode}`）或为空；不要求随 OrgNode 改名自动同步，UI 展示优先使用 OrgNode slice 的 `name`。
+- 幂等与并发：高并发下通过“确定性 code + 事务内冲突处理（重试/读回）”避免重复创建；统一的幂等键（`Idempotency-Key`/`request_id`）在 025/026 固化。
+- 数据治理（后续）：频繁调动可能遗留无引用的 `is_auto_created=true` Position，M1 不做自动清理；治理策略（例如清理无 assignment 的空壳、或统一 Retire）在 031（数据质量）或后续运维计划中落地。
 
 ### 6. 事件生成与发布（对齐 022；投递闭环在 026）
 - 024 的交付口径：在写入成功后生成 `OrgChangedEvent/OrgAssignmentChangedEvent` 并通过应用内 `EventBus` 发布（字段对齐 022；`transaction_time=now()`、`initiator_id` 来自 Session；`entity_version/sequence` 先按最小策略生成，完整审计/幂等口径在 025/026 加固）。
@@ -83,8 +88,8 @@
 ## 任务清单与验收标准
 1. [ ] 模块骨架：创建 `modules/org`（DDD 目录）与 `module.go/links.go/permissions/constants.go`，保证可被 app 注册且不破坏 cleanarch 约束。验收：`go test ./...` 编译通过（仅作为烟囱验证；完整门禁在 readiness）。
 2. [ ] Repository（sqlc + tenant 过滤）：实现 `org_nodes/org_node_slices/org_edges/positions/org_assignments` 的最小查询与写入 repo（Create/InsertUpdate/List/AsOf），所有查询强制 tenant 过滤。验收：repo 层测试覆盖基本 CRUD 与 tenant 隔离。
-3. [ ] Service（主链写路径）：实现 Node/Assignment 的 Create 与 Update（Insert）主路径；Update 的 `end_date` 计算与截断逻辑按 025 的算法落地（先跑通主路径，冻结窗口/审计在 025）。验收：服务层测试覆盖有效期基础路径与 DB 约束冲突报错稳定。
-4. [ ] 自动 Position：实现 “Create Assignment -> 自动创建空壳 Position” 主路径与特性开关；明确矩阵/虚线写入默认拒绝。验收：测试覆盖有/无 position_id、开关关闭、重复请求（幂等占位策略可先以事务检查实现，统一幂等键在 025/026 固化）。
+3. [ ] Service（主链写路径）：实现 Node/Assignment 的 Create 与 Update（Insert）主路径；实现 MoveNode（失效旧边+创建新边）；Update 的 `end_date` 计算与截断逻辑按 025 的算法落地（先跑通主路径，冻结窗口/审计在 025）。验收：服务层测试覆盖有效期基础路径、MoveNode 主路径与 DB 约束冲突报错稳定。
+4. [ ] 自动 Position：实现 “Create Assignment -> 自动创建空壳 Position” 主路径与特性开关；明确矩阵/虚线写入默认拒绝；落地自动 Position 的 `code/title` 生成策略与并发去重策略。验收：测试覆盖有/无 position_id、开关关闭、并发冲突/重试、重复请求（幂等键在 025/026 固化）。
 5. [ ] Controller/DTO：实现最小 REST/HTMX 控制器，强制 Session+tenant 校验，解析 `effective_date`（默认 now）并返回稳定错误结构；权限判定的 `pkg/authz` 接入与策略片段在 026。验收：controller 测试覆盖无 Session/无 tenant/参数非法/租户隔离。
 6. [ ] 事件生成（应用内发布）：写入成功后生成并发布 `OrgChanged/OrgAssignmentChanged`（字段对齐 022；`transaction_time/initiator_id` 必填；`entity_version/sequence` 先按最小策略生成，审计与幂等加固在 025/026）。验收：测试验证事件字段齐全且发布时机在事务成功后。
 7. [ ] 最小 templ 页面：提供节点/Assignment 的最小页面用于人工验证；执行 `templ generate && make css`（如有模板变更）。验收：生成后 `git status --short` 干净。
