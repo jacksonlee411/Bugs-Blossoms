@@ -21,15 +21,25 @@
 ## 设计决策
 - 校验范围：写入时校验 OrgNode/OrgEdge/Position/OrgAssignment 的 `effective_date/end_date` 半开区间、无重叠、无空档（适用于强约束口径）、无环（OrgEdge/Node 一致）；同一 subject primary 唯一。
 - 冻结窗口：默认“月末+3 天”拒绝修改历史（可租户覆盖），服务层统一检查，返回明确错误码/信息并记录审计。
-- Correct vs Update：Update 走新时间片（截断旧片段）；Correct 原位修改需更高权限与审计标记（change_type=Correct）。两者均需区分 initiator 与 transaction_time。
+- Correct vs Update：M1 阶段 Update **仅接受 `effective_date`**（禁止显式提交 `end_date`）；系统按 **Insert 语义** 自动计算 `end_date` 为“下一片段 `effective_date`（若存在）或 `9999-12-31`”，从设计上避免重叠并强制保留未来排程。Correct 原位修改需更高权限与审计标记（change_type=Correct），且不得变更时间字段。两者均需区分 initiator 与 transaction_time。
 - Rescind：提供软撤销（状态标记 + 审计），与 Retire 区分；Rescind 需权限校验与事件记录。
 - 审计与事件：审计记录包含 transaction_time、version、initiator_id、change_type、old/new snapshot；事件补充 `transaction_time`/`initiator`/`entity_version`/`effective_window`，对齐 022 契约，幂等键沿用 event_id/sequence。
 - 性能与缓存：校验查询使用现有索引/视图，避免递归 CTE 热路径；必要时增加针对 `tstzrange` 的 GiST 索引检查，确保性能不退化。
 - 权限与上下文：所有校验需建立在 Session+租户上下文；无 Session/tenant 直接拒绝。
 
+### Update（Insert）算法（M1）
+1. 令 `X = effective_date`。
+2. 定位“当前片段” `S`：找到覆盖 `X` 的片段（`S.effective_date <= X < S.end_date`）；若找不到则拒绝（`ORG_GAP`/`ORG_NOT_FOUND_AT_DATE`，按实现选其一但必须稳定）。
+3. 定位“下一片段” `N`：找到 `X` 之后最早片段（`N.effective_date > X`）。
+4. 计算新片段结束时间 `Y`：
+   - 若存在 `N`：强制 `Y = N.effective_date`（自动衔接，保留未来排程）。
+   - 否则 `Y = 9999-12-31`。
+5. 同一事务写入：若 `S.effective_date < X`，先将 `S.end_date` 截断为 `X`，再插入新片段 `[X, Y)`。
+备注：由于 `end_date` 由系统自动计算且上限为 `N.effective_date`，非并发场景不会产生跨未来片段的重叠；并发冲突由锁/重试与 DB 兜底处理。
+
 ## 任务清单与验收标准
 1. [ ] 有效期/层级校验与冻结窗口：实现无重叠/无空档/无环校验与冻结窗口拒绝（可租户覆盖）。验收：测试覆盖正常写入、重叠拒绝、空档拒绝、环检测、冻结期拒绝。
-2. [ ] Correct/Update/Rescind 分支与审计：区分 Update（截断）与 Correct（原位，需更高权限）、Rescind（软撤销）并写审计（transaction_time/version/initiator/change_type/old/new）。验收：测试覆盖三类操作含权限路径与审计字段断言。
+2. [ ] Correct/Update/Rescind 分支与审计：区分 Update（Insert，仅提交 `effective_date`，`end_date` 自动计算）与 Correct（原位，需更高权限且不改时间字段）、Rescind（软撤销）并写审计（transaction_time/version/initiator/change_type/old/new）。验收：测试覆盖三类操作含权限路径与审计字段断言，并覆盖 Update 在存在未来片段时自动衔接 `end_date=N.effective_date`、保留未来排程且不触发 `ORG_OVERLAP`（非并发）。
 3. [ ] 事件补充字段：事件 payload 补充 transaction_time/initiator/entity_version/effective_window，对齐 022 契约，幂等键 event_id/sequence 生效。验收：事件生成测试验证字段与幂等。
 4. [ ] 性能校验：复用 020/027 基准或新增 bench，确认校验/查询在 1k 节点数据集下性能不退化（<200ms 读取基线，写入校验不超预期）；记录命令与结果。验收：记录在 `docs/dev-records/DEV-PLAN-025-READINESS.md`。
 5. [ ] Readiness：执行 `make check lint`、`go test ./modules/org/...`（或影响路径），必要时 `make db lint`/`make check tr`；记录命令/耗时/结果到 `docs/dev-records/DEV-PLAN-025-READINESS.md`。

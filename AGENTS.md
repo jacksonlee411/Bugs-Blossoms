@@ -121,6 +121,7 @@ modules/{module}/
 
 ## Tool use
 - DO NOT USE `sed` for file manipulation
+- 未经用户明确批准，禁止通过 `git checkout --` / `git restore` / `git reset` / `git clean` 等操作丢弃或回退任何未提交改动（即使不在本次任务范围）。如需只提交部分变更，优先使用 `git add -p`，或先与用户确认是否 `stash`/拆分提交。
 
 ### Code Quality & Format (与 CI 对齐)
 - 推送前必须运行与 CI 相同的检查，避免远程 Quality Gates 报红。
