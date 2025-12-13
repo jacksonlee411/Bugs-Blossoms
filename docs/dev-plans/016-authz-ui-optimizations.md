@@ -161,7 +161,7 @@
 4. [ ] i18n 清理：移除硬编码状态与提示文案（用户页状态映射、角色矩阵标题/分页、Unauthorized JS 兜底文案）。
 5. [ ] diff 默认结构化渲染 + 复制反馈（Unauthorized/PolicyInspector/Requests 详情页）。
 6. [ ] 业务页面“部分授权”统一模式：按钮禁用 + 申请入口 + 权限状态提示（对齐 012 的 HRM/Logging 体验）。
-7. [ ] 导航/Quick Links/Spotlight：默认无权限隐藏 + 直访 403 统一反馈；补齐回归清单与验证（对齐 014D）。
+7. [x] 导航/Quick Links/Spotlight：默认无权限隐藏 + 直访 403 统一反馈；补齐回归清单与验证（对齐 014D）。
 8. [ ] HTMX/REST 403 契约与非 HTMX fallback 回归验证（对齐 014D/015B4）。
 
 ### P1（体验增强：更好理解与排障）

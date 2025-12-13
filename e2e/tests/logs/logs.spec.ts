@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, logout } from '../../fixtures/auth';
-import { resetTestDatabase, seedScenario } from '../../fixtures/test-data';
+import { login, logout, waitForAlpine, resetTestDatabase, seedScenario } from '../../fixtures';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -20,9 +19,19 @@ test.describe('logging authz gating', () => {
 
 	test('allows superadmin to view logs page and tabs', async ({ page }) => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
+		await waitForAlpine(page);
 
 		// Prefer visible expanded link to avoid grabbing the collapsed (hidden) variant
 		const logsNavLink = page.locator('a[href="/logs"]').filter({ hasText: /logs/i }).first();
+
+		// If the sidebar is collapsed, expand it to make the link visible
+		if (!(await logsNavLink.isVisible())) {
+			const toggleButton = page.locator('button.btn-sidebar-toggle');
+			if (await toggleButton.isVisible()) {
+				await toggleButton.click();
+			}
+		}
+
 		await expect(logsNavLink).toBeVisible();
 
 		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
