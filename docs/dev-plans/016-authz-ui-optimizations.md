@@ -2,7 +2,7 @@
 
 **状态**: 草拟中（2025-12-12 16:00 UTC）
 
-## 背景
+## 背景与进展
 - DEV-PLAN-012~015 已定义并落地 Casbin 授权底座、模块改造与公共层 UI 契约；其中 DEV-PLAN-015A/015B 交付了策略平台与 UI 工作流（角色/用户策略管理、Unauthorized/PolicyInspector、草稿提交与反馈）。
 - 当前 UI 已可跑通闭环，但在信息架构、交互一致性、误操作防护、i18n/a11y 与可理解性上仍有可预期的体验成本。
 - 本文档将 012~015 的 UI 需求与现有实现进行对照，沉淀“调查发现 + UI 优化建议”，作为后续迭代的设计/开发 backlog。
@@ -156,7 +156,7 @@
 ## 建议优先级与落地清单（Backlog）
 ### P0（优先做：减少误操作 + 统一体验）
 1. [ ] 引入统一 Authz Workspace（Sticky Footer/Header）：作为当前上下文的提交栏，展示暂存数量与提交入口；支持提交前预览 + reason 必填 + 危险项提示。
-2. [ ] 补齐 `/core/authz/requests/{id}` 请求详情页（最小只读即可），确保 `view_url` 不断链；非 HTMX 也可访问（对齐 015B4）。
+2. [x] 补齐 `/core/authz/requests/{id}` 请求详情页（最小只读即可），确保 `view_url` 不断链；非 HTMX 也可访问（对齐 015B4）。
 3. [ ] p/g 语义分离：角色页 `type=g` 仅做“角色继承/绑定角色”；用户页以“用户↔角色”视图呈现继承与变更；表单不再要求无意义字段。
 4. [ ] i18n 清理：移除硬编码状态与提示文案（用户页状态映射、角色矩阵标题/分页、Unauthorized JS 兜底文案）。
 5. [ ] diff 默认结构化渲染 + 复制反馈（Unauthorized/PolicyInspector/Requests 详情页）。
@@ -186,3 +186,18 @@
 - DEV-PLAN-015（母计划）：`docs/dev-plans/015-casbin-policy-ui-and-workflow.md`
 - DEV-PLAN-015B（UI/体验）：`docs/dev-plans/015B-casbin-policy-ui-and-experience.md`
 - 015B1/015B2/015B3/015B4 子计划同目录文件
+
+## 实施记录（2025-12-13 更新）
+### 已完成 (P0 阶段)
+1. **核心组件开发**：
+   - `AuthzGuard` (templ): 实现了细粒度授权控制组件，支持 fallback。
+   - `AuthzWorkspace` (templ): 实现了 Sticky Footer 布局的暂存区组件。
+2. **页面与控制器**：
+   - `RequestDetail` (templ): 请求详情页模板已实现，并支持结构化 diff + 原始 JSON 展示。
+   - `AuthzRequestController`: 已接入 `PolicyDraftService.Get`，通过 `/core/authz/requests/{id}` 渲染只读请求详情。
+   - `AuthzRequestController_test`: 通过集成测试验证从 `/core/api/authz/requests` 创建草稿后，`view_url` 能正确渲染详情页。
+
+### 下一步计划
+1. **Workspace 接入**：在角色矩阵 / 用户权限页接入 `AuthzWorkspace`，统一暂存计数与“提交草稿”入口。
+2. **列表页补齐**：为 `/core/authz/requests` 增加最小可用列表视图（按状态/我发起的过滤），并与详情页打通导航。
+3. **文案与 i18n 清理**：梳理 Unauthorized/PolicyInspector/Requests 相关状态与错误文案，去除硬编码中英文混用，补齐多语言 keys。

@@ -123,6 +123,7 @@ func (m *Module) Register(app application.Application) error {
 		controllers.NewWebSocketController(app),
 		controllers.NewSettingsController(app),
 		controllers.NewAuthzAPIController(app),
+		controllers.NewAuthzRequestController(app),
 	)
 	app.RegisterHashFsAssets(assets.HashFS)
 	app.RegisterGraphSchema(application.GraphSchema{

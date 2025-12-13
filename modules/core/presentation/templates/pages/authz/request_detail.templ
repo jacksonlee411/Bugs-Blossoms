@@ -1,0 +1,171 @@
+package authz
+
+import (
+	"strings"
+
+	"github.com/iota-uz/iota-sdk/components/copy_button"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+func statusMessageKey(status string) string {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "pending_review":
+		return "Authz.Status.PendingReview"
+	case "approved":
+		return "Authz.Status.Approved"
+	case "merged":
+		return "Authz.Status.Merged"
+	case "failed":
+		return "Authz.Status.Failed"
+	case "rejected":
+		return "Authz.Status.Rejected"
+	case "canceled":
+		return "Authz.Status.Canceled"
+	case "draft":
+		return "Authz.Status.Draft"
+	default:
+		return "Unknown"
+	}
+}
+
+templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ _ = templ.URL("") }}
+	{{ statusKey := statusMessageKey(vm.Status) }}
+	{{ statusLabel := pageCtx.T(statusKey) }}
+	<main class="mx-auto max-w-5xl px-4 py-6 space-y-6">
+		<header class="flex items-start justify-between gap-4 flex-wrap">
+			<div class="space-y-2">
+				<h1 class="text-xl font-semibold text-surface-50">
+					Policy Change Request
+				</h1>
+				<div class="flex items-center gap-2 text-xs text-surface-200">
+					<span>{ pageCtx.T("Authz.Unauthorized.RequestID") }:</span>
+					<span class="font-mono text-surface-50" id="authz-request-id">{ vm.ID }</span>
+					@copy_button.CopyButton(copy_button.Props{
+						Text:     vm.ID,
+						Size:     "14",
+						Variant:  copy_button.VariantMinimal,
+						ShowText: true,
+					})
+				</div>
+				if vm.Reason != "" {
+					<p class="text-sm text-surface-200">
+						<span class="font-medium">{ pageCtx.T("Authz.Unauthorized.Reason") }:</span>
+						<span class="ml-1">{ vm.Reason }</span>
+					</p>
+				}
+			</div>
+			<div class="space-y-2 text-right text-xs text-surface-200">
+				<span class={"inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium", vm.StatusClass}>
+					{ statusLabel }
+				</span>
+				<div>
+					<span>{ pageCtx.T("CreatedAt") }:</span>
+					<span class="ml-1 font-mono text-surface-50">{ vm.CreatedAt }</span>
+				</div>
+				if vm.UpdatedAt != "" {
+					<div>
+						<span>{ pageCtx.T("UpdatedAt") }:</span>
+						<span class="ml-1 font-mono text-surface-50">{ vm.UpdatedAt }</span>
+					</div>
+				}
+			</div>
+		</header>
+
+		<section class="grid gap-4 md:grid-cols-3">
+			<div class="space-y-2 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4 md:col-span-2">
+				<h2 class="text-sm font-semibold text-surface-50">
+					Diff
+				</h2>
+				if len(vm.Diff) > 0 {
+					<table class="mt-2 w-full table-auto border-collapse text-xs">
+						<thead class="border-b border-surface-400/60 text-left text-surface-200">
+							<tr>
+								<th class="py-1 pr-3 font-medium">Op</th>
+								<th class="py-1 pr-3 font-medium">Path</th>
+								<th class="py-1 font-medium">Value</th>
+							</tr>
+						</thead>
+						<tbody class="divide-y divide-surface-400/40">
+							for _, item := range vm.Diff {
+								<tr class="align-top">
+									<td class="py-1 pr-3 font-mono text-surface-100">{ strings.ToUpper(item.Op) }</td>
+									<td class="py-1 pr-3 font-mono text-surface-100">{ item.Path }</td>
+									<td class="py-1 text-surface-100 break-all">{ item.Text }</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				} else {
+					<p class="text-xs text-surface-200">
+						No diff payload.
+					</p>
+				}
+			</div>
+			<div class="space-y-3 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4">
+				<h2 class="text-sm font-semibold text-surface-50">
+					Summary
+				</h2>
+				<dl class="space-y-1 text-xs text-surface-200">
+					if vm.Object != "" {
+						<div class="flex justify-between gap-2">
+							<dt class="font-medium">Object</dt>
+							<dd class="font-mono text-surface-50">{ vm.Object }</dd>
+						</div>
+					}
+					if vm.Action != "" {
+						<div class="flex justify-between gap-2">
+							<dt class="font-medium">Action</dt>
+							<dd class="font-mono text-surface-50">{ vm.Action }</dd>
+						</div>
+					}
+					if vm.Domain != "" {
+						<div class="flex justify-between gap-2">
+							<dt class="font-medium">{ pageCtx.T("Authz.Domain") }</dt>
+							<dd class="font-mono text-surface-50">{ vm.Domain }</dd>
+						</div>
+					}
+					if vm.Requester != "" {
+						<div class="flex justify-between gap-2">
+							<dt class="font-medium">Subject</dt>
+							<dd class="font-mono text-surface-50">{ vm.Requester }</dd>
+						</div>
+					}
+				</dl>
+				if vm.PRLink != "" {
+					<a
+						href={ templ.URL(vm.PRLink) }
+						target="_blank"
+						rel="noreferrer"
+						class="inline-flex items-center text-xs font-medium text-primary hover:underline"
+					>
+						View PR
+					</a>
+				}
+			</div>
+		</section>
+
+		<section class="space-y-2 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4">
+			<div class="flex items-center justify-between gap-2">
+				<h2 class="text-sm font-semibold text-surface-50">
+					Raw diff
+				</h2>
+				<span class="text-xs text-surface-200">
+					JSON
+				</span>
+			</div>
+			<pre class="max-h-80 overflow-auto rounded-md bg-surface-900/80 p-3 text-xs text-surface-100"><code>{ vm.DiffJSON }</code></pre>
+		</section>
+
+		if vm.BotLog != "" {
+			<section class="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/60 p-4">
+				<h2 class="text-sm font-semibold text-amber-100">
+					Bot log
+				</h2>
+				<pre class="max-h-60 overflow-auto whitespace-pre-wrap break-words text-xs text-amber-50">{ vm.BotLog }</pre>
+			</section>
+		}
+	</main>
+}
