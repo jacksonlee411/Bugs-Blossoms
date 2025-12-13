@@ -100,8 +100,3 @@
 - `config/access/policies/org/*.csv` 策略片段与 authz 门禁通过记录。
 - Outbox schema + relay + 事件重放验证。
 - 缓存键与失效策略实现与记录。
-
-## 交付物
-- API/路由与权限片段。
-- 事件发布实现。
-- authz 门禁执行记录。
