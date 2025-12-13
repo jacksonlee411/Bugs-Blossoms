@@ -1,6 +1,6 @@
 # DEV-PLAN-021：Org 核心表与约束
 
-**状态**: 进行中（2025-12-09 更新）
+**状态**: 进行中（2025-12-13 更新）
 
 ## 进度速记
 - ✅ 范围/目标/约束已定稿（单租户单树、ltree 防环、EXCLUDE 防重叠/双亲、唯一根）。
@@ -10,6 +10,12 @@
 ## 范围与输入
 - 覆盖 020 计划步骤 1 的 schema 落地，限定在单一 Organization Unit 树 + Position + Assignment 主链（不含编制/矩阵/角色，占位留给 022+）。
 - 有效期统一使用 UTC、半开区间 `[effective_date, end_date)`；所有约束/索引均带 `tenant_id`，PostgreSQL 17，需启用 `ltree` 与 `btree_gist` 扩展。
+
+## 时间约束与 end_date 管理（评审补充）
+- **时间约束类型**：采用 Valid Time / Effective Dating。物理存储为 `effective_date/end_date` 两列，语义为 UTC 半开区间 `[effective_date, end_date)`；在约束/索引/查询中用 `tstzrange(effective_date, end_date)` 表达该区间（无需额外存储 range 字段）。
+- **DB 层强约束**：通过 `GiST + EXCLUDE USING gist (..., tstzrange(...) WITH &&)` 在数据库层强制“同键区间不重叠”（同节点 slice、防双亲、同父同窗重名、编码时效唯一等），并用 `check (effective_date < end_date)` 防止非法区间。
+- **end_date 管理策略（M1）**：`end_date` 默认 `'9999-12-31'`；写路径按 Insert（Update）语义处理时**仅接受 `effective_date`**，由系统自动计算 `end_date = 下一片段的 effective_date（若存在）否则 9999-12-31`，并在同一事务内截断当前覆盖片段的 `end_date = effective_date` 后插入新片段 `[effective_date, end_date)`，以避免人工计算导致的 overlap/gap 并保留未来排程。实现细节与并发锁顺序见 `docs/dev-plans/025-org-time-and-audit.md`。
+- **是否可自动管理**：可以且建议强制自动管理。原因：时态数据一旦允许客户端显式写 `end_date`，极易引入重叠/空档并污染审计；M1 统一通过 Service 层加锁与算法计算维护时间线连续性（“无空档”口径至少适用于 `org_node_slices` 强约束实体，其它时间片表默认只强制无重叠，是否无空档按业务语义收敛）。
 
 ## 目标
 - 使用 Atlas 描述式 schema + Goose 迁移生成核心表与约束（EXCLUDE 防重叠、ltree 防环、防双亲、code 唯一、同父同窗重名）。
