@@ -36,4 +36,3 @@ func summarizeStagedEntries(entries []dtos.StagedPolicyEntry) viewmodels.AuthzCh
 	sort.Strings(summary.Resources)
 	return summary
 }
-
