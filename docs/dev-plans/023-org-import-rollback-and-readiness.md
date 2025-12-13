@@ -1,6 +1,6 @@
 # DEV-PLAN-023：Org 导入/回滚脚本与 Readiness
 
-**状态**: 规划中（2025-01-15 14:00 UTC）
+**状态**: 规划中（2025-12-13 更新）
 
 ## 背景
 - 对应 020 步骤 3，承接 021（schema 落地）与 022（占位表/事件契约），需提供导入/导出/回滚脚本雏形并完成 readiness（lint/test），为 024 CRUD 主链上线前做数据与执行面准备。
@@ -8,10 +8,10 @@
 ## 目标
 - 提供基于 Go 的 CLI 工具 (`cmd/org-data`)，支持 CSV 数据的导入、导出与回滚，具备完整的 dry-run 校验能力。
 - 定义明确的 CSV 数据模板与校验规则（唯一性、层级完整性、时间窗有效性）。
-- `make check lint` 与 `go test ./modules/org/...`（或相关路径）通过，失败有回滚/清理方案。
+- `make check lint` 与 `go test ./cmd/org-data/... ./modules/org/...`（或相关路径）通过，失败有回滚/清理方案。
 
 ## 范围与非目标
-- 范围：为 org 主链提供数据工具；覆盖 021/022 已落地的表（org_nodes/edges/positions/assignments）。
+- 范围：为 org 主链提供数据工具；覆盖 021/022 已落地的表（`org_nodes`/`org_node_slices`/`org_edges`/`positions`/`org_assignments`；可选扩展到 `org_roles/org_role_assignments/org_attribute_inheritance_rules/change_requests` 的导出）。
 - 非目标：不实现最终 UI、审批/流程、矩阵/继承逻辑执行，只提供数据导入与清理脚本；不交付生产级自动化灰度，仅最小可用路径。
 
 ## 依赖与里程碑
@@ -22,39 +22,44 @@
 ### 1. 工具形态：Go CLI (`cmd/org-data`)
 - **原因**：Shell 脚本处理 CSV 和复杂校验（如时间重叠、树环检测）能力不足且难以维护。使用 Go CLI 可复用 `modules/org/domain` 中的逻辑和 `pkg/db` 连接池。
 - **命令结构**：
-  - `org-data import --tenant <uuid> --file <path> [--dry-run] [--strict]`
-  - `org-data export --tenant <uuid> --output <dir>`
-  - `org-data rollback --tenant <uuid> --since <timestamp> [--dry-run]`
+  - `org-data import --tenant <uuid> --input <dir> [--apply] [--strict] [--mode seed|merge]`
+  - `org-data export --tenant <uuid> --output <dir> [--as-of <date|rfc3339>]`
+  - `org-data rollback --tenant <uuid> (--since <timestamp>) [--apply]`
 - **Shell 包装**：保留 `scripts/org/*.sh` 作为 CLI 的简单包装器，方便运维调用。
 
 ### 2. CSV 数据契约
 - **格式**：UTF-8，逗号分隔，带 Header。
+- **时间字段**：`effective_date/end_date` 支持 `YYYY-MM-DD` 或 RFC3339；`YYYY-MM-DD` 解释为 `00:00:00Z`，统一按 UTC 写入；有效期语义为半开区间 `[effective_date, end_date)`，空 `end_date` 由工具自动补齐（同一实体按 `effective_date` 排序，取下一片段的 `effective_date` 或 `9999-12-31`）。
 - **模板定义**：
-  - `nodes.csv`: `code` (必填), `type` (OrgUnit), `name`, `i18n_names` (JSON), `effective_date` (YYYY-MM-DD), `end_date`, `parent_code` (用于构建 Edge), `display_order`
+  - `nodes.csv`: `code` (必填), `type` (OrgUnit), `name`, `i18n_names` (JSON), `status` (active/retired), `effective_date`, `end_date`, `parent_code` (为空表示 root), `display_order`, `manager_user_id` (可选)
   - `positions.csv`: `code` (必填), `org_node_code` (必填), `title`, `effective_date`, `end_date`, `is_auto_created`
-  - `assignments.csv`: `person_id` (必填), `position_code` (必填), `type` (primary), `effective_date`, `end_date`
-- **引用解析**：导入时 CLI 需建立内存映射（Code -> UUID），将 CSV 中的 `parent_code` 转换为 DB 中的 `parent_node_id`。
+  - `assignments.csv`: `subject_id` (必填), `position_code` (必填), `assignment_type` (primary/matrix/dotted), `effective_date`, `end_date`, `pernr` (可选)
+- **映射规则**：
+  - `nodes.csv` 每行会落成：`org_nodes`（按 `code` 确保存在稳定 ID）+ `org_node_slices`（属性时间片）+ `org_edges`（父子关系时间片，root 行不写 edge；`parent_hint` 与 edge 在写入前做一致性校验）。
+  - 导入时 CLI 需建立内存映射（Code -> UUID），将 CSV 中的 `parent_code/org_node_code` 转换为 DB 中的 `*_node_id`。
 
 ### 3. 校验与执行逻辑
 - **Phase 1: Parse & Static Validate**
   - 检查必填项、日期格式（`effective_date < end_date`）、JSON 格式。
-  - 内存中构建树，检查是否存在**环路**（Cycle Detection）。
+  - 内存中构建树并做环路检测：默认按最小 `effective_date` 的快照检查；`--strict` 下对所有边界时间点（各行 `effective_date` 的去重集合）逐点做 as-of 检查，避免把“不同时间片的边”误判为同一时点成环。
+  - 自动补齐 `end_date` 后，按实体维度检查“无重叠”；`--strict` 下额外检查“无空档”（对 `org_node_slices/org_edges/org_assignments` 默认按约束 1 执行）。
 - **Phase 2: DB Dry-Run (Read-Only)**
-  - 检查 `code` 在租户内是否冲突（若存在则标记为 Update 或 Skip）。
+  - seed 模式：若检测到租户已存在 org 主链数据则直接拒绝。
+  - merge 模式：检查 `code` 在租户内是否冲突（若存在则标记为 Update 或 Skip）。
   - 检查 `parent_code` 是否存在（或在当前批次中创建）。
   - 检查时间片重叠（Overlap Check）：查询 DB 中该实体的现有时间片，模拟插入看是否触发 EXCLUDE 约束。
 - **Phase 3: Apply (Transactional)**
   - 开启事务。
-  - 按拓扑顺序写入：Nodes -> Edges -> Positions -> Assignments。
+  - 按依赖顺序写入：`org_nodes` -> `org_node_slices` -> `org_edges` -> `positions` -> `org_assignments`（`org_edges` 的 `path/depth` 由触发器维护）。
   - 失败则全量回滚。
 
 ### 4. 回滚策略 (Rollback)
-- **机制**：由于 021 Schema 未引入 `batch_id`，回滚依赖 **时间窗口 + 租户**。
+- **机制**：M1 先采用 **时间窗口 + 租户** 的最小方案；为降低误删风险，导入默认只支持“空租户/空组织数据”的 seed 模式（若检测到 tenant 已存在 org 主链数据则拒绝，需显式开关才允许 merge）。
 - **逻辑**：
   - `rollback --since "2025-01-15T12:00:00Z"`
   - 查询所有 `created_at >= since AND tenant_id = target` 的记录。
-  - 逆序删除：Assignments -> Positions -> Edges -> Nodes。
-  - **安全网**：必须先执行 `--dry-run` 列出将要删除的记录数，需用户二次确认（输入 `YES`）。
+  - 逆序删除：`org_assignments` -> `positions` -> `org_edges` -> `org_node_slices` -> `org_nodes`。
+  - **安全网**：必须先执行 `--dry-run` 列出将要删除的记录数；执行 `--apply` 前需用户二次确认（输入 `YES`）。
 
 ### 5. Readiness 检查集
 - **Lint**: `golangci-lint` 覆盖 `cmd/org-data` 及 `modules/org`。
@@ -96,8 +101,8 @@
   - `make check lint` 和 `go test` 的覆盖率报告。
 
 ## 风险与回滚/降级路径
-- **数据污染风险**：CLI 必须默认开启 `--dry-run`，只有显式传入 `--apply` 才执行写入。
-- **回滚误删风险**：`rollback` 命令必须强制要求 `--dry-run` 预览，并要求用户输入随机生成的验证码或固定字符串（如 "CONFIRM"）才能执行删除。
+- **数据污染风险**：CLI 必须默认 `--dry-run`，只有显式传入 `--apply` 才执行写入；写入失败必须整事务回滚。
+- **回滚误删风险**：`rollback` 必须强制 `--dry-run` 预览，并要求用户输入确认字符串（如 `YES`）后才允许 `--apply`；M1 的 `--since` 回滚不保证恢复“被更新记录”的旧值，后续可通过 025 的审计/request_id 或引入 batch/run 追踪表增强可回放性。
 
 ## 交付物
 - `cmd/org-data` 源码及 `scripts/org/*.sh` 包装脚本。
