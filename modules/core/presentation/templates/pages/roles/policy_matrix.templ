@@ -3,6 +3,7 @@ package roles
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/components/base/button"
@@ -14,6 +15,10 @@ import (
 	corecomponents "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/components"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 )
+
+func displayRoleName(value string) string {
+	return strings.TrimPrefix(strings.TrimSpace(value), "role:")
+}
 
 type PolicyMatrixEntry struct {
 	dtos.PolicyEntryResponse
@@ -315,7 +320,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						if props.Type == "g" {
 							@base.TableCell(base.TableCellProps{}) {
 								<div class="flex items-center gap-2">
-									<span class="font-mono">{ entry.Object }</span>
+									<span class="font-mono" x-tooltip.raw={ entry.Object }>{ displayRoleName(entry.Object) }</span>
 									if entry.Staged {
 										{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
 										if entry.StageKind == "remove" {

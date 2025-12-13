@@ -68,6 +68,10 @@
     "Prev": "Назад",
     "Next": "Вперёд"
   },
+  "CopyButton": {
+    "Copy": "Копировать",
+    "Copied": "Скопировано"
+  },
   "Spotlight": {
     "Placeholder": "Поиск...",
     "NothingFound": "Ничего не найдено",
@@ -286,7 +290,8 @@
     "Permissions": {
       "Inherited": "Наследованные",
       "Direct": "Прямые",
-      "Overrides": "Переопределения"
+      "Overrides": "Переопределения",
+      "ViewRolePolicies": "Посмотреть политики роли"
     },
     "Single": {
       "EditUser": "Редактировать пользователя",

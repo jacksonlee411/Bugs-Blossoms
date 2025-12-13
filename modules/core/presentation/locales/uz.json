@@ -68,6 +68,10 @@
     "Prev": "Oldingi",
     "Next": "Keyingi"
   },
+  "CopyButton": {
+    "Copy": "Nusxalash",
+    "Copied": "Nusxalandi"
+  },
   "Spotlight": {
     "Placeholder": "Qidirish...",
     "NothingFound": "Hech narsa topilmadi",
@@ -214,7 +218,8 @@
     "Permissions": {
       "Inherited": "Meros qilingan",
       "Direct": "To'g'ridan-to'g'ri",
-      "Overrides": "Bekor qiluvchi"
+      "Overrides": "Bekor qiluvchi",
+      "ViewRolePolicies": "Rol siyosatlarini ko'rish"
     },
     "Single": {
       "EditUser": "Foydalanuvchini tahrirlash",

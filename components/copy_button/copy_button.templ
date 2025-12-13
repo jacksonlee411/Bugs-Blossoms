@@ -1,6 +1,10 @@
 package copy_button
 
-import icons "github.com/iota-uz/icons/phosphor"
+import (
+	icons "github.com/iota-uz/icons/phosphor"
+
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
 
 type Props struct {
 	Text     string
@@ -18,6 +22,7 @@ const (
 )
 
 templ CopyButton(props Props) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ size := props.Size }}
 	if size == "" {
 		{{ size = "16" }}
@@ -26,6 +31,12 @@ templ CopyButton(props Props) {
 	if variant == "" {
 		{{ variant = VariantDefault }}
 	}
+	{{ copyLabel := pageCtx.T("CopyButton.Copy") }}
+	{{ copiedLabel := pageCtx.T("CopyButton.Copied") }}
+	{{ textJSON, _ := templ.JSONString(props.Text) }}
+	{{ copyLabelJSON, _ := templ.JSONString(copyLabel) }}
+	{{ copiedLabelJSON, _ := templ.JSONString(copiedLabel) }}
+	{{ xData := "{copied:false,text:" + textJSON + ",copyLabel:" + copyLabelJSON + ",copiedLabel:" + copiedLabelJSON + ",async copyText(){try{await navigator.clipboard.writeText(this.text);this.copied=true;setTimeout(()=>this.copied=false,2000);}catch(err){console.error('Failed to copy text: ',err);}}}" }}
 	<button
 		type="button"
 		class={
@@ -34,18 +45,7 @@ templ CopyButton(props Props) {
 			templ.KV("hover:bg-gray-100 p-1", variant == VariantMinimal),
 			props.Class,
 		}
-		x-data={ `{
-			copied: false,
-			async copyText() {
-				try {
-					await navigator.clipboard.writeText('` + props.Text + `');
-					this.copied = true;
-					setTimeout(() => this.copied = false, 2000);
-				} catch (err) {
-					console.error('Failed to copy text: ', err);
-				}
-			}
-		}` }
+		x-data={ xData }
 		@click="copyText()"
 		x-bind:class="copied ? 'text-green-600' : ''"
 	>
@@ -56,7 +56,7 @@ templ CopyButton(props Props) {
 			@icons.CheckCircle(icons.Props{Size: size})
 		</span>
 		if props.ShowText {
-			<span class="text-xs font-medium" x-text="copied ? 'Copied!' : 'Copy'"></span>
+			<span class="text-xs font-medium" x-text="copied ? copiedLabel : copyLabel"></span>
 		}
 	</button>
 }

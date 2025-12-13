@@ -98,16 +98,18 @@ func (c *EmployeeController) List(w http.ResponseWriter, r *http.Request) {
 	pageCtx, _ := composables.TryUsePageCtx(r.Context())
 	canCreate := pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "create")
 	canUpdate := pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "update")
+	canRequest := composables.CanUser(r.Context(), corepermissions.AuthzRequestsWrite) == nil
 	canDebug := composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil
 	employeesVM := mapping.MapViewModels(employeeEntities, mappers.EmployeeToViewModel)
 	for _, vm := range employeesVM {
 		vm.CanUpdate = canUpdate
 	}
 	props := &employees.IndexPageProps{
-		Employees: employeesVM,
-		NewURL:    fmt.Sprintf("%s/new", c.basePath),
-		CanCreate: canCreate,
-		CanDebug:  canDebug,
+		Employees:  employeesVM,
+		NewURL:     fmt.Sprintf("%s/new", c.basePath),
+		CanCreate:  canCreate,
+		CanRequest: canRequest,
+		CanDebug:   canDebug,
 	}
 	if isHxRequest {
 		templ.Handler(employees.EmployeesTable(props), templ.WithStreaming()).ServeHTTP(w, r)
@@ -161,11 +163,13 @@ func (c *EmployeeController) GetEdit(w http.ResponseWriter, r *http.Request) {
 	vm := mappers.EmployeeToViewModel(entity)
 	vm.CanUpdate = pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "update")
 	vm.CanDelete = pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "delete")
+	canRequest := composables.CanUser(r.Context(), corepermissions.AuthzRequestsWrite) == nil
 	props := &employees.EditPageProps{
-		Employee:  vm,
-		Errors:    map[string]string{},
-		SaveURL:   fmt.Sprintf("%s/%d", c.basePath, id),
-		DeleteURL: fmt.Sprintf("%s/%d", c.basePath, id),
+		Employee:   vm,
+		Errors:     map[string]string{},
+		SaveURL:    fmt.Sprintf("%s/%d", c.basePath, id),
+		DeleteURL:  fmt.Sprintf("%s/%d", c.basePath, id),
+		CanRequest: canRequest,
 	}
 	templ.Handler(employees.Edit(props), templ.WithStreaming()).ServeHTTP(w, r)
 }
@@ -309,11 +313,16 @@ func (c *EmployeeController) Update(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Error retrieving employee", http.StatusInternalServerError)
 				return
 			}
+			pageCtx, _ := composables.TryUsePageCtx(r.Context())
+			vm := mappers.EmployeeToViewModel(entity)
+			vm.CanUpdate = pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "update")
+			vm.CanDelete = pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "delete")
 			props := &employees.EditPageProps{
-				Employee:  mappers.EmployeeToViewModel(entity),
-				Errors:    errorsMap,
-				SaveURL:   fmt.Sprintf("%s/%d", c.basePath, id),
-				DeleteURL: fmt.Sprintf("%s/%d", c.basePath, id),
+				Employee:   vm,
+				Errors:     errorsMap,
+				SaveURL:    fmt.Sprintf("%s/%d", c.basePath, id),
+				DeleteURL:  fmt.Sprintf("%s/%d", c.basePath, id),
+				CanRequest: composables.CanUser(r.Context(), corepermissions.AuthzRequestsWrite) == nil,
 			}
 			templ.Handler(employees.EditForm(props), templ.WithStreaming()).ServeHTTP(w, r)
 			return
@@ -324,11 +333,16 @@ func (c *EmployeeController) Update(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Error retrieving employee", http.StatusInternalServerError)
 			return
 		}
+		pageCtx, _ := composables.TryUsePageCtx(r.Context())
+		vm := mappers.EmployeeToViewModel(entity)
+		vm.CanUpdate = pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "update")
+		vm.CanDelete = pageCtx != nil && pageCtx.CanAuthz(hrmEmployeesAuthzObject, "delete")
 		props := &employees.EditPageProps{
-			Employee:  mappers.EmployeeToViewModel(entity),
-			Errors:    errorsMap,
-			SaveURL:   fmt.Sprintf("%s/%d", c.basePath, id),
-			DeleteURL: fmt.Sprintf("%s/%d", c.basePath, id),
+			Employee:   vm,
+			Errors:     errorsMap,
+			SaveURL:    fmt.Sprintf("%s/%d", c.basePath, id),
+			DeleteURL:  fmt.Sprintf("%s/%d", c.basePath, id),
+			CanRequest: composables.CanUser(r.Context(), corepermissions.AuthzRequestsWrite) == nil,
 		}
 		templ.Handler(employees.EditForm(props), templ.WithStreaming()).ServeHTTP(w, r)
 		return

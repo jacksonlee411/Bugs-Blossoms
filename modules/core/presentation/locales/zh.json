@@ -68,6 +68,10 @@
     "Prev": "上一页",
     "Next": "下一页"
   },
+  "CopyButton": {
+    "Copy": "复制",
+    "Copied": "已复制"
+  },
   "Spotlight": {
     "Placeholder": "搜索...",
     "NothingFound": "未找到任何内容",
@@ -217,7 +221,8 @@
     "Permissions": {
       "Inherited": "继承权限",
       "Direct": "直接权限",
-      "Overrides": "覆盖权限"
+      "Overrides": "覆盖权限",
+      "ViewRolePolicies": "查看角色策略"
     },
     "Single": {
       "EditUser": "编辑用户",

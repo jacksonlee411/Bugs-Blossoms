@@ -68,6 +68,10 @@
     "Prev": "Previous",
     "Next": "Next"
   },
+  "CopyButton": {
+    "Copy": "Copy",
+    "Copied": "Copied!"
+  },
   "Spotlight": {
     "Placeholder": "Search...",
     "NothingFound": "Nothing found",
@@ -214,7 +218,8 @@
     "Permissions": {
       "Inherited": "Inherited",
       "Direct": "Direct",
-      "Overrides": "Overrides"
+      "Overrides": "Overrides",
+      "ViewRolePolicies": "View role policies"
     },
     "Single": {
       "EditUser": "Edit user",

@@ -157,12 +157,12 @@
 ### P0（优先做：减少误操作 + 统一体验）
 1. [x] 引入统一 Authz Workspace（Sticky Footer/Header）：作为当前上下文的提交栏，展示暂存数量与提交入口；支持提交前预览 + reason 必填 + 危险项提示。（已交付：角色矩阵/用户权限页统一提交栏 + reason 必填 + 提交前预览 + 危险项提示 + 二次确认）
 2. [x] 补齐 `/core/authz/requests/{id}` 请求详情页（最小只读即可），确保 `view_url` 不断链；非 HTMX 也可访问（对齐 015B4）。
-3. [ ] p/g 语义分离：角色页 `type=g` 仅做“角色继承/绑定角色”；用户页以“用户↔角色”视图呈现继承与变更；表单不再要求无意义字段。（已交付最小版本：角色矩阵/用户权限页的 g 规则表单与表格语义化（Role/ParentRole，action=*，effect=allow）；“用户↔角色”来源链路仍待补齐）
-4. [ ] i18n 清理：移除硬编码状态与提示文案（用户页状态映射、角色矩阵标题/分页、Unauthorized JS 兜底文案）。（已完成基础：用户页状态映射、角色矩阵/Requests/Workspace 关键文案、Unauthorized JS SLA/错误兜底；仍有少量组件级英文（如 CopyButton 文案）待收敛）
+3. [ ] p/g 语义分离：角色页 `type=g` 仅做“角色继承/绑定角色”；用户页以“用户↔角色”视图呈现继承与变更；表单不再要求无意义字段。（已交付最小版本：角色矩阵/用户权限页的 g 规则表单与表格语义化（Role/ParentRole，action=*，effect=allow）；并补齐角色名展示与“跳转到角色策略”入口；Effective 来源链路仍待补齐）
+4. [ ] i18n 清理：移除硬编码状态与提示文案（用户页状态映射、角色矩阵标题/分页、Unauthorized JS 兜底文案）。（已完成基础：用户页状态映射、角色矩阵/Requests/Workspace 关键文案、Unauthorized JS SLA/错误兜底；CopyButton 文案已收敛；仍有少量非关键文案待后续收敛）
 5. [x] diff 默认结构化渲染 + 复制反馈（Unauthorized/PolicyInspector/Requests 详情页）。
-6. [ ] 业务页面“部分授权”统一模式：按钮禁用 + 申请入口 + 权限状态提示（对齐 012 的 HRM/Logging 体验）。
+6. [x] 业务页面“部分授权”统一模式：按钮禁用 + 申请入口 + 权限状态提示（对齐 012 的 HRM/Logging 体验）。（已交付：HRM Employees 的 create/update/delete 场景；Logging 无权限直访统一 Unauthorized）
 7. [x] 导航/Quick Links/Spotlight：默认无权限隐藏 + 直访 403 统一反馈；补齐回归清单与验证（对齐 014D）。
-8. [ ] HTMX/REST 403 契约与非 HTMX fallback 回归验证（对齐 014D/015B4）。
+8. [x] HTMX/REST 403 契约与非 HTMX fallback 回归验证（对齐 014D/015B4）。（已补齐：JSON 合同、HTMX headers、HTML fallback 渲染的回归测试）
 
 ### P1（体验增强：更好理解与排障）
 1. [ ] 增加 Effective 权限汇总视图 + 来源链路（用户页）。
@@ -204,10 +204,13 @@
    - 403 payload 的 object/action 对齐为 `core.authz/read`（避免无效 missing policy），并补齐相关 i18n 文案与 toast 文案。
    - `type=g` 在角色矩阵/用户权限页进行语义化展示（Role/ParentRole，action=*，effect=allow）。
    - Unauthorized/PolicyInspector 的 diff 默认结构化渲染，并提供 raw diff + 复制能力。
+   - 业务页面（HRM Employees）在无 create/update/delete 权限时，提供禁用态 + 申请入口 + 提示（partial authorization）。
+   - CopyButton 文案收敛并纳入 i18n。
 5. **CI 修复**：
    - 修复 `templ fmt .`/`go fmt` 在 CI 的格式化差异（确保 quality-gates 通过）。
 6. **质量门禁回归**：
    - 已跑 `make check lint`、`make authz-test`、`make authz-lint`、`make check tr`、`go vet ./...` 与相关 `go test`。
+   - 补齐 ensureAuthz 的 JSON/HTMX/HTML fallback 403 契约回归测试。
 
 ### 下一步计划
 1. **业务页面体验对齐**：补齐 HRM/Logging 等业务页“部分授权”统一模式（禁用 + 申请入口 + 权限状态提示）（对齐 P0-6）。
