@@ -269,21 +269,23 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 		<div class="border border-primary rounded-lg overflow-hidden">
 			{{ columns := []*base.TableColumn{} }}
 			if props.Type == "g" {
-				{{ columns = []*base.TableColumn{
-					{Label: pageCtx.T("Authz.ParentRole"), Key: "role"},
-					{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
-					{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-28"},
-				} }}
+				{{columns = []*base.TableColumn{
+	{Label: pageCtx.T("Authz.ParentRole"), Key: "role"},
+	{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
+	{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-28"},
+}
+				}}
 			} else {
-				{{ columns = []*base.TableColumn{
-					{Label: pageCtx.T("Authz.Type"), Key: "type", Class: "w-14"},
-					{Label: pageCtx.T("Authz.Subject"), Key: "subject"},
-					{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
-					{Label: pageCtx.T("Authz.Object"), Key: "object"},
-					{Label: pageCtx.T("Authz.Action"), Key: "action"},
-					{Label: pageCtx.T("Authz.Effect"), Key: "effect", Class: "w-28"},
-					{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-28"},
-				} }}
+				{{columns = []*base.TableColumn{
+	{Label: pageCtx.T("Authz.Type"), Key: "type", Class: "w-14"},
+	{Label: pageCtx.T("Authz.Subject"), Key: "subject"},
+	{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
+	{Label: pageCtx.T("Authz.Object"), Key: "object"},
+	{Label: pageCtx.T("Authz.Action"), Key: "action"},
+	{Label: pageCtx.T("Authz.Effect"), Key: "effect", Class: "w-28"},
+	{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-28"},
+}
+				}}
 			}
 			@base.Table(base.TableProps{
 				Columns: columns,

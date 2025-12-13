@@ -595,21 +595,23 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 				{{ columns = append(columns, &base.TableColumn{Label: "", Key: "select", Class: "w-10"}) }}
 			}
 			if props.Type == "g" {
-				{{ columns = append(columns,
-					&base.TableColumn{Label: pageCtx.T("Authz.Role"), Key: "role"},
-					&base.TableColumn{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
-					&base.TableColumn{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-32"},
-				) }}
+				{{columns = append(columns,
+	&base.TableColumn{Label: pageCtx.T("Authz.Role"), Key: "role"},
+	&base.TableColumn{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
+	&base.TableColumn{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-32"},
+)
+				}}
 			} else {
-				{{ columns = append(columns,
-					&base.TableColumn{Label: pageCtx.T("Authz.Type"), Key: "type", Class: "w-14"},
-					&base.TableColumn{Label: pageCtx.T("Authz.Subject"), Key: "subject"},
-					&base.TableColumn{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
-					&base.TableColumn{Label: pageCtx.T("Authz.Object"), Key: "object"},
-					&base.TableColumn{Label: pageCtx.T("Authz.Action"), Key: "action"},
-					&base.TableColumn{Label: pageCtx.T("Authz.Effect"), Key: "effect", Class: "w-28"},
-					&base.TableColumn{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-32"},
-				) }}
+				{{columns = append(columns,
+	&base.TableColumn{Label: pageCtx.T("Authz.Type"), Key: "type", Class: "w-14"},
+	&base.TableColumn{Label: pageCtx.T("Authz.Subject"), Key: "subject"},
+	&base.TableColumn{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
+	&base.TableColumn{Label: pageCtx.T("Authz.Object"), Key: "object"},
+	&base.TableColumn{Label: pageCtx.T("Authz.Action"), Key: "action"},
+	&base.TableColumn{Label: pageCtx.T("Authz.Effect"), Key: "effect", Class: "w-28"},
+	&base.TableColumn{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-32"},
+)
+				}}
 			}
 			@base.Table(base.TableProps{
 				Columns: columns,
