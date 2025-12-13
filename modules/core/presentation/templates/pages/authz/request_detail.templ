@@ -58,7 +58,7 @@ templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
 				}
 			</div>
 			<div class="space-y-2 text-right text-xs text-surface-200">
-				<span class={"inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium", vm.StatusClass}>
+				<span class={ "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium", vm.StatusClass }>
 					{ statusLabel }
 				</span>
 				<div>
@@ -73,7 +73,6 @@ templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
 				}
 			</div>
 		</header>
-
 		<section class="grid gap-4 md:grid-cols-3">
 			<div class="space-y-2 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4 md:col-span-2">
 				<h2 class="text-sm font-semibold text-surface-50">
@@ -146,7 +145,6 @@ templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
 				}
 			</div>
 		</section>
-
 		<section class="space-y-2 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4">
 			<div class="flex items-center justify-between gap-2">
 				<h2 class="text-sm font-semibold text-surface-50">
@@ -158,7 +156,6 @@ templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
 			</div>
 			<pre class="max-h-80 overflow-auto rounded-md bg-surface-900/80 p-3 text-xs text-surface-100"><code>{ vm.DiffJSON }</code></pre>
 		</section>
-
 		if vm.BotLog != "" {
 			<section class="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/60 p-4">
 				<h2 class="text-sm font-semibold text-amber-100">
