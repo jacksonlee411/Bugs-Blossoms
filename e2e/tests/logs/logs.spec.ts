@@ -21,18 +21,9 @@ test.describe('logging authz gating', () => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
 		await waitForAlpine(page);
 
-		// Prefer visible expanded link to avoid grabbing the collapsed (hidden) variant
-		const logsNavLink = page.locator('a[href="/logs"]').filter({ hasText: /logs/i }).first();
-
-		// If the sidebar is collapsed, expand it to make the link visible
-		if (!(await logsNavLink.isVisible())) {
-			const toggleButton = page.locator('button.btn-sidebar-toggle');
-			if (await toggleButton.isVisible()) {
-				await toggleButton.click();
-			}
-		}
-
-		await expect(logsNavLink).toBeVisible();
+		// Ensure authorized users have a Logs navigation entry
+		const logsNavLink = page.locator('a[href="/logs"]').filter({ hasText: /logs/i });
+		await expect(logsNavLink).toHaveCount(1);
 
 		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
 		if (response) {
