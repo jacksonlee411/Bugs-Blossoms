@@ -8,7 +8,11 @@ package copy_button
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import icons "github.com/iota-uz/icons/phosphor"
+import (
+	icons "github.com/iota-uz/icons/phosphor"
+
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
 
 type Props struct {
 	Text     string
@@ -46,6 +50,7 @@ func CopyButton(props Props) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		pageCtx := composables.UsePageCtx(ctx)
 		size := props.Size
 		if size == "" {
 			size = "16"
@@ -54,6 +59,12 @@ func CopyButton(props Props) templ.Component {
 		if variant == "" {
 			variant = VariantDefault
 		}
+		copyLabel := pageCtx.T("CopyButton.Copy")
+		copiedLabel := pageCtx.T("CopyButton.Copied")
+		textJSON, _ := templ.JSONString(props.Text)
+		copyLabelJSON, _ := templ.JSONString(copyLabel)
+		copiedLabelJSON, _ := templ.JSONString(copiedLabel)
+		xData := "{copied:false,text:" + textJSON + ",copyLabel:" + copyLabelJSON + ",copiedLabel:" + copiedLabelJSON + ",async copyText(){try{await navigator.clipboard.writeText(this.text);this.copied=true;setTimeout(()=>this.copied=false,2000);}catch(err){console.error('Failed to copy text: ',err);}}}"
 		var templ_7745c5c3_Var2 = []any{
 			"inline-flex items-center gap-1 transition-all duration-200 text-gray-300 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 rounded cursor-pointer",
 			templ.KV("bg-gray-100 hover:bg-gray-200 px-2 py-1", variant == VariantDefault),
@@ -82,20 +93,9 @@ func CopyButton(props Props) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(`{
-			copied: false,
-			async copyText() {
-				try {
-					await navigator.clipboard.writeText('` + props.Text + `');
-					this.copied = true;
-					setTimeout(() => this.copied = false, 2000);
-				} catch (err) {
-					console.error('Failed to copy text: ', err);
-				}
-			}
-		}`)
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(xData)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/copy_button/copy_button.templ`, Line: 48, Col: 4}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/copy_button/copy_button.templ`, Line: 48, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -122,7 +122,7 @@ func CopyButton(props Props) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if props.ShowText {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<span class=\"text-xs font-medium\" x-text=\"copied ? &#39;Copied!&#39; : &#39;Copy&#39;\"></span>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<span class=\"text-xs font-medium\" x-text=\"copied ? copiedLabel : copyLabel\"></span>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

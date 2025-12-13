@@ -68,6 +68,10 @@
     "Prev": "上一页",
     "Next": "下一页"
   },
+  "CopyButton": {
+    "Copy": "复制",
+    "Copied": "已复制"
+  },
   "Spotlight": {
     "Placeholder": "搜索...",
     "NothingFound": "未找到任何内容",
@@ -217,7 +221,8 @@
     "Permissions": {
       "Inherited": "继承权限",
       "Direct": "直接权限",
-      "Overrides": "覆盖权限"
+      "Overrides": "覆盖权限",
+      "ViewRolePolicies": "查看角色策略"
     },
     "Single": {
       "EditUser": "编辑用户",
@@ -433,10 +438,24 @@
     "Object": "资源",
     "Action": "动作",
     "Subject": "主体",
+    "Type": "类型",
+    "Effect": "效果",
+    "Role": "角色",
+    "ParentRole": "父角色",
     "Workspace": {
       "Context": "上下文",
       "Changes": "变更",
-      "Discard": "丢弃草稿"
+      "Discard": "丢弃草稿",
+      "ConfirmTitle": "确认提交",
+      "ConfirmDescription": "将基于暂存变更创建草稿。",
+      "WarningTitle": "危险项提示",
+      "WarningDeny": "包含 {{.Count}} 条 deny 规则。",
+      "WarningWildcard": "包含 {{.Count}} 条通配符规则。",
+      "WarningMultiDomain": "涉及多个域：{{.Domains}}",
+      "PreviewTitle": "变更预览",
+      "PreviewKind": "变更",
+      "PreviewAdd": "新增",
+      "PreviewRemove": "撤销"
     },
     "RequestDetail": {
       "Title": "策略变更申请",
@@ -449,7 +468,11 @@
       "ViewPR": "查看 PR",
       "RawDiffTitle": "原始 diff",
       "RawDiffFormat": "JSON",
-      "BotLogTitle": "Bot 日志"
+      "BotLogTitle": "Bot 日志",
+      "Approve": "批准",
+      "Reject": "拒绝",
+      "Cancel": "取消",
+      "Revert": "回滚"
     },
     "Toast": {
       "ErrorTitle": "错误",
@@ -510,6 +533,7 @@
       "Timeout": "超时未回写，请复制 request_id 并重试查询",
       "Retry": "重试查询",
       "Copy": "复制 request_id",
+      "CountdownPrefix": "SLA",
       "Unknown": "SLA 未知"
     },
     "Status": {

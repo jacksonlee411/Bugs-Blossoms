@@ -68,6 +68,10 @@
     "Prev": "Oldingi",
     "Next": "Keyingi"
   },
+  "CopyButton": {
+    "Copy": "Nusxalash",
+    "Copied": "Nusxalandi"
+  },
   "Spotlight": {
     "Placeholder": "Qidirish...",
     "NothingFound": "Hech narsa topilmadi",
@@ -214,7 +218,8 @@
     "Permissions": {
       "Inherited": "Meros qilingan",
       "Direct": "To'g'ridan-to'g'ri",
-      "Overrides": "Bekor qiluvchi"
+      "Overrides": "Bekor qiluvchi",
+      "ViewRolePolicies": "Rol siyosatlarini ko'rish"
     },
     "Single": {
       "EditUser": "Foydalanuvchini tahrirlash",
@@ -430,10 +435,24 @@
     "Object": "Obyekt",
     "Action": "Amal",
     "Subject": "Subyekt",
+    "Type": "Turi",
+    "Effect": "Ta'sir",
+    "Role": "Rol",
+    "ParentRole": "Ota rol",
     "Workspace": {
       "Context": "Kontekst",
       "Changes": "O‘zgarishlar",
-      "Discard": "Loyihani bekor qilish"
+      "Discard": "Loyihani bekor qilish",
+      "ConfirmTitle": "Yuborishni tasdiqlang",
+      "ConfirmDescription": "Qoralama o‘zgarishlardan loyiha yaratiladi.",
+      "WarningTitle": "Xavf ogohlantirishlari",
+      "WarningDeny": "{{.Count}} ta deny qoida mavjud.",
+      "WarningWildcard": "{{.Count}} ta wildcard (*) qoida mavjud.",
+      "WarningMultiDomain": "Bir nechta domenlar: {{.Domains}}",
+      "PreviewTitle": "Ko‘rib chiqish",
+      "PreviewKind": "O‘zgarish",
+      "PreviewAdd": "Qo‘shish",
+      "PreviewRemove": "O'chirish"
     },
     "RequestDetail": {
       "Title": "Siyosat o‘zgarishi so‘rovi",
@@ -446,7 +465,11 @@
       "ViewPR": "PRni ko‘rish",
       "RawDiffTitle": "Xom diff",
       "RawDiffFormat": "JSON",
-      "BotLogTitle": "Bot jurnali"
+      "BotLogTitle": "Bot jurnali",
+      "Approve": "Tasdiqlash",
+      "Reject": "Rad etish",
+      "Cancel": "Bekor qilish",
+      "Revert": "Qaytarish"
     },
     "Toast": {
       "ErrorTitle": "Xato",
@@ -507,6 +530,7 @@
       "Timeout": "Holat olinmadi, request_id ni nusxalab qayta urinib ko'ring",
       "Retry": "Qayta tekshirish",
       "Copy": "request_id nusxalash",
+      "CountdownPrefix": "SLA",
       "Unknown": "SLA noma'lum"
     },
     "Status": {

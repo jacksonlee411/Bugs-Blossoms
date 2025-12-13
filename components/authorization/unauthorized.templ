@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/iota-uz/iota-sdk/components/copy_button"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
@@ -38,6 +39,7 @@ templ requestForm(props RequestFormProps) {
 	submitLabel = pageCtx.T("Authz.Unauthorized.Apply")
 }
 	}}
+	{{ suggestions := parseSuggestedDiff(props.Diff) }}
 	<form
 		class="space-y-3"
 		hx-post={ requestURL }
@@ -55,13 +57,45 @@ templ requestForm(props RequestFormProps) {
 		<label class="block text-xs font-semibold text-surface-200" for="authz-diff">
 			{ pageCtx.T("Authz.Unauthorized.SuggestedDiff") }
 		</label>
-		<textarea
-			id="authz-diff"
-			name="diff"
-			rows="4"
-			class="w-full rounded-md border border-surface-400/60 bg-surface-500/40 p-2 text-xs font-mono text-surface-50"
-			readonly
-		>{ props.Diff }</textarea>
+		<textarea id="authz-diff" name="diff" class="hidden" readonly>{ props.Diff }</textarea>
+		<div class="rounded-md border border-surface-400/60 bg-surface-500/30 p-3 space-y-2">
+			if len(suggestions) > 0 {
+				<table class="w-full table-auto border-collapse text-xs">
+					<thead class="border-b border-surface-400/60 text-left text-surface-200">
+						<tr>
+							<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Domain") }</th>
+							<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Object") }</th>
+							<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Action") }</th>
+							<th class="py-1 font-medium">{ pageCtx.T("Authz.Effect") }</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-surface-400/40 text-surface-50">
+						for _, item := range suggestions {
+							<tr class="align-top">
+								<td class="py-1 pr-3 font-mono">{ item.Domain }</td>
+								<td class="py-1 pr-3 font-mono break-all">{ item.Object }</td>
+								<td class="py-1 pr-3 font-mono">{ item.Action }</td>
+								<td class="py-1 font-mono">{ item.Effect }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			} else {
+				<div class="text-xs text-surface-200">{ pageCtx.T("Empty") }</div>
+			}
+			<div class="flex items-center justify-between gap-2 pt-1">
+				<details class="text-xs text-surface-200">
+					<summary class="cursor-pointer select-none">{ pageCtx.T("Authz.RequestDetail.RawDiffTitle") }</summary>
+					<pre class="mt-2 max-h-44 overflow-auto rounded bg-surface-900/80 p-2 text-[11px] text-surface-50"><code>{ props.Diff }</code></pre>
+				</details>
+				@copy_button.CopyButton(copy_button.Props{
+					Text:    props.Diff,
+					Variant: copy_button.VariantMinimal,
+					Size:    "14",
+					Class:   "!text-surface-200 hover:!text-surface-50",
+				})
+			</div>
+		</div>
 		<div class="space-y-2">
 			<label class="block text-xs font-semibold text-surface-200" for="authz-reason">
 				{ pageCtx.T("Authz.Unauthorized.Reason") }
@@ -138,6 +172,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 		data-base-revision={ baseRevision }
 		data-request-id={ requestID }
 		data-sla-unknown={ pageCtx.T("Authz.SLA.Unknown") }
+		data-sla-countdown-prefix={ pageCtx.T("Authz.SLA.CountdownPrefix") }
 		data-status-unknown-label={ pageCtx.T("Unknown") }
 		data-status-pending-review={ pageCtx.T("Authz.Status.PendingReview") }
 		data-status-approved={ pageCtx.T("Authz.Status.Approved") }
@@ -325,6 +360,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 
 					function formatSLA(container, isoString) {
 						const unknown = (container?.dataset?.slaUnknown || "").trim();
+						const prefix = (container?.dataset?.slaCountdownPrefix || "").trim();
 						if (!isoString) {
 							return unknown;
 						}
@@ -338,7 +374,8 @@ templ Unauthorized(props *UnauthorizedProps) {
 						}
 						const mins = Math.floor(diff / 60000);
 						const secs = Math.floor((diff % 60000) / 1000);
-						return "SLA " + String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+						const countdown = String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+						return prefix ? prefix + " " + countdown : countdown;
 					}
 
 					function findContainer(id) {
@@ -405,7 +442,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 						}
 						if (!resp.ok) {
 							const labels = toastLabels(null);
-							throw payload || { code: resp.status, message: labels.defaultError || "Request failed, please try again" };
+							throw payload || { code: resp.status, message: labels.defaultError };
 						}
 						const data = normalize(payload);
 						cache.set(id, { data, fetchedAt: Date.now(), status: data?.status || "" });
@@ -425,10 +462,10 @@ templ Unauthorized(props *UnauthorizedProps) {
 						const code = detail.code || detail.Code || "";
 						const container = (detail.meta && detail.meta.request_id) ? findContainer(detail.meta.request_id) : null;
 						const labels = toastLabels(container);
-						const message = detail.message || detail.Message || labels.defaultError || "Request failed, please try again";
-						dispatchToast("error", code || labels.errorTitle || "Error", message);
+						const message = detail.message || detail.Message || labels.defaultError;
+						dispatchToast("error", code || labels.errorTitle, message);
 						if (detail.meta && detail.meta.base_revision) {
-							dispatchToast("warning", labels.staleTitle || "Policy revision updated", labels.staleMessage || "Refresh the page to sync the latest policy revision");
+							dispatchToast("warning", labels.staleTitle, labels.staleMessage);
 						}
 						if (detail.meta && detail.meta.request_id) {
 							const retry = container?.querySelector("[data-authz-retry-bot]");
@@ -494,10 +531,11 @@ templ Unauthorized(props *UnauthorizedProps) {
 							return;
 						}
 						const labels = toastLabels(null);
-						const slaMsg = detail.estimatedSLA ? formatSLA({ dataset: { slaUnknown: "" } }, detail.estimatedSLA) : "";
-						const prefix = labels.submittedPrefix || "Submitted";
+						const container = findContainer(detail.id) || document.querySelector("[data-authz-container]");
+						const slaMsg = detail.estimatedSLA ? formatSLA(container, detail.estimatedSLA) : "";
+						const prefix = labels.submittedPrefix;
 						const message = slaMsg ? prefix + " " + detail.id + " · " + slaMsg : prefix + " " + detail.id;
-						dispatchToast("success", labels.submitTitle || "Submitted", message);
+						dispatchToast("success", labels.submitTitle, message);
 						handleUpdate(detail.id, detail);
 					}
 
@@ -619,7 +657,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 						return;
 					}
 					var container = retryBtn.closest("[data-authz-container]");
-					var defaultErrorMsg = (container && container.dataset && container.dataset.toastDefaultError) || "Request failed, please try again";
+					var defaultErrorMsg = (container && container.dataset && container.dataset.toastDefaultError) || "";
 					retryBtn.disabled = true;
 					fetch("/core/api/authz/requests/" + reqId + "/trigger-bot?retry_token=" + encodeURIComponent(token), {
 						method: "POST",

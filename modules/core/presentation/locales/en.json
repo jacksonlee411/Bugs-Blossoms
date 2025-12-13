@@ -68,6 +68,10 @@
     "Prev": "Previous",
     "Next": "Next"
   },
+  "CopyButton": {
+    "Copy": "Copy",
+    "Copied": "Copied!"
+  },
   "Spotlight": {
     "Placeholder": "Search...",
     "NothingFound": "Nothing found",
@@ -214,7 +218,8 @@
     "Permissions": {
       "Inherited": "Inherited",
       "Direct": "Direct",
-      "Overrides": "Overrides"
+      "Overrides": "Overrides",
+      "ViewRolePolicies": "View role policies"
     },
     "Single": {
       "EditUser": "Edit user",
@@ -430,10 +435,24 @@
     "Object": "Object",
     "Action": "Action",
     "Subject": "Subject",
+    "Type": "Type",
+    "Effect": "Effect",
+    "Role": "Role",
+    "ParentRole": "Parent role",
     "Workspace": {
       "Context": "Context",
       "Changes": "Changes",
-      "Discard": "Discard draft"
+      "Discard": "Discard draft",
+      "ConfirmTitle": "Confirm submission",
+      "ConfirmDescription": "This will create a draft from staged changes.",
+      "WarningTitle": "Risk warnings",
+      "WarningDeny": "Contains {{.Count}} deny rule(s).",
+      "WarningWildcard": "Contains {{.Count}} wildcard rule(s).",
+      "WarningMultiDomain": "Affects multiple domains: {{.Domains}}",
+      "PreviewTitle": "Preview",
+      "PreviewKind": "Change",
+      "PreviewAdd": "Add",
+      "PreviewRemove": "Remove"
     },
     "RequestDetail": {
       "Title": "Policy Change Request",
@@ -446,7 +465,11 @@
       "ViewPR": "View PR",
       "RawDiffTitle": "Raw diff",
       "RawDiffFormat": "JSON",
-      "BotLogTitle": "Bot log"
+      "BotLogTitle": "Bot log",
+      "Approve": "Approve",
+      "Reject": "Reject",
+      "Cancel": "Cancel",
+      "Revert": "Revert"
     },
     "Toast": {
       "ErrorTitle": "Error",
@@ -507,6 +530,7 @@
       "Timeout": "Timed out waiting for status, copy request_id and retry",
       "Retry": "Retry",
       "Copy": "Copy request_id",
+      "CountdownPrefix": "SLA",
       "Unknown": "SLA unknown"
     },
     "Status": {

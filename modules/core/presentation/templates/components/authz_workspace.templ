@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/iota-uz/iota-sdk/components/base/dialog"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
@@ -14,6 +15,7 @@ type AuthzWorkspaceProps struct {
 	DisplayDomain string
 	StagedCount   int
 	Summary       viewmodels.AuthzChangesSummary
+	Preview       viewmodels.AuthzWorkspacePreview
 	SubmitURL     string
 	ClearURL      string
 	RequestObject string
@@ -32,6 +34,7 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 	if displayDomain == "" {
 		{{ displayDomain = props.Domain }}
 	}
+	{{ confirmAction := "open-authz-workspace-confirmation" }}
 	<form
 		id="authz-workspace"
 		class="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-400/60 bg-surface-700/90 backdrop-blur"
@@ -89,12 +92,94 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 				</button>
 				<button
 					class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
-					type="submit"
+					type="button"
+					@click={ fmt.Sprintf("$dispatch('%s')", confirmAction) }
 				>
 					{ pageCtx.T("Authz.Stage.SubmitDraft") }
 				</button>
 			</div>
 		</div>
 	</form>
+	@dialog.Confirmation(&dialog.Props{
+		Heading:     pageCtx.T("Authz.Workspace.ConfirmTitle"),
+		Text:        pageCtx.T("Authz.Workspace.ConfirmDescription"),
+		Action:      confirmAction,
+		CancelText:  pageCtx.T("Cancel"),
+		ConfirmText: pageCtx.T("Authz.Stage.SubmitDraft"),
+		Attrs: templ.Attributes{
+			"@closing": `({target}) => {
+				if (target.returnValue === "confirm") {
+					const form = document.getElementById("authz-workspace");
+					if (form && form.requestSubmit) {
+						form.requestSubmit();
+					}
+				}
+			}`,
+		},
+	}) {
+		<div class="w-full space-y-4 text-sm text-surface-700">
+			if props.Preview.DenyCount > 0 || props.Preview.WildcardCount > 0 || len(props.Preview.Domains) > 1 {
+				<div class="w-full rounded-md border border-amber-500/40 bg-amber-50 px-3 py-2 text-amber-900">
+					<div class="text-xs font-semibold uppercase tracking-wide">{ pageCtx.T("Authz.Workspace.WarningTitle") }</div>
+					<ul class="mt-2 list-disc pl-5 space-y-1 text-xs">
+						if props.Preview.DenyCount > 0 {
+							<li>{ pageCtx.T("Authz.Workspace.WarningDeny", map[string]any{"Count": props.Preview.DenyCount}) }</li>
+						}
+						if props.Preview.WildcardCount > 0 {
+							<li>{ pageCtx.T("Authz.Workspace.WarningWildcard", map[string]any{"Count": props.Preview.WildcardCount}) }</li>
+						}
+						if len(props.Preview.Domains) > 1 {
+							<li>{ pageCtx.T("Authz.Workspace.WarningMultiDomain", map[string]any{"Domains": strings.Join(props.Preview.Domains, ", ")}) }</li>
+						}
+					</ul>
+				</div>
+			}
+			<div class="space-y-2">
+				<div class="text-xs font-semibold uppercase tracking-wide text-surface-500">
+					{ pageCtx.T("Authz.Workspace.PreviewTitle") }
+				</div>
+				if len(props.Preview.Items) == 0 {
+					<div class="text-xs text-surface-500">{ pageCtx.T("Empty") }</div>
+				} else {
+					<div class="max-h-64 overflow-auto rounded-md border border-surface-200 bg-white">
+						<table class="w-full table-auto border-collapse text-xs">
+							<thead class="border-b border-surface-200 text-left text-surface-500">
+								<tr>
+									<th class="px-3 py-2 font-medium">{ pageCtx.T("Authz.Workspace.PreviewKind") }</th>
+									<th class="px-3 py-2 font-medium">{ pageCtx.T("Authz.Type") }</th>
+									<th class="px-3 py-2 font-medium">{ pageCtx.T("Authz.Domain") }</th>
+									<th class="px-3 py-2 font-medium">{ pageCtx.T("Authz.Object") }</th>
+									<th class="px-3 py-2 font-medium">{ pageCtx.T("Authz.Action") }</th>
+									<th class="px-3 py-2 font-medium">{ pageCtx.T("Authz.Effect") }</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-surface-100">
+								for _, item := range props.Preview.Items {
+									<tr class="align-top">
+										<td class="px-3 py-2">
+											if item.StageKind == "remove" {
+												<span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 font-medium text-red-700">
+													{ pageCtx.T("Authz.Workspace.PreviewRemove") }
+												</span>
+											} else {
+												<span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-700">
+													{ pageCtx.T("Authz.Workspace.PreviewAdd") }
+												</span>
+											}
+										</td>
+										<td class="px-3 py-2 font-mono text-surface-700">{ item.Type }</td>
+										<td class="px-3 py-2 font-mono text-surface-700">{ item.Domain }</td>
+										<td class="px-3 py-2 font-mono text-surface-700 break-all">{ item.Object }</td>
+										<td class="px-3 py-2 font-mono text-surface-700 break-all">{ item.Action }</td>
+										<td class="px-3 py-2 font-mono text-surface-700">{ item.Effect }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</div>
+		</div>
+	}
 	<div class="h-20"></div>
 }

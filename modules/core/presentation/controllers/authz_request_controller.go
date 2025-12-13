@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	authzpkg "github.com/iota-uz/iota-sdk/pkg/authz"
 	authzPersistence "github.com/iota-uz/iota-sdk/pkg/authz/persistence"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
@@ -72,6 +74,7 @@ func (c *AuthzRequestController) List(w http.ResponseWriter, r *http.Request) {
 
 	mine := query.Get("mine") == "1" || strings.EqualFold(query.Get("mine"), "true")
 	sortAsc := strings.EqualFold(strings.TrimSpace(query.Get("sort")), "asc")
+	canReview := composables.CanUser(r.Context(), permissions.AuthzRequestsReview) == nil
 
 	listParams := services.ListPolicyDraftsParams{
 		Subject:  subject,
@@ -110,14 +113,15 @@ func (c *AuthzRequestController) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	viewModel := &viewmodels.AuthzRequestList{
-		Items:    items,
-		Total:    total,
-		Page:     params.Page,
-		Limit:    params.Limit,
-		Mine:     mine,
-		Statuses: statuses,
-		Subject:  subject,
-		Domain:   domain,
+		Items:     items,
+		Total:     total,
+		Page:      params.Page,
+		Limit:     params.Limit,
+		Mine:      mine,
+		Statuses:  statuses,
+		Subject:   subject,
+		Domain:    domain,
+		CanReview: canReview,
 	}
 
 	templ.Handler(authz.Requests(viewModel), templ.WithStreaming()).ServeHTTP(w, r)
@@ -152,7 +156,7 @@ func (c *AuthzRequestController) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	viewModel := buildAuthzRequestDetail(draft)
+	viewModel := buildAuthzRequestDetail(r.Context(), draft)
 
 	templ.Handler(authz.RequestDetail(viewModel), templ.WithStreaming()).ServeHTTP(w, r)
 }
@@ -174,7 +178,7 @@ func buildAuthzRequestListItem(draft services.PolicyDraft) viewmodels.AuthzReque
 	}
 }
 
-func buildAuthzRequestDetail(draft services.PolicyDraft) *viewmodels.AuthzRequestDetail {
+func buildAuthzRequestDetail(ctx context.Context, draft services.PolicyDraft) *viewmodels.AuthzRequestDetail {
 	var pretty bytes.Buffer
 	diffJSON := ""
 	if len(draft.Diff) > 0 {
@@ -185,29 +189,48 @@ func buildAuthzRequestDetail(draft services.PolicyDraft) *viewmodels.AuthzReques
 		}
 	}
 
+	diffKind := ""
 	diffItems := make([]viewmodels.PolicyDiffItem, 0)
+	suggestions := make([]viewmodels.AuthzPolicySuggestionItem, 0)
 	if len(draft.Diff) > 0 {
 		var rawOps []map[string]any
-		if err := json.Unmarshal(draft.Diff, &rawOps); err == nil {
-			for _, op := range rawOps {
-				opName, _ := op["op"].(string)
-				path, _ := op["path"].(string)
-				var text string
-				if val, ok := op["value"]; ok {
-					switch v := val.(type) {
-					case string:
-						text = v
-					default:
-						if b, err := json.Marshal(v); err == nil {
-							text = string(b)
+		if err := json.Unmarshal(draft.Diff, &rawOps); err == nil && len(rawOps) > 0 {
+			if _, ok := rawOps[0]["op"]; ok {
+				diffKind = "patch"
+				for _, op := range rawOps {
+					opName, _ := op["op"].(string)
+					path, _ := op["path"].(string)
+					var text string
+					if val, ok := op["value"]; ok {
+						switch v := val.(type) {
+						case string:
+							text = v
+						default:
+							if b, err := json.Marshal(v); err == nil {
+								text = string(b)
+							}
 						}
 					}
+					diffItems = append(diffItems, viewmodels.PolicyDiffItem{
+						Op:   opName,
+						Path: path,
+						Text: text,
+					})
 				}
-				diffItems = append(diffItems, viewmodels.PolicyDiffItem{
-					Op:   opName,
-					Path: path,
-					Text: text,
-				})
+			} else if _, ok := rawOps[0]["subject"]; ok {
+				diffKind = "suggestions"
+				var parsed []authzpkg.PolicySuggestion
+				if err := json.Unmarshal(draft.Diff, &parsed); err == nil {
+					for _, item := range parsed {
+						suggestions = append(suggestions, viewmodels.AuthzPolicySuggestionItem{
+							Subject: item.Subject,
+							Domain:  item.Domain,
+							Object:  item.Object,
+							Action:  item.Action,
+							Effect:  item.Effect,
+						})
+					}
+				}
 			}
 		}
 	}
@@ -229,6 +252,17 @@ func buildAuthzRequestDetail(draft services.PolicyDraft) *viewmodels.AuthzReques
 		prLink = strings.TrimSpace(*draft.PRLink)
 	}
 
+	canReview := composables.CanUser(ctx, permissions.AuthzRequestsReview) == nil
+	canCancel := composables.CanUser(ctx, permissions.AuthzRequestsWrite) == nil
+	canRevert := canReview && len(draft.AppliedPolicySnapshot) > 0
+	canRetryBot := canReview || canCancel
+	retryToken := ""
+	if canRetryBot && draft.Status == authzPersistence.PolicyChangeStatusFailed {
+		if token, err := authzutil.GenerateRetryToken(draft.ID, time.Minute); err == nil {
+			retryToken = token
+		}
+	}
+
 	return &viewmodels.AuthzRequestDetail{
 		ID:          draft.ID.String(),
 		Status:      status,
@@ -242,9 +276,16 @@ func buildAuthzRequestDetail(draft services.PolicyDraft) *viewmodels.AuthzReques
 		Domain:      draft.Domain,
 		Reason:      draft.Reason,
 		DiffJSON:    diffJSON,
+		DiffKind:    diffKind,
 		Diff:        diffItems,
+		Suggestions: suggestions,
 		BotLog:      botLog,
 		PRLink:      prLink,
+		CanReview:   canReview,
+		CanCancel:   canCancel,
+		CanRevert:   canRevert,
+		CanRetryBot: canRetryBot,
+		RetryToken:  retryToken,
 	}
 }
 

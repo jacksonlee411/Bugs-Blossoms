@@ -14,10 +14,11 @@ import (
 )
 
 type EditPageProps struct {
-	Employee  *viewmodels.Employee
-	Errors    map[string]string
-	SaveURL   string
-	DeleteURL string
+	Employee   *viewmodels.Employee
+	Errors     map[string]string
+	SaveURL    string
+	DeleteURL  string
+	CanRequest bool
 }
 
 templ EditForm(props *EditPageProps) {
@@ -175,65 +176,107 @@ templ EditForm(props *EditPageProps) {
 				</div>
 			}
 		</div>
-		<div
-			x-data
-			class="h-20 shadow-t-lg border-t w-full flex items-center justify-end px-8 bg-surface-300 border-t-primary mt-auto gap-4"
-		>
-			{{deleteAttrs := templ.Attributes{
+		<div x-data class="shadow-t-lg border-t w-full bg-surface-300 border-t-primary mt-auto px-8 py-4 space-y-3">
+			if !canUpdate || !canDelete {
+				<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-900/30 px-3 py-2 text-sm text-amber-100">
+					<span>{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
+					<div class="flex flex-wrap items-center gap-2">
+						if props.CanRequest {
+							if !canUpdate {
+								<form hx-post="/core/api/authz/requests" hx-target="body" hx-swap="none">
+									<input type="hidden" name="object" value="hrm.employees"/>
+									<input type="hidden" name="action" value="update"/>
+									<input type="hidden" name="domain" value="hrm"/>
+									<input type="hidden" name="diff" value="[]"/>
+									<input type="hidden" name="request_access" value="1"/>
+									<input
+										type="hidden"
+										name="reason"
+										value={ pageCtx.T("Authz.Unauthorized.ReasonDefault", map[string]any{"Operation": pageCtx.T("Save")}) }
+									/>
+									<button class="btn btn-xs btn-primary" type="submit">
+										{ pageCtx.T("Authz.Unauthorized.Apply") }
+									</button>
+								</form>
+							}
+							if canUpdate && !canDelete {
+								<form hx-post="/core/api/authz/requests" hx-target="body" hx-swap="none">
+									<input type="hidden" name="object" value="hrm.employees"/>
+									<input type="hidden" name="action" value="delete"/>
+									<input type="hidden" name="domain" value="hrm"/>
+									<input type="hidden" name="diff" value="[]"/>
+									<input type="hidden" name="request_access" value="1"/>
+									<input
+										type="hidden"
+										name="reason"
+										value={ pageCtx.T("Authz.Unauthorized.ReasonDefault", map[string]any{"Operation": pageCtx.T("Delete")}) }
+									/>
+									<button class="btn btn-xs btn-primary" type="submit">
+										{ pageCtx.T("Authz.Unauthorized.Apply") }
+									</button>
+								</form>
+							}
+						}
+					</div>
+				</div>
+			}
+			<div class="flex items-center justify-end gap-4">
+				{{deleteAttrs := templ.Attributes{
 	"name":   "_action",
 	"value":  "delete",
 	"type":   "button",
 	"@click": "$dispatch('open-delete-employee-confirmation')",
 	"id":     "delete-employee-btn",
 }
-			}}
-			if !canDelete {
-				deleteAttrs["disabled"] = "true"
-				deleteAttrs["aria-disabled"] = "true"
-				deleteAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
-			}
-			<form
-				id="delete-form"
-				hx-delete={ props.DeleteURL }
-				hx-trigger="submit"
-				hx-target="closest .content"
-				hx-swap="innerHTML"
-				hx-indicator="#delete-employee-btn"
-				hx-disabled-elt="find button"
-			>
-				@button.Danger(button.Props{
-					Size:  button.SizeMD,
-					Attrs: deleteAttrs,
-				}) {
-					{ pageCtx.T("Delete") }
+				}}
+				if !canDelete {
+					deleteAttrs["disabled"] = "true"
+					deleteAttrs["aria-disabled"] = "true"
+					deleteAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
 				}
-			</form>
-			{{saveAttrs := templ.Attributes{
+				<form
+					id="delete-form"
+					hx-delete={ props.DeleteURL }
+					hx-trigger="submit"
+					hx-target="closest .content"
+					hx-swap="innerHTML"
+					hx-indicator="#delete-employee-btn"
+					hx-disabled-elt="find button"
+				>
+					@button.Danger(button.Props{
+						Size:  button.SizeMD,
+						Attrs: deleteAttrs,
+					}) {
+						{ pageCtx.T("Delete") }
+					}
+				</form>
+				{{saveAttrs := templ.Attributes{
 	"name":  "_action",
 	"value": "save",
 	"id":    "save-btn",
 }
-			}}
-			if !canUpdate {
-				saveAttrs["disabled"] = "true"
-				saveAttrs["aria-disabled"] = "true"
-				saveAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
-			}
-			<form
-				id="save-form"
-				method="post"
-				hx-post={ props.SaveURL }
-				hx-indicator="#save-btn"
-				hx-target="#edit-content"
-				hx-swap="outerHTML"
-			>
-				@button.Primary(button.Props{
-					Size:  button.SizeMD,
-					Attrs: saveAttrs,
-				}) {
-					{ pageCtx.T("Save") }
+				}}
+				if !canUpdate {
+					saveAttrs["disabled"] = "true"
+					saveAttrs["aria-disabled"] = "true"
+					saveAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
 				}
-			</form>
+				<form
+					id="save-form"
+					method="post"
+					hx-post={ props.SaveURL }
+					hx-indicator="#save-btn"
+					hx-target="#edit-content"
+					hx-swap="outerHTML"
+				>
+					@button.Primary(button.Props{
+						Size:  button.SizeMD,
+						Attrs: saveAttrs,
+					}) {
+						{ pageCtx.T("Save") }
+					}
+				</form>
+			</div>
 		</div>
 	</div>
 }

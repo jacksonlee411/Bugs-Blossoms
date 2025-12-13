@@ -13,10 +13,11 @@ import (
 )
 
 type IndexPageProps struct {
-	Employees []*viewmodels.Employee
-	NewURL    string
-	CanCreate bool
-	CanDebug  bool
+	Employees  []*viewmodels.Employee
+	NewURL     string
+	CanCreate  bool
+	CanRequest bool
+	CanDebug   bool
 }
 
 templ EmployeesTable(props *IndexPageProps) {
@@ -84,53 +85,85 @@ templ EmployeesContent(props *IndexPageProps) {
 			})
 		}
 		<div class="mt-5 bg-surface-600 border border-primary rounded-lg">
-			<form
-				class="p-4 flex items-center gap-3"
-				hx-get="/hrm/employees"
-				hx-trigger="keyup changed delay:500ms from:(form input), change changed from:(form select)"
-				hx-target="table"
-				hx-swap="outerHTML"
-			>
-				@input.Text(&input.Props{
-					AddonLeft: &input.Addon{
-						Component: icons.MagnifyingGlass(icons.Props{Size: "20"}),
-					},
-					Placeholder: pageCtx.T("Search"),
-					Attrs: templ.Attributes{
-						"name": "name",
-					},
-				})
-				@base.Select(&base.SelectProps{
-					Prefix: pageCtx.T("PerPage"),
-					Attrs: templ.Attributes{
-						"name": "limit",
-					},
-				}) {
-					<option>15</option>
-					<option>25</option>
-					<option>50</option>
-					<option>100</option>
-				}
-				@base.Select(&base.SelectProps{Placeholder: pageCtx.T("CreatedAt")}) {
-					<option>Yesterday</option>
-					<option>The day before yesterday</option>
-				}
-				@button.Primary(button.Props{
-					Size: button.SizeNormal,
-					Href: props.NewURL,
-					Icon: icons.PlusCircle(icons.Props{Size: "18"}),
-					Attrs: templ.Attributes{
-						"aria-disabled": templ.KV("true", !props.CanCreate),
-						"disabled":      templ.KV("true", !props.CanCreate),
-					},
-				}) {
-					if props.CanCreate {
-						{ pageCtx.T("Employees.List.New") }
-					} else {
-						{ pageCtx.T("Authz.Unauthorized.ApplyHint") }
+			<div class="p-4 flex items-center gap-3">
+				<form
+					class="flex items-center gap-3 flex-1"
+					hx-get="/hrm/employees"
+					hx-trigger="keyup changed delay:500ms from:(form input), change changed from:(form select)"
+					hx-target="table"
+					hx-swap="outerHTML"
+				>
+					@input.Text(&input.Props{
+						AddonLeft: &input.Addon{
+							Component: icons.MagnifyingGlass(icons.Props{Size: "20"}),
+						},
+						Placeholder: pageCtx.T("Search"),
+						Attrs: templ.Attributes{
+							"name": "name",
+						},
+					})
+					@base.Select(&base.SelectProps{
+						Prefix: pageCtx.T("PerPage"),
+						Attrs: templ.Attributes{
+							"name": "limit",
+						},
+					}) {
+						<option>15</option>
+						<option>25</option>
+						<option>50</option>
+						<option>100</option>
 					}
-				}
-			</form>
+					@base.Select(&base.SelectProps{Placeholder: pageCtx.T("CreatedAt")}) {
+						<option>Yesterday</option>
+						<option>The day before yesterday</option>
+					}
+				</form>
+				<div class="flex items-center gap-2">
+					@button.Primary(button.Props{
+						Size:     button.SizeNormal,
+						Href:     props.NewURL,
+						Disabled: !props.CanCreate,
+						Icon:     icons.PlusCircle(icons.Props{Size: "18"}),
+						Attrs: func() templ.Attributes {
+							attrs := templ.Attributes{}
+							if !props.CanCreate {
+								attrs["aria-disabled"] = "true"
+								attrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
+							}
+							return attrs
+						}(),
+					}) {
+						{ pageCtx.T("Employees.List.New") }
+					}
+					if !props.CanCreate {
+						if props.CanRequest {
+							<form
+								class="flex items-center gap-2"
+								hx-post="/core/api/authz/requests"
+								hx-target="body"
+								hx-swap="none"
+							>
+								<input type="hidden" name="object" value="hrm.employees"/>
+								<input type="hidden" name="action" value="create"/>
+								<input type="hidden" name="domain" value="hrm"/>
+								<input type="hidden" name="diff" value="[]"/>
+								<input type="hidden" name="request_access" value="1"/>
+								<input
+									type="hidden"
+									name="reason"
+									value={ pageCtx.T("Authz.Unauthorized.ReasonDefault", map[string]any{"Operation": pageCtx.T("Employees.List.New")}) }
+								/>
+								<button class="btn btn-xs btn-primary" type="submit">
+									{ pageCtx.T("Authz.Unauthorized.Apply") }
+								</button>
+								<span class="text-xs text-secondary-300">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
+							</form>
+						} else {
+							<span class="text-xs text-secondary-300">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
+						}
+					}
+				</div>
+			</div>
 			@EmployeesTable(props)
 		</div>
 	</div>
