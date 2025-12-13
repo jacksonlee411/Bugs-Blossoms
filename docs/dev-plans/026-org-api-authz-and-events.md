@@ -32,6 +32,7 @@
 
 ## 依赖与里程碑
 - 依赖：
+  - 017：Transactional Outbox 工具链（`pkg/outbox` + 标准 schema/relay）。
   - 024：主链 service/repo/controller 骨架可用。
   - 025：Insert/Correct/Rescind/冻结窗口与审计（至少错误码与行为稳定）。
   - 022：事件结构体/Topic 命名与字段口径确定。
@@ -56,13 +57,13 @@
 ### 3. 事件投递闭环（Transactional Outbox）
 - 原子性要求：业务写入与 outbox 插入必须在同一数据库事务内提交（避免“数据已改但事件未发/事件已发但数据未改”）。
 - 事件来源：复用 022 的 `OrgChangedEvent/OrgAssignmentChangedEvent`，Topic 仍按 `org.changed.v1/org.assignment.changed.v1`；`transaction_time` 取事务提交时间，`effective_window` 取变更的 valid time。
-- 表名：`org_outbox`（M1 先模块内独立，避免跨模块耦合；如后续抽象为通用 outbox，通过 adapter/view 兼容）。
+- 工具链：复用 `DEV-PLAN-017` 的 `pkg/outbox`；本模块使用独立表 `org_outbox`（结构与索引对齐 017，便于未来演进为独立服务）。
 - 幂等与重放：outbox 以 `event_id` 为幂等键、`sequence` 为有序游标；消费者与应用内 handler 必须基于 `event_id` 幂等处理并允许重放。
 - 顺序性：M1 relay 采用**单 worker**按 `sequence` 升序投递；多实例部署通过“仅开启一个 relay”或使用 `pg_try_advisory_lock` 保证同一时刻只有一个 relay；如未来并行化，按 `tenant_id` 分区并在分区内保持顺序（否则下游不得假设顺序）。
 - Outbox 表（M1，示意字段）：
-  - `id uuid pk`、`tenant_id uuid not null`、`topic text not null`、`event_id uuid not null unique`、`sequence bigserial`、`payload jsonb not null`、`created_at timestamptz default now()`、`published_at timestamptz null`、`attempts int default 0`、`locked_at timestamptz null`、`last_error text null`
-  - 索引：`(published_at, sequence)`、`(tenant_id, published_at, sequence)`；relay 抢占用 `FOR UPDATE SKIP LOCKED`
-- Relay：M1 做进程内 relay（轮询 `published_at is null` 事件→按 `sequence` 投递到应用内 `EventBus`→成功后更新 `published_at`；失败记录 `last_error/attempts` 并可重试）。后续可替换为异步队列/外部总线（不改变 outbox 表与事件契约）。
+  - `id uuid pk`、`tenant_id uuid not null`、`topic text not null`、`event_id uuid not null unique`、`sequence bigserial`、`payload jsonb not null`、`created_at timestamptz default now()`、`published_at timestamptz null`、`attempts int default 0`、`available_at timestamptz default now()`、`locked_at timestamptz null`、`last_error text null`
+  - 索引：`(published_at, sequence)`、`(tenant_id, published_at, sequence)`、`(available_at, sequence) where published_at is null`
+- Relay：使用 `pkg/outbox` relay（短事务 claim/dispatch/ack；`FOR UPDATE SKIP LOCKED` + `available_at/locked_at` + 重试退避）。投递目标为 `outbox.Dispatcher`（需返回 `error`）；若继续投递到进程内 `pkg/eventbus`，需补充可返回错误的适配层（例如新增 `PublishE`/`PublishWithResult`），否则 outbox 无法判定失败并安全重试。
 
 ### 4. Snapshot（对账/恢复）
 - `GET /org/snapshot?effective_date=...&include=...` 返回指定时间点的状态；默认仅返回树最小集（`org_nodes/org_node_slices/org_edges`），岗位/分配等通过 `include=` 显式请求，避免大 payload/超时。
@@ -86,8 +87,8 @@
 ## 任务清单与验收标准
 1. [ ] API 路由与控制器：补齐 `/org/**` REST API（含 snapshot/batch），所有入口统一解析 `effective_date` 并强制 Session+tenant。验收：接口级测试覆盖租户隔离与默认 effective_date。
 2. [ ] Authz 接入：为各 API 绑定 object+action（read/write/assign/admin），403 返回遵循统一 forbidden payload；新增 `config/access/policies/org/*.csv` 并运行 `make authz-test authz-lint authz-pack`。验收：门禁通过且 403 payload 含 `debug_url/base_revision` 等字段。
-3. [ ] Outbox schema + repo：新增 outbox 表（或复用通用 outbox），写路径在同事务内插入 outbox 事件。验收：集成测试断言“写入成功必有 outbox 记录”，失败回滚无残留。
-4. [ ] Relay 与重放：实现最小 relay（按 `sequence` 升序轮询未发布事件→发布到 EventBus→标记已发布），并保证多实例下不并发投递（开关或 advisory lock）与重复消费幂等。验收：并发跑两个 relay 不产生重复副作用（以 `event_id` 断言），且顺序性符合预期。
+3. [ ] Outbox schema + enqueue：创建 `org_outbox`（结构对齐 017），写路径在同事务内 enqueue outbox 事件（使用 `pkg/outbox`）。验收：集成测试断言“写入成功必有 outbox 记录”，失败回滚无残留。
+4. [ ] Relay 与重放：接入 `pkg/outbox` relay（按 `sequence` 升序轮询未发布事件→投递到 `Dispatcher`→标记已发布），并保证多实例下不并发投递（开关或 advisory lock）与幂等重放。验收：并发跑两个 relay 不产生重复副作用（以 `event_id` 断言），且顺序性符合预期。
 5. [ ] Snapshot：实现 `/org/snapshot`（默认最小集，`include=` 取子集）并支持必要分页；下游可用作全量纠偏。验收：在种子数据下可正确返回 as-of 视图且权限校验生效。
 6. [ ] Batch：实现 `/org/batch`（含 dry_run），限制单次 commands 规模并保证事务原子性与错误返回稳定。验收：测试覆盖全成功/中途失败回滚、dry-run 不落库、权限校验与规模限制。
 7. [ ] 缓存与失效：为树/分配读路径加缓存，订阅 outbox 事件触发失效；记录全量重建命令。验收：测试覆盖缓存命中/失效。
