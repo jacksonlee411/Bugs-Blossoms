@@ -40,11 +40,6 @@ test.describe('logging authz gating', () => {
 	test('blocks logs page for user without logging permissions', async ({ page }) => {
 		await login(page, 'nohrm@example.com', 'TestPass123!');
 
-		const logsNavLink = page.locator('a[href="/logs"]').filter({ hasText: /logs/i }).first();
-		if (await logsNavLink.count()) {
-			await logsNavLink.scrollIntoViewIfNeeded();
-		}
-
 		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
 		if (response) {
 			expect([401, 403]).toContain(response.status());
