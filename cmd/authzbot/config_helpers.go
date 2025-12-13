@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"os"
@@ -13,7 +14,7 @@ func discoverRepoRoot() (string, error) {
 	if dir := strings.TrimSpace(os.Getenv("AUTHZ_BOT_REPO_DIR")); dir != "" {
 		return filepath.Abs(dir)
 	}
-	if out, err := exec.Command("git", "rev-parse", "--show-toplevel").Output(); err == nil {
+	if out, err := exec.CommandContext(context.Background(), "git", "rev-parse", "--show-toplevel").Output(); err == nil {
 		return strings.TrimSpace(string(out)), nil
 	}
 	return os.Getwd()
@@ -35,7 +36,7 @@ func resolveRepoSlug(root, remote string) (string, string, error) {
 	if slug := strings.TrimSpace(os.Getenv("AUTHZ_BOT_REPO_SLUG")); slug != "" {
 		return splitSlug(slug)
 	}
-	cmd := exec.Command("git", "-C", root, "config", fmt.Sprintf("remote.%s.url", remote))
+	cmd := exec.CommandContext(context.Background(), "git", "-C", root, "config", fmt.Sprintf("remote.%s.url", remote))
 	out, err := cmd.Output()
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read remote %s url: %w", remote, err)
@@ -75,7 +76,7 @@ func defaultBaseBranch(root string) string {
 	if branch := strings.TrimSpace(os.Getenv("AUTHZ_BOT_BASE_BRANCH")); branch != "" {
 		return branch
 	}
-	if out, err := exec.Command("git", "-C", root, "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
+	if out, err := exec.CommandContext(context.Background(), "git", "-C", root, "rev-parse", "--abbrev-ref", "HEAD").Output(); err == nil {
 		return strings.TrimSpace(string(out))
 	}
 	return "main"

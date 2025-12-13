@@ -1,0 +1,74 @@
+package components
+
+import (
+	"fmt"
+
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
+)
+
+type AuthzWorkspaceProps struct {
+	Subject     string
+	Domain      string
+	StagedCount int
+	Summary     viewmodels.AuthzChangesSummary
+	SubmitURL   string
+	ClearURL    string
+	CSRFToken   string
+}
+
+// AuthzWorkspace renders a sticky footer for managing staged policy changes.
+// It appears only when StagedCount > 0.
+templ AuthzWorkspace(props AuthzWorkspaceProps) {
+	if props.StagedCount <= 0 {
+		return
+	}
+	<div
+		id="authz-workspace"
+		class="fixed bottom-0 left-0 right-0 z-50 border-t border-surface-400/60 bg-surface-700/90 backdrop-blur"
+	>
+		<div class="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+			<div class="flex items-center gap-6">
+				<div class="flex flex-col">
+					<span class="text-[10px] font-bold uppercase tracking-wider text-surface-200">Context</span>
+					<div class="flex items-center gap-1 text-sm text-surface-50">
+						<span class="font-medium">{ props.Subject }</span>
+						<span class="text-surface-300">&#64;</span>
+						<span class="font-medium">{ props.Domain }</span>
+					</div>
+				</div>
+				<div class="h-8 w-px bg-surface-400/60"></div>
+				<div class="flex items-center gap-3">
+					<span class="inline-flex items-center justify-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary-foreground">
+						{ fmt.Sprintf("%d", props.StagedCount) } Changes
+					</span>
+					<span class="text-xs text-surface-100">
+						(+{ fmt.Sprintf("%d", props.Summary.Added) } / -{ fmt.Sprintf("%d", props.Summary.Removed) })
+					</span>
+				</div>
+			</div>
+			<div class="flex items-center gap-3">
+				<button
+					hx-delete={ props.ClearURL }
+					hx-target="#authz-workspace"
+					hx-swap="outerHTML"
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, props.CSRFToken) }
+					class="rounded-md border border-surface-400/80 bg-transparent px-3 py-2 text-sm font-medium text-surface-50 hover:bg-surface-500/60"
+					type="button"
+				>
+					Discard draft
+				</button>
+				<button
+					hx-post={ props.SubmitURL }
+					hx-target="#authz-workspace"
+					hx-swap="outerHTML"
+					hx-headers={ fmt.Sprintf(`{"X-CSRF-Token": "%s"}`, props.CSRFToken) }
+					class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
+					type="submit"
+				>
+					Submit request
+				</button>
+			</div>
+		</div>
+	</div>
+	<div class="h-20"></div>
+}

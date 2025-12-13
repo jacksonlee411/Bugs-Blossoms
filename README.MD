@@ -53,6 +53,7 @@
 - 403 响应契约（HX/REST 统一）：未经授权返回 `application/json`，示例 `{\"error\":\"forbidden\",\"object\":\"logging.logs\",\"action\":\"view\",\"subject\":\"user:<uuid>\",\"domain\":\"tenant:<id>\",\"missing_policies\":[...],\"suggest_diff\":[...],\"request_url\":\"/core/api/authz/requests\",\"debug_url\":\"/core/api/authz/debug?subject=...&object=...&action=...\"}`。
 - Core 用户权限页：Policy Board 支持 g/p 暂存、批量撤销与域筛选，Tab 顶部按钮提交草稿/申请权限；提交后 UI 轮询 `/core/api/authz/requests`（≤5 分钟 SLA）并展示 request_id。
 - Unauthorized 占位与前端 props：统一透出 `object`、`action`、`subject`、`domain`、`missing_policies`、`suggest_diff`、`request_url`、`debug_url`，并写入页面 `data-*` 便于 015B 组件复用；导航/Quick Links/Sidebar/Spotlight 入口均通过 `AuthzObject/AuthzAction` 或 `.RequireAuthz` 过滤，未授权用户不可见。
+- UI 授权申请与反馈：业务页面的 Unauthorized/PolicyInspector 统一提交到 `/core/api/authz/requests`，响应包含 `request_id`、`estimated_sla_expires_at`、`view_url`、`can_retry_bot`、`retry_token`；前端轮询 15s 更新状态，终态或 30s 内缓存命中即停止，基线过期会在 HX-Trigger 中附带 `base_revision` 与 toast 提示；`status=failed` 时可携带 `retry_token` 调用 `POST /core/api/authz/requests/{id}/trigger-bot?retry_token=...`（同 request 60s 冷却），终态自动隐藏重试入口；非 HTMX 场景返回标准 JSON/错误页并附错误码/i18n key，可用 flash/fallback 展示。
 
 示例：
 
