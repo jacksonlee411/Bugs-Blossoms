@@ -38,15 +38,15 @@
 - **非目标**：不实现薪酬预算、绩效考核，不做编制/空岗管理，不调整 finance 模块 schema，仅通过事件/视图消费。
 
 ## Workday 能力对齐
-| Workday 关键点 | Workday 行为说明 | 本计划方案 | 差距/补充动作 |
-| --- | --- | --- | --- |
-| Organization Unit（原 Supervisory）/ Company / Cost / Custom Hierarchies | 每个层级有独立版本与有效期，驱动 BP、财务和报表 | **M1：仅单一 Organization Unit 树，无版本化**；M2+ 才开放多层级/占位 | 需在 M2 引入多树与版本冻结，允许 Draft/Active 并存 |
-| Business Process（BP）绑定 | 审批路由基于 Supervisory、Company 及 security group | **M1 不做**，仅保留事件出口 | M3+ 才接入 `pkg/workflow` 与 `org_bp_bindings`、route preview |
-| Security Domain / Group | Workday 通过 domain policy 授权到 org level，支持继承 | **M1 不做策略生成**，仅事件；Authz 继承放入后续 | M3+ 实现“组织节点 ↔ security group”映射与 policy 草稿 |
-| Effective Dating & Retro Changes | 所有对象支持未来/过去生效，Retro 需影响历史审批/薪酬 | M1 支持 EffectiveWindow + 重叠/冻结校验，**无 retro** | Retro API/冲突策略/审计放入 M3+ |
-| Matrix / Shared Line | 员工可有主、辅组织用于审批/报表 | **M1 仅主属，assignment_type 占位（matrix/dotted）不启用** | M2+ 才开放 lateral link/secondary 并定义权限提示 |
-| Position Management | 职位必须挂载 Supervisory org，调动时影响 Budget/Comp | **M1：Assignment 以 Position 为锚点（Person → Position → Org），可自动生成一对一空壳 Position；无编制/空岗** | M2/021 再扩展编制、空岗、多岗与成本中心耦合 |
-| Impact Analysis & What-if Simulation | 变更前展示受影响员工、BP、security | **M1 不含 Impact/What-if** | M4 才引入 Impact 面板与指标口径 |
+| Workday 关键点 | Workday 行为说明 | 本计划方案 | 对应设计原则（编号） | 差距/补充动作 |
+| --- | --- | --- | --- | --- |
+| Organization Unit（原 Supervisory）/ Company / Cost / Custom Hierarchies | 每个层级有独立版本与有效期，驱动 BP、财务和报表 | **M1：仅单一 Organization Unit 树，无版本化**；M2+ 才开放多层级/占位 | 2/3/5 | 需在 M2 引入多树与版本冻结，允许 Draft/Active 并存 |
+| Business Process（BP）绑定 | 审批路由基于 Supervisory、Company 及 security group | **M1 不做**，仅保留事件出口 | 4/6 | M3+ 才接入 `pkg/workflow` 与 `org_bp_bindings`、route preview |
+| Security Domain / Group | Workday 通过 domain policy 授权到 org level，支持继承 | **M1 不做策略生成**，仅事件；Authz 继承放入后续 | 6（补：最小权限） | M3+ 实现“组织节点 ↔ security group”映射与 policy 草稿 |
+| Effective Dating & Retro Changes | 所有对象支持未来/过去生效，Retro 需影响历史审批/薪酬 | M1 支持 EffectiveWindow + 重叠/冻结校验，**无 retro** | 2/5 | Retro API/冲突策略/审计放入 M3+ |
+| Matrix / Shared Line | 员工可有主、辅组织用于审批/报表 | **M1 仅主属，assignment_type 占位（matrix/dotted）不启用** | 2/3/5 | M2+ 才开放 lateral link/secondary 并定义权限提示 |
+| Position Management | 职位必须挂载 Supervisory org，调动时影响 Budget/Comp | **M1：Assignment 以 Position 为锚点（Person → Position → Org），可自动生成一对一空壳 Position；无编制/空岗** | 2/6 | M2/021 再扩展编制、空岗、多岗与成本中心耦合 |
+| Impact Analysis & What-if Simulation | 变更前展示受影响员工、BP、security | **M1 不含 Impact/What-if** | 4/6 | M4 才引入 Impact 面板与指标口径 |
 
 ## 关键业务蓝图
 ### 1. 组织结构与类型
@@ -129,6 +129,36 @@
 - **Reporting/Analytics**：提供 `org_reporting` 视图供 BI 工具使用，支持任意时间点快照，与 Workday Custom Reporting 对齐；后续补组织图导出、路径查询、人员路径查询接口。
 - **事件契约**：OrgChanged/OrgAssignmentChanged 附带 tenant_id/node_id/effective_window/version/assignment_type/幂等键，向后兼容扩展字段；预留继承解析后的属性、变更请求上下文字段。
 - **跨模块校验**：person/pernr 通过 HRM 只读视图或缓存软校验并周期性对账；position_id 必填且归属 OrgNode，HRM Position SOR 成熟后再启用更强校验。
+
+### 集成视图（简版）
+```mermaid
+flowchart LR
+  Org[modules/org<br/>组织层级 SOR]
+  HRM[modules/hrm<br/>Person SOR]
+  Authz[pkg/authz<br/>Casbin/权限判定]
+  Workflow[modules/workflow<br/>BP/审批（后续）]
+  Finance[modules/finance<br/>冻结：只读消费]
+  Other[采购/项目/其他模块<br/>只读消费]
+  Bus[pkg/eventbus<br/>事件总线]
+  Cache[Redis/内存缓存<br/>树缓存]
+  DB[(PostgreSQL 17)]
+  BI[BI/Reporting<br/>org_reporting 视图]
+
+  HRM -->|只读视图/缓存：person_id、pernr 软校验| Org
+  Org -->|API 调用：Org.Read/Write/Assign/Admin| Authz
+  Org <--> Cache
+  Org --> DB
+  HRM --> DB
+  Finance --> DB
+  BI --> DB
+
+  Org -.->|OrgChanged / OrgAssignmentChanged| Bus
+  Bus -.-> HRM
+  Bus -.-> Authz
+  Bus -.-> Workflow
+  Bus -.-> Finance
+  Bus -.-> Other
+```
 
 ## 上线与迁移
 - 租户初始化：导入脚本（CSV/JSON）创建唯一根节点、批量导入节点/边、补齐员工 primary assignment；导入前执行重叠/重名校验，导入后输出对账报告并记入 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md`。

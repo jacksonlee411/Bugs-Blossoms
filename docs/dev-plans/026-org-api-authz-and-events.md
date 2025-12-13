@@ -11,6 +11,8 @@
 - `make authz-test authz-lint authz-pack` 通过，策略片段提交。
 - 所有入口接受 `effective_date` 参数（默认 `time.Now()`），响应/查询遵循时间线语义。
 - 树/分配读写配套缓存键（含层级/tenant/effective_date）与事件驱动失效/重建策略。
+- **对账与恢复**：提供 `GET /org/snapshot` 接口，允许下游系统（Authz/HRM）拉取指定时间点的全量状态，用于事件丢失后的纠偏。
+- **批量事务**：提供 `POST /org/batch` 接口，支持在单事务内执行多条 Create/Update/Move 指令，保障组织架构调整（Reorg）的原子性。
 
 ## 实施步骤
 1. [ ] 实现 `/org/**` REST API，统一 Session+租户校验，调用 `pkg/authz` 判定对应动作；所有读/写接口接受 `effective_date`（默认 `time.Now()`）。
