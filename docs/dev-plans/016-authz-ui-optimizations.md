@@ -155,10 +155,10 @@
 
 ## 建议优先级与落地清单（Backlog）
 ### P0（优先做：减少误操作 + 统一体验）
-1. [ ] 引入统一 Authz Workspace（Sticky Footer/Header）：作为当前上下文的提交栏，展示暂存数量与提交入口；支持提交前预览 + reason 必填 + 危险项提示。
+1. [ ] 引入统一 Authz Workspace（Sticky Footer/Header）：作为当前上下文的提交栏，展示暂存数量与提交入口；支持提交前预览 + reason 必填 + 危险项提示。（已完成基础接入：角色矩阵/用户权限页统一提交栏 + reason 必填；预览/危险项提示待补齐）
 2. [x] 补齐 `/core/authz/requests/{id}` 请求详情页（最小只读即可），确保 `view_url` 不断链；非 HTMX 也可访问（对齐 015B4）。
 3. [ ] p/g 语义分离：角色页 `type=g` 仅做“角色继承/绑定角色”；用户页以“用户↔角色”视图呈现继承与变更；表单不再要求无意义字段。
-4. [ ] i18n 清理：移除硬编码状态与提示文案（用户页状态映射、角色矩阵标题/分页、Unauthorized JS 兜底文案）。
+4. [ ] i18n 清理：移除硬编码状态与提示文案（用户页状态映射、角色矩阵标题/分页、Unauthorized JS 兜底文案）。（已清理：用户页状态映射、部分角色矩阵文案；仍有残留待收敛）
 5. [ ] diff 默认结构化渲染 + 复制反馈（Unauthorized/PolicyInspector/Requests 详情页）。
 6. [ ] 业务页面“部分授权”统一模式：按钮禁用 + 申请入口 + 权限状态提示（对齐 012 的 HRM/Logging 体验）。
 7. [x] 导航/Quick Links/Spotlight：默认无权限隐藏 + 直访 403 统一反馈；补齐回归清单与验证（对齐 014D）。
@@ -166,7 +166,7 @@
 
 ### P1（体验增强：更好理解与排障）
 1. [ ] 增加 Effective 权限汇总视图 + 来源链路（用户页）。
-2. [ ] 草稿中心（Requests Center）列表页完善：过滤/分页/我的与待审核视图 + 详情页补齐审核动作与运维入口（PR/bot/revert）。
+2. [ ] 草稿中心（Requests Center）列表页完善：过滤/分页/我的与待审核视图 + 详情页补齐审核动作与运维入口（PR/bot/revert）。（已交付最小列表页：过滤/分页/我发起的；待补齐“待审核/运维动作”等）
 
 ### P2（质量与规模化）
 1. [ ] 资源/动作字典化选择（Object/Action selector），减少拼写与无效 diff。
@@ -202,8 +202,10 @@
 4. **体验与一致性**：
    - 角色矩阵/用户权限页接入 `AuthzWorkspace`，统一暂存数量与提交入口，并要求 reason 输入。
    - 403 payload 的 object/action 对齐为 `core.authz/read`（避免无效 missing policy），并补齐相关 i18n 文案与 toast 文案。
+5. **CI 修复**：
+   - 修复 `templ fmt .`/`go fmt` 在 CI 的格式化差异（确保 quality-gates 通过）。
 
 ### 下一步计划
-1. **Workspace 接入**：在角色矩阵 / 用户权限页接入 `AuthzWorkspace`，统一暂存计数与“提交草稿”入口。
-2. **列表页补齐**：为 `/core/authz/requests` 增加最小可用列表视图（按状态/我发起的过滤），并与详情页打通导航。
-3. **文案与 i18n 清理**：梳理 Unauthorized/PolicyInspector/Requests 相关状态与错误文案，去除硬编码中英文混用，补齐多语言 keys。
+1. **Workspace 增强**：补齐提交前预览、危险项提示与一致的二次确认（对齐 P0-1）。
+2. **Requests Center 完善**：补齐“待审核/运维动作（PR/bot/revert）”等视图与能力（对齐 P1-2）。
+3. **语义与文案收敛**：推进 p/g 语义分离与剩余硬编码文案/i18n 清理（对齐 P0-3/P0-4）。
