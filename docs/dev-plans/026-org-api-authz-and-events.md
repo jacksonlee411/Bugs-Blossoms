@@ -56,36 +56,40 @@
 ### 3. 事件投递闭环（Transactional Outbox）
 - 原子性要求：业务写入与 outbox 插入必须在同一数据库事务内提交（避免“数据已改但事件未发/事件已发但数据未改”）。
 - 事件来源：复用 022 的 `OrgChangedEvent/OrgAssignmentChangedEvent`，Topic 仍按 `org.changed.v1/org.assignment.changed.v1`；`transaction_time` 取事务提交时间，`effective_window` 取变更的 valid time。
-- 幂等与重放：outbox 以 `event_id` 为幂等键、`sequence` 为全局有序游标（M1 可先按 DB 自增/时间排序实现，027 再优化）；消费者必须幂等处理并允许重放。
+- 表名：`org_outbox`（M1 先模块内独立，避免跨模块耦合；如后续抽象为通用 outbox，通过 adapter/view 兼容）。
+- 幂等与重放：outbox 以 `event_id` 为幂等键、`sequence` 为有序游标；消费者与应用内 handler 必须基于 `event_id` 幂等处理并允许重放。
+- 顺序性：M1 relay 采用**单 worker**按 `sequence` 升序投递；多实例部署通过“仅开启一个 relay”或使用 `pg_try_advisory_lock` 保证同一时刻只有一个 relay；如未来并行化，按 `tenant_id` 分区并在分区内保持顺序（否则下游不得假设顺序）。
 - Outbox 表（M1，示意字段）：
   - `id uuid pk`、`tenant_id uuid not null`、`topic text not null`、`event_id uuid not null unique`、`sequence bigserial`、`payload jsonb not null`、`created_at timestamptz default now()`、`published_at timestamptz null`、`attempts int default 0`、`locked_at timestamptz null`、`last_error text null`
-  - 索引：`(published_at, created_at)`、`(tenant_id, created_at)`；relay 抢占用 `FOR UPDATE SKIP LOCKED`
-- Relay：M1 做进程内 relay（轮询 outbox 未发布事件并 `Publish` 到应用内 `EventBus`），失败记录 `last_error/attempts` 并可重试；后续可替换为异步队列/外部总线（不改变 outbox 表与事件契约）。
+  - 索引：`(published_at, sequence)`、`(tenant_id, published_at, sequence)`；relay 抢占用 `FOR UPDATE SKIP LOCKED`
+- Relay：M1 做进程内 relay（轮询 `published_at is null` 事件→按 `sequence` 投递到应用内 `EventBus`→成功后更新 `published_at`；失败记录 `last_error/attempts` 并可重试）。后续可替换为异步队列/外部总线（不改变 outbox 表与事件契约）。
 
 ### 4. Snapshot（对账/恢复）
-- `GET /org/snapshot?effective_date=...&include=...` 返回指定时间点的全量状态（至少包含 `org_nodes/org_node_slices/org_edges/positions/org_assignments` 的 as-of 视图），用于事件丢失后的全量纠偏。
+- `GET /org/snapshot?effective_date=...&include=...` 返回指定时间点的状态；默认仅返回树最小集（`org_nodes/org_node_slices/org_edges`），岗位/分配等通过 `include=` 显式请求，避免大 payload/超时。
 - 权限：默认要求 `org.* admin`；如需系统间调用，使用 system subject（由调用方注入）并单独策略放行。
 - 性能口径：支持 `include=` 子集与分页（如有必要），避免一次性返回超大 payload；性能优化在 027。
 - 响应建议包含：`tenant_id/effective_date/generated_at`、各资源的数组与计数摘要（便于下游快速校验差异）。
 
 ### 5. Batch（单事务重组）
 - `POST /org/batch` 在单事务内执行多条指令（Create/Update/Move/Assign），要么全部成功要么全部回滚；支持 `dry_run=true` 仅做校验与影响摘要（Impact 更完整版本在 030）。
-- 权限：默认要求 `org.* admin`（M1 先保守）；后续可按指令类型降权。
+- 规模限制：M1 对 `commands` 数量设上限（建议 50~100）；`MoveNode` 视为重型指令，可进一步限制 Move 条数或禁止在同一批次混入多次 Move，降低长事务/死锁风险。
+- 权限：默认要求 `org.* admin`（M1 先保守）；入口 admin 已覆盖写能力，不再逐指令鉴权；如后续需降权，再在入口按 command 预检所需 object+action 并返回稳定错误。
 - 事件策略：成功提交后按指令产生相应 outbox 事件；MoveNode 可能影响子树 path，M1 仅保证“边变更事件”可重放，子树级联事件策略在 027 评估。
 - 请求体建议结构（示意）：
   - `effective_date`（全局默认）+ `commands[]`（每条含 `type` 与 `payload`），服务端校验通过后在同事务内执行并写 outbox。
 
 ### 6. 缓存键与失效
 - 缓存键：至少覆盖树查询与按 subject 的分配查询，key 包含 `tenant_id/hierarchy_type/effective_date`（以及 subject id），建议使用 `pkg/repo.CacheKey("org", "<kind>", ...)` 生成。
+- 写后即时失效：写事务提交后，本进程立即按 tenant 粒度清理本地缓存（避免等待 relay 轮询带来的读旧值体验）；跨实例仍以 outbox relay 驱动失效。
 - 失效策略：消费 outbox 事件后按 tenant 维度清理 org 缓存（M1 先粗粒度），必要时提供全量重建命令（调用 `/org/snapshot` 或重启应用）；精细化失效与读优化在 027。
 
 ## 任务清单与验收标准
 1. [ ] API 路由与控制器：补齐 `/org/**` REST API（含 snapshot/batch），所有入口统一解析 `effective_date` 并强制 Session+tenant。验收：接口级测试覆盖租户隔离与默认 effective_date。
 2. [ ] Authz 接入：为各 API 绑定 object+action（read/write/assign/admin），403 返回遵循统一 forbidden payload；新增 `config/access/policies/org/*.csv` 并运行 `make authz-test authz-lint authz-pack`。验收：门禁通过且 403 payload 含 `debug_url/base_revision` 等字段。
 3. [ ] Outbox schema + repo：新增 outbox 表（或复用通用 outbox），写路径在同事务内插入 outbox 事件。验收：集成测试断言“写入成功必有 outbox 记录”，失败回滚无残留。
-4. [ ] Relay 与重放：实现最小 relay（轮询未发布事件→发布到 EventBus→标记已发布），并保证重复消费幂等。验收：重复运行 relay 不产生重复副作用（以幂等键断言）。
-5. [ ] Snapshot：实现 `/org/snapshot` 并支持 include 子集与必要分页；下游可用作全量纠偏。验收：在种子数据下可正确返回 as-of 视图且权限校验生效。
-6. [ ] Batch：实现 `/org/batch`（含 dry_run），事务原子性与错误返回稳定。验收：测试覆盖全成功/中途失败回滚、dry-run 不落库、权限校验。
+4. [ ] Relay 与重放：实现最小 relay（按 `sequence` 升序轮询未发布事件→发布到 EventBus→标记已发布），并保证多实例下不并发投递（开关或 advisory lock）与重复消费幂等。验收：并发跑两个 relay 不产生重复副作用（以 `event_id` 断言），且顺序性符合预期。
+5. [ ] Snapshot：实现 `/org/snapshot`（默认最小集，`include=` 取子集）并支持必要分页；下游可用作全量纠偏。验收：在种子数据下可正确返回 as-of 视图且权限校验生效。
+6. [ ] Batch：实现 `/org/batch`（含 dry_run），限制单次 commands 规模并保证事务原子性与错误返回稳定。验收：测试覆盖全成功/中途失败回滚、dry-run 不落库、权限校验与规模限制。
 7. [ ] 缓存与失效：为树/分配读路径加缓存，订阅 outbox 事件触发失效；记录全量重建命令。验收：测试覆盖缓存命中/失效。
 8. [ ] Readiness：执行 `make check lint`、`go test ./modules/org/...`、`make authz-test authz-lint authz-pack`；记录到 `docs/dev-records/DEV-PLAN-026-READINESS.md`。
 
@@ -99,7 +103,7 @@
 - 策略风险：策略片段变更可能导致大面积 403；可先在 shadow 模式验证再切换 enforce（由 `config/access/authz_flags.yaml` 控制），并保留回滚 commit。
 - Outbox 风险：relay 轮询可能带来 DB 压力；M1 先保守频率并提供开关（停用 relay 时仅保留 outbox 数据以便后续补发）。
 - Snapshot 风险：全量响应可能过大；默认 require admin 且支持 include 子集/分页，性能优化在 027。
-- Batch 风险：MoveNode 子树级联更新可能引发锁竞争；M1 限制 batch 指令规模并记录锁顺序，必要时拆分为多批次或改用离线窗口执行。
+- Batch 风险：MoveNode 子树级联更新可能引发锁竞争；M1 限制 batch 指令规模/Move 数量并记录锁顺序，必要时拆分为多批次或改用离线窗口执行。
 
 ## 交付物
 - `/org/**` REST API（含 `GET /org/snapshot`、`POST /org/batch`）与接口测试。
