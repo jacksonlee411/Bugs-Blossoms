@@ -154,6 +154,7 @@
     "Users": "Пользователи",
     "Roles": "Роли",
     "Groups": "Группы",
+    "AuthzRequests": "Запросы политик",
     "Settings": "Настройки",
     "KnowledgeBase": "База знаний",
     "Operations": "Операции",
@@ -415,6 +416,45 @@
   },
   "Authz": {
     "Debug": "Authz Debug",
+    "Requests": {
+      "Title": "Запросы на изменение политик",
+      "Mine": "Мои запросы",
+      "DefaultReason": {
+        "Roles": "Запрос на обновление политик роли",
+        "Users": "Запрос на обновление политик пользователя"
+      }
+    },
+    "PolicyMatrix": {
+      "Title": "Матрица политик"
+    },
+    "Object": "Объект",
+    "Action": "Действие",
+    "Subject": "Субъект",
+    "Workspace": {
+      "Context": "Контекст",
+      "Changes": "Изменения",
+      "Discard": "Отменить черновик"
+    },
+    "RequestDetail": {
+      "Title": "Запрос на изменение политик",
+      "DiffTitle": "Diff",
+      "Op": "Операция",
+      "Path": "Путь",
+      "Value": "Значение",
+      "NoDiff": "Diff отсутствует.",
+      "SummaryTitle": "Сводка",
+      "ViewPR": "Открыть PR",
+      "RawDiffTitle": "Исходный diff",
+      "RawDiffFormat": "JSON",
+      "BotLogTitle": "Логи бота"
+    },
+    "Toast": {
+      "ErrorTitle": "Ошибка",
+      "DefaultError": "Не удалось выполнить запрос, попробуйте еще раз",
+      "StaleRevisionTitle": "Базовая ревизия обновлена",
+      "StaleRevisionMessage": "Обновите страницу, чтобы синхронизировать последнюю ревизию",
+      "SubmittedPrefix": "Черновик отправлен"
+    },
     "Unauthorized": {
       "Title": "Требуется разрешение",
       "_Description": "У вас нет прав на операцию «{{.Operation}}». Отправьте запрос на доступ или обратитесь к администратору.",
@@ -424,6 +464,7 @@
       "ApplyHint": "Недостаточно прав для выполнения действия",
       "SuggestedDiff": "Предложенный diff",
       "Reason": "Причина",
+      "ReasonDefault": "Запрос доступа: {{.Operation}}",
       "RetryOnce": "Повторить один раз",
       "CopyRequestID": "Скопировать request_id",
       "LastRequest": "Последний request_id",
@@ -446,7 +487,8 @@
       "MatchedPolicy": "Сопоставленные политики",
       "Attributes": "Атрибуты",
       "GenerateDraft": "Создать черновик",
-      "Loading": "Загрузка..."
+      "Loading": "Загрузка...",
+      "ReasonDefault": "Проверка политик {{.Object}} {{.Action}}"
     },
     "Stage": {
       "Badge": "Черновиков %d",
@@ -454,7 +496,10 @@
       "AddRule": "Добавить правило",
       "SubmitDraft": "Отправить черновик",
       "BulkRemove": "Массовое удаление",
-      "SelectAll": "Выбрать все"
+      "SelectAll": "Выбрать все",
+      "RoleHint": "Черновик действует только для текущей роли и домена; отправка очистит его.",
+      "SubmitHint": "В черновике %d изменений; отправка очистит его.",
+      "EmptyHint": "Нет черновых правил; отправка сформирует diff из формы или черновика."
     },
     "SLA": {
       "Expected": "Ожидаем обновление ≤5 минут",

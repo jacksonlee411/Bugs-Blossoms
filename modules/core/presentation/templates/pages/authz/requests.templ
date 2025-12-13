@@ -1,0 +1,172 @@
+package authz
+
+import (
+	"fmt"
+	"net/url"
+	"strings"
+
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+func containsStatus(list []string, want string) bool {
+	want = strings.ToLower(strings.TrimSpace(want))
+	if want == "" {
+		return false
+	}
+	for _, item := range list {
+		if strings.ToLower(strings.TrimSpace(item)) == want {
+			return true
+		}
+	}
+	return false
+}
+
+func requestListPages(total int64, limit int) int {
+	if limit <= 0 {
+		return 1
+	}
+	pages := int((total + int64(limit) - 1) / int64(limit))
+	if pages <= 0 {
+		return 1
+	}
+	return pages
+}
+
+func buildRequestListURL(baseURL string, page int, limit int, mine bool, statuses []string) string {
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	values := url.Values{}
+	values.Set("page", fmt.Sprintf("%d", page))
+	values.Set("limit", fmt.Sprintf("%d", limit))
+	if mine {
+		values.Set("mine", "1")
+	}
+	for _, status := range statuses {
+		if st := strings.TrimSpace(status); st != "" {
+			values.Add("status", st)
+		}
+	}
+	if encoded := values.Encode(); encoded != "" {
+		return baseURL + "?" + encoded
+	}
+	return baseURL
+}
+
+templ Requests(vm *viewmodels.AuthzRequestList) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ _ = templ.URL("") }}
+	{{ baseURL := "/core/authz/requests" }}
+	{{ pages := requestListPages(vm.Total, vm.Limit) }}
+	{{ statusOptions := []string{"pending_review", "approved", "merged", "failed", "rejected", "canceled", "draft"} }}
+	{{ prevPage := vm.Page - 1 }}
+	{{ nextPage := vm.Page + 1 }}
+	{{ prevDisabled := vm.Page <= 1 }}
+	{{ nextDisabled := vm.Page >= pages }}
+	<main class="mx-auto max-w-6xl px-4 py-6 space-y-6">
+		<header class="flex items-start justify-between gap-4 flex-wrap">
+			<div class="space-y-1">
+				<h1 class="text-xl font-semibold text-surface-50">{ pageCtx.T("Authz.Requests.Title") }</h1>
+				<p class="text-sm text-surface-200">{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</p>
+			</div>
+		</header>
+
+		<form method="get" class="flex flex-wrap items-end gap-4 rounded-lg border border-surface-400/60 bg-surface-600/40 p-4">
+			<div class="space-y-1">
+				<label class="text-xs font-medium text-surface-200">{ pageCtx.T("Status") }</label>
+				<select
+					name="status"
+					multiple
+					class="select select-sm min-w-56 bg-surface-500 border border-surface-400/60 text-sm rounded"
+				>
+					for _, opt := range statusOptions {
+						{{ label := pageCtx.T(statusMessageKey(opt)) }}
+						<option value={ opt } selected?={ containsStatus(vm.Statuses, opt) }>{ label }</option>
+					}
+				</select>
+			</div>
+			<div class="flex items-center gap-2">
+				<input
+					type="checkbox"
+					name="mine"
+					value="1"
+					checked?={ vm.Mine }
+					class="checkbox checkbox-sm"
+				/>
+				<label class="text-sm text-surface-100">{ pageCtx.T("Authz.Requests.Mine") }</label>
+			</div>
+			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", vm.Limit) }/>
+			<input type="hidden" name="page" value="1"/>
+			<button type="submit" class="btn btn-sm btn-primary">{ pageCtx.T("Scaffold.Filters.Title") }</button>
+			<a href={ templ.URL(baseURL) } class="btn btn-sm">{ pageCtx.T("All") }</a>
+		</form>
+
+		<section class="rounded-lg border border-surface-400/60 bg-surface-600/40 overflow-hidden">
+			<table class="w-full table-auto border-collapse text-sm">
+				<thead class="border-b border-surface-400/60 text-left text-surface-200">
+					<tr>
+						<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Unauthorized.RequestID") }</th>
+						<th class="py-3 px-4 font-medium">{ pageCtx.T("Status") }</th>
+						<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Object") }</th>
+						<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Action") }</th>
+						<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Domain") }</th>
+						<th class="py-3 px-4 font-medium">{ pageCtx.T("CreatedAt") }</th>
+						<th class="py-3 px-4 font-medium">{ pageCtx.T("UpdatedAt") }</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-surface-400/40">
+					if len(vm.Items) == 0 {
+						<tr>
+							<td colspan="7" class="py-8 text-center text-sm text-surface-200">{ pageCtx.T("Empty") }</td>
+						</tr>
+					}
+					for _, item := range vm.Items {
+						{{ statusKey := statusMessageKey(item.Status) }}
+						<tr class="align-top">
+							<td class="py-3 px-4">
+								<a class="font-mono text-primary hover:underline" href={ templ.URL(item.ViewURL) }>{ item.ID }</a>
+								if item.Reason != "" {
+									<div class="mt-1 text-xs text-surface-200">{ item.Reason }</div>
+								}
+							</td>
+							<td class="py-3 px-4">
+								<span class={ "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium", item.StatusClass }>
+									{ pageCtx.T(statusKey) }
+								</span>
+							</td>
+							<td class="py-3 px-4 font-mono text-surface-50">{ item.Object }</td>
+							<td class="py-3 px-4 font-mono text-surface-50">{ item.Action }</td>
+							<td class="py-3 px-4 font-mono text-surface-50">{ item.Domain }</td>
+							<td class="py-3 px-4 font-mono text-xs text-surface-100">{ item.CreatedAt }</td>
+							<td class="py-3 px-4 font-mono text-xs text-surface-100">{ item.UpdatedAt }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</section>
+
+		<div class="flex items-center justify-between text-sm text-surface-200">
+			<div>{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</div>
+			<div class="flex items-center gap-2">
+				<a
+					class={ templ.Classes("btn btn-sm", templ.KV("btn-disabled", prevDisabled)) }
+					href={ templ.URL(buildRequestListURL(baseURL, prevPage, vm.Limit, vm.Mine, vm.Statuses)) }
+					aria-disabled?={ prevDisabled }
+				>
+					{ pageCtx.T("Pagination.Prev") }
+				</a>
+				<a
+					class={ templ.Classes("btn btn-sm", templ.KV("btn-disabled", nextDisabled)) }
+					href={ templ.URL(buildRequestListURL(baseURL, nextPage, vm.Limit, vm.Mine, vm.Statuses)) }
+					aria-disabled?={ nextDisabled }
+				>
+					{ pageCtx.T("Pagination.Next") }
+				</a>
+			</div>
+		</div>
+	</main>
+}

@@ -151,16 +151,22 @@ func (s *policyStageStore) Clear(key string, subject, domain string) int {
 	if !ok || len(entries) == 0 {
 		return 0
 	}
-	if strings.TrimSpace(subject) == "" && strings.TrimSpace(domain) == "" {
+	subject = strings.TrimSpace(subject)
+	domain = strings.TrimSpace(domain)
+	if subject == "" && domain == "" {
 		delete(s.data, key)
 		return 0
 	}
 	next := make([]dtos.StagedPolicyEntry, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Subject == subject && entry.Domain == domain {
+		if subject != "" && entry.Subject != subject {
+			next = append(next, entry)
 			continue
 		}
-		next = append(next, entry)
+		if domain != "" && entry.Domain != domain {
+			next = append(next, entry)
+			continue
+		}
 	}
 	if len(next) == 0 {
 		delete(s.data, key)

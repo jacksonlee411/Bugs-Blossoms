@@ -154,6 +154,7 @@
     "Users": "Foydalanuvchilar",
     "Roles": "Rollar",
     "Groups": "Guruhlar",
+    "AuthzRequests": "Siyosat so‘rovlari",
     "Settings": "Sozlamalar",
     "KnowledgeBase": "Bilimlar bazasi",
     "Operations": "Operatsiyalar",
@@ -415,6 +416,45 @@
   },
   "Authz": {
     "Debug": "Authz Debug",
+    "Requests": {
+      "Title": "Siyosat o‘zgarishi so‘rovlari",
+      "Mine": "Mening so‘rovlarim",
+      "DefaultReason": {
+        "Roles": "Rol siyosatini yangilash so‘rovi",
+        "Users": "Foydalanuvchi siyosatini yangilash so‘rovi"
+      }
+    },
+    "PolicyMatrix": {
+      "Title": "Siyosat matritsasi"
+    },
+    "Object": "Obyekt",
+    "Action": "Amal",
+    "Subject": "Subyekt",
+    "Workspace": {
+      "Context": "Kontekst",
+      "Changes": "O‘zgarishlar",
+      "Discard": "Loyihani bekor qilish"
+    },
+    "RequestDetail": {
+      "Title": "Siyosat o‘zgarishi so‘rovi",
+      "DiffTitle": "Diff",
+      "Op": "Amal",
+      "Path": "Yo‘l",
+      "Value": "Qiymat",
+      "NoDiff": "Diff mavjud emas.",
+      "SummaryTitle": "Xulosa",
+      "ViewPR": "PRni ko‘rish",
+      "RawDiffTitle": "Xom diff",
+      "RawDiffFormat": "JSON",
+      "BotLogTitle": "Bot jurnali"
+    },
+    "Toast": {
+      "ErrorTitle": "Xato",
+      "DefaultError": "So'rov bajarilmadi, qayta urinib ko'ring",
+      "StaleRevisionTitle": "Bazaviy reviziya yangilandi",
+      "StaleRevisionMessage": "Eng so'nggi reviziyani olish uchun sahifani yangilang",
+      "SubmittedPrefix": "Loyiha yuborildi"
+    },
     "Unauthorized": {
       "Title": "Ruxsat talab qilinadi",
       "_Description": "{{.Operation}} bajarish uchun ruxsatingiz yo'q. Ruxsat so'rang yoki administratorga murojaat qiling.",
@@ -424,6 +464,7 @@
       "ApplyHint": "Bu amal uchun ruxsatingiz yo'q",
       "SuggestedDiff": "Tavsiya etilgan diff",
       "Reason": "Sabab",
+      "ReasonDefault": "Ruxsat so‘rovi: {{.Operation}}",
       "RetryOnce": "Bir marta qayta urinib ko'rish",
       "CopyRequestID": "request_id ni nusxalash",
       "LastRequest": "Oxirgi request_id",
@@ -446,7 +487,8 @@
       "MatchedPolicy": "Mos siyosatlar",
       "Attributes": "Atributlar",
       "GenerateDraft": "Loyiha yaratish",
-      "Loading": "Yuklanmoqda..."
+      "Loading": "Yuklanmoqda...",
+      "ReasonDefault": "Siyosat tekshiruvi {{.Object}} {{.Action}}"
     },
     "Stage": {
       "Badge": "Qoralama %d",
@@ -454,7 +496,10 @@
       "AddRule": "Qoida qo'shish",
       "SubmitDraft": "Qoralamani yuborish",
       "BulkRemove": "Ommaviy o'chirish",
-      "SelectAll": "Hammasini belgilash"
+      "SelectAll": "Hammasini belgilash",
+      "RoleHint": "Loyiha faqat joriy rol va domen uchun amal qiladi; yuborilgach tozalanadi.",
+      "SubmitHint": "Loyihada %d ta o‘zgarish; yuborilgach tozalanadi.",
+      "EmptyHint": "Loyihada qoidalar yo‘q; yuborish forma yoki loyiha asosida diff tuzadi."
     },
     "SLA": {
       "Expected": "Yangilanish ≤5 daqiqada kutiladi",

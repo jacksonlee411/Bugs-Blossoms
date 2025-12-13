@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -12,11 +13,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/authz"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	authzPersistence "github.com/iota-uz/iota-sdk/pkg/authz/persistence"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
 )
@@ -50,12 +53,79 @@ func (c *AuthzRequestController) Register(r *mux.Router) {
 		middleware.NavItems(),
 		middleware.WithPageContext(),
 	)
+	router.HandleFunc("/requests", c.List).Methods(http.MethodGet)
 	router.HandleFunc("/requests/{id}", c.Get).Methods(http.MethodGet)
+}
+
+func (c *AuthzRequestController) List(w http.ResponseWriter, r *http.Request) {
+	if err := composables.CanUser(r.Context(), permissions.AuthzRequestsRead); err != nil {
+		writeForbiddenResponse(w, r, "core.authz", "read")
+		return
+	}
+
+	params := composables.UsePaginated(r)
+	query := r.URL.Query()
+
+	subject := strings.TrimSpace(query.Get("subject"))
+	domain := strings.TrimSpace(query.Get("domain"))
+	statuses := query["status"]
+
+	mine := query.Get("mine") == "1" || strings.EqualFold(query.Get("mine"), "true")
+	sortAsc := strings.EqualFold(strings.TrimSpace(query.Get("sort")), "asc")
+
+	listParams := services.ListPolicyDraftsParams{
+		Subject:  subject,
+		Domain:   domain,
+		Limit:    params.Limit,
+		Offset:   params.Offset,
+		SortAsc:  sortAsc,
+		Statuses: make([]authzPersistence.PolicyChangeStatus, 0, len(statuses)),
+	}
+	for _, status := range statuses {
+		if val := strings.TrimSpace(status); val != "" {
+			listParams.Statuses = append(listParams.Statuses, authzPersistence.PolicyChangeStatus(val))
+		}
+	}
+
+	tenantID := tenantIDFromContext(r)
+	if mine {
+		currentUser, err := composables.UseUser(r.Context())
+		if err == nil && currentUser != nil {
+			requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+			listParams.RequesterID = &requesterID
+		}
+	}
+
+	svc := c.app.Service(services.PolicyDraftService{}).(*services.PolicyDraftService)
+	drafts, total, err := svc.List(r.Context(), tenantID, listParams)
+	if err != nil {
+		composables.UseLogger(r.Context()).WithError(err).Error("authz ui: failed to list requests")
+		http.Error(w, "failed to list requests", http.StatusInternalServerError)
+		return
+	}
+
+	items := make([]viewmodels.AuthzRequestListItem, 0, len(drafts))
+	for _, draft := range drafts {
+		items = append(items, buildAuthzRequestListItem(draft))
+	}
+
+	viewModel := &viewmodels.AuthzRequestList{
+		Items:    items,
+		Total:    total,
+		Page:     params.Page,
+		Limit:    params.Limit,
+		Mine:     mine,
+		Statuses: statuses,
+		Subject:  subject,
+		Domain:   domain,
+	}
+
+	templ.Handler(authz.Requests(viewModel), templ.WithStreaming()).ServeHTTP(w, r)
 }
 
 func (c *AuthzRequestController) Get(w http.ResponseWriter, r *http.Request) {
 	if err := composables.CanUser(r.Context(), permissions.AuthzRequestsRead); err != nil {
-		writeForbiddenResponse(w, r, "core.authz", "requests")
+		writeForbiddenResponse(w, r, "core.authz", "read")
 		return
 	}
 
@@ -74,7 +144,7 @@ func (c *AuthzRequestController) Get(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, services.ErrPolicyDraftNotFound):
 			http.NotFound(w, r)
 		case errors.Is(err, services.ErrTenantMismatch):
-			writeForbiddenResponse(w, r, "core.authz", "requests")
+			writeForbiddenResponse(w, r, "core.authz", "read")
 		default:
 			composables.UseLogger(r.Context()).WithError(err).Error("authz ui: failed to load request")
 			http.Error(w, "failed to load request", http.StatusInternalServerError)
@@ -85,6 +155,23 @@ func (c *AuthzRequestController) Get(w http.ResponseWriter, r *http.Request) {
 	viewModel := buildAuthzRequestDetail(draft)
 
 	templ.Handler(authz.RequestDetail(viewModel), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func buildAuthzRequestListItem(draft services.PolicyDraft) viewmodels.AuthzRequestListItem {
+	status := string(draft.Status)
+
+	return viewmodels.AuthzRequestListItem{
+		ID:          draft.ID.String(),
+		Status:      status,
+		StatusClass: statusBadgeClass(status),
+		Object:      strings.TrimSpace(draft.Object),
+		Action:      strings.TrimSpace(draft.Action),
+		Domain:      strings.TrimSpace(draft.Domain),
+		Reason:      strings.TrimSpace(draft.Reason),
+		CreatedAt:   draft.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:   draft.UpdatedAt.Format(time.RFC3339),
+		ViewURL:     fmt.Sprintf("/core/authz/requests/%s", draft.ID),
+	}
 }
 
 func buildAuthzRequestDetail(draft services.PolicyDraft) *viewmodels.AuthzRequestDetail {

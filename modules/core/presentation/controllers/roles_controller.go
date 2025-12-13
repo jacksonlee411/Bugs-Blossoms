@@ -451,6 +451,7 @@ func (c *RolesController) buildPolicyMatrixProps(
 			}
 			return len(stagedEntries)
 		}(),
+		StageSummary: summarizeStagedEntries(stagedEntries),
 	}, nil
 }
 

@@ -123,7 +123,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 	{{ debug := debugURL(subject, object, normalizedAction, domain, strings.TrimSpace(props.DebugURL)) }}
 	{{ reason := strings.TrimSpace(props.Reason) }}
 	{{if reason == "" {
-	reason = fmt.Sprintf("申请 %s", operation)
+	reason = pageCtx.T("Authz.Unauthorized.ReasonDefault", map[string]interface{}{"Operation": operation})
 }
 	}}
 	<section
@@ -146,6 +146,12 @@ templ Unauthorized(props *UnauthorizedProps) {
 		data-status-rejected={ pageCtx.T("Authz.Status.Rejected") }
 		data-status-canceled={ pageCtx.T("Authz.Status.Canceled") }
 		data-status-draft={ pageCtx.T("Authz.Status.Draft") }
+		data-toast-error-title={ pageCtx.T("Authz.Toast.ErrorTitle") }
+		data-toast-default-error={ pageCtx.T("Authz.Toast.DefaultError") }
+		data-toast-stale-title={ pageCtx.T("Authz.Toast.StaleRevisionTitle") }
+		data-toast-stale-message={ pageCtx.T("Authz.Toast.StaleRevisionMessage") }
+		data-toast-submit-title={ pageCtx.T("Authz.Unauthorized.SubmitSuccess") }
+		data-toast-submitted-prefix={ pageCtx.T("Authz.Toast.SubmittedPrefix") }
 	>
 		<div class="flex items-start justify-between gap-3">
 			<div class="space-y-2">
@@ -271,6 +277,19 @@ templ Unauthorized(props *UnauthorizedProps) {
 		return labels[key] || key || container?.dataset?.statusUnknownLabel || "";
 	}
 
+					function toastLabels(container) {
+						const el = container || document.querySelector("[data-authz-container]");
+						const ds = el?.dataset || {};
+						return {
+							errorTitle: (ds.toastErrorTitle || "").trim(),
+							defaultError: (ds.toastDefaultError || "").trim(),
+							staleTitle: (ds.toastStaleTitle || "").trim(),
+							staleMessage: (ds.toastStaleMessage || "").trim(),
+							submitTitle: (ds.toastSubmitTitle || "").trim(),
+							submittedPrefix: (ds.toastSubmittedPrefix || "").trim(),
+						};
+					}
+
 					function parseDetail(detail) {
 						let data = detail || {};
 						if (typeof data === "string") {
@@ -385,7 +404,8 @@ templ Unauthorized(props *UnauthorizedProps) {
 							payload = null;
 						}
 						if (!resp.ok) {
-							throw payload || { code: resp.status, message: "请求失败，请重试" };
+							const labels = toastLabels(null);
+							throw payload || { code: resp.status, message: labels.defaultError || "Request failed, please try again" };
 						}
 						const data = normalize(payload);
 						cache.set(id, { data, fetchedAt: Date.now(), status: data?.status || "" });
@@ -403,13 +423,14 @@ templ Unauthorized(props *UnauthorizedProps) {
 					function handleError(err) {
 						const detail = normalize(err) || parseDetail(err) || {};
 						const code = detail.code || detail.Code || "";
-						const message = detail.message || detail.Message || "请求失败，请重试";
-						dispatchToast("error", code || "错误", message);
+						const container = (detail.meta && detail.meta.request_id) ? findContainer(detail.meta.request_id) : null;
+						const labels = toastLabels(container);
+						const message = detail.message || detail.Message || labels.defaultError || "Request failed, please try again";
+						dispatchToast("error", code || labels.errorTitle || "Error", message);
 						if (detail.meta && detail.meta.base_revision) {
-							dispatchToast("warning", "权限基线已更新", "请刷新页面以同步最新权限基线");
+							dispatchToast("warning", labels.staleTitle || "Policy revision updated", labels.staleMessage || "Refresh the page to sync the latest policy revision");
 						}
 						if (detail.meta && detail.meta.request_id) {
-							const container = findContainer(detail.meta.request_id);
 							const retry = container?.querySelector("[data-authz-retry-bot]");
 							if (retry) {
 								retry.classList.add("hidden");
@@ -472,9 +493,11 @@ templ Unauthorized(props *UnauthorizedProps) {
 						if (!detail || !detail.id) {
 							return;
 						}
+						const labels = toastLabels(null);
 						const slaMsg = detail.estimatedSLA ? formatSLA({ dataset: { slaUnknown: "" } }, detail.estimatedSLA) : "";
-						const message = slaMsg ? "已提交草稿 " + detail.id + " · " + slaMsg : "已提交草稿 " + detail.id;
-						dispatchToast("success", "提交成功", message);
+						const prefix = labels.submittedPrefix || "Submitted";
+						const message = slaMsg ? prefix + " " + detail.id + " · " + slaMsg : prefix + " " + detail.id;
+						dispatchToast("success", labels.submitTitle || "Submitted", message);
 						handleUpdate(detail.id, detail);
 					}
 
@@ -595,6 +618,8 @@ templ Unauthorized(props *UnauthorizedProps) {
 					if (!reqId || !token) {
 						return;
 					}
+					var container = retryBtn.closest("[data-authz-container]");
+					var defaultErrorMsg = (container && container.dataset && container.dataset.toastDefaultError) || "Request failed, please try again";
 					retryBtn.disabled = true;
 					fetch("/core/api/authz/requests/" + reqId + "/trigger-bot?retry_token=" + encodeURIComponent(token), {
 						method: "POST",
@@ -614,7 +639,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 								if (window.dispatchEvent) {
 									window.dispatchEvent(
 										new CustomEvent("showErrorToast", {
-											detail: result?.body || { code: "E_INTERNAL", message: "请求失败，请重试", meta: { request_id: reqId } },
+											detail: result?.body || { code: "E_INTERNAL", message: defaultErrorMsg, meta: { request_id: reqId } },
 										}),
 									);
 								}
@@ -628,7 +653,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 							if (window.dispatchEvent) {
 								window.dispatchEvent(
 									new CustomEvent("showErrorToast", {
-										detail: { code: "E_INTERNAL", message: "请求失败，请重试", meta: { request_id: reqId } },
+										detail: { code: "E_INTERNAL", message: defaultErrorMsg, meta: { request_id: reqId } },
 									}),
 								);
 							}
