@@ -57,20 +57,26 @@
 - 原子性要求：业务写入与 outbox 插入必须在同一数据库事务内提交（避免“数据已改但事件未发/事件已发但数据未改”）。
 - 事件来源：复用 022 的 `OrgChangedEvent/OrgAssignmentChangedEvent`，Topic 仍按 `org.changed.v1/org.assignment.changed.v1`；`transaction_time` 取事务提交时间，`effective_window` 取变更的 valid time。
 - 幂等与重放：outbox 以 `event_id` 为幂等键、`sequence` 为全局有序游标（M1 可先按 DB 自增/时间排序实现，027 再优化）；消费者必须幂等处理并允许重放。
-- Relay：M1 可先做进程内 relay（轮询 outbox 未发布事件并 `Publish` 到应用内 `EventBus`），后续可替换为异步队列/外部总线（不改变 outbox 表与事件契约）。
+- Outbox 表（M1，示意字段）：
+  - `id uuid pk`、`tenant_id uuid not null`、`topic text not null`、`event_id uuid not null unique`、`sequence bigserial`、`payload jsonb not null`、`created_at timestamptz default now()`、`published_at timestamptz null`、`attempts int default 0`、`locked_at timestamptz null`、`last_error text null`
+  - 索引：`(published_at, created_at)`、`(tenant_id, created_at)`；relay 抢占用 `FOR UPDATE SKIP LOCKED`
+- Relay：M1 做进程内 relay（轮询 outbox 未发布事件并 `Publish` 到应用内 `EventBus`），失败记录 `last_error/attempts` 并可重试；后续可替换为异步队列/外部总线（不改变 outbox 表与事件契约）。
 
 ### 4. Snapshot（对账/恢复）
 - `GET /org/snapshot?effective_date=...&include=...` 返回指定时间点的全量状态（至少包含 `org_nodes/org_node_slices/org_edges/positions/org_assignments` 的 as-of 视图），用于事件丢失后的全量纠偏。
 - 权限：默认要求 `org.* admin`；如需系统间调用，使用 system subject（由调用方注入）并单独策略放行。
 - 性能口径：支持 `include=` 子集与分页（如有必要），避免一次性返回超大 payload；性能优化在 027。
+- 响应建议包含：`tenant_id/effective_date/generated_at`、各资源的数组与计数摘要（便于下游快速校验差异）。
 
 ### 5. Batch（单事务重组）
 - `POST /org/batch` 在单事务内执行多条指令（Create/Update/Move/Assign），要么全部成功要么全部回滚；支持 `dry_run=true` 仅做校验与影响摘要（Impact 更完整版本在 030）。
 - 权限：默认要求 `org.* admin`（M1 先保守）；后续可按指令类型降权。
 - 事件策略：成功提交后按指令产生相应 outbox 事件；MoveNode 可能影响子树 path，M1 仅保证“边变更事件”可重放，子树级联事件策略在 027 评估。
+- 请求体建议结构（示意）：
+  - `effective_date`（全局默认）+ `commands[]`（每条含 `type` 与 `payload`），服务端校验通过后在同事务内执行并写 outbox。
 
 ### 6. 缓存键与失效
-- 缓存键：至少覆盖树查询与按 subject 的分配查询，key 包含 `tenant_id/hierarchy_type/effective_date`（以及 subject id）。
+- 缓存键：至少覆盖树查询与按 subject 的分配查询，key 包含 `tenant_id/hierarchy_type/effective_date`（以及 subject id），建议使用 `pkg/repo.CacheKey("org", "<kind>", ...)` 生成。
 - 失效策略：消费 outbox 事件后按 tenant 维度清理 org 缓存（M1 先粗粒度），必要时提供全量重建命令（调用 `/org/snapshot` 或重启应用）；精细化失效与读优化在 027。
 
 ## 任务清单与验收标准
