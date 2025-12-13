@@ -430,10 +430,24 @@
     "Object": "Объект",
     "Action": "Действие",
     "Subject": "Субъект",
+    "Type": "Тип",
+    "Effect": "Эффект",
+    "Role": "Роль",
+    "ParentRole": "Родительская роль",
     "Workspace": {
       "Context": "Контекст",
       "Changes": "Изменения",
-      "Discard": "Отменить черновик"
+      "Discard": "Отменить черновик",
+      "ConfirmTitle": "Подтвердите отправку",
+      "ConfirmDescription": "Будет создан черновик из сохранённых изменений.",
+      "WarningTitle": "Предупреждения",
+      "WarningDeny": "Содержит deny правил: {{.Count}}.",
+      "WarningWildcard": "Содержит правил с подстановкой (*): {{.Count}}.",
+      "WarningMultiDomain": "Затрагивает несколько доменов: {{.Domains}}",
+      "PreviewTitle": "Предпросмотр",
+      "PreviewKind": "Изменение",
+      "PreviewAdd": "Добавить",
+      "PreviewRemove": "Удалить"
     },
     "RequestDetail": {
       "Title": "Запрос на изменение политик",
@@ -446,7 +460,11 @@
       "ViewPR": "Открыть PR",
       "RawDiffTitle": "Исходный diff",
       "RawDiffFormat": "JSON",
-      "BotLogTitle": "Логи бота"
+      "BotLogTitle": "Логи бота",
+      "Approve": "Одобрить",
+      "Reject": "Отклонить",
+      "Cancel": "Отменить",
+      "Revert": "Откатить"
     },
     "Toast": {
       "ErrorTitle": "Ошибка",
@@ -507,6 +525,7 @@
       "Timeout": "Время ожидания истекло, скопируйте request_id и повторите запрос",
       "Retry": "Повторить",
       "Copy": "Скопировать request_id",
+      "CountdownPrefix": "SLA",
       "Unknown": "SLA неизвестно"
     },
     "Status": {

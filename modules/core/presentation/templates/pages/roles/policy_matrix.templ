@@ -30,6 +30,7 @@ type PolicyMatrixProps struct {
 	Limit        int
 	StageTotal   int
 	StageSummary viewmodels.AuthzChangesSummary
+	StagePreview viewmodels.AuthzWorkspacePreview
 
 	RoleID  string
 	Subject string
@@ -171,6 +172,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 				hx-post="/core/api/authz/policies/stage"
 				hx-target="body"
 				hx-swap="none"
+				x-data="{ typ: 'p' }"
 			>
 				<input type="hidden" name="subject" value={ props.Subject }/>
 				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -182,19 +184,24 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						},
 					})
 					<div class="space-y-1">
-						<label class="text-sm text-secondary-200">Type</label>
-						<select name="type" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
+						<label class="text-sm text-secondary-200">{ pageCtx.T("Authz.Type") }</label>
+						<select name="type" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full" x-model="typ">
 							<option value="p" selected>p</option>
 							<option value="g">g</option>
 						</select>
 					</div>
-					<div class="space-y-1">
-						<label class="text-sm text-secondary-200">Effect</label>
-						<select name="effect" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
-							<option value="allow" selected>allow</option>
-							<option value="deny">deny</option>
-						</select>
-					</div>
+					<template x-if="typ !== 'g'">
+						<div class="space-y-1">
+							<label class="text-sm text-secondary-200">{ pageCtx.T("Authz.Effect") }</label>
+							<select name="effect" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
+								<option value="allow" selected>allow</option>
+								<option value="deny">deny</option>
+							</select>
+						</div>
+					</template>
+					<template x-if="typ === 'g'">
+						<input type="hidden" name="effect" value="allow"/>
+					</template>
 					@input.Text(&input.Props{
 						Label: pageCtx.T("Authz.Subject"),
 						Attrs: templ.Attributes{
@@ -204,22 +211,39 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						},
 					})
 				</div>
-				@input.Text(&input.Props{
-					Label:       pageCtx.T("Authz.Object"),
-					Placeholder: "core.users",
-					Attrs: templ.Attributes{
-						"name":     "object",
-						"required": "true",
-					},
-				})
-				@input.Text(&input.Props{
-					Label:       pageCtx.T("Authz.Action"),
-					Placeholder: "read",
-					Attrs: templ.Attributes{
-						"name":     "action",
-						"required": "true",
-					},
-				})
+				<template x-if="typ !== 'g'">
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("Authz.Object"),
+						Placeholder: "core.users",
+						Attrs: templ.Attributes{
+							"name":     "object",
+							"required": "true",
+						},
+					})
+				</template>
+				<template x-if="typ === 'g'">
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("Authz.ParentRole"),
+						Placeholder: "role:core.viewer",
+						Attrs: templ.Attributes{
+							"name":     "object",
+							"required": "true",
+						},
+					})
+				</template>
+				<template x-if="typ !== 'g'">
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("Authz.Action"),
+						Placeholder: "read",
+						Attrs: templ.Attributes{
+							"name":     "action",
+							"required": "true",
+						},
+					})
+				</template>
+				<template x-if="typ === 'g'">
+					<input type="hidden" name="action" value="*"/>
+				</template>
 				<div class="flex justify-end gap-2">
 					@button.Secondary(button.Props{
 						Size: button.SizeSM,
@@ -243,21 +267,31 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 			</form>
 		}
 		<div class="border border-primary rounded-lg overflow-hidden">
-			@base.Table(base.TableProps{
-				Columns: []*base.TableColumn{
-					{Label: "Type", Key: "type", Class: "w-14"},
+			{{ columns := []*base.TableColumn{} }}
+			if props.Type == "g" {
+				{{ columns = []*base.TableColumn{
+					{Label: pageCtx.T("Authz.ParentRole"), Key: "role"},
+					{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
+					{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-28"},
+				} }}
+			} else {
+				{{ columns = []*base.TableColumn{
+					{Label: pageCtx.T("Authz.Type"), Key: "type", Class: "w-14"},
 					{Label: pageCtx.T("Authz.Subject"), Key: "subject"},
 					{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
 					{Label: pageCtx.T("Authz.Object"), Key: "object"},
 					{Label: pageCtx.T("Authz.Action"), Key: "action"},
-					{Label: "Effect", Key: "effect", Class: "w-28"},
+					{Label: pageCtx.T("Authz.Effect"), Key: "effect", Class: "w-28"},
 					{Label: pageCtx.T("Actions"), Key: "actions", Class: "w-28"},
-				},
+				} }}
+			}
+			@base.Table(base.TableProps{
+				Columns: columns,
 			}) {
 				if len(props.Entries) == 0 {
 					@base.TableRow(base.TableRowProps{}) {
 						@base.TableCell(base.TableCellProps{
-							Attrs: templ.Attributes{"colspan": "7"},
+							Attrs: templ.Attributes{"colspan": fmt.Sprintf("%d", len(columns))},
 						}) {
 							<div class="py-4 text-center text-sm text-secondary-400">
 								{ pageCtx.T("Empty") }
@@ -276,34 +310,54 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					@base.TableRow(base.TableRowProps{
 						Attrs: templ.Attributes{"class": rowClass},
 					}) {
-						@base.TableCell(base.TableCellProps{}) {
-							{ entry.Type }
-						}
-						@base.TableCell(base.TableCellProps{}) {
-							{ entry.Subject }
-						}
-						@base.TableCell(base.TableCellProps{}) {
-							{ entry.Domain }
-						}
-						@base.TableCell(base.TableCellProps{}) {
-							{ entry.Object }
-						}
-						@base.TableCell(base.TableCellProps{}) {
-							{ entry.Action }
-						}
-						@base.TableCell(base.TableCellProps{}) {
-							<div class="flex items-center gap-2">
-								<span>{ entry.Effect }</span>
-								if entry.Staged {
-									{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
-									if entry.StageKind == "remove" {
-										{{ badgeClass = "text-[11px] px-2 py-0.5 rounded-full border bg-red-700 border-red-500 text-white" }}
+						if props.Type == "g" {
+							@base.TableCell(base.TableCellProps{}) {
+								<div class="flex items-center gap-2">
+									<span class="font-mono">{ entry.Object }</span>
+									if entry.Staged {
+										{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
+										if entry.StageKind == "remove" {
+											{{ badgeClass = "text-[11px] px-2 py-0.5 rounded-full border bg-red-700 border-red-500 text-white" }}
+										}
+										<span class={ badgeClass }>
+											{ pageCtx.T("Authz.Stage.BadgeShort") }
+										</span>
 									}
-									<span class={ badgeClass }>
-										{ pageCtx.T("Authz.Stage.BadgeShort") }
-									</span>
-								}
-							</div>
+								</div>
+							}
+							@base.TableCell(base.TableCellProps{}) {
+								{ entry.Domain }
+							}
+						} else {
+							@base.TableCell(base.TableCellProps{}) {
+								{ entry.Type }
+							}
+							@base.TableCell(base.TableCellProps{}) {
+								{ entry.Subject }
+							}
+							@base.TableCell(base.TableCellProps{}) {
+								{ entry.Domain }
+							}
+							@base.TableCell(base.TableCellProps{}) {
+								{ entry.Object }
+							}
+							@base.TableCell(base.TableCellProps{}) {
+								{ entry.Action }
+							}
+							@base.TableCell(base.TableCellProps{}) {
+								<div class="flex items-center gap-2">
+									<span>{ entry.Effect }</span>
+									if entry.Staged {
+										{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
+										if entry.StageKind == "remove" {
+											{{ badgeClass = "text-[11px] px-2 py-0.5 rounded-full border bg-red-700 border-red-500 text-white" }}
+										}
+										<span class={ badgeClass }>
+											{ pageCtx.T("Authz.Stage.BadgeShort") }
+										</span>
+									}
+								</div>
+							}
 						}
 						@base.TableCell(base.TableCellProps{
 							Classes: templ.Classes("text-right"),
@@ -374,6 +428,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 			DisplayDomain: props.Domain,
 			StagedCount:   props.StageTotal,
 			Summary:       props.StageSummary,
+			Preview:       props.StagePreview,
 			SubmitURL:     "/core/api/authz/requests",
 			ClearURL:      clearURL,
 			RequestObject: "core.roles",

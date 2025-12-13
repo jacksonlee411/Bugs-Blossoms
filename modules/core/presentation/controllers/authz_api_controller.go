@@ -378,7 +378,9 @@ func (c *AuthzAPIController) triggerBot(
 	logger *logrus.Entry,
 	svc *services.PolicyDraftService,
 ) {
-	if !c.ensurePermission(w, r, permissions.AuthzRequestsReview) {
+	if composables.CanUser(r.Context(), permissions.AuthzRequestsReview) != nil &&
+		composables.CanUser(r.Context(), permissions.AuthzRequestsWrite) != nil {
+		c.writeHTMXError(w, r, http.StatusForbidden, "AUTHZ_FORBIDDEN", "permission denied")
 		return
 	}
 	id, err := parseUUID(mux.Vars(r)["id"])
@@ -387,7 +389,12 @@ func (c *AuthzAPIController) triggerBot(
 		return
 	}
 	locker := r.URL.Query().Get("locker")
-	token := r.URL.Query().Get("retry_token")
+	token := strings.TrimSpace(r.URL.Query().Get("retry_token"))
+	if token == "" {
+		if err := r.ParseForm(); err == nil {
+			token = strings.TrimSpace(r.FormValue("retry_token"))
+		}
+	}
 	if err := authzutil.ValidateRetryToken(token, id); err != nil {
 		c.writeHTMXErrorWithMeta(w, r, http.StatusUnauthorized, "AUTHZ_INVALID_TOKEN", "error.bot_retry_token_invalid", map[string]string{
 			"request_id": id.String(),

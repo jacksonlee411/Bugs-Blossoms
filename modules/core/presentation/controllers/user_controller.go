@@ -1008,6 +1008,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		DefaultDomain: defaultDomain,
 		StageTotal:    len(stagedEntries),
 		StageSummary:  summarizeStagedEntries(stagedEntries),
+		StagePreview:  buildWorkspacePreview(stagedEntries),
 		Requests:      requestStatuses,
 		Inherited:     inheritedColumn,
 		Direct:        directColumn,
