@@ -38,15 +38,15 @@
 - **非目标**：不实现薪酬预算、绩效考核，不做编制/空岗管理，不调整 finance 模块 schema，仅通过事件/视图消费。
 
 ## Workday 能力对齐
-| Workday 关键点 | Workday 行为说明 | 本计划方案 | 差距/补充动作 |
-| --- | --- | --- | --- |
-| Organization Unit（原 Supervisory）/ Company / Cost / Custom Hierarchies | 每个层级有独立版本与有效期，驱动 BP、财务和报表 | **M1：仅单一 Organization Unit 树，无版本化**；M2+ 才开放多层级/占位 | 需在 M2 引入多树与版本冻结，允许 Draft/Active 并存 |
-| Business Process（BP）绑定 | 审批路由基于 Supervisory、Company 及 security group | **M1 不做**，仅保留事件出口 | M3+ 才接入 `pkg/workflow` 与 `org_bp_bindings`、route preview |
-| Security Domain / Group | Workday 通过 domain policy 授权到 org level，支持继承 | **M1 不做策略生成**，仅事件；Authz 继承放入后续 | M3+ 实现“组织节点 ↔ security group”映射与 policy 草稿 |
-| Effective Dating & Retro Changes | 所有对象支持未来/过去生效，Retro 需影响历史审批/薪酬 | M1 支持 EffectiveWindow + 重叠/冻结校验，**无 retro** | Retro API/冲突策略/审计放入 M3+ |
-| Matrix / Shared Line | 员工可有主、辅组织用于审批/报表 | **M1 仅主属，assignment_type 占位（matrix/dotted）不启用** | M2+ 才开放 lateral link/secondary 并定义权限提示 |
-| Position Management | 职位必须挂载 Supervisory org，调动时影响 Budget/Comp | **M1：Assignment 以 Position 为锚点（Person → Position → Org），可自动生成一对一空壳 Position；无编制/空岗** | M2/021 再扩展编制、空岗、多岗与成本中心耦合 |
-| Impact Analysis & What-if Simulation | 变更前展示受影响员工、BP、security | **M1 不含 Impact/What-if** | M4 才引入 Impact 面板与指标口径 |
+| Workday 关键点 | Workday 行为说明 | 本计划方案 | 对应设计原则（编号） | 差距/补充动作 |
+| --- | --- | --- | --- | --- |
+| Organization Unit（原 Supervisory）/ Company / Cost / Custom Hierarchies | 每个层级有独立版本与有效期，驱动 BP、财务和报表 | **M1：仅单一 Organization Unit 树，无版本化**；M2+ 才开放多层级/占位 | 2/3/5 | 需在 M2 引入多树与版本冻结，允许 Draft/Active 并存 |
+| Business Process（BP）绑定 | 审批路由基于 Supervisory、Company 及 security group | **M1 不做**，仅保留事件出口 | 4/6 | M3+ 才接入 `pkg/workflow` 与 `org_bp_bindings`、route preview |
+| Security Domain / Group | Workday 通过 domain policy 授权到 org level，支持继承 | **M1 不做策略生成**，仅事件；Authz 继承放入后续 | 6（补：最小权限） | M3+ 实现“组织节点 ↔ security group”映射与 policy 草稿 |
+| Effective Dating & Retro Changes | 所有对象支持未来/过去生效，Retro 需影响历史审批/薪酬 | M1 支持 EffectiveWindow + 重叠/冻结校验，**无 retro** | 2/5 | Retro API/冲突策略/审计放入 M3+ |
+| Matrix / Shared Line | 员工可有主、辅组织用于审批/报表 | **M1 仅主属，assignment_type 占位（matrix/dotted）不启用** | 2/3/5 | M2+ 才开放 lateral link/secondary 并定义权限提示 |
+| Position Management | 职位必须挂载 Supervisory org，调动时影响 Budget/Comp | **M1：Assignment 以 Position 为锚点（Person → Position → Org），可自动生成一对一空壳 Position；无编制/空岗** | 2/6 | M2/021 再扩展编制、空岗、多岗与成本中心耦合 |
+| Impact Analysis & What-if Simulation | 变更前展示受影响员工、BP、security | **M1 不含 Impact/What-if** | 4/6 | M4 才引入 Impact 面板与指标口径 |
 
 ## 关键业务蓝图
 ### 1. 组织结构与类型
@@ -130,6 +130,36 @@
 - **事件契约**：OrgChanged/OrgAssignmentChanged 附带 tenant_id/node_id/effective_window/version/assignment_type/幂等键，向后兼容扩展字段；预留继承解析后的属性、变更请求上下文字段。
 - **跨模块校验**：person/pernr 通过 HRM 只读视图或缓存软校验并周期性对账；position_id 必填且归属 OrgNode，HRM Position SOR 成熟后再启用更强校验。
 
+### 集成视图（简版）
+```mermaid
+flowchart LR
+  Org[modules/org<br/>组织层级 SOR]
+  HRM[modules/hrm<br/>Person SOR]
+  Authz[pkg/authz<br/>Casbin/权限判定]
+  Workflow[modules/workflow<br/>BP/审批（后续）]
+  Finance[modules/finance<br/>冻结：只读消费]
+  Other[采购/项目/其他模块<br/>只读消费]
+  Bus[pkg/eventbus<br/>事件总线]
+  Cache[Redis/内存缓存<br/>树缓存]
+  DB[(PostgreSQL 17)]
+  BI[BI/Reporting<br/>org_reporting 视图]
+
+  HRM -->|只读视图/缓存：person_id、pernr 软校验| Org
+  Org -->|API 调用：Org.Read/Write/Assign/Admin| Authz
+  Org <--> Cache
+  Org --> DB
+  HRM --> DB
+  Finance --> DB
+  BI --> DB
+
+  Org -.->|OrgChanged / OrgAssignmentChanged| Bus
+  Bus -.-> HRM
+  Bus -.-> Authz
+  Bus -.-> Workflow
+  Bus -.-> Finance
+  Bus -.-> Other
+```
+
 ## 上线与迁移
 - 租户初始化：导入脚本（CSV/JSON）创建唯一根节点、批量导入节点/边、补齐员工 primary assignment；导入前执行重叠/重名校验，导入后输出对账报告并记入 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md`。
 - 灰度与回滚：按租户/环境开关只读接口，写接口仅对导入账号开放；导入前对 org 相关表快照（pg_dump），提供清理脚本与缓存重建。
@@ -176,6 +206,7 @@
 
 *   **步骤 3: 准备基础脚本与验证**
     *   **任务**: 编写初步的数据导入/导出脚本和回滚脚本的雏形。
+    *   **任务**: M1 阶段优先交付 **DB backend**（事务直写、dry-run、manifest 回滚），用于造数与快速回滚；待 026 的 `/org/batch` 与 outbox/审计路径稳定后，再补 **API backend** 以复用校验/审计/事件闭环。
     *   **任务**: 确保项目通过 `make check lint`、`go test ./modules/org/...`（或相关路径），必要时补充 bench/seed 脚本的空壳以便后续填充；验证失败时必须提供回滚/清理脚本。
 
 ### **阶段 1 (M1 里程碑): 最小可用主数据链**
@@ -191,19 +222,20 @@
     *   **任务**: 实现 `Rescind` (撤销) 状态，用于软删除误创建的数据；冻结窗口（默认月末+3 天，可按租户覆盖）违反时拒绝写入并记录审计。
 
 *   **步骤 6: 开发 API 与发布事件**
-    *   **任务**: 提供节点、职位、分配的 RESTful API。
-    *   **任务**: 在数据变更成功后，通过事件总线发布 `OrgChanged` 和 `OrgAssignmentChanged` 事件；所有入口统一使用 `pkg/authz` 判定 `Org.Read/Org.Write/Org.Assign/Org.Admin`，提交 `config/access/policies/org/**` 片段并运行 `make authz-test authz-lint authz-pack` 作为准入。
+    *   **任务**: 提供节点、职位、分配的 RESTful API（含 `effective_date` 语义与稳定错误码）。
+    *   **任务**: 先落地 Transactional Outbox 工具链（DEV-PLAN-017，`pkg/outbox`），并在 Org 模块使用独立表 `org_outbox`；确保“业务写入 + outbox 入库”同一事务提交。
+    *   **任务**: 在事务提交后通过 relay 投递 `OrgChanged` 和 `OrgAssignmentChanged`（允许重放、消费者按 `event_id` 幂等）；所有入口统一使用 `pkg/authz` 判定 `Org.Read/Org.Write/Org.Assign/Org.Admin`，提交 `config/access/policies/org/**` 片段并运行 `make authz-test authz-lint authz-pack` 作为准入。
+
+*   **步骤 6A: 实现 M1 前端界面**
+    *   **任务**: 根据 `Presentation Layer & API` 章节中的 UI 描述，开发组织模块的前端界面。
+    *   **关键**: 实现树形视图、节点/职位/分配的增删改查表单，以及支持 `effective_date` 的日期选择器。UI 组件应通过 `DEV-PLAN-026` 中定义的 API 与后端交互。
+    *   **产出**: 可交互的组织管理前端页面，覆盖 M1 里程碑的核心功能。
 
 *   **步骤 7: 性能与上线准备**
     *   **任务**: 完成性能基准测试，确保“1000个节点，查询时间小于200毫秒”的指标达成（基准脚本需固定数据集、PG17 环境、命令行参数，纳入 repo/CI 可重复执行）。
     *   **任务**: 完善数据导入和灰度发布脚本，准备上线；若性能不达标，提供特性开关/降级查询与回滚剧本。
 
 ### **阶段 2：继承、矩阵与角色占位**
-
-*   **步骤 7A: 实现 M1 前端界面**
-    *   **任务**: 根据 `Presentation Layer & API` 章节中的 UI 描述，开发组织模块的前端界面。
-    *   **关键**: 实现树形视图、节点/职位/分配的增删改查表单，以及支持 `effective_date` 的日期选择器。UI 组件应通过 `DEV-PLAN-026` 中定义的 API 与后端交互。
-    *   **产出**: 可交互的组织管理前端页面，覆盖 M1 里程碑的核心功能。
 
 此阶段在 M1 稳定后启动，重点是增强读取和查询能力。
 
@@ -238,17 +270,18 @@
 *   **步骤 14: 运维、治理与可选的 SOM 对齐**
     *   **任务**: 建立完善的监控指标、健康检查、自动化压测和运维脚本。
 
-## 实施路线图（子计划 021-035）
-为确保步骤落地可跟踪、可复用，以上每个步骤对应一个独立的子计划文档（编号从 021 开始，文件位于 `docs/dev-plans/DEV-PLAN-0xx-*.md`，命名可按步骤主题细化）。路线图按依赖顺序规划如下：
+## 实施路线图（子计划 017、021-035）
+为确保步骤落地可跟踪、可复用，以上每个步骤对应一个独立的子计划文档：其中 DEV-PLAN-017 为跨模块 outbox 基础设施；Org 模块子计划编号从 021 开始（文件位于 `docs/dev-plans/DEV-PLAN-0xx-*.md`）。路线图按依赖顺序规划如下：
 
 - DEV-PLAN-021（步骤 1，Schema 与约束）：先行完成核心表/约束迁移及 `make db lint` + 上下行验证，解锁后续开发。
 - DEV-PLAN-022（步骤 2，占位表与事件契约）：依赖 021，补占位表与事件契约，完成 sqlc/atlas 生成校验。
-- DEV-PLAN-023（步骤 3，导入/回滚与 readiness）：依赖 021-022，产出导入/回滚脚本雏形，跑 `make check lint`、路径级 `go test` 完成 readiness。
+- DEV-PLAN-023（步骤 3，导入/回滚与 readiness）：依赖 021-022，优先交付 DB backend（dry-run + manifest 回滚）与 readiness；待 026 的 `/org/batch` 就绪后补 API backend 以复用审计与事件闭环。
 - DEV-PLAN-024（步骤 4，主链 CRUD）：依赖 021-023，交付 Person→Position→Org CRUD 与租户/Session 守卫。
 - DEV-PLAN-025（步骤 5，时间约束与审计）：依赖 024，补有效期/冻结窗口/Correct-Update-Rescind 审计。
-- DEV-PLAN-026（步骤 6，API + Authz + 事件）：依赖 024-025，提供 REST API、事件发布，提交策略片段并跑 `make authz-test authz-lint authz-pack`。
+- DEV-PLAN-017（步骤 6 前置，Transactional Outbox 工具链）：在 026 落地前先完成 `pkg/outbox`（Publisher/Relay/Cleaner）与标准 schema/查询口径，确保 relay 投递有 `error` 边界、支持重试与重放。
+- DEV-PLAN-026（步骤 6，API + Authz + Outbox）：依赖 017/024-025，提供 REST API、Authz 强制与 outbox 投递闭环，提交策略片段并跑 `make authz-test authz-lint authz-pack`。
 - DEV-PLAN-035（步骤 6A，M1 前端 UI）：依赖 026，完成树形视图/表单/分配前端、`templ generate && make css`、`pageCtx.CanAuthz` 接入及 e2e。
-- DEV-PLAN-027（步骤 7，性能基准与灰度）：依赖 026，完成 1k 节点 <200ms 基准脚本、导入与灰度发布/回滚剧本。
+- DEV-PLAN-027（步骤 7，性能基准与灰度）：依赖 026，完成 1k 节点 <200ms 基准脚本、导入与灰度发布/回滚剧本（作为 M1 上线验收门槛）。
 - DEV-PLAN-028（步骤 8，继承解析与角色读侧）：依赖 026-027，落地属性继承解析与角色查询占位，矩阵/虚线只读。
 - DEV-PLAN-029（步骤 9，闭包表与深层读优化）：依赖 028，加入闭包表/物化视图及迁移回填、幂等刷新、feature flag/回滚方案。
 - DEV-PLAN-030（步骤 10，变更请求与预检）：依赖 026-027，提供 change_requests 草稿/提交（无 workflow 时仅审计）与 Pre-flight API，并补权限/租户隔离测试。
@@ -265,7 +298,7 @@
                                  025 时间/审计
                                           |
                                           v
-            026 API+Authz+事件 -> 027 性能/灰度
+             017 Outbox 工具链 -> 026 API+Authz+Outbox -> 027 性能/灰度
                       |                 |
                       v                 v
             035 M1 前端 UI       030 变更请求/预检

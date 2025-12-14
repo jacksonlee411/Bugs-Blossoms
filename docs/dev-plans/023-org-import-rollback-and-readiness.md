@@ -1,46 +1,116 @@
 # DEV-PLAN-023：Org 导入/回滚脚本与 Readiness
 
-**状态**: 规划中（2025-01-15 12:00 UTC）
+**状态**: 规划中（2025-12-13 更新）
 
 ## 背景
 - 对应 020 步骤 3，承接 021（schema 落地）与 022（占位表/事件契约），需提供导入/导出/回滚脚本雏形并完成 readiness（lint/test），为 024 CRUD 主链上线前做数据与执行面准备。
 
 ## 目标
-- 提供可运行的导入/回滚脚本雏形（含 dry-run）、最小对账报告输出。
-- `make check lint` 与 `go test ./modules/org/...`（或相关路径）通过，失败有回滚/清理方案。
+- 提供基于 Go 的 CLI 工具 (`cmd/org-data`)，支持 CSV 数据的导入、导出与回滚，具备完整的 dry-run 校验能力。
+- 定义明确的 CSV 数据模板与校验规则（唯一性、层级完整性、时间窗有效性）。
+- `make check lint` 与 `go test ./cmd/org-data/... ./modules/org/...`（或相关路径）通过，失败有回滚/清理方案。
 
 ## 范围与非目标
-- 范围：为 org 主链提供导入/导出/回滚脚本（含 dry-run）、最小对账报告、验证命令与记录；覆盖 021/022 已落地的表（org_nodes/edges/positions/assignments、org_attribute_inheritance_rules、org_roles、org_role_assignments、change_requests 占位）。
+- 范围：为 org 主链提供数据工具；覆盖 021/022 已落地的表（`org_nodes`/`org_node_slices`/`org_edges`/`positions`/`org_assignments`；可选扩展到 `org_roles/org_role_assignments/org_attribute_inheritance_rules/change_requests` 的导出）。
 - 非目标：不实现最终 UI、审批/流程、矩阵/继承逻辑执行，只提供数据导入与清理脚本；不交付生产级自动化灰度，仅最小可用路径。
 
 ## 依赖与里程碑
 - 依赖：基于 DEV-PLAN-021 schema 与 DEV-PLAN-022 占位/契约，确保导入数据与现有约束一致；在 024 CRUD 主链前完成 readiness。
-- 里程碑（按提交时间填充）：脚本雏形 -> dry-run 与对账 -> lint/test 通过 -> 记录更新。
+- 里程碑（按提交时间填充）：CLI 工具骨架 -> CSV 解析与校验逻辑 -> 数据库交互与回滚 -> Readiness 验证。
 
 ## 设计决策
-- 脚本形态与入口：放置于 `scripts/org/`（如 `import.sh`/`export.sh`/`rollback.sh`），支持 `--input`/`--tenant`/`--dry-run`/`--window`（有效期）/`--tables`（覆盖范围）参数；默认 dry-run，不带 `--apply` 不落库。
-- 数据格式：统一使用 CSV（每张表一文件，UTF-8，无 BOM），在 README/usage 中给出模板列顺序与示例；导出生成同格式，便于回放与对账，避免 CSV/JSON 双栈维护。
-- 数据覆盖：导入/导出涵盖 `org_nodes`、`org_edges`、`positions`、`org_assignments`、`org_attribute_inheritance_rules`、`org_roles`、`org_role_assignments`、`change_requests` 草稿；必要时可通过 `--tables` 选择子集。
-- 校验与对账：导入前执行唯一/重叠/父子/租户校验（复用 SQL/视图）；导入后生成对账报告（节点数、边数、有效期冲突数、导入/跳过/失败计数），输出到 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md` 或临时文件再汇总。
-- 幂等与回滚：导入以幂等键（tenant_id + code/id）驱动，重复导入仅更新相同窗口数据；`rollback.sh` 接受 `--tenant`+`--token`/`--since`（快照或时间窗）删除导入批次，必须提供 dry-run 与确认提示，批次 token 写入日志/对账报告便于追溯。
-- Schema/版本兼容：执行前检查 `modules/org/infrastructure/atlas/schema.hcl` 与对应迁移已落地（`atlas migrate status --env dev` 无待应用），与 021/022 生成的 schema rev 一致，若检测到差异或 pending 迁移则拒绝导入并提示先同步。
-- Readiness 检查：最小集为 `make check lint` + `go test ./modules/org/...`（按影响路径可缩小范围），必要时补充 `make db lint` 以验证迁移可回滚；所有命令与结果记录到文档。
+### 1. 工具形态：Go CLI (`cmd/org-data`)
+- **原因**：Shell 脚本处理 CSV 和复杂校验（如时间重叠、树环检测）能力不足且难以维护。使用 Go CLI 可复用 `modules/org/domain` 中的逻辑和 `pkg/db` 连接池。
+- **命令结构**：
+  - `org-data import --tenant <uuid> --input <dir> [--apply] [--strict] [--mode seed|merge] [--backend db|api]`
+  - `org-data export --tenant <uuid> --output <dir> [--as-of <date|rfc3339>]`
+  - `org-data rollback --tenant <uuid> (--manifest <path> | --since <timestamp>) [--apply]`
+- **Shell 包装**：保留 `scripts/org/*.sh` 作为 CLI 的简单包装器，方便运维调用。
+
+### 2. CSV 数据契约
+- **格式**：UTF-8，逗号分隔，带 Header。
+- **时间字段**：`effective_date/end_date` 支持 `YYYY-MM-DD` 或 RFC3339；`YYYY-MM-DD` 解释为 `00:00:00Z`，统一按 UTC 写入；有效期语义为半开区间 `[effective_date, end_date)`，空 `end_date` 由工具自动补齐（同一实体按 `effective_date` 排序，取下一片段的 `effective_date` 或 `9999-12-31`）。
+- **模板定义**：
+  - `nodes.csv`: `code` (必填), `type` (OrgUnit), `name`, `i18n_names` (JSON), `status` (active/retired), `effective_date`, `end_date`, `parent_code` (为空表示 root), `display_order`, `manager_user_id` (可选), `manager_email` (可选，优先级低于 manager_user_id)
+  - `positions.csv`: `code` (必填), `org_node_code` (必填), `title`, `effective_date`, `end_date`, `is_auto_created`
+  - `assignments.csv`: `position_code` (必填), `assignment_type` (primary/matrix/dotted), `effective_date`, `end_date`, `pernr` (必填), `subject_id` (可选，若为空则按 pernr 生成稳定 UUID)
+- **映射规则**：
+  - `nodes.csv` 每行会落成：`org_nodes`（按 `code` 确保存在稳定 ID）+ `org_node_slices`（属性时间片）+ `org_edges`（父子关系时间片，root 行不写 edge；`parent_hint` 与 edge 在写入前做一致性校验）。
+  - 导入时 CLI 需建立内存映射（Code -> UUID），将 CSV 中的 `parent_code/org_node_code` 转换为 DB 中的 `*_node_id`。
+  - `assignments.csv` 不支持 024 的“隐式自动创建 Position”，Position 必须显式存在（批量导入口径更严格，避免隐式生成脏数据）。
+
+### 3. 校验与执行逻辑
+- **Phase 1: Parse & Static Validate**
+  - 检查必填项、日期格式（`effective_date < end_date`）、JSON 格式。
+  - 内存中构建树并做环路检测：默认按最小 `effective_date` 的快照检查；`--strict` 下对所有边界时间点（各行 `effective_date` 的去重集合）逐点做 as-of 检查，避免把“不同时间片的边”误判为同一时点成环。
+  - 自动补齐 `end_date` 后，按实体维度检查“无重叠”；`--strict` 下额外检查“无空档”（对 `org_node_slices/org_edges/org_assignments` 默认按约束 1 执行）。
+  - 时区一致性：对所有 `YYYY-MM-DD` 输入强制解释为 UTC 的 `00:00:00Z`，并在运行日志中打印规范化后的时间点（避免因运行环境时区差异导致跨天偏移）。
+- **Phase 2: DB Dry-Run (Read-Only)**
+  - seed 模式：若检测到租户已存在 org 主链数据则直接拒绝。
+  - merge 模式：检查 `code` 在租户内是否冲突（若存在则标记为 Update 或 Skip）。
+  - 检查 `parent_code` 是否存在（或在当前批次中创建）。
+  - 检查时间片重叠（Overlap Check）：查询 DB 中该实体的现有时间片，模拟插入看是否触发 EXCLUDE 约束。
+- **Phase 3: Apply (Transactional)**
+  - 开启事务（db backend）或调用 API 批量入口（api backend，优先走 `POST /org/batch` 以复用 024/026 的校验、审计与事件发布路径）。
+  - 按依赖顺序写入：`org_nodes` -> `org_node_slices` -> `org_edges` -> `positions` -> `org_assignments`（`org_edges` 的 `path/depth` 由触发器维护）。
+  - 失败则全量回滚。
+  - 事件与缓存一致性：
+    - **db backend**：不直接触发应用内缓存失效；若在应用运行期间做 merge，需在执行后调用 026 的 `/org/snapshot` 或重启应用以完成对账/缓存重建（直到 outbox/relay 落地）。
+    - **api backend**：由服务端在同一事务内写入 outbox 并发布 `OrgChanged/OrgAssignmentChanged`（对齐 022），触发下游（Authz/缓存/索引）更新。
+
+### 4. 回滚策略 (Rollback)
+- **机制**：M1 先采用 **时间窗口 + 租户** 的最小方案；为降低误删风险，导入默认只支持“空租户/空组织数据”的 seed 模式（若检测到 tenant 已存在 org 主链数据则拒绝，需显式开关才允许 merge）。
+- **Manifest（推荐）**：每次 `import --apply` 生成 `import_manifest_<timestamp>.json`，记录本次导入写入/更新的主键集合、生成的 `subject_id(pernr->uuid)` 映射与执行摘要；`rollback --manifest` 以 manifest 为准做精确回滚，适用于 merge 场景。
+- **逻辑**：
+  - `rollback --since "2025-01-15T12:00:00Z"`
+  - 查询所有 `created_at >= since AND tenant_id = target` 的记录。
+  - 逆序删除：`org_assignments` -> `positions` -> `org_edges` -> `org_node_slices` -> `org_nodes`。
+  - **安全网**：默认 dry-run（不加 `--apply`）列出将要删除的记录数；执行 `--apply` 前需用户二次确认（输入 `YES`）。
+
+### 5. Readiness 检查集
+- **Lint**: `golangci-lint` 覆盖 `cmd/org-data` 及 `modules/org`。
+- **Test**:
+  - `go test ./cmd/org-data/...`：测试 CSV 解析与 CLI 逻辑。
+  - `go test ./modules/org/...`：测试领域校验逻辑。
+- **DB Lint**: `atlas migrate lint` 确保 Schema 无破坏性变更。
 
 ## 任务清单与验收标准
-1. [ ] 脚本雏形：在 `scripts/org/` 提供 `import.sh`/`export.sh`/`rollback.sh`（含 `--dry-run`/`--apply`/`--tables`/`--tenant`/`--window`），README 或脚本内 `usage` 说明 CSV 模板（列顺序/示例）、样例命令、默认 dry-run。验收：本地 dry-run 跑通并输出校验结果，不修改数据库。
-2. [ ] 数据校验与对账：实现导入前校验（唯一/重叠/父子/租户）与导入后报告（导入/跳过/失败计数、冲突明细）。验收：报告写入 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md`，含时间戳、输入源、批次 token；如使用临时文件需在记录中引用。
-3. [ ] 幂等与回滚路径：导入支持重复执行不破坏既有数据；`rollback.sh` 支持按 tenant+时间窗/批次 token 清理导入批次并提供 dry-run。验收：给出示例命令、风险提示，dry-run 输出记录到 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md` 或 023 readiness 文档。
-4. [ ] Schema/版本前置校验：脚本执行前校验 atlas 状态/迁移 rev（基于 021/022 生成的版本），若存在 pending 或 schema diff 则中止并提示同步；记录校验结果。验收：校验命令与结果写入 `docs/dev-records/DEV-PLAN-023-READINESS.md`。
-5. [ ] Readiness：执行 `make check lint` 与 `go test ./modules/org/...`（或影响子路径），必要时 `make db lint` 验证迁移可上下行；记录命令、耗时、结果到 `docs/dev-records/DEV-PLAN-023-READINESS.md`，确保 `git status --short` 干净。
+1. [ ] **CLI 骨架与 CSV 解析**
+   - 创建 `cmd/org-data/main.go` 及子命令结构。
+   - 实现 CSV Parser，支持上述 `nodes.csv`, `positions.csv` 等模板，解析为 Go Struct。
+   - 验收：`go run cmd/org-data/main.go import --help` 可用，能正确解析示例 CSV 并打印 JSON 结构。
+
+2. [ ] **校验逻辑 (Dry-Run)**
+   - 实现内存环路检测与时间片重叠预检。
+   - 实现 `Code -> UUID` 的解析逻辑（Mock DB 或连接 Dev DB）。
+   - 验收：提供含环路/重叠数据的 CSV，运行 `import`（不加 `--apply`）能准确报错并输出错误行号。
+
+3. [ ] **数据库交互与回滚**
+   - 集成 `pkg/db`，实现事务写入。
+   - 实现 `rollback` 命令，按时间窗查询并生成删除计划。
+   - 验收：在本地 DB 执行导入成功；执行回滚后数据被清理；`dry-run` 模式下不产生脏数据。
+
+4. [ ] **Shell 包装与文档**
+   - 编写 `scripts/org/import.sh` 等包装脚本。
+   - 更新 README，提供 CSV 模板下载链接或示例内容。
+   - 验收：`scripts/org/import.sh` 可直接调用，文档清晰。
+
+5. [ ] **Readiness 验证**
+   - 执行 `make check lint`。
+   - 执行 `go test ./modules/org/... ./cmd/org-data/...`。
+   - 记录执行结果到 `docs/dev-records/DEV-PLAN-023-READINESS.md`。
 
 ## 验证记录
-- 将导入/校验/回滚/测试命令与结果写入 `docs/dev-records/DEV-PLAN-023-READINESS.md`，对账报告写入或链接至 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md`；执行后确认 `git status --short` 干净。
+- 在 `docs/dev-records/DEV-PLAN-023-READINESS.md` 中记录：
+  - `org-data import`（不加 `--apply`）的输出日志（包含校验失败的示例）。
+  - `org-data rollback` 的执行日志。
+  - `make check lint` 和 `go test` 的覆盖率报告。
 
 ## 风险与回滚/降级路径
-- 导入风险：错误数据可能破坏唯一/时间约束，默认 dry-run 并提示差异；失败后可用 `rollback.sh --dry-run` 预览，再带确认参数执行清理，必要时配合 `make db migrate down`（针对 org 迁移目录，勿使用 HRM 标志位）撤回最新迁移。
-- 依赖风险：若 021/022 schema 变动未同步，导入脚本需检查 schema 版本或报错退出；README 中注明兼容版本与如何更新迁移。
+- **数据污染风险**：CLI 默认 dry-run（不加 `--apply`），只有显式传入 `--apply` 才执行写入；写入失败必须整事务回滚。
+- **回滚误删风险**：merge 场景必须优先使用 `rollback --manifest`；`--since` 仅作为 seed 的兜底手段，且不保证恢复“被更新记录”的旧值（后续可通过 025 的审计/request_id 或引入 batch/run 追踪表增强可回放性）。
 
 ## 交付物
-- `scripts/org/import.sh`/`export.sh`/`rollback.sh`（含 usage/dry-run/示例命令）。
-- 对账报告与命令记录（`docs/dev-records/DEV-PLAN-020-ORG-PILOT.md`）。
-- Readiness 记录（`docs/dev-records/DEV-PLAN-023-READINESS.md`，含 lint/test/db lint/回滚 dry-run 结果）。
+- `cmd/org-data` 源码及 `scripts/org/*.sh` 包装脚本。
+- CSV 数据模板示例（`docs/samples/org/*.csv`）。
+- Readiness 验证报告 (`docs/dev-records/DEV-PLAN-023-READINESS.md`)。
