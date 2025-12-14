@@ -206,6 +206,7 @@ flowchart LR
 
 *   **步骤 3: 准备基础脚本与验证**
     *   **任务**: 编写初步的数据导入/导出脚本和回滚脚本的雏形。
+    *   **任务**: M1 阶段优先交付 **DB backend**（事务直写、dry-run、manifest 回滚），用于造数与快速回滚；待 026 的 `/org/batch` 与 outbox/审计路径稳定后，再补 **API backend** 以复用校验/审计/事件闭环。
     *   **任务**: 确保项目通过 `make check lint`、`go test ./modules/org/...`（或相关路径），必要时补充 bench/seed 脚本的空壳以便后续填充；验证失败时必须提供回滚/清理脚本。
 
 ### **阶段 1 (M1 里程碑): 最小可用主数据链**
@@ -221,19 +222,20 @@ flowchart LR
     *   **任务**: 实现 `Rescind` (撤销) 状态，用于软删除误创建的数据；冻结窗口（默认月末+3 天，可按租户覆盖）违反时拒绝写入并记录审计。
 
 *   **步骤 6: 开发 API 与发布事件**
-    *   **任务**: 提供节点、职位、分配的 RESTful API。
-    *   **任务**: 在数据变更成功后，通过事件总线发布 `OrgChanged` 和 `OrgAssignmentChanged` 事件；所有入口统一使用 `pkg/authz` 判定 `Org.Read/Org.Write/Org.Assign/Org.Admin`，提交 `config/access/policies/org/**` 片段并运行 `make authz-test authz-lint authz-pack` 作为准入。
+    *   **任务**: 提供节点、职位、分配的 RESTful API（含 `effective_date` 语义与稳定错误码）。
+    *   **任务**: 先落地 Transactional Outbox 工具链（DEV-PLAN-017，`pkg/outbox`），并在 Org 模块使用独立表 `org_outbox`；确保“业务写入 + outbox 入库”同一事务提交。
+    *   **任务**: 在事务提交后通过 relay 投递 `OrgChanged` 和 `OrgAssignmentChanged`（允许重放、消费者按 `event_id` 幂等）；所有入口统一使用 `pkg/authz` 判定 `Org.Read/Org.Write/Org.Assign/Org.Admin`，提交 `config/access/policies/org/**` 片段并运行 `make authz-test authz-lint authz-pack` 作为准入。
+
+*   **步骤 6A: 实现 M1 前端界面**
+    *   **任务**: 根据 `Presentation Layer & API` 章节中的 UI 描述，开发组织模块的前端界面。
+    *   **关键**: 实现树形视图、节点/职位/分配的增删改查表单，以及支持 `effective_date` 的日期选择器。UI 组件应通过 `DEV-PLAN-026` 中定义的 API 与后端交互。
+    *   **产出**: 可交互的组织管理前端页面，覆盖 M1 里程碑的核心功能。
 
 *   **步骤 7: 性能与上线准备**
     *   **任务**: 完成性能基准测试，确保“1000个节点，查询时间小于200毫秒”的指标达成（基准脚本需固定数据集、PG17 环境、命令行参数，纳入 repo/CI 可重复执行）。
     *   **任务**: 完善数据导入和灰度发布脚本，准备上线；若性能不达标，提供特性开关/降级查询与回滚剧本。
 
 ### **阶段 2：继承、矩阵与角色占位**
-
-*   **步骤 7A: 实现 M1 前端界面**
-    *   **任务**: 根据 `Presentation Layer & API` 章节中的 UI 描述，开发组织模块的前端界面。
-    *   **关键**: 实现树形视图、节点/职位/分配的增删改查表单，以及支持 `effective_date` 的日期选择器。UI 组件应通过 `DEV-PLAN-026` 中定义的 API 与后端交互。
-    *   **产出**: 可交互的组织管理前端页面，覆盖 M1 里程碑的核心功能。
 
 此阶段在 M1 稳定后启动，重点是增强读取和查询能力。
 
@@ -268,17 +270,18 @@ flowchart LR
 *   **步骤 14: 运维、治理与可选的 SOM 对齐**
     *   **任务**: 建立完善的监控指标、健康检查、自动化压测和运维脚本。
 
-## 实施路线图（子计划 021-035）
-为确保步骤落地可跟踪、可复用，以上每个步骤对应一个独立的子计划文档（编号从 021 开始，文件位于 `docs/dev-plans/DEV-PLAN-0xx-*.md`，命名可按步骤主题细化）。路线图按依赖顺序规划如下：
+## 实施路线图（子计划 017、021-035）
+为确保步骤落地可跟踪、可复用，以上每个步骤对应一个独立的子计划文档：其中 DEV-PLAN-017 为跨模块 outbox 基础设施；Org 模块子计划编号从 021 开始（文件位于 `docs/dev-plans/DEV-PLAN-0xx-*.md`）。路线图按依赖顺序规划如下：
 
 - DEV-PLAN-021（步骤 1，Schema 与约束）：先行完成核心表/约束迁移及 `make db lint` + 上下行验证，解锁后续开发。
 - DEV-PLAN-022（步骤 2，占位表与事件契约）：依赖 021，补占位表与事件契约，完成 sqlc/atlas 生成校验。
-- DEV-PLAN-023（步骤 3，导入/回滚与 readiness）：依赖 021-022，产出导入/回滚脚本雏形，跑 `make check lint`、路径级 `go test` 完成 readiness。
+- DEV-PLAN-023（步骤 3，导入/回滚与 readiness）：依赖 021-022，优先交付 DB backend（dry-run + manifest 回滚）与 readiness；待 026 的 `/org/batch` 就绪后补 API backend 以复用审计与事件闭环。
 - DEV-PLAN-024（步骤 4，主链 CRUD）：依赖 021-023，交付 Person→Position→Org CRUD 与租户/Session 守卫。
 - DEV-PLAN-025（步骤 5，时间约束与审计）：依赖 024，补有效期/冻结窗口/Correct-Update-Rescind 审计。
-- DEV-PLAN-026（步骤 6，API + Authz + 事件）：依赖 024-025，提供 REST API、事件发布，提交策略片段并跑 `make authz-test authz-lint authz-pack`。
+- DEV-PLAN-017（步骤 6 前置，Transactional Outbox 工具链）：在 026 落地前先完成 `pkg/outbox`（Publisher/Relay/Cleaner）与标准 schema/查询口径，确保 relay 投递有 `error` 边界、支持重试与重放。
+- DEV-PLAN-026（步骤 6，API + Authz + Outbox）：依赖 017/024-025，提供 REST API、Authz 强制与 outbox 投递闭环，提交策略片段并跑 `make authz-test authz-lint authz-pack`。
 - DEV-PLAN-035（步骤 6A，M1 前端 UI）：依赖 026，完成树形视图/表单/分配前端、`templ generate && make css`、`pageCtx.CanAuthz` 接入及 e2e。
-- DEV-PLAN-027（步骤 7，性能基准与灰度）：依赖 026，完成 1k 节点 <200ms 基准脚本、导入与灰度发布/回滚剧本。
+- DEV-PLAN-027（步骤 7，性能基准与灰度）：依赖 026，完成 1k 节点 <200ms 基准脚本、导入与灰度发布/回滚剧本（作为 M1 上线验收门槛）。
 - DEV-PLAN-028（步骤 8，继承解析与角色读侧）：依赖 026-027，落地属性继承解析与角色查询占位，矩阵/虚线只读。
 - DEV-PLAN-029（步骤 9，闭包表与深层读优化）：依赖 028，加入闭包表/物化视图及迁移回填、幂等刷新、feature flag/回滚方案。
 - DEV-PLAN-030（步骤 10，变更请求与预检）：依赖 026-027，提供 change_requests 草稿/提交（无 workflow 时仅审计）与 Pre-flight API，并补权限/租户隔离测试。
@@ -295,7 +298,7 @@ flowchart LR
                                  025 时间/审计
                                           |
                                           v
-            026 API+Authz+事件 -> 027 性能/灰度
+             017 Outbox 工具链 -> 026 API+Authz+Outbox -> 027 性能/灰度
                       |                 |
                       v                 v
             035 M1 前端 UI       030 变更请求/预检
