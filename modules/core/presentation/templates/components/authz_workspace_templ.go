@@ -602,7 +602,7 @@ func AuthzWorkspace(props AuthzWorkspaceProps) templ.Component {
 					var templ_7745c5c3_Var36 string
 					templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(item.Domain)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/components/authz_workspace.templ`, Line: 171, Col: 73}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/components/authz_workspace.templ`, Line: 171, Col: 72}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 					if templ_7745c5c3_Err != nil {
@@ -615,7 +615,7 @@ func AuthzWorkspace(props AuthzWorkspaceProps) templ.Component {
 					var templ_7745c5c3_Var37 string
 					templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(item.Object)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/components/authz_workspace.templ`, Line: 172, Col: 83}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/components/authz_workspace.templ`, Line: 172, Col: 82}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 					if templ_7745c5c3_Err != nil {
@@ -628,7 +628,7 @@ func AuthzWorkspace(props AuthzWorkspaceProps) templ.Component {
 					var templ_7745c5c3_Var38 string
 					templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(item.Action)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/components/authz_workspace.templ`, Line: 173, Col: 83}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/components/authz_workspace.templ`, Line: 173, Col: 82}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 					if templ_7745c5c3_Err != nil {
@@ -651,7 +651,7 @@ func AuthzWorkspace(props AuthzWorkspaceProps) templ.Component {
 					var templ_7745c5c3_Var39 string
 					templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(effectLabel)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/components/authz_workspace.templ`, Line: 180, Col: 73}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/core/presentation/templates/components/authz_workspace.templ`, Line: 181, Col: 72}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
 					if templ_7745c5c3_Err != nil {

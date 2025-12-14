@@ -45,7 +45,11 @@ templ (p *DetailsDropdownProps) render() {
 		</details>
 		// This is a way to close main dropdown on click outside without using JavaScript
 		<details class="hidden peer-open:block" name="details-dropdown">
-			<summary class="fixed w-full h-full left-0 top-0"></summary>
+			<summary
+				aria-label="Close dropdown"
+				title="Close dropdown"
+				class="fixed w-full h-full left-0 top-0"
+			></summary>
 		</details>
 	</div>
 }

@@ -43,17 +43,17 @@ templ List(class string) {
 
 // Button renders an individual tab button
 templ Button(value string) {
-		<button
-			role="tab"
-			data-tab-value={ value }
-			x-bind:aria-selected={ fmt.Sprintf("isActive('%s') ? 'true' : 'false'", value) }
-			x-bind:tabindex={ fmt.Sprintf("isActive('%s') ? '0' : '-1'", value) }
-			@click={ fmt.Sprintf("setActiveTab('%s')", value) }
-			class="relative z-10 py-2 px-3 text-sm font-medium rounded-xl transition-colors duration-200 flex-1 text-center !cursor-pointer"
-			x-bind:class={ fmt.Sprintf("{'text-slate-900': isActive('%s'), 'text-slate-200 hover:text-slate-100': !isActive('%s')}", value, value) }
-		>
-			{ children... }
-		</button>
+	<button
+		role="tab"
+		data-tab-value={ value }
+		x-bind:aria-selected={ fmt.Sprintf("isActive('%s') ? 'true' : 'false'", value) }
+		x-bind:tabindex={ fmt.Sprintf("isActive('%s') ? '0' : '-1'", value) }
+		@click={ fmt.Sprintf("setActiveTab('%s')", value) }
+		class="relative z-10 py-2 px-3 text-sm font-medium rounded-xl transition-colors duration-200 flex-1 text-center !cursor-pointer"
+		x-bind:class={ fmt.Sprintf("{'text-slate-900': isActive('%s'), 'text-slate-200 hover:text-slate-100': !isActive('%s')}", value, value) }
+	>
+		{ children... }
+	</button>
 }
 
 // Content renders tab content that shows/hides based on active tab

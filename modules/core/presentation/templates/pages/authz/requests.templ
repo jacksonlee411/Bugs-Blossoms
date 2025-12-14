@@ -73,33 +73,33 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 		BaseProps: layouts.BaseProps{Title: pageCtx.T("Authz.Requests.Title")},
 	}) {
 		<main class="mx-auto max-w-6xl px-4 py-6 space-y-6">
-		<header class="flex items-start justify-between gap-4 flex-wrap">
-			<div class="space-y-1">
-				<h1 class="text-xl font-semibold text-surface-50">{ pageCtx.T("Authz.Requests.Title") }</h1>
-				<p class="text-sm text-surface-200">{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</p>
-			</div>
-			<div class="flex items-center gap-2 flex-wrap">
-				<a
-					href={ templ.URL(baseURL) }
-					class={ templ.Classes("btn btn-sm", templ.KV("btn-primary", !vm.Mine && len(vm.Statuses) == 0)) }
-				>
-					{ pageCtx.T("All") }
-				</a>
-				<a
-					href={ templ.URL(buildRequestListURL(baseURL, 1, vm.Limit, true, vm.Statuses)) }
-					class={ templ.Classes("btn btn-sm", templ.KV("btn-primary", vm.Mine)) }
-				>
-					{ pageCtx.T("Authz.Requests.Mine") }
-				</a>
-				if vm.CanReview {
+			<header class="flex items-start justify-between gap-4 flex-wrap">
+				<div class="space-y-1">
+					<h1 class="text-xl font-semibold text-surface-50">{ pageCtx.T("Authz.Requests.Title") }</h1>
+					<p class="text-sm text-surface-200">{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</p>
+				</div>
+				<div class="flex items-center gap-2 flex-wrap">
 					<a
-						href={ templ.URL(reviewLink) }
-						class={ templ.Classes("btn btn-sm", templ.KV("btn-primary", !vm.Mine && len(vm.Statuses) == 1 && containsStatus(vm.Statuses, "pending_review"))) }
+						href={ templ.URL(baseURL) }
+						class={ templ.Classes("btn btn-sm", templ.KV("btn-primary", !vm.Mine && len(vm.Statuses) == 0)) }
 					>
-						{ pageCtx.T("Authz.Status.PendingReview") }
+						{ pageCtx.T("All") }
 					</a>
-				}
-			</div>
+					<a
+						href={ templ.URL(buildRequestListURL(baseURL, 1, vm.Limit, true, vm.Statuses)) }
+						class={ templ.Classes("btn btn-sm", templ.KV("btn-primary", vm.Mine)) }
+					>
+						{ pageCtx.T("Authz.Requests.Mine") }
+					</a>
+					if vm.CanReview {
+						<a
+							href={ templ.URL(reviewLink) }
+							class={ templ.Classes("btn btn-sm", templ.KV("btn-primary", !vm.Mine && len(vm.Statuses) == 1 && containsStatus(vm.Statuses, "pending_review"))) }
+						>
+							{ pageCtx.T("Authz.Status.PendingReview") }
+						</a>
+					}
+				</div>
 			</header>
 			<form method="get" class="flex flex-wrap items-end gap-4 rounded-lg border border-surface-400/60 bg-surface-600/40 p-4">
 				<div class="space-y-1">
@@ -110,11 +110,11 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 						multiple
 						class="select select-sm min-w-56 bg-surface-500 border border-surface-400/60 text-sm rounded"
 					>
-					for _, opt := range statusOptions {
-						{{ label := pageCtx.T(statusMessageKey(opt)) }}
-						<option value={ opt } selected?={ containsStatus(vm.Statuses, opt) }>{ label }</option>
-					}
-				</select>
+						for _, opt := range statusOptions {
+							{{ label := pageCtx.T(statusMessageKey(opt)) }}
+							<option value={ opt } selected?={ containsStatus(vm.Statuses, opt) }>{ label }</option>
+						}
+					</select>
 				</div>
 				<div class="flex items-center gap-2">
 					<input
@@ -127,54 +127,54 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 					/>
 					<label for="authz-requests-mine" class="text-sm text-surface-100">{ pageCtx.T("Authz.Requests.Mine") }</label>
 				</div>
-			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", vm.Limit) }/>
-			<input type="hidden" name="page" value="1"/>
-			<button type="submit" class="btn btn-sm btn-primary">{ pageCtx.T("Scaffold.Filters.Title") }</button>
-			<a href={ templ.URL(baseURL) } class="btn btn-sm">{ pageCtx.T("All") }</a>
-		</form>
-		<section class="rounded-lg border border-surface-400/60 bg-surface-600/40 overflow-hidden">
-			<table class="w-full table-auto border-collapse text-sm">
-				<thead class="border-b border-surface-400/60 text-left text-surface-200">
-					<tr>
-						<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Unauthorized.RequestID") }</th>
-						<th class="py-3 px-4 font-medium">{ pageCtx.T("Status") }</th>
-						<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Object") }</th>
-						<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Action") }</th>
-						<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Domain") }</th>
-						<th class="py-3 px-4 font-medium">{ pageCtx.T("CreatedAt") }</th>
-						<th class="py-3 px-4 font-medium">{ pageCtx.T("UpdatedAt") }</th>
-					</tr>
-				</thead>
-				<tbody class="divide-y divide-surface-400/40">
-					if len(vm.Items) == 0 {
+				<input type="hidden" name="limit" value={ fmt.Sprintf("%d", vm.Limit) }/>
+				<input type="hidden" name="page" value="1"/>
+				<button type="submit" class="btn btn-sm btn-primary">{ pageCtx.T("Scaffold.Filters.Title") }</button>
+				<a href={ templ.URL(baseURL) } class="btn btn-sm">{ pageCtx.T("All") }</a>
+			</form>
+			<section class="rounded-lg border border-surface-400/60 bg-surface-600/40 overflow-hidden">
+				<table class="w-full table-auto border-collapse text-sm">
+					<thead class="border-b border-surface-400/60 text-left text-surface-200">
 						<tr>
-							<td colspan="7" class="py-8 text-center text-sm text-surface-200">{ pageCtx.T("Empty") }</td>
+							<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Unauthorized.RequestID") }</th>
+							<th class="py-3 px-4 font-medium">{ pageCtx.T("Status") }</th>
+							<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Object") }</th>
+							<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Action") }</th>
+							<th class="py-3 px-4 font-medium">{ pageCtx.T("Authz.Domain") }</th>
+							<th class="py-3 px-4 font-medium">{ pageCtx.T("CreatedAt") }</th>
+							<th class="py-3 px-4 font-medium">{ pageCtx.T("UpdatedAt") }</th>
 						</tr>
-					}
-					for _, item := range vm.Items {
-						{{ statusKey := statusMessageKey(item.Status) }}
-						<tr class="align-top">
-							<td class="py-3 px-4">
-								<a class="font-mono text-primary hover:underline" href={ templ.URL(item.ViewURL) }>{ item.ID }</a>
-								if item.Reason != "" {
-									<div class="mt-1 text-xs text-surface-200">{ item.Reason }</div>
-								}
-							</td>
-							<td class="py-3 px-4">
-								<span class={ "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium", item.StatusClass }>
-									{ pageCtx.T(statusKey) }
-								</span>
-							</td>
-							<td class="py-3 px-4 font-mono text-surface-50">{ item.Object }</td>
-							<td class="py-3 px-4 font-mono text-surface-50">{ item.Action }</td>
-							<td class="py-3 px-4 font-mono text-surface-50">{ item.Domain }</td>
-							<td class="py-3 px-4 font-mono text-xs text-surface-100">{ item.CreatedAt }</td>
-							<td class="py-3 px-4 font-mono text-xs text-surface-100">{ item.UpdatedAt }</td>
-						</tr>
-					}
-				</tbody>
-			</table>
-		</section>
+					</thead>
+					<tbody class="divide-y divide-surface-400/40">
+						if len(vm.Items) == 0 {
+							<tr>
+								<td colspan="7" class="py-8 text-center text-sm text-surface-200">{ pageCtx.T("Empty") }</td>
+							</tr>
+						}
+						for _, item := range vm.Items {
+							{{ statusKey := statusMessageKey(item.Status) }}
+							<tr class="align-top">
+								<td class="py-3 px-4">
+									<a class="font-mono text-primary hover:underline" href={ templ.URL(item.ViewURL) }>{ item.ID }</a>
+									if item.Reason != "" {
+										<div class="mt-1 text-xs text-surface-200">{ item.Reason }</div>
+									}
+								</td>
+								<td class="py-3 px-4">
+									<span class={ "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium", item.StatusClass }>
+										{ pageCtx.T(statusKey) }
+									</span>
+								</td>
+								<td class="py-3 px-4 font-mono text-surface-50">{ item.Object }</td>
+								<td class="py-3 px-4 font-mono text-surface-50">{ item.Action }</td>
+								<td class="py-3 px-4 font-mono text-surface-50">{ item.Domain }</td>
+								<td class="py-3 px-4 font-mono text-xs text-surface-100">{ item.CreatedAt }</td>
+								<td class="py-3 px-4 font-mono text-xs text-surface-100">{ item.UpdatedAt }</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</section>
 			<div class="flex items-center justify-between text-sm text-surface-200">
 				<div>{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</div>
 				<div class="flex items-center gap-2">

@@ -125,27 +125,27 @@ templ ThemeSwitcher() {
 	}
 }
 
-	templ SidebarTrigger(class string) {
-		<button
-			x-data
-			type="button"
-			aria-label="Open sidebar"
-			class={
-				"flex items-center justify-center w-9 h-9 rounded-md bg-surface-400 text-black cursor-pointer",
-				class,
-			}
-			@click="$dispatch('open-sidebar')"
+templ SidebarTrigger(class string) {
+	<button
+		x-data
+		type="button"
+		aria-label="Open sidebar"
+		class={
+			"flex items-center justify-center w-9 h-9 rounded-md bg-surface-400 text-black cursor-pointer",
+			class,
+		}
+		@click="$dispatch('open-sidebar')"
 	>
 		@icons.List(icons.Props{Size: "20"})
 	</button>
-	}
+}
 
-	templ Navbar(pageCtx types.PageContextProvider) {
-		<nav aria-label="Top navigation" class="h-16 shadow-b-lg border-b w-full flex items-center px-8 bg-surface-300 border-b-primary">
-			<div class="ml-auto flex items-center gap-8">
-				<div class="hidden lg:block">
-					@spotlight.Spotlight()
-				</div>
+templ Navbar(pageCtx types.PageContextProvider) {
+	<nav aria-label="Top navigation" class="h-16 shadow-b-lg border-b w-full flex items-center px-8 bg-surface-300 border-b-primary">
+		<div class="ml-auto flex items-center gap-8">
+			<div class="hidden lg:block">
+				@spotlight.Spotlight()
+			</div>
 			@ThemeSwitcher()
 			@base.DetailsDropdown(&base.DetailsDropdownProps{
 				Summary: Avatar(),
@@ -157,11 +157,11 @@ templ ThemeSwitcher() {
 				@base.DropdownItem(base.DropdownItemProps{Href: "/logout"}) {
 					{ pageCtx.T("NavigationLinks.Navbar.Logout") }
 				}
-				}
-				@SidebarTrigger("lg:hidden")
-			</div>
-		</nav>
-	}
+			}
+			@SidebarTrigger("lg:hidden")
+		</div>
+	</nav>
+}
 
 templ DefaultSidebarFooter() {
 	{{
@@ -170,30 +170,30 @@ templ DefaultSidebarFooter() {
 	@SidebarFooter(pageCtx)
 }
 
-	templ SidebarFooter(pageCtx types.PageContextProvider) {
+templ SidebarFooter(pageCtx types.PageContextProvider) {
 	<!-- Collapsed view: icon only -->
-		<div x-show="isCollapsed">
-			@button.Sidebar(button.Props{
-				Size:  button.SizeMD,
-				Class: "p-2 w-auto flex justify-center text-red-300 hover:text-red-200",
-				Href:  "/logout",
-			}) {
-				<div class="w-6 h-6 flex items-center justify-center">
-					@icons.SignOut(icons.Props{
+	<div x-show="isCollapsed">
+		@button.Sidebar(button.Props{
+			Size:  button.SizeMD,
+			Class: "p-2 w-auto flex justify-center text-red-300 hover:text-red-200",
+			Href:  "/logout",
+		}) {
+			<div class="w-6 h-6 flex items-center justify-center">
+				@icons.SignOut(icons.Props{
 					Size: "20",
 				})
 			</div>
 		}
 	</div>
 	<!-- Expanded view: icon + text -->
-		<div x-show="!isCollapsed">
-			@button.Sidebar(button.Props{
-				Size:  button.SizeMD,
-				Class: "w-full justify-center gap-2 text-red-300 hover:text-red-200",
-				Href:  "/logout",
-			}) {
-				@icons.SignOut(icons.Props{
-					Size: "20",
+	<div x-show="!isCollapsed">
+		@button.Sidebar(button.Props{
+			Size:  button.SizeMD,
+			Class: "w-full justify-center gap-2 text-red-300 hover:text-red-200",
+			Href:  "/logout",
+		}) {
+			@icons.SignOut(icons.Props{
+				Size: "20",
 			})
 			{ pageCtx.T("SignOut") }
 		}
@@ -231,15 +231,15 @@ templ Authenticated(props AuthenticatedProps) {
 		mobileSidebarProps := sidebarProps
 		mobileSidebarProps.AriaLabel = "Sidebar (mobile)"
 	}}
-		if props.WebsocketURL == "" {
-			{{ props.WebsocketURL = "/ws" }}
-		}
-		@Base(&props.BaseProps) {
-			@toast.Container()
-			@authzcomponents.AuthzClient()
-			@MobileSidebar(mobileSidebarProps)
-			<div
-				x-data="{
+	if props.WebsocketURL == "" {
+		{{ props.WebsocketURL = "/ws" }}
+	}
+	@Base(&props.BaseProps) {
+		@toast.Container()
+		@authzcomponents.AuthzClient()
+		@MobileSidebar(mobileSidebarProps)
+		<div
+			x-data="{
 					sidebarCollapsed: initSidebarCollapsed(),
 					init() {
 					this.$nextTick(() => {
