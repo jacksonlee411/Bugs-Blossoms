@@ -211,8 +211,13 @@
 6. **质量门禁回归**：
    - 已跑 `make check lint`、`make authz-test`、`make authz-lint`、`make check tr`、`go vet ./...` 与相关 `go test`。
    - 补齐 ensureAuthz 的 JSON/HTMX/HTML fallback 403 契约回归测试。
+7. **P0-3 用户页 Effective 权限汇总闭环**：
+   - 用户权限页新增 Effective 汇总视图（按 domain/object/action 聚合）并展示来源链路（用户直配 + 角色继承链）。
+   - g 继承项支持直达对应角色策略矩阵（从角色名/ID 解析到 `/roles/{id}/policies`），避免仅靠搜索定位。
+8. **P0-4 文案与 i18n 收敛**：
+   - 清理残留硬编码英文/组件级文案，并补齐四语种 locale key（含表单/错误页/布尔值/Effect 文案等）。
 
 ### 下一步计划
 1. **业务页面体验对齐**：补齐 HRM/Logging 等业务页“部分授权”统一模式（禁用 + 申请入口 + 权限状态提示）（对齐 P0-6）。
 2. **403 契约回归**：补齐 HTMX/REST/非 HTMX 的 403 契约与 fallback 回归验证清单（对齐 P0-8/014D/015B4）。
-3. **语义与文案收敛**：继续推进 p/g 语义深化（用户有效权限来源链路）与剩余组件级英文/i18n 收敛（对齐 P0-3/P0-4/P1-1）。
+3. **语义深化（P1）**：继续推进 p/g 语义深化（例如更完整的 role->permission explainability/排障能力）（对齐 P1-1）。

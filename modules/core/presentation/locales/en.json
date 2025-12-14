@@ -57,9 +57,16 @@
       "NoDataDescription": "There is no data available for this table.",
       "NothingFound": "Nothing found"
     },
+    "Form": {
+      "ValidationFailed": "Field validation failed"
+    },
     "Filters": {
       "Title": "Filters",
       "SelectAll": "Select All"
+    },
+    "Boolean": {
+      "True": "True",
+      "False": "False"
     }
   },
   "Empty": "Empty",
@@ -179,7 +186,8 @@
     "Meta": {
       "Title": "Dashboard"
     },
-    "Welcome": "Welcome to the dashboard"
+    "Welcome": "Welcome to the dashboard",
+    "NoDBConnection": "No database connection available"
   },
   "Users": {
     "Meta": {
@@ -219,6 +227,13 @@
       "Inherited": "Inherited",
       "Direct": "Direct",
       "Overrides": "Overrides",
+      "Effective": "Effective",
+      "EffectiveHint": "Aggregated permissions with sources",
+      "Sources": "Sources",
+      "Source": {
+        "Direct": "Direct",
+        "RoleChain": "Source chain: %s"
+      },
       "ViewRolePolicies": "View role policies"
     },
     "Single": {
@@ -437,6 +452,8 @@
     "Subject": "Subject",
     "Type": "Type",
     "Effect": "Effect",
+    "EffectAllow": "Allow",
+    "EffectDeny": "Deny",
     "Role": "Role",
     "ParentRole": "Parent role",
     "Workspace": {

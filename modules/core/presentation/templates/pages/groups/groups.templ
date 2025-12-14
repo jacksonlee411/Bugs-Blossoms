@@ -116,7 +116,7 @@ templ GroupsTable(props *IndexPageProps) {
 templ GroupsContent(props *IndexPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	@filters.Drawer(filters.DrawerProps{
-		Heading: "Filters",
+		Heading: pageCtx.T("Scaffold.Filters.Title"),
 		Action:  "open-group-filters",
 	}) {
 		@base.Select(&base.SelectProps{Placeholder: pageCtx.T("CreatedAt")}) {

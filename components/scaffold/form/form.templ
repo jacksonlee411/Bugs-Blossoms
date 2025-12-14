@@ -141,7 +141,7 @@ templ FormWithErrors(cfg *FormConfig, fieldErrors map[string]string) {
 	{{ pgCtx := composables.UsePageCtx(ctx) }}
 	<div class="flex flex-col justify-between h-[calc(100vh-4rem)]" id="edit-content">
 		if len(fieldErrors) > 0 {
-			<small data-testid="field-error" class="text-red-500">Field validation failed</small>
+			<small data-testid="field-error" class="text-red-500">{ pgCtx.T("Scaffold.Form.ValidationFailed") }</small>
 		}
 		<form
 			id="save-form"

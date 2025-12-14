@@ -57,9 +57,16 @@
       "NoDataDescription": "此表没有可用数据。",
       "NothingFound": "未找到任何内容"
     },
+    "Form": {
+      "ValidationFailed": "字段校验失败"
+    },
     "Filters": {
       "Title": "筛选器",
       "SelectAll": "全选"
+    },
+    "Boolean": {
+      "True": "是",
+      "False": "否"
     }
   },
   "Empty": "暂无数据",
@@ -182,7 +189,8 @@
     "Meta": {
       "Title": "仪表板"
     },
-    "Welcome": "欢迎使用仪表板"
+    "Welcome": "欢迎使用仪表板",
+    "NoDBConnection": "没有可用的数据库连接"
   },
   "Users": {
     "Meta": {
@@ -222,6 +230,13 @@
       "Inherited": "继承权限",
       "Direct": "直接权限",
       "Overrides": "覆盖权限",
+      "Effective": "有效权限汇总",
+      "EffectiveHint": "按来源聚合后的权限",
+      "Sources": "来源",
+      "Source": {
+        "Direct": "用户直配",
+        "RoleChain": "来源链路：%s"
+      },
       "ViewRolePolicies": "查看角色策略"
     },
     "Single": {
@@ -440,6 +455,8 @@
     "Subject": "主体",
     "Type": "类型",
     "Effect": "效果",
+    "EffectAllow": "允许",
+    "EffectDeny": "拒绝",
     "Role": "角色",
     "ParentRole": "父角色",
     "Workspace": {
