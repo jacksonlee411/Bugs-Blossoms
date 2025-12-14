@@ -29,6 +29,7 @@ templ RoleRow(role *viewmodels.Role) {
 	if !pageCtx.CanAuthz("core.roles", "update") {
 		buttonAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
 	}
+	buttonAttrs["aria-label"] = pageCtx.T("Edit")
 	@base.TableRow(base.TableRowProps{
 		Attrs: attrs,
 	}) {

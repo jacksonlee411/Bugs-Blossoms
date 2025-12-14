@@ -50,13 +50,14 @@ templ UserRow(user *viewmodels.User, rowProps *base.TableRowProps) {
 		rowProps.Attrs["id"] = fmt.Sprintf("user-%s", user.ID)
 		rowProps.Attrs["class"] = "hide-on-load"
 		canEdit := pageCtx.CanAuthz("core.users", "update")
-		editAttrs := templ.Attributes{
-			"class": "btn-fixed",
-		}
-		if !pageCtx.CanAuthz("core.users", "update") {
-			editAttrs["data-authz-disabled"] = "true"
-			editAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
-		}
+			editAttrs := templ.Attributes{
+				"class": "btn-fixed",
+			}
+			editAttrs["aria-label"] = pageCtx.T("Edit")
+			if !pageCtx.CanAuthz("core.users", "update") {
+				editAttrs["data-authz-disabled"] = "true"
+				editAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
+			}
 	}}
 	@base.TableRow(*rowProps) {
 		@base.TableCell(base.TableCellProps{}) {

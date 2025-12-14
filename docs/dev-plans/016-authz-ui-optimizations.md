@@ -157,21 +157,21 @@
 ### P0（优先做：减少误操作 + 统一体验）
 1. [x] 引入统一 Authz Workspace（Sticky Footer/Header）：作为当前上下文的提交栏，展示暂存数量与提交入口；支持提交前预览 + reason 必填 + 危险项提示。（已交付：角色矩阵/用户权限页统一提交栏 + reason 必填 + 提交前预览 + 危险项提示 + 二次确认）
 2. [x] 补齐 `/core/authz/requests/{id}` 请求详情页（最小只读即可），确保 `view_url` 不断链；非 HTMX 也可访问（对齐 015B4）。
-3. [ ] p/g 语义分离：角色页 `type=g` 仅做“角色继承/绑定角色”；用户页以“用户↔角色”视图呈现继承与变更；表单不再要求无意义字段。（已交付最小版本：角色矩阵/用户权限页的 g 规则表单与表格语义化（Role/ParentRole，action=*，effect=allow）；并补齐角色名展示与“跳转到角色策略”入口；Effective 来源链路仍待补齐）
-4. [ ] i18n 清理：移除硬编码状态与提示文案（用户页状态映射、角色矩阵标题/分页、Unauthorized JS 兜底文案）。（已完成基础：用户页状态映射、角色矩阵/Requests/Workspace 关键文案、Unauthorized JS SLA/错误兜底；CopyButton 文案已收敛；仍有少量非关键文案待后续收敛）
+3. [x] p/g 语义分离：角色页 `type=g` 仅做“角色继承/绑定角色”；用户页以“用户↔角色”视图呈现继承与变更；表单不再要求无意义字段。（已完成：g 规则不再要求填写/提交无意义的 Action/Effect；后端对 g 默认补齐 `action="*"`/`effect="allow"`；角色矩阵/用户权限页的 g 展示语义化并支持跳转到角色策略）
+4. [x] i18n 清理：移除硬编码状态与提示文案（用户页状态映射、角色矩阵标题/分页、Unauthorized JS 兜底文案）。（已完成：关键交互与状态均走 i18n；allow/deny 展示统一映射到 i18n 文案）
 5. [x] diff 默认结构化渲染 + 复制反馈（Unauthorized/PolicyInspector/Requests 详情页）。
 6. [x] 业务页面“部分授权”统一模式：按钮禁用 + 申请入口 + 权限状态提示（对齐 012 的 HRM/Logging 体验）。（已交付：HRM Employees 的 create/update/delete 场景；Logging 无权限直访统一 Unauthorized）
 7. [x] 导航/Quick Links/Spotlight：默认无权限隐藏 + 直访 403 统一反馈；补齐回归清单与验证（对齐 014D）。
 8. [x] HTMX/REST 403 契约与非 HTMX fallback 回归验证（对齐 014D/015B4）。（已补齐：JSON 合同、HTMX headers、HTML fallback 渲染的回归测试）
 
 ### P1（体验增强：更好理解与排障）
-1. [ ] 增加 Effective 权限汇总视图 + 来源链路（用户页）。
+1. [x] 增加 Effective 权限汇总视图 + 来源链路（用户页）。（已完成：按 domain/object/action 聚合；展示直配 + 角色继承链；支持跳转到角色策略矩阵）
 2. [x] 草稿中心（Requests Center）列表页完善：过滤/分页/我的与待审核视图 + 详情页补齐审核动作与运维入口（PR/bot/revert）。（已交付：过滤/分页/全部&我发起&待审核（按权限可见）；详情页支持结构化 diff + 审核/运维动作）
 
 ### P2（质量与规模化）
-1. [ ] 资源/动作字典化选择（Object/Action selector），减少拼写与无效 diff。
-2. [ ] 批量操作二次确认/撤销能力（尤其是 bulk remove）。
-3. [ ] 为核心页面补充 axe smoke + 键盘巡检记录（对齐 015B 验收）。
+1. [x] 资源/动作字典化选择（Object/Action selector），减少拼写与无效 diff。（已完成：角色矩阵/用户权限页暂存抽屉提供 datalist 建议项）
+2. [x] 批量操作二次确认/撤销能力（尤其是 bulk remove）。（已完成：用户权限页 bulk remove 增加确认弹窗 + Undo 撤销能力，支持批量删除暂存条目）
+3. [ ] 为核心页面补充 axe smoke + 键盘巡检记录（对齐 015B 验收）。（已提供巡检清单模板：`docs/dev-records/DEV-PLAN-016-A11Y-CHECKLIST.md`；待补齐实际巡检结果）
 
 ## 验收标准（建议）
 - 角色/用户/业务页的授权申请入口：均可在 UI 内清晰看到“将要变更什么 + 为什么 + 预计多久生效 + 去哪看状态”。
@@ -218,9 +218,8 @@
    - 清理残留硬编码英文/组件级文案，并补齐四语种 locale key（含表单/错误页/布尔值/Effect 文案等）。
 
 ### 下一步计划
-1. **业务页面体验对齐**：补齐 HRM/Logging 等业务页“部分授权”统一模式（禁用 + 申请入口 + 权限状态提示）（对齐 P0-6）。
-2. **403 契约回归**：补齐 HTMX/REST/非 HTMX 的 403 契约与 fallback 回归验证清单（对齐 P0-8/014D/015B4）。
-3. **语义深化（P1）**：继续推进 p/g 语义深化（例如更完整的 role->permission explainability/排障能力）（对齐 P1-1）。
+1. **a11y 复验与记录（P2）**：补齐核心页面 axe smoke + 键盘巡检记录（对齐 015B 验收），并沉淀为可复用的回归清单。
+2. **语义深化（P1）**：继续推进 role->permission explainability（更完整的来源解释/排障能力、对象/动作字典化进一步收敛）。
 
 #### P0-8：403 契约与 fallback 回归验证清单（建议）
 - **REST(JSON)**：对任意受保护 endpoint，带 `Accept: application/json` 时返回 `403` 且 `Content-Type: application/json`；payload 至少包含 `error/object/action/subject/domain/missing_policies/suggest_diff/request_url/debug_url/base_revision/request_id`（其中 `base_revision/request_id` 允许为空但推荐透出）。

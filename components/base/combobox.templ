@@ -4,6 +4,7 @@ import (
 	"fmt"
 	icons "github.com/iota-uz/icons/phosphor"
 	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
 type TriggerProps struct {
@@ -57,6 +58,11 @@ templ DropdownIndicator() {
 }
 
 templ SelectedValues() {
+	{{ pageCtx, hasPageCtx := composables.TryUsePageCtx(ctx) }}
+	{{ removeLabel := "Remove" }}
+	if hasPageCtx && pageCtx != nil {
+		{{ removeLabel = pageCtx.T("Remove") }}
+	}
 	<ul class="flex items-center gap-2 flex-wrap">
 		<template x-for="item in Array.from(selectedValues.values())">
 			<li class="flex items-center gap-1.5 px-1.5 py-1 rounded-md bg-surface-100">
@@ -65,6 +71,7 @@ templ SelectedValues() {
 					class="text-brand-500 cursor-pointer"
 					type="button"
 					@click="removeSelectedValue(item.value)"
+					aria-label={ removeLabel }
 				>
 					@icons.XCircle(icons.Props{Size: "20"})
 				</button>

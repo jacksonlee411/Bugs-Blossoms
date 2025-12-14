@@ -939,6 +939,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 	if err != nil {
 		return nil, err
 	}
+	selectorOpts := buildAuthzSelectorOptions(entries)
 	subjectEntries := filterPolicies(entries, PolicyListParams{Subject: subject})
 
 	tenantID := us.TenantID()
@@ -990,6 +991,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		defaultDomain,
 		baseURL,
 		requestMap,
+		selectorOpts,
 		canStage,
 		canDebug,
 		roleNameToID,
@@ -1005,6 +1007,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		defaultDomain,
 		baseURL,
 		requestMap,
+		selectorOpts,
 		canStage,
 		canDebug,
 		roleNameToID,
@@ -1020,6 +1023,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		defaultDomain,
 		baseURL,
 		requestMap,
+		selectorOpts,
 		canStage,
 		canDebug,
 		roleNameToID,
@@ -1060,6 +1064,7 @@ func (c *UsersController) buildUserPolicyColumnProps(
 	defaultDomain string,
 	baseURL string,
 	requestMap map[string]requestStatusInfo,
+	selectorOpts authzSelectorOptions,
 	canStage bool,
 	canDebug bool,
 	roleNameToID map[string]uint,
@@ -1111,6 +1116,9 @@ func (c *UsersController) buildUserPolicyColumnProps(
 		Type:          params.Type,
 		Search:        params.Search,
 		DomainFilter:  params.Domain,
+		ObjectOptions: selectorOpts.Objects,
+		ActionOptions: selectorOpts.Actions,
+		RoleOptions:   selectorOpts.Roles,
 		CanDebug:      canDebug,
 		CanStage:      canStage,
 		BaseURL:       baseURL,

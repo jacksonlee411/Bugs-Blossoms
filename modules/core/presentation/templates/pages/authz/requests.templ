@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
@@ -68,7 +69,10 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 	{{ prevDisabled := vm.Page <= 1 }}
 	{{ nextDisabled := vm.Page >= pages }}
 	{{ reviewLink := buildRequestListURL(baseURL, 1, vm.Limit, false, []string{"pending_review"}) }}
-	<main class="mx-auto max-w-6xl px-4 py-6 space-y-6">
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{Title: pageCtx.T("Authz.Requests.Title")},
+	}) {
+		<main class="mx-auto max-w-6xl px-4 py-6 space-y-6">
 		<header class="flex items-start justify-between gap-4 flex-wrap">
 			<div class="space-y-1">
 				<h1 class="text-xl font-semibold text-surface-50">{ pageCtx.T("Authz.Requests.Title") }</h1>
@@ -96,31 +100,33 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 					</a>
 				}
 			</div>
-		</header>
-		<form method="get" class="flex flex-wrap items-end gap-4 rounded-lg border border-surface-400/60 bg-surface-600/40 p-4">
-			<div class="space-y-1">
-				<label class="text-xs font-medium text-surface-200">{ pageCtx.T("Status") }</label>
-				<select
-					name="status"
-					multiple
-					class="select select-sm min-w-56 bg-surface-500 border border-surface-400/60 text-sm rounded"
-				>
+			</header>
+			<form method="get" class="flex flex-wrap items-end gap-4 rounded-lg border border-surface-400/60 bg-surface-600/40 p-4">
+				<div class="space-y-1">
+					<label for="authz-requests-status" class="text-xs font-medium text-surface-200">{ pageCtx.T("Status") }</label>
+					<select
+						id="authz-requests-status"
+						name="status"
+						multiple
+						class="select select-sm min-w-56 bg-surface-500 border border-surface-400/60 text-sm rounded"
+					>
 					for _, opt := range statusOptions {
 						{{ label := pageCtx.T(statusMessageKey(opt)) }}
 						<option value={ opt } selected?={ containsStatus(vm.Statuses, opt) }>{ label }</option>
 					}
 				</select>
-			</div>
-			<div class="flex items-center gap-2">
-				<input
-					type="checkbox"
-					name="mine"
-					value="1"
-					checked?={ vm.Mine }
-					class="checkbox checkbox-sm"
-				/>
-				<label class="text-sm text-surface-100">{ pageCtx.T("Authz.Requests.Mine") }</label>
-			</div>
+				</div>
+				<div class="flex items-center gap-2">
+					<input
+						id="authz-requests-mine"
+						type="checkbox"
+						name="mine"
+						value="1"
+						checked?={ vm.Mine }
+						class="checkbox checkbox-sm"
+					/>
+					<label for="authz-requests-mine" class="text-sm text-surface-100">{ pageCtx.T("Authz.Requests.Mine") }</label>
+				</div>
 			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", vm.Limit) }/>
 			<input type="hidden" name="page" value="1"/>
 			<button type="submit" class="btn btn-sm btn-primary">{ pageCtx.T("Scaffold.Filters.Title") }</button>
@@ -169,24 +175,25 @@ templ Requests(vm *viewmodels.AuthzRequestList) {
 				</tbody>
 			</table>
 		</section>
-		<div class="flex items-center justify-between text-sm text-surface-200">
-			<div>{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</div>
-			<div class="flex items-center gap-2">
-				<a
-					class={ templ.Classes("btn btn-sm", templ.KV("btn-disabled", prevDisabled)) }
-					href={ templ.URL(buildRequestListURL(baseURL, prevPage, vm.Limit, vm.Mine, vm.Statuses)) }
-					aria-disabled?={ prevDisabled }
-				>
-					{ pageCtx.T("Pagination.Prev") }
-				</a>
-				<a
-					class={ templ.Classes("btn btn-sm", templ.KV("btn-disabled", nextDisabled)) }
-					href={ templ.URL(buildRequestListURL(baseURL, nextPage, vm.Limit, vm.Mine, vm.Statuses)) }
-					aria-disabled?={ nextDisabled }
-				>
-					{ pageCtx.T("Pagination.Next") }
-				</a>
+			<div class="flex items-center justify-between text-sm text-surface-200">
+				<div>{ fmt.Sprintf(pageCtx.T("Pagination.Status"), vm.Page, pages, vm.Total) }</div>
+				<div class="flex items-center gap-2">
+					if prevDisabled {
+						<span class="btn btn-sm btn-disabled" aria-disabled="true">{ pageCtx.T("Pagination.Prev") }</span>
+					} else {
+						<a class="btn btn-sm" href={ templ.URL(buildRequestListURL(baseURL, prevPage, vm.Limit, vm.Mine, vm.Statuses)) }>
+							{ pageCtx.T("Pagination.Prev") }
+						</a>
+					}
+					if nextDisabled {
+						<span class="btn btn-sm btn-disabled" aria-disabled="true">{ pageCtx.T("Pagination.Next") }</span>
+					} else {
+						<a class="btn btn-sm" href={ templ.URL(buildRequestListURL(baseURL, nextPage, vm.Limit, vm.Mine, vm.Statuses)) }>
+							{ pageCtx.T("Pagination.Next") }
+						</a>
+					}
+				</div>
 			</div>
-		</div>
-	</main>
+		</main>
+	}
 }

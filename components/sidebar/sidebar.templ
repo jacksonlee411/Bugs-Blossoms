@@ -20,16 +20,24 @@ type Props struct {
 	TabGroups    TabGroupCollection
 	Footer       templ.Component
 	InitialState SidebarState // Server-side initial state hint
+	AriaLabel    string
 }
 
 templ Sidebar(props Props) {
-	<div
-		x-data="sidebar()"
-		x-cloak
-		:class="{ 'sidebar-collapsed': isCollapsed }"
-		x-init="initSidebar()"
-		class="flex w-full flex-col bg-surface-200 shadow-lg py-6 h-screen sticky top-0 transition-all duration-300 overflow-visible"
-	>
+	{{
+		label := props.AriaLabel
+		if label == "" {
+			label = "Sidebar"
+		}
+	}}
+		<aside
+			x-data="sidebar()"
+			x-cloak
+			:class="{ 'sidebar-collapsed': isCollapsed }"
+			x-init="initSidebar()"
+			aria-label={ label }
+			class="flex w-full flex-col bg-surface-200 shadow-lg py-6 h-screen sticky top-0 transition-all duration-300 overflow-visible"
+		>
 		{{
 			// For single groups, use the group's value as default, otherwise use provided default
 			defaultValue := props.TabGroups.DefaultValue
@@ -60,31 +68,39 @@ templ Sidebar(props Props) {
 							}
 						</div>
 					</div>
+					}
+				</div>
+					@SidebarContent(props)
 				}
-			</div>
-			@SidebarContent(props)
+			</aside>
 		}
-	</div>
-}
 
 templ SidebarContent(props Props) {
-	<div class="relative mb-4">
-		<button
-			@click="toggle(); $dispatch('sidebar-toggle')"
-			class="btn btn-sidebar-toggle btn-sm btn-fixed btn-rounded absolute -right-3 top-0 z-10 hidden lg:flex"
-		>
-			<div x-show="!isCollapsed">
-				@icons.CaretLeft(icons.Props{Size: "16"})
+	{{
+		label := props.AriaLabel
+		if label == "" {
+			label = "Sidebar"
+		}
+	}}
+			<div class="relative mb-4">
+				<button
+					@click="toggle(); $dispatch('sidebar-toggle')"
+					aria-label="Toggle sidebar"
+				type="button"
+				class="btn btn-sidebar-toggle btn-sm btn-fixed btn-rounded absolute -right-3 top-0 z-10 hidden lg:flex"
+			>
+				<div x-show="!isCollapsed">
+					@icons.CaretLeft(icons.Props{Size: "16"})
 			</div>
 			<div x-show="isCollapsed">
 				@icons.CaretRight(icons.Props{Size: "16"})
 			</div>
-		</button>
-	</div>
-	<nav class="py-4 flex-1">
-		for _, tabGroup := range props.TabGroups.Groups {
-			@navtabs.Content(tabGroup.Value) {
-				<ul
+			</button>
+		</div>
+		<nav aria-label={ label + " navigation" } class="py-4 flex-1">
+			for _, tabGroup := range props.TabGroups.Groups {
+				@navtabs.Content(tabGroup.Value) {
+					<ul
 					id="sidebar-navigation"
 					:class="{ 'px-2': isCollapsed, 'px-6': !isCollapsed }"
 					class="flex flex-col gap-2 overflow-y-auto h-[calc(100vh-17rem)] hide-scrollbar transition-all duration-300"
@@ -108,7 +124,7 @@ templ SidebarContent(props Props) {
 }
 
 templ AccordionGroup(group Group) {
-	<div>
+	<li>
 		<!-- Collapsed view: only icon -->
 		<div
 			x-show="isCollapsed"
@@ -138,8 +154,8 @@ templ AccordionGroup(group Group) {
 					}
 				}
 			</ul>
-		</details>
-	</div>
+			</details>
+	</li>
 }
 
 templ AccordionLink(link Link) {

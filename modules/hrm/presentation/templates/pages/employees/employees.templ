@@ -50,18 +50,21 @@ templ EmployeesTable(props *IndexPageProps) {
 							<span x-text={ fmt.Sprintf("format('%s')", employee.UpdatedAt) }></span>
 						</div>
 					}
-					@base.TableCell(base.TableCellProps{}) {
-						if employee.CanUpdate {
-							@button.Secondary(button.Props{
-								Fixed: true,
-								Size:  button.SizeSM,
-								Class: "btn-fixed",
-								Href:  fmt.Sprintf("/hrm/employees/%s", employee.ID),
-							}) {
-								@icons.PencilSimple(icons.Props{Size: "20"})
+						@base.TableCell(base.TableCellProps{}) {
+							if employee.CanUpdate {
+								@button.Secondary(button.Props{
+									Fixed: true,
+									Size:  button.SizeSM,
+									Class: "btn-fixed",
+									Href:  fmt.Sprintf("/hrm/employees/%s", employee.ID),
+									Attrs: templ.Attributes{
+										"aria-label": pageCtx.T("Edit"),
+									},
+								}) {
+									@icons.PencilSimple(icons.Props{Size: "20"})
+								}
 							}
 						}
-					}
 				}
 			}
 		}

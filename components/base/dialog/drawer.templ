@@ -2,6 +2,7 @@ package dialog
 
 import (
 	"fmt"
+	"strings"
 	icons "github.com/iota-uz/icons/phosphor"
 )
 
@@ -26,6 +27,7 @@ type DrawerProps struct {
 	Open      bool
 	Direction Direction
 	Action    string
+	AriaLabel string
 	Attrs     templ.Attributes
 	Classes   templ.CSSClasses
 }
@@ -40,20 +42,34 @@ templ Drawer(props DrawerProps) {
 		if props.ID != "" {
 			attrs["id"] = props.ID
 		}
+
+		dialogAttrs := templ.Attributes{}
+		for k, v := range props.Attrs {
+			dialogAttrs[k] = v
+		}
+		if _, hasLabel := dialogAttrs["aria-label"]; !hasLabel {
+			if _, hasLabelledBy := dialogAttrs["aria-labelledby"]; !hasLabelledBy {
+				if strings.TrimSpace(props.AriaLabel) != "" {
+					dialogAttrs["aria-label"] = strings.TrimSpace(props.AriaLabel)
+				} else {
+					dialogAttrs["aria-label"] = "Drawer"
+				}
+			}
+		}
 	}}
-	<div
-		{ attrs... }
-	>
+	<div { attrs... }>
 		<dialog
 			x-bind="dialog"
-			{ props.Attrs... }
+			role="dialog"
+			aria-modal="true"
+			{ dialogAttrs... }
 			class={
 				templ.Classes(
 					"dialog m-0 bg-transparent",
 					directions[props.Direction],
 					"w-full h-full max-w-full max-h-full",
 					props.Classes,
-				),
+				)
 			}
 		>
 			{ children... }
@@ -70,13 +86,28 @@ type StdDrawerProps struct {
 }
 
 templ StdViewDrawer(props StdDrawerProps) {
+	{{
+		headingID := fmt.Sprintf("%s-heading", strings.TrimSpace(props.ID))
+		if strings.TrimSpace(props.ID) == "" {
+			headingID = fmt.Sprintf("%s-heading", strings.TrimSpace(props.Action))
+		}
+		if strings.TrimSpace(headingID) == "-heading" {
+			headingID = "drawer-heading"
+		}
+		dialogAttrs := templ.Attributes{
+			"aria-labelledby": headingID,
+		}
+		for k, v := range props.Attrs {
+			dialogAttrs[k] = v
+		}
+	}}
 	@Drawer(DrawerProps{
 		ID:        props.ID,
 		Direction: RTL,
 		Open:      props.Open,
 		Action:    props.Action,
 		Classes:   templ.Classes("flex items-stretch"),
-		Attrs:     props.Attrs,
+		Attrs:     dialogAttrs,
 	}) {
 		<div class="bg-white dark:bg-gray-900 w-3/4 md:w-2/3 ml-auto">
 			<div
@@ -89,11 +120,11 @@ templ StdViewDrawer(props StdDrawerProps) {
 							"border-b border-primary",
 						}
 					>
-						<h3 class="font-medium">
+						<h3 class="font-medium" id={ headingID }>
 							{ props.Title }
 						</h3>
 						<div>
-							<button class="cursor-pointer">
+							<button class="cursor-pointer" type="submit" aria-label="Close">
 								@icons.XCircle(icons.Props{Size: "20"})
 							</button>
 						</div>

@@ -285,17 +285,40 @@ func (c *AuthzAPIController) stagePolicy(
 			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
 			return
 		}
-		entries, err := c.stageStore.AddMany(key, payloads)
+		entries, createdIDs, err := c.stageStore.AddManyWithIDs(key, payloads)
 		if err != nil {
 			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
 			return
 		}
 		htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(entries)))
 		writeJSON(w, http.StatusCreated, dtos.StagePolicyResponse{
-			Data:  entries,
-			Total: len(entries),
+			Data:       entries,
+			Total:      len(entries),
+			CreatedIDs: createdIDs,
 		})
 	case http.MethodDelete:
+		contentType := strings.ToLower(r.Header.Get("Content-Type"))
+		if strings.Contains(contentType, "application/json") {
+			var payload struct {
+				IDs []string `json:"ids"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+				c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "invalid delete payload")
+				return
+			}
+			entries, err := c.stageStore.DeleteMany(key, payload.IDs)
+			if err != nil {
+				c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_ERROR", err.Error())
+				return
+			}
+			htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(entries)))
+			writeJSON(w, http.StatusOK, dtos.StagePolicyResponse{
+				Data:  entries,
+				Total: len(entries),
+			})
+			return
+		}
+
 		id := strings.TrimSpace(r.URL.Query().Get("id"))
 		if id != "" {
 			entries, err := c.stageStore.Delete(key, id)

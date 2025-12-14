@@ -28,19 +28,22 @@ type PolicyMatrixEntry struct {
 	StageOnly bool
 }
 
-type PolicyMatrixProps struct {
-	Entries      []PolicyMatrixEntry
-	Total        int
-	Page         int
-	Limit        int
-	StageTotal   int
-	StageSummary viewmodels.AuthzChangesSummary
-	StagePreview viewmodels.AuthzWorkspacePreview
+	type PolicyMatrixProps struct {
+		Entries      []PolicyMatrixEntry
+		Total        int
+		Page         int
+		Limit        int
+		StageTotal   int
+		StageSummary viewmodels.AuthzChangesSummary
+		StagePreview viewmodels.AuthzWorkspacePreview
+		ObjectOptions []string
+		ActionOptions []string
+		RoleOptions   []string
 
-	RoleID  string
-	Subject string
-	Domain  string
-	Type    string
+		RoleID  string
+		Subject string
+		Domain  string
+		Type    string
 	Search  string
 
 	CanDebug   bool
@@ -103,12 +106,12 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						<form
 							class="flex items-center gap-2"
 							hx-post="/core/api/authz/requests"
-							hx-target="body"
-							hx-swap="none"
-							data-loading-label={ pageCtx.T("Authz.PolicyInspector.Loading") }
-							hx-on::before-request="this.querySelector('button').disabled=true; this.querySelector('button').dataset.originalText=this.querySelector('button').innerText; this.querySelector('button').innerText=(this.dataset.loadingLabel||'Loading...');"
-							hx-on::after-request="this.querySelector('button').disabled=false; if(this.querySelector('button').dataset.originalText){this.querySelector('button').innerText=this.querySelector('button').dataset.originalText;}"
-						>
+								hx-target="body"
+								hx-swap="none"
+								data-loading-label={ pageCtx.T("Authz.PolicyInspector.Loading") }
+								hx-on::before-request="this.querySelector('button').disabled=true; this.querySelector('button').dataset.originalText=this.querySelector('button').innerText; this.querySelector('button').innerText=(this.dataset.loadingLabel||this.querySelector('button').innerText);"
+								hx-on::after-request="this.querySelector('button').disabled=false; if(this.querySelector('button').dataset.originalText){this.querySelector('button').innerText=this.querySelector('button').dataset.originalText;}"
+							>
 							<input type="hidden" name="object" value="core.roles"/>
 							<input type="hidden" name="action" value="update"/>
 							<input type="hidden" name="domain" value={ props.Domain }/>
@@ -204,9 +207,6 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							</select>
 						</div>
 					</template>
-					<template x-if="typ === 'g'">
-						<input type="hidden" name="effect" value="allow"/>
-					</template>
 					@input.Text(&input.Props{
 						Label: pageCtx.T("Authz.Subject"),
 						Attrs: templ.Attributes{
@@ -216,44 +216,59 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						},
 					})
 				</div>
-				<template x-if="typ !== 'g'">
-					@input.Text(&input.Props{
-						Label:       pageCtx.T("Authz.Object"),
-						Placeholder: "core.users",
-						Attrs: templ.Attributes{
-							"name":     "object",
-							"required": "true",
-						},
-					})
-				</template>
-				<template x-if="typ === 'g'">
-					@input.Text(&input.Props{
-						Label:       pageCtx.T("Authz.ParentRole"),
-						Placeholder: "role:core.viewer",
-						Attrs: templ.Attributes{
-							"name":     "object",
-							"required": "true",
-						},
-					})
-				</template>
-				<template x-if="typ !== 'g'">
-					@input.Text(&input.Props{
-						Label:       pageCtx.T("Authz.Action"),
-						Placeholder: "read",
-						Attrs: templ.Attributes{
-							"name":     "action",
-							"required": "true",
-						},
-					})
-				</template>
-				<template x-if="typ === 'g'">
-					<input type="hidden" name="action" value="*"/>
-				</template>
-				<div class="flex justify-end gap-2">
-					@button.Secondary(button.Props{
-						Size: button.SizeSM,
-						Attrs: templ.Attributes{
-							"type":           "button",
+					<template x-if="typ !== 'g'">
+						@input.Text(&input.Props{
+							Label:       pageCtx.T("Authz.Object"),
+							Placeholder: "core.users",
+							Attrs: templ.Attributes{
+								"name":     "object",
+								"required": "true",
+								"list":     "authz-policy-object-options",
+							},
+						})
+					</template>
+					<template x-if="typ === 'g'">
+						@input.Text(&input.Props{
+							Label:       pageCtx.T("Authz.ParentRole"),
+							Placeholder: "role:core.viewer",
+							Attrs: templ.Attributes{
+								"name":     "object",
+								"required": "true",
+								"list":     "authz-policy-role-options",
+							},
+						})
+					</template>
+					<template x-if="typ !== 'g'">
+						@input.Text(&input.Props{
+							Label:       pageCtx.T("Authz.Action"),
+							Placeholder: "read",
+							Attrs: templ.Attributes{
+								"name":     "action",
+								"required": "true",
+								"list":     "authz-policy-action-options",
+							},
+						})
+					</template>
+					<datalist id="authz-policy-object-options">
+						for _, option := range props.ObjectOptions {
+							<option value={ option }></option>
+						}
+					</datalist>
+					<datalist id="authz-policy-action-options">
+						for _, option := range props.ActionOptions {
+							<option value={ option }></option>
+						}
+					</datalist>
+					<datalist id="authz-policy-role-options">
+						for _, option := range props.RoleOptions {
+							<option value={ option }></option>
+						}
+					</datalist>
+					<div class="flex justify-end gap-2">
+						@button.Secondary(button.Props{
+							Size: button.SizeSM,
+							Attrs: templ.Attributes{
+								"type":           "button",
 							"formnovalidate": "true",
 							"@click":         "$dispatch('open-stage-policy')",
 						},
@@ -351,14 +366,20 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							@base.TableCell(base.TableCellProps{}) {
 								{ entry.Action }
 							}
-							@base.TableCell(base.TableCellProps{}) {
-								<div class="flex items-center gap-2">
-									<span>{ entry.Effect }</span>
-									if entry.Staged {
-										{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
-										if entry.StageKind == "remove" {
-											{{ badgeClass = "text-[11px] px-2 py-0.5 rounded-full border bg-red-700 border-red-500 text-white" }}
-										}
+								@base.TableCell(base.TableCellProps{}) {
+									<div class="flex items-center gap-2">
+										{{ effectLabel := entry.Effect }}
+										{{ if strings.EqualFold(effectLabel, "allow") {
+											effectLabel = pageCtx.T("Authz.EffectAllow")
+										} else if strings.EqualFold(effectLabel, "deny") {
+											effectLabel = pageCtx.T("Authz.EffectDeny")
+										} }}
+										<span>{ effectLabel }</span>
+										if entry.Staged {
+											{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
+											if entry.StageKind == "remove" {
+												{{ badgeClass = "text-[11px] px-2 py-0.5 rounded-full border bg-red-700 border-red-500 text-white" }}
+											}
 										<span class={ badgeClass }>
 											{ pageCtx.T("Authz.Stage.BadgeShort") }
 										</span>

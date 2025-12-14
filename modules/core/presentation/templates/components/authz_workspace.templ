@@ -168,14 +168,20 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 											}
 										</td>
 										<td class="px-3 py-2 font-mono text-surface-700">{ item.Type }</td>
-										<td class="px-3 py-2 font-mono text-surface-700">{ item.Domain }</td>
-										<td class="px-3 py-2 font-mono text-surface-700 break-all">{ item.Object }</td>
-										<td class="px-3 py-2 font-mono text-surface-700 break-all">{ item.Action }</td>
-										<td class="px-3 py-2 font-mono text-surface-700">{ item.Effect }</td>
-									</tr>
-								}
-							</tbody>
-						</table>
+											<td class="px-3 py-2 font-mono text-surface-700">{ item.Domain }</td>
+											<td class="px-3 py-2 font-mono text-surface-700 break-all">{ item.Object }</td>
+											<td class="px-3 py-2 font-mono text-surface-700 break-all">{ item.Action }</td>
+											{{ effectLabel := item.Effect }}
+											{{ if strings.EqualFold(effectLabel, "allow") {
+												effectLabel = pageCtx.T("Authz.EffectAllow")
+											} else if strings.EqualFold(effectLabel, "deny") {
+												effectLabel = pageCtx.T("Authz.EffectDeny")
+											} }}
+											<td class="px-3 py-2 font-mono text-surface-700">{ effectLabel }</td>
+										</tr>
+									}
+								</tbody>
+							</table>
 					</div>
 				}
 			</div>

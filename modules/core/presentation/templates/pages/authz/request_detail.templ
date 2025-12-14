@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/iota-uz/iota-sdk/components/copy_button"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
@@ -34,7 +35,10 @@ templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
 	{{ _ = templ.URL("") }}
 	{{ statusKey := statusMessageKey(vm.Status) }}
 	{{ statusLabel := pageCtx.T(statusKey) }}
-	<main class="mx-auto max-w-5xl px-4 py-6 space-y-6">
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{Title: pageCtx.T("Authz.RequestDetail.Title")},
+	}) {
+		<main class="mx-auto max-w-5xl px-4 py-6 space-y-6">
 		<header class="flex items-start justify-between gap-4 flex-wrap">
 			<div class="space-y-2">
 				<h1 class="text-xl font-semibold text-surface-50">
@@ -92,15 +96,21 @@ templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
 						<tbody class="divide-y divide-surface-400/40">
 							for _, item := range vm.Suggestions {
 								<tr class="align-top">
-									<td class="py-1 pr-3 font-mono text-surface-100">{ item.Subject }</td>
-									<td class="py-1 pr-3 font-mono text-surface-100">{ item.Domain }</td>
-									<td class="py-1 pr-3 font-mono text-surface-100 break-all">{ item.Object }</td>
-									<td class="py-1 pr-3 font-mono text-surface-100">{ item.Action }</td>
-									<td class="py-1 font-mono text-surface-100">{ item.Effect }</td>
-								</tr>
-							}
-						</tbody>
-					</table>
+										<td class="py-1 pr-3 font-mono text-surface-100">{ item.Subject }</td>
+										<td class="py-1 pr-3 font-mono text-surface-100">{ item.Domain }</td>
+										<td class="py-1 pr-3 font-mono text-surface-100 break-all">{ item.Object }</td>
+										<td class="py-1 pr-3 font-mono text-surface-100">{ item.Action }</td>
+										{{ effectLabel := item.Effect }}
+										{{ if strings.EqualFold(effectLabel, "allow") {
+											effectLabel = pageCtx.T("Authz.EffectAllow")
+										} else if strings.EqualFold(effectLabel, "deny") {
+											effectLabel = pageCtx.T("Authz.EffectDeny")
+										} }}
+										<td class="py-1 font-mono text-surface-100">{ effectLabel }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
 				} else if len(vm.Diff) > 0 {
 					<table class="mt-2 w-full table-auto border-collapse text-xs">
 						<thead class="border-b border-surface-400/60 text-left text-surface-200">
@@ -249,5 +259,6 @@ templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
 				<pre class="max-h-60 overflow-auto whitespace-pre-wrap break-words text-xs text-amber-50">{ vm.BotLog }</pre>
 			</section>
 		}
-	</main>
+		</main>
+	}
 }

@@ -18,13 +18,15 @@ templ Spotlight() {
 		x-data="spotlight"
 		class="relative"
 		x-id="['spotlight', 'spinner']"
-	>
-		<button
-			@click="open()"
-			class="flex items-center justify-center w-9 h-9 rounded-full bg-surface-400 text-100 cursor-pointer"
 		>
-			@icons.MagnifyingGlass(icons.Props{
-				Size: "20",
+			<button
+				@click="open()"
+				type="button"
+				aria-label={ intl.MustT(ctx, "Spotlight.Open") }
+				class="flex items-center justify-center w-9 h-9 rounded-full bg-surface-400 text-100 cursor-pointer"
+			>
+				@icons.MagnifyingGlass(icons.Props{
+					Size: "20",
 			})
 		</button>
 		<!-- Spotlight Trigger -->

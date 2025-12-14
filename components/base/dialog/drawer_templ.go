@@ -11,6 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"fmt"
 	icons "github.com/iota-uz/icons/phosphor"
+	"strings"
 )
 
 type Direction int
@@ -34,6 +35,7 @@ type DrawerProps struct {
 	Open      bool
 	Direction Direction
 	Action    string
+	AriaLabel string
 	Attrs     templ.Attributes
 	Classes   templ.CSSClasses
 }
@@ -68,6 +70,20 @@ func Drawer(props DrawerProps) templ.Component {
 		if props.ID != "" {
 			attrs["id"] = props.ID
 		}
+
+		dialogAttrs := templ.Attributes{}
+		for k, v := range props.Attrs {
+			dialogAttrs[k] = v
+		}
+		if _, hasLabel := dialogAttrs["aria-label"]; !hasLabel {
+			if _, hasLabelledBy := dialogAttrs["aria-labelledby"]; !hasLabelledBy {
+				if strings.TrimSpace(props.AriaLabel) != "" {
+					dialogAttrs["aria-label"] = strings.TrimSpace(props.AriaLabel)
+				} else {
+					dialogAttrs["aria-label"] = "Drawer"
+				}
+			}
+		}
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -86,17 +102,16 @@ func Drawer(props DrawerProps) templ.Component {
 				directions[props.Direction],
 				"w-full h-full max-w-full max-h-full",
 				props.Classes,
-			),
-		}
+			)}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<dialog x-bind=\"dialog\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<dialog x-bind=\"dialog\" role=\"dialog\" aria-modal=\"true\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, props.Attrs)
+		templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, dialogAttrs)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -158,6 +173,20 @@ func StdViewDrawer(props StdDrawerProps) templ.Component {
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+
+		headingID := fmt.Sprintf("%s-heading", strings.TrimSpace(props.ID))
+		if strings.TrimSpace(props.ID) == "" {
+			headingID = fmt.Sprintf("%s-heading", strings.TrimSpace(props.Action))
+		}
+		if strings.TrimSpace(headingID) == "-heading" {
+			headingID = "drawer-heading"
+		}
+		dialogAttrs := templ.Attributes{
+			"aria-labelledby": headingID,
+		}
+		for k, v := range props.Attrs {
+			dialogAttrs[k] = v
+		}
 		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -195,20 +224,33 @@ func StdViewDrawer(props StdDrawerProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\"><h3 class=\"font-medium\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\"><h3 class=\"font-medium\" id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var8 string
-			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
+			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(headingID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/dialog/drawer.templ`, Line: 93, Col: 20}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/dialog/drawer.templ`, Line: 123, Col: 44}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</h3><div><button class=\"cursor-pointer\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var9 string
+			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.Title)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/dialog/drawer.templ`, Line: 124, Col: 20}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</h3><div><button class=\"cursor-pointer\" type=\"submit\" aria-label=\"Close\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -216,7 +258,7 @@ func StdViewDrawer(props StdDrawerProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</button></div></div></form><div class=\"flex-1 min-h-0 overflow-y-auto\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</button></div></div></form><div class=\"flex-1 min-h-0 overflow-y-auto\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -224,7 +266,7 @@ func StdViewDrawer(props StdDrawerProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -236,7 +278,7 @@ func StdViewDrawer(props StdDrawerProps) templ.Component {
 			Open:      props.Open,
 			Action:    props.Action,
 			Classes:   templ.Classes("flex items-stretch"),
-			Attrs:     props.Attrs,
+			Attrs:     dialogAttrs,
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
