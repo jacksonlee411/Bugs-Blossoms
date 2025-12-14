@@ -209,3 +209,4 @@ CREATE INDEX uploads_tenant_id_idx ON uploads (tenant_id);
 CREATE INDEX roles_tenant_id_idx ON roles (tenant_id);
 
 CREATE INDEX user_groups_tenant_id_idx ON user_groups (tenant_id);
+

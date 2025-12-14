@@ -96,7 +96,8 @@ run_pg_dump() {
 }
 
 TMP_FILE=$(mktemp)
-trap 'rm -f "$TMP_FILE"' EXIT
+TMP_FORMATTED_FILE=$(mktemp)
+trap 'rm -f "$TMP_FILE" "$TMP_FORMATTED_FILE"' EXIT
 
 TABLE_FLAGS=()
 for table in "${TABLES[@]}"; do
@@ -105,7 +106,13 @@ done
 
 run_pg_dump "$TMP_FILE"
 
-mv "$TMP_FILE" "$SCHEMA_PATH"
+if command -v pg_format >/dev/null 2>&1; then
+  pg_format "$TMP_FILE" > "$TMP_FORMATTED_FILE"
+  mv "$TMP_FORMATTED_FILE" "$SCHEMA_PATH"
+else
+  mv "$TMP_FILE" "$SCHEMA_PATH"
+  echo "Warning: pg_format not found, exported schema may fail CI SQL formatting check." >&2
+fi
 trap - EXIT
 
 echo "Exported HRM schema to $SCHEMA_PATH"
