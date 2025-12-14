@@ -2,6 +2,7 @@ package layouts
 
 import (
 	icons "github.com/iota-uz/icons/phosphor"
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/components/base/avatar"
 	"github.com/iota-uz/iota-sdk/components/base/button"
@@ -225,6 +226,7 @@ templ Authenticated(props AuthenticatedProps) {
 	}
 	@Base(&props.BaseProps) {
 		@toast.Container()
+		@authzcomponents.AuthzClient()
 		@MobileSidebar(sidebarProps)
 		<div
 			x-data="{

@@ -10,6 +10,7 @@ import (
 	"github.com/a-h/templ"
 	"github.com/gorilla/mux"
 
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	corepermissions "github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/authenticationlog"
@@ -60,8 +61,14 @@ func (c *LogsController) Register(r *mux.Router) {
 }
 
 func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
-	if !ensureLoggingAuthz(w, r, "view") {
-		return
+	tenantID := authzutil.TenantIDFromContext(r.Context())
+	currentUser, userErr := composables.UseUser(r.Context())
+	ctxWithState, state := authzutil.EnsureViewStateOrAnonymous(r.Context(), tenantID, currentUser)
+	if ctxWithState != r.Context() {
+		*r = *r.WithContext(ctxWithState)
+	}
+	if state != nil {
+		state.Tenant = loggingAuthzDomain
 	}
 
 	pagination := composables.UsePaginated(r)
@@ -78,14 +85,34 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 	var actionLogs []*actionlog.ActionLog
 	var actionTotal int64
 
+	canView := false
+	if userErr == nil && currentUser != nil {
+		allowed, _, err := authzutil.CheckCapability(r.Context(), state, tenantID, currentUser, logsAuthzObject, "view")
+		if err == nil {
+			canView = allowed
+		}
+	} else if state != nil {
+		recordForbiddenCapability(state, r, logsAuthzObject, "view", authzutil.CapabilityKey(logsAuthzObject, "view"))
+	}
+
+	if !canView {
+		accept := strings.ToLower(r.Header.Get("Accept"))
+		if strings.Contains(accept, "application/json") || htmx.IsHxRequest(r) {
+			writeForbiddenResponse(w, r, logsAuthzObject, "view")
+			return
+		}
+	}
+
 	var err error
-	switch tab {
-	case "authentication":
-		authLogs, authTotal, err = c.logsService.ListAuthenticationLogs(r.Context(), authParams)
-	case "action":
-		actionLogs, actionTotal, err = c.logsService.ListActionLogs(r.Context(), actionParams)
-	default:
-		err = errors.New("unsupported tab")
+	if canView {
+		switch tab {
+		case "authentication":
+			authLogs, authTotal, err = c.logsService.ListAuthenticationLogs(r.Context(), authParams)
+		case "action":
+			actionLogs, actionTotal, err = c.logsService.ListActionLogs(r.Context(), actionParams)
+		default:
+			err = errors.New("unsupported tab")
+		}
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -93,6 +120,7 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	canDebug := composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil
+	canRequest := composables.CanUser(r.Context(), corepermissions.AuthzRequestsWrite) == nil
 	props := &viewmodels.LogsPageProps{
 		BasePath:  c.basePath,
 		ActiveTab: tab,
@@ -110,7 +138,9 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 			Page:    pagination.Page,
 			PerPage: pagination.Limit,
 		},
-		CanDebug: canDebug,
+		CanView:    canView,
+		CanRequest: canRequest,
+		CanDebug:   canDebug,
 	}
 
 	if htmx.IsHxRequest(r) {

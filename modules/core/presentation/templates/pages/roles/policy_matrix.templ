@@ -199,8 +199,8 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						<div class="space-y-1">
 							<label class="text-sm text-secondary-200">{ pageCtx.T("Authz.Effect") }</label>
 							<select name="effect" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
-								<option value="allow" selected>allow</option>
-								<option value="deny">deny</option>
+								<option value="allow" selected>{ pageCtx.T("Authz.EffectAllow") }</option>
+								<option value="deny">{ pageCtx.T("Authz.EffectDeny") }</option>
 							</select>
 						</div>
 					</template>

@@ -269,11 +269,22 @@ templ PolicyInspector(props *PolicyInspectorProps) {
 						if (traceEl) {
 							traceEl.innerHTML = "";
 							if (payload.trace && payload.trace.matched_policy && payload.trace.matched_policy.length) {
-								payload.trace.matched_policy.forEach(function (rule) {
+								var matched = payload.trace.matched_policy;
+								if (matched.length === 5) {
 									var li = document.createElement("li");
-									li.textContent = rule;
+									li.textContent =
+										"p: " +
+										["sub=" + matched[0], "dom=" + matched[1], "obj=" + matched[2], "act=" + matched[3], "eft=" + matched[4]].join(
+											" · ",
+										);
 									traceEl.appendChild(li);
-								});
+								} else {
+									matched.forEach(function (rule) {
+										var li = document.createElement("li");
+										li.textContent = rule;
+										traceEl.appendChild(li);
+									});
+								}
 							} else {
 								var li = document.createElement("li");
 								li.textContent = container.dataset.emptyLabel || "";

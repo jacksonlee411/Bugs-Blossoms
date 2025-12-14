@@ -419,6 +419,10 @@ func (c *UsersController) GetEdit(
 			return
 		}
 	}
+	roleNameToID := make(map[string]uint, len(roles))
+	for _, roleEntity := range roles {
+		roleNameToID[roleEntity.Name()] = roleEntity.ID()
+	}
 
 	var groups []*viewmodels.Group
 	if canAuthzCapability(r.Context(), groupsAuthzObject, "list") {
@@ -455,7 +459,7 @@ func (c *UsersController) GetEdit(
 
 	var policyBoard *users.UserPolicyBoardProps
 	if composables.CanUser(r.Context(), permissions.AuthzDebug) == nil {
-		board, buildErr := c.buildUserPolicyBoardProps(r.Context(), r, policyService, us, r.URL.Query())
+		board, buildErr := c.buildUserPolicyBoardProps(r.Context(), r, policyService, us, r.URL.Query(), roleNameToID)
 		if buildErr != nil {
 			logger.WithError(buildErr).Warn("failed to build user policy board")
 		} else {
@@ -480,6 +484,7 @@ func (c *UsersController) GetPolicies(
 	w http.ResponseWriter,
 	logger *logrus.Entry,
 	userService *services.UserService,
+	roleService *services.RoleService,
 	policyService *services.PolicyDraftService,
 ) {
 	if !ensureUsersAuthz(w, r, "view") {
@@ -499,7 +504,20 @@ func (c *UsersController) GetPolicies(
 		writeJSONError(w, http.StatusInternalServerError, "USER_NOT_FOUND", "failed to load user")
 		return
 	}
-	board, buildErr := c.buildUserPolicyBoardProps(r.Context(), r, policyService, us, r.URL.Query())
+	roleNameToID := map[string]uint{}
+	if canAuthzCapability(r.Context(), rolesAuthzObject, "list") {
+		roles, rolesErr := roleService.GetAll(r.Context())
+		if rolesErr != nil {
+			logger.WithError(rolesErr).Warn("failed to load roles for user policy board")
+		} else {
+			roleNameToID = make(map[string]uint, len(roles))
+			for _, roleEntity := range roles {
+				roleNameToID[roleEntity.Name()] = roleEntity.ID()
+			}
+		}
+	}
+
+	board, buildErr := c.buildUserPolicyBoardProps(r.Context(), r, policyService, us, r.URL.Query(), roleNameToID)
 	if buildErr != nil {
 		logger.WithError(buildErr).Error("failed to build user policy board")
 		writeJSONError(w, http.StatusInternalServerError, "POLICY_BOARD_ERROR", "failed to load user policies")
@@ -509,6 +527,9 @@ func (c *UsersController) GetPolicies(
 	switch column {
 	case "":
 		templ.Handler(users.UserPolicyBoard(board), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	case "effective":
+		templ.Handler(users.UserEffectivePolicies(&board.Effective), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	case userPolicyColumnInherited:
 		templ.Handler(users.UserPolicyColumn(&board.Inherited), templ.WithStreaming()).ServeHTTP(w, r)
@@ -909,6 +930,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 	policyService *services.PolicyDraftService,
 	us user.User,
 	values url.Values,
+	roleNameToID map[string]uint,
 ) (*users.UserPolicyBoardProps, error) {
 	subject := authzSubjectForUser(us.TenantID(), us)
 	defaultDomain := authz.DomainFromTenant(us.TenantID())
@@ -970,6 +992,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		requestMap,
 		canStage,
 		canDebug,
+		roleNameToID,
 	)
 	if err != nil {
 		return nil, err
@@ -984,6 +1007,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		requestMap,
 		canStage,
 		canDebug,
+		roleNameToID,
 	)
 	if err != nil {
 		return nil, err
@@ -998,10 +1022,14 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		requestMap,
 		canStage,
 		canDebug,
+		roleNameToID,
 	)
 	if err != nil {
 		return nil, err
 	}
+
+	effectiveParams := parseUserPolicyParams(values, 20)
+	effectiveProps := buildUserEffectivePoliciesProps(entries, subject, defaultDomain, effectiveParams, roleNameToID, baseURL)
 
 	return &users.UserPolicyBoardProps{
 		Subject:       subject,
@@ -1010,6 +1038,7 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		StageSummary:  summarizeStagedEntries(stagedEntries),
 		StagePreview:  buildWorkspacePreview(stagedEntries),
 		Requests:      requestStatuses,
+		Effective:     effectiveProps,
 		Inherited:     inheritedColumn,
 		Direct:        directColumn,
 		Overrides:     overrideColumn,
@@ -1033,6 +1062,7 @@ func (c *UsersController) buildUserPolicyColumnProps(
 	requestMap map[string]requestStatusInfo,
 	canStage bool,
 	canDebug bool,
+	roleNameToID map[string]uint,
 ) (users.UserPolicyColumnProps, error) {
 	filteredBase := filterUserPolicyEntriesByColumn(baseEntries, column, defaultDomain, params)
 	filteredStage := filterUserStagedEntriesByColumn(stagedEntries, column, defaultDomain, params)
@@ -1047,6 +1077,15 @@ func (c *UsersController) buildUserPolicyColumnProps(
 			requestID = statusInfo.ID
 			requestStatus = statusInfo.Label
 		}
+		rolePoliciesURL := ""
+		if entry.Type == "g" && roleNameToID != nil {
+			roleName := strings.TrimPrefix(strings.TrimSpace(entry.Object), "role:")
+			if roleName != "" {
+				if roleID, ok := roleNameToID[roleName]; ok && roleID > 0 {
+					rolePoliciesURL = fmt.Sprintf("/roles/%d/policies?domain=%s", roleID, url.QueryEscape(entry.Domain))
+				}
+			}
+		}
 		entries = append(entries, users.UserPolicyEntry{
 			PolicyEntryResponse: entry.PolicyEntryResponse,
 			StageID:             entry.StageID,
@@ -1055,6 +1094,7 @@ func (c *UsersController) buildUserPolicyColumnProps(
 			StageOnly:           entry.StageOnly,
 			RequestID:           requestID,
 			RequestStatus:       requestStatus,
+			RolePoliciesURL:     rolePoliciesURL,
 		})
 	}
 

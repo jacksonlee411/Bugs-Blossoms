@@ -435,7 +435,7 @@ func GroupsContent(props *IndexPageProps) templ.Component {
 			return nil
 		})
 		templ_7745c5c3_Err = filters.Drawer(filters.DrawerProps{
-			Heading: "Filters",
+			Heading: pageCtx.T("Scaffold.Filters.Title"),
 			Action:  "open-group-filters",
 		}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var13), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {

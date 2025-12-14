@@ -4,6 +4,7 @@ import (
 	"fmt"
 	icons "github.com/iota-uz/icons/phosphor"
 	"github.com/iota-uz/iota-sdk/components/base/dialog"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
 type DefaultDrawerProps struct {
@@ -136,6 +137,7 @@ templ DetailsDrawer(props DetailsDrawerProps) {
 }
 
 templ renderDetailFieldValue(field DetailFieldValue) {
+	{{ pgCtx := composables.UsePageCtx(ctx) }}
 	if field.Value == "" {
 		<span class="text-gray-400 dark:text-gray-300">-</span>
 	} else {
@@ -144,9 +146,9 @@ templ renderDetailFieldValue(field DetailFieldValue) {
 				@templ.Raw(field.Value)
 			case DetailFieldTypeBoolean:
 				if field.Value == "true" {
-					<span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-900/20 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/30">True</span>
+					<span class="inline-flex items-center rounded-md bg-green-50 dark:bg-green-900/20 px-2 py-1 text-xs font-medium text-green-700 dark:text-green-400 ring-1 ring-inset ring-green-600/20 dark:ring-green-500/30">{ pgCtx.T("Scaffold.Boolean.True") }</span>
 				} else {
-					<span class="inline-flex items-center rounded-md bg-red-50 dark:bg-red-900/20 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/30">False</span>
+					<span class="inline-flex items-center rounded-md bg-red-50 dark:bg-red-900/20 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-400 ring-1 ring-inset ring-red-600/20 dark:ring-red-500/30">{ pgCtx.T("Scaffold.Boolean.False") }</span>
 				}
 			case DetailFieldTypeBadge:
 				<span class="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/20 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-600/20 dark:ring-blue-500/30">{ field.Value }</span>

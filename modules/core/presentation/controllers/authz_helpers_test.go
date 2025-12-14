@@ -20,6 +20,7 @@ import (
 func TestEnsureAuthz_ForbiddenJSONContract(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/users", nil)
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("X-Request-ID", "req-core-json")
 
 	rr := httptest.NewRecorder()
 	allowed := ensureAuthz(rr, req, authz.ObjectName("core", "users"), "list", nil)
@@ -29,6 +30,7 @@ func TestEnsureAuthz_ForbiddenJSONContract(t *testing.T) {
 
 	var payload authzutil.ForbiddenPayload
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &payload))
+	require.Equal(t, "forbidden", payload.Error)
 	require.Equal(t, "core.users", payload.Object)
 	require.Equal(t, "list", payload.Action)
 	require.Equal(t, "/core/api/authz/requests", payload.RequestURL)
@@ -36,6 +38,7 @@ func TestEnsureAuthz_ForbiddenJSONContract(t *testing.T) {
 	require.Equal(t, "global", payload.Domain)
 	require.NotEmpty(t, payload.Subject)
 	require.NotEmpty(t, payload.MissingPolicies)
+	require.Equal(t, "req-core-json", payload.RequestID)
 
 	state := authz.ViewStateFromContext(req.Context())
 	require.NotNil(t, state)
@@ -46,6 +49,7 @@ func TestEnsureAuthz_ForbiddenJSONContract(t *testing.T) {
 func TestEnsureAuthz_ForbiddenHTMXContract(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/users", nil)
 	req.Header.Set("Hx-Request", "true")
+	req = req.WithContext(composables.WithPageCtx(req.Context(), &stubPageCtx{}))
 
 	rr := httptest.NewRecorder()
 	allowed := ensureAuthz(rr, req, authz.ObjectName("core", "users"), "list", nil)
@@ -54,7 +58,7 @@ func TestEnsureAuthz_ForbiddenHTMXContract(t *testing.T) {
 	require.Equal(t, http.StatusForbidden, rr.Code)
 	require.Equal(t, "body", rr.Header().Get("Hx-Retarget"))
 	require.Equal(t, "innerHTML", rr.Header().Get("Hx-Reswap"))
-	require.NotEmpty(t, rr.Body.String())
+	require.Contains(t, rr.Body.String(), "data-authz-container")
 }
 
 type stubPageCtx struct {
@@ -106,5 +110,17 @@ func TestEnsureAuthz_ForbiddenHTMLFallbackRendersUnauthorized(t *testing.T) {
 
 	require.False(t, allowed)
 	require.Equal(t, http.StatusForbidden, rr.Code)
-	require.Contains(t, rr.Body.String(), "Authz.Unauthorized.Title")
+	require.Contains(t, rr.Body.String(), "data-authz-container")
+	require.Contains(t, rr.Body.String(), "data-request-url=\"/core/api/authz/requests\"")
+}
+
+func TestEnsureAuthz_ForbiddenHTMLFallbackWithoutPageCtxReturnsPlainText(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/users", nil)
+
+	rr := httptest.NewRecorder()
+	allowed := ensureAuthz(rr, req, authz.ObjectName("core", "users"), "list", nil)
+
+	require.False(t, allowed)
+	require.Equal(t, http.StatusForbidden, rr.Code)
+	require.Contains(t, rr.Body.String(), "Forbidden:")
 }

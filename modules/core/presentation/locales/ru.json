@@ -57,9 +57,16 @@
       "NoDataDescription": "Для этой таблицы нет доступных данных.",
       "NothingFound": "Ничего не найдено"
     },
+    "Form": {
+      "ValidationFailed": "Проверка полей не пройдена"
+    },
     "Filters": {
       "Title": "Фильтры",
       "SelectAll": "Выбрать все"
+    },
+    "Boolean": {
+      "True": "Да",
+      "False": "Нет"
     }
   },
   "Empty": "Пусто",
@@ -251,7 +258,8 @@
     "Meta": {
       "Title": "Панель управления"
     },
-    "Welcome": "Добро пожаловать на панель управления"
+    "Welcome": "Добро пожаловать на панель управления",
+    "NoDBConnection": "Нет соединения с базой данных"
   },
   "Users": {
     "Meta": {
@@ -291,6 +299,13 @@
       "Inherited": "Наследованные",
       "Direct": "Прямые",
       "Overrides": "Переопределения",
+      "Effective": "Итоговые",
+      "EffectiveHint": "Сводно с источниками",
+      "Sources": "Источники",
+      "Source": {
+        "Direct": "Напрямую",
+        "RoleChain": "Цепочка источника: %s"
+      },
       "ViewRolePolicies": "Посмотреть политики роли"
     },
     "Single": {
@@ -437,6 +452,8 @@
     "Subject": "Субъект",
     "Type": "Тип",
     "Effect": "Эффект",
+    "EffectAllow": "Разрешить",
+    "EffectDeny": "Запретить",
     "Role": "Роль",
     "ParentRole": "Родительская роль",
     "Workspace": {
