@@ -57,9 +57,16 @@
       "NoDataDescription": "Bu jadvaldagi ma'lumotlar mavjud emas.",
       "NothingFound": "Hech narsa topilmadi"
     },
+    "Form": {
+      "ValidationFailed": "Maydonlar tekshiruvidan o'tmadi"
+    },
     "Filters": {
       "Title": "Filtrlar",
       "SelectAll": "Barchasini tanlash"
+    },
+    "Boolean": {
+      "True": "Ha",
+      "False": "Yo'q"
     }
   },
   "Empty": "Bo'sh",
@@ -179,7 +186,8 @@
     "Meta": {
       "Title": "Boshqaruv paneli"
     },
-    "Welcome": "Boshqaruv paneliga xush kelibsiz"
+    "Welcome": "Boshqaruv paneliga xush kelibsiz",
+    "NoDBConnection": "Ma'lumotlar bazasiga ulanish mavjud emas"
   },
   "Users": {
     "Meta": {
@@ -219,6 +227,13 @@
       "Inherited": "Meros qilingan",
       "Direct": "To'g'ridan-to'g'ri",
       "Overrides": "Bekor qiluvchi",
+      "Effective": "Yakuniy",
+      "EffectiveHint": "Manbalari bilan jamlanma",
+      "Sources": "Manbalar",
+      "Source": {
+        "Direct": "Bevosita",
+        "RoleChain": "Manba zanjiri: %s"
+      },
       "ViewRolePolicies": "Rol siyosatlarini ko'rish"
     },
     "Single": {
@@ -437,6 +452,8 @@
     "Subject": "Subyekt",
     "Type": "Turi",
     "Effect": "Ta'sir",
+    "EffectAllow": "Ruxsat berish",
+    "EffectDeny": "Taqiqlash",
     "Role": "Rol",
     "ParentRole": "Ota rol",
     "Workspace": {

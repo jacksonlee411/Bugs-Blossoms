@@ -113,14 +113,14 @@ templ GroupsTable(props *IndexPageProps) {
 	}
 }
 
-templ GroupsContent(props *IndexPageProps) {
-	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	@filters.Drawer(filters.DrawerProps{
-		Heading: "Filters",
-		Action:  "open-group-filters",
-	}) {
-		@base.Select(&base.SelectProps{Placeholder: pageCtx.T("CreatedAt")}) {
-			<option>{ pageCtx.T("Filters.CreatedAt.Yesterday") }</option>
+	templ GroupsContent(props *IndexPageProps) {
+		{{ pageCtx := composables.UsePageCtx(ctx) }}
+		@filters.Drawer(filters.DrawerProps{
+			Heading: pageCtx.T("Scaffold.Filters.Title"),
+			Action:  "open-group-filters",
+		}) {
+			@base.Select(&base.SelectProps{Placeholder: pageCtx.T("CreatedAt")}) {
+				<option>{ pageCtx.T("Filters.CreatedAt.Yesterday") }</option>
 			<option>{ pageCtx.T("Filters.CreatedAt.Ereyesterday") }</option>
 		}
 	}

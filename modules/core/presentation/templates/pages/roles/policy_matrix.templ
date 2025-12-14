@@ -197,13 +197,13 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					</div>
 					<template x-if="typ !== 'g'">
 						<div class="space-y-1">
-							<label class="text-sm text-secondary-200">{ pageCtx.T("Authz.Effect") }</label>
-							<select name="effect" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
-								<option value="allow" selected>allow</option>
-								<option value="deny">deny</option>
-							</select>
-						</div>
-					</template>
+								<label class="text-sm text-secondary-200">{ pageCtx.T("Authz.Effect") }</label>
+								<select name="effect" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
+									<option value="allow" selected>{ pageCtx.T("Authz.EffectAllow") }</option>
+									<option value="deny">{ pageCtx.T("Authz.EffectDeny") }</option>
+								</select>
+							</div>
+						</template>
 					<template x-if="typ === 'g'">
 						<input type="hidden" name="effect" value="allow"/>
 					</template>

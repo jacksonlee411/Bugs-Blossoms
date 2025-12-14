@@ -14,13 +14,14 @@ type IndexPageProps struct {
 }
 
 templ DashboardContent(props *IndexPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	<div class="m-6">
 		@templ.Raw(ui.GenerateCSS(props.Dashboard.Grid))
 		if props.DashboardResult != nil {
 			@ui.DashboardWithData(props.Dashboard, props.DashboardResult)
 		} else {
 			<div class="p-8 text-center">
-				<p class="text-gray-600">No database connection available</p>
+				<p class="text-gray-600">{ pageCtx.T("Dashboard.NoDBConnection") }</p>
 			</div>
 		}
 	</div>

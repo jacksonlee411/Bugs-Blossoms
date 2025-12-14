@@ -72,9 +72,9 @@ templ ImportContent(props *ImportPageProps) {
 						"type":    "button",
 						"onclick": "history.back()",
 					},
-				}) {
-					Cancel
-				}
+					}) {
+						{ pgCtx.T("Cancel") }
+					}
 				@button.Primary(button.Props{
 					Size: button.SizeMD,
 					Icon: icons.CloudArrowUp(icons.Props{Size: "20"}),

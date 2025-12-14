@@ -7,7 +7,7 @@ import (
 )
 
 templ ForbiddenContent() {
-	@layouts.Base(&layouts.BaseProps{Title: "Forbidden", WebsocketURL: "/ws"}) {
+	@layouts.Base(&layouts.BaseProps{Title: intl.MustT(ctx, "ErrorPages.Forbidden.Title"), WebsocketURL: "/ws"}) {
 		<div class="flex flex-col items-center justify-center h-screen w-full">
 			<div class="flex flex-col items-center">
 				<!-- Lock icon -->
@@ -38,7 +38,7 @@ templ ForbiddenContent() {
 							"onclick": "history.back()",
 						},
 					}) {
-						Go Back
+						{ intl.MustT(ctx, "Back") }
 					}
 				</div>
 			</div>
