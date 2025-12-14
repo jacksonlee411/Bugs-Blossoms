@@ -121,7 +121,7 @@ func (c *RolesController) List(
 		return
 	}
 
-	ensurePageCapabilities(r, rolesAuthzObject, "create", "update", "delete")
+	ensurePageCapabilities(r, rolesAuthzObject, "create", "update", "delete", "view")
 
 	params := composables.UsePaginated(r)
 	search := r.URL.Query().Get("name")
