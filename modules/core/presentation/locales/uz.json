@@ -231,6 +231,8 @@
     },
     "Permissions": {
       "Inherited": "Meros qilingan",
+      "InheritedHint": "Meros huquqlar rollar/guruhlar tayinlovidan keladi. Rollar/guruhlarni “Ma'lumotlar” bo‘limida tahrirlang; yakuniy natijani “Yakuniy”da ko‘ring.",
+      "InheritedHintShort": "Faqat o‘qish (tahrir Ma'lumotlar’da)",
       "Direct": "To'g'ridan-to'g'ri",
       "Overrides": "Bekor qiluvchi",
       "Effective": "Yakuniy",
@@ -271,6 +273,7 @@
       "NotAllowed": "O'chirib bo'lmaydi: Siz ushbu tenantdagi yagona foydalanuvchisiz"
     }
   },
+  "Clear": "Tozalash",
   "Create": "Yaratish",
   "Roles": {
     "Meta": {

@@ -62,10 +62,11 @@ templ EditForm(props *EditFormProps) {
 		saveAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
 	}
 	<div class="flex flex-col justify-between h-[calc(100vh-4rem)]" id="edit-content">
-		<div class="flex-1 overflow-y-auto p-6">
-			@tab.Root(tab.Props{
-				DefaultValue: "userinfo",
-			}) {
+		@tab.Root(tab.Props{
+			DefaultValue: "userinfo",
+			Class:        "flex flex-col h-full",
+		}) {
+			<div class="flex-1 overflow-y-auto p-6">
 				@tab.List(tab.ListProps{}) {
 					@tab.Button("userinfo") {
 						{ pageCtx.T("Users.Tabs.UserInfo") }
@@ -185,12 +186,11 @@ templ EditForm(props *EditFormProps) {
 						})
 					}
 				</div>
-			}
-		</div>
-		<div
-			x-data
-			class="h-20 shadow-t-lg border-t w-full flex items-center justify-end px-8 bg-surface-300 border-t-primary mt-auto gap-4"
-		>
+			</div>
+			<div
+				class="h-20 shadow-t-lg border-t w-full flex items-center justify-end px-8 bg-surface-300 border-t-primary mt-auto gap-4"
+				x-show="selectedTab === 'userinfo'"
+			>
 			<form
 				id="delete-form"
 				hx-delete={ fmt.Sprintf("/users/%s", props.User.ID) }
@@ -234,7 +234,8 @@ templ EditForm(props *EditFormProps) {
 					{ pageCtx.T("Save") }
 				}
 			</form>
-		</div>
+			</div>
+		}
 		if !canUpdate {
 			<div class="mt-4">
 				@authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{

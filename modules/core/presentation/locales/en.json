@@ -231,6 +231,8 @@
     },
     "Permissions": {
       "Inherited": "Inherited",
+      "InheritedHint": "Inherited permissions come from role/group assignments. Edit roles/groups in \"User info\" and use \"Effective\" to see what actually applies.",
+      "InheritedHintShort": "Read-only (edit in User info)",
       "Direct": "Direct",
       "Overrides": "Overrides",
       "Effective": "Effective",
@@ -271,6 +273,7 @@
       "NotAllowed": "Cannot delete: You are the only user in this tenant"
     }
   },
+  "Clear": "Clear",
   "Create": "Create",
   "Roles": {
     "Meta": {
