@@ -20,13 +20,14 @@ type IndexPageProps struct {
 templ RoleRow(role *viewmodels.Role) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{attrs := templ.Attributes{
-	"id":    fmt.Sprintf("role-%s", role.ID),
-	"class": "hide-on-load",
-}
+		"id":    fmt.Sprintf("role-%s", role.ID),
+		"class": "hide-on-load",
+	}
 	}}
-	{{ canEdit := pageCtx.CanAuthz("core.roles", "update") && role.CanUpdate }}
+	{{ canView := pageCtx.CanAuthz("core.roles", "view") }}
 	{{ buttonAttrs := templ.Attributes{} }}
-	if !pageCtx.CanAuthz("core.roles", "update") {
+	if !canView {
+		buttonAttrs["data-authz-disabled"] = "true"
 		buttonAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
 	}
 	buttonAttrs["aria-label"] = pageCtx.T("Edit")
@@ -43,7 +44,7 @@ templ RoleRow(role *viewmodels.Role) {
 		}
 		@base.TableCell(base.TableCellProps{}) {
 			@button.Secondary(button.Props{
-				Disabled: !canEdit,
+				Disabled: !canView,
 				Fixed:    true,
 				Size:     button.SizeSM,
 				Class:    "btn-fixed",

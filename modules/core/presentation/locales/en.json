@@ -770,7 +770,8 @@
     "Projects": "Projects",
     "Warehouse": "Warehouse",
     "CRM": "CRM",
-    "HRM": "HR Management"
+    "HRM": "HR Management",
+    "Logging": "Logging"
   },
   "Countries": {
     "AF": "Afghanistan",
