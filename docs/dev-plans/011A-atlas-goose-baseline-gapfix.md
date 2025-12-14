@@ -26,6 +26,7 @@
 ### 3.1 仓库实际状态（已验证）
 - [X] `Makefile` 已包含 `atlas-install` 与 `db plan/db lint` 入口，但 `db plan` 目前调用 `atlas schema diff` 且依赖不存在的 `modules/hrm/infrastructure/atlas/schema.hcl`（`Makefile:83`-`Makefile:90`）。
 - [X] `.github/workflows/quality-gates.yml` 已定义 `hrm-atlas` 过滤器，并在命中时运行 `make atlas-install`、`make db plan`、`make db lint`（`.github/workflows/quality-gates.yml:65`-`.github/workflows/quality-gates.yml:71`、`.github/workflows/quality-gates.yml:113`-`.github/workflows/quality-gates.yml:115`、`.github/workflows/quality-gates.yml:226`-`.github/workflows/quality-gates.yml:245`）。
+- [X] HRM Goose 执行面仅在 `Makefile` 有入口（`./scripts/db/run_goose.sh`），但仓库未提供脚本，也未声明/锁定 goose CLI 的安装来源与版本（会造成 CI/开发者环境版本漂移）。
 - [X] 仓库缺失以下关键文件/目录（导致工具链不可用）：
   - [X] `atlas.hcl`（CI/Makefile 期望存在）
   - [X] `modules/hrm/infrastructure/atlas/`（CI/文档期望存在）
@@ -37,6 +38,8 @@
 ### 3.2 风险与影响
 - 触发 `hrm-atlas` 过滤器后，CI 可能在“缺文件/错误入口”阶段失败，无法体现真实质量门禁（迁移漂移、lint 失败等）。
 - 文档宣称 “HRM 已迁入 migrations/hrm 并由 goose 执行”，但现状并非如此，会误导后续 DEV-PLAN（例如 `DEV-PLAN-017/020/021`）对工具链能力的依赖判断。
+- Atlas `schema diff` / `migrate lint` 需要 `--dev-url`（临时/隔离 dev 数据库）来验证 SQL 正确性：若复用同一库或 dev 库不可用，会引入噪音甚至导致 lint/plan 不稳定，从而削弱 CI/CD 的可信度。
+- goose baseline 迁移在“已有表但无 goose 版本表”的环境可能直接失败（表已存在），需要明确既有环境的接入策略，否则上线/迁移会出现不可预期的阻塞。
 
 ## 4. 架构与关键决策 (Architecture & Decisions)
 ### 4.1 目标架构图（HRM 专用链路）
@@ -60,10 +63,16 @@ flowchart LR
    - 选项 A：`src = "file://modules/hrm/infrastructure/atlas/schema.hcl"`（与 011 文档一致，但需要解决 HRM 外键引用到 core 表时的建模边界）。
    - 选项 B：`src = "file://modules/hrm/infrastructure/persistence/schema/hrm-schema.sql"`（直接复用现有 SQL，避免为外键引用补齐 core 表的 HCL 建模；但需更新文档/过滤器/库存表中的 “Atlas Schema File” 列）。
    - 建议：以“能在本仓库落地并可重复执行”为第一优先级，先落地 B（最小闭环），再按需要补 A（将 SQL 逐步迁入 HCL 并解决跨表引用的建模策略）。
+3. **工具链版本与安装策略（Atlas/Goose）**
+   - 目标：CI 与开发者本地使用同一版本的 atlas/goose，避免“工具链漂移”掩盖真实质量门禁。
+   - 建议：
+     - 在 `tools.go` 显式锁定 `ariga.io/atlas/cmd/atlas` 与 `github.com/pressly/goose/v3/cmd/goose`（并在文档中给出版本基线）。
+     - Make 侧提供可重复的安装入口（例如 `make atlas-install` / `make goose-install` 或统一的 `make tools-install`），禁止隐式依赖宿主机 apt/brew 版本。
 
 ## 5. 接口契约与命令口径 (CLI / Make Targets)
 ### 5.1 必须支持的命令（对齐文档与 CI）
 - `make atlas-install`
+- `make goose-install`（或等价的可重复安装入口，用于锁定 goose CLI 版本）
 - `make db plan`：输出 dry-run 的 SQL 计划（不落盘、不写迁移文件）
 - `make db lint`：运行 `atlas migrate lint`（至少覆盖 destructive/dependent 等规则）
 - `HRM_MIGRATIONS=1 make db migrate up|down|redo|status`：通过 `scripts/db/run_goose.sh` 执行 HRM 迁移
@@ -76,6 +85,19 @@ flowchart LR
 - 迁移目录：固定 `migrations/hrm`。
 - Down/Redo：尊重 `GOOSE_STEPS`（例如 `GOOSE_STEPS=1` 时仅回滚/重做 1 步）。
 - 失败处理：任何失败返回非 0；打印关键环境与 goose 输出；禁止吞错。
+- 依赖检查：若 `goose` 不存在或版本不符合要求，必须给出明确提示（建议打印 `goose -version` 与建议的安装命令）。
+- 既有环境接入（baseline bootstrap）：支持一种“仅写入版本表、不执行 baseline SQL”的模式，用于目标库已有人为建表但尚未接入 goose 版本表的场景（不使用不存在的 `--fake` 参数）。
+  - 建议形态：通过环境变量显式开启（例如 `GOOSE_BOOTSTRAP_BASELINE=1`），并要求显式指定/推导 baseline 版本号（避免误写版本）。
+
+### 5.3 Atlas Dev DB 约定（`--dev-url` / `env.dev`）
+- 目标：Atlas 的 plan/lint 必须在一个“隔离的 dev 数据库”上运行，避免与业务库/测试库互相污染。
+- 本地建议：在同一 Postgres 实例上创建独立 dev 库（例如 `ATLAS_DEV_DB_NAME=hrm_dev`），由 `make db plan`/CI 步骤负责确保其存在。
+- CI 建议（无 DinD）：复用 workflow 的 Postgres service，但在运行 Atlas 前创建独立 dev 库（例如 `hrm_dev`）；若权限受限，则在计划中明确替代方案与约束（例如使用专用角色或预置数据库）。
+
+### 5.4 Baseline 迁移兼容性（既有环境）
+- 问题：若目标环境已通过 `hrm-schema.sql` 手工建表，直接执行 baseline 迁移很可能因“表已存在”失败。
+- 建议策略（优先）：提供可审核、可重复的 bootstrap 流程：在确认 schema 已符合 baseline 的前提下，仅初始化 goose 版本表并标记 baseline 版本已应用，然后进入后续增量迁移。
+- 不建议策略：在 baseline SQL 中大量使用 `IF NOT EXISTS` 规避失败（容易掩盖漂移与约束差异）；如确需使用，必须在计划中列明适用范围与风险。
 
 ## 6. 实施步骤 (Execution Plan)
 1. [ ] **补齐缺失文件与目录骨架**
@@ -83,21 +105,25 @@ flowchart LR
    - [ ] 新增 `modules/hrm/infrastructure/atlas/`（若采用 SQL 作为 src，可先放置 README/占位说明；若采用 HCL 作为 src，则包含 `schema.hcl`）。
    - [ ] 新增 `migrations/hrm/`（至少包含一条 baseline 迁移与 `atlas.sum`）。
    - [ ] 新增 `scripts/db/run_goose.sh`（按 5.2 约束实现）。
+   - [ ] 在 `tools.go` 锁定 atlas/goose CLI 依赖，并补齐 Make 安装入口（`make goose-install` 或 `make tools-install`）。
    - [ ] 新增 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`（按“时间-命令-预期-实际-结论/回滚”模板）。
 
 2. [ ] **修正 Makefile 与文档声明的漂移**
    - [ ] `make db plan`：与 `atlas.hcl` 的 env 定义对齐（决定是 `schema diff` 还是 `migrate diff --dry-run`，并确保 CI 有可连接 dev-db）。
+   - [ ] 明确并落实 Atlas dev-db 策略：`make db plan` 使用独立 `ATLAS_DEV_DB_NAME`，并确保该库存在（本地/CI 均可重复执行）。
    - [ ] `make db lint`：确保无需手工参数即可运行（通过 `atlas.hcl` 或显式 `--dir/--dev-url`）。
    - [ ] 修正 `README.MD` / `docs/CONTRIBUTING.MD` / `AGENTS.md` 中关于文件路径、迁移文件命名与命令等描述，避免宣称不存在的产物。
    - [ ] 同步更新 `docs/dev-records/hrm-sql-inventory.md` 的 “Atlas Schema File / Latest HRM Migration” 列，使其可点击且真实存在。
 
 3. [ ] **完善 CI 的 `hrm-atlas` 质量门禁闭环**
    - [ ] 确保 `lint-and-format` job 在 `hrm-atlas=true` 时能连接 Postgres 并成功运行 `make db plan`、`make db lint`。
+   - [ ] 在 CI 步骤中显式创建 Atlas dev-db（例如 `hrm_dev`），避免依赖默认数据库或隐式行为。
    - [ ] （可选但推荐）当 `hrm-atlas` 与 `hrm-sqlc` 同时命中时，增加步骤：运行 HRM goose 迁移、导出 HRM schema、执行 `make sqlc-generate`，并用 `git status --short` 兜底确保无遗留 diff。
 
 4. [ ] **Readiness 记录与回归验证**
    - [ ] 本地执行并记录（建议写入 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`）：
      - [ ] `make atlas-install`
+     - [ ] `make goose-install`（或等价入口）
      - [ ] `make db plan`
      - [ ] `make db lint`
      - [ ] `HRM_MIGRATIONS=1 make db migrate up` / `... down`（至少 1 步 smoke）
@@ -108,6 +134,8 @@ flowchart LR
 - CI：任意触发 `hrm-atlas` 的 PR，`lint-and-format` job 不因缺文件/缺脚本失败；`make db plan`、`make db lint` 可重复通过。
 - 本地：在干净 PG17 数据库上可按文档执行完整闭环：生成/应用 HRM 迁移 → 导出 schema → sqlc generate → `git status --short` 干净。
 - 文档：README/CONTRIBUTING/AGENTS/Inventory 中引用的所有路径都真实存在且命令可执行。
+- 工具链：atlas/goose 版本来源清晰且可重复安装；CI/开发者本地不依赖宿主机随机版本。
+- 既有环境：存在可审核的 baseline bootstrap 指引，不会因“表已存在”导致 HRM goose 接入卡死。
 
 ## 8. 回滚与降级策略 (Rollback)
 - 如补齐方案引入 CI 不稳定：优先把 `hrm-atlas` 过滤器临时收敛到“仅在存在 atlas/goose 资产后再启用”的最小集合（以避免误触发）。
