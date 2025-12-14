@@ -149,7 +149,8 @@
 - 运行时真实配置单一信息源：`/home/shangmeilin/Bugs-Blossoms-020/Makefile` 与 `/home/shangmeilin/Bugs-Blossoms-020/devhub.yml`（文档尽量引用，不复制细节）
 - 对外入口：`/home/shangmeilin/Bugs-Blossoms-020/README.MD`（只做摘要 + 链接）
 - Superadmin 专题：`/home/shangmeilin/Bugs-Blossoms-020/docs/SUPERADMIN.md`
-- 架构理论基线：`/home/shangmeilin/Bugs-Blossoms-020/docs/dev-records/R200r-Go语言ERP系统最佳实践.md`（需与 AGENTS 保持引用关系）
+- 架构活体指南（建议新增）：`/home/shangmeilin/Bugs-Blossoms-020/docs/ARCHITECTURE.md`（承载可持续维护的架构约定；被 AGENTS/CONTRIBUTING 引用）
+- 架构/规范历史快照（归档）：`/home/shangmeilin/Bugs-Blossoms-020/docs/Archived/`（用于保留决策快照类长文，不作为活体 SSOT）
 
 ### 5.2 AI 文档合并/撤销策略（择一落地）
 
@@ -214,7 +215,7 @@
 
 | 文件 | 决策点 | 建议执行 |
 | :--- | :--- | :--- |
-| `/home/shangmeilin/Bugs-Blossoms-020/docs/dev-records/R200r-Go语言ERP系统最佳实践.md` | 它是“历史记录”还是“活体参考”？两者不能兼得 | 二选一：若为历史记录，在文件头部声明“归档，不再更新”；若为活体参考，将活体部分拆到 `docs/ARCHITECTURE.md` 并保持可维护的篇幅 |
+| `/home/shangmeilin/Bugs-Blossoms-020/docs/dev-records/R200r-Go语言ERP系统最佳实践.md` | （已决策）该文件定位为“历史记录/决策快照”，不再作为活体参考 | 执行阶段直接拆分：将该文件头部标记为 `[Archived]`，并迁移到 `/home/shangmeilin/Bugs-Blossoms-020/docs/Archived/`；同时在 `docs/ARCHITECTURE.md`（新建）中沉淀需要长期维护的“活体”架构约定，并由 AGENTS 引用 |
 
 ### 5.7 变更触发器表（防漂移机制：改了什么必须同步哪里）
 
@@ -235,7 +236,7 @@
 1. **端口/地址不要写死**：除非是对外固定端口（例如示例域名），本地端口优先引用 `/home/shangmeilin/Bugs-Blossoms-020/devhub.yml` 或以环境变量 `PORT/ORIGIN` 表达。
 2. **命令优先引用 Makefile target**：文档写 `make check lint`，而不是复制其内部执行细节；减少改 Makefile 后需要同步多处文案。
 3. **runbook 与入口分离**：CONTRIBUTING 只放入口与矩阵，runbook 放到 `docs/runbooks/`，README 只索引。
-4. **“活体”与“归档”必须标注**：`docs/dev-records/` 下默认归档；若需要活体指南，应迁移到 `docs/guides/` 或 `docs/ARCHITECTURE.md` 并在文件头部标注“维护责任与更新频率”。
+4. **“活体”与“归档”必须标注**：归档类长文统一迁移到 `/home/shangmeilin/Bugs-Blossoms-020/docs/Archived/` 并在标题/文件头部标注 `[Archived]`；需要长期维护的活体指南统一放到 `docs/guides/` 或 `/home/shangmeilin/Bugs-Blossoms-020/docs/ARCHITECTURE.md` 并标注“维护责任与更新频率”。
 
 ### 5.9 `/home/shangmeilin/Bugs-Blossoms-020/AGENTS.md` 主干化（SSOT Trunk）方案
 
@@ -277,6 +278,7 @@
 阶段 2（P1：降低重复）
 - 对 `/home/shangmeilin/Bugs-Blossoms-020/AGENTS.md` 去重并明确“以 Makefile/devhub.yml 为准”。
 - 将 `/home/shangmeilin/Bugs-Blossoms-020/CLAUDE.md`、`/home/shangmeilin/Bugs-Blossoms-020/GEMINI.md` 的通用规则改为引用 AGENTS/CONTRIBUTING（保留差异化内容）。
+- 新增归档落点：创建 `/home/shangmeilin/Bugs-Blossoms-020/docs/Archived/`，并将 `/home/shangmeilin/Bugs-Blossoms-020/docs/dev-records/R200r-Go语言ERP系统最佳实践.md` 标记为 `[Archived]` 后迁移到该目录；在 `/home/shangmeilin/Bugs-Blossoms-020/docs/ARCHITECTURE.md` 沉淀活体架构约定。
 
 阶段 3（P2：README 信息架构优化）
 - 将 `/home/shangmeilin/Bugs-Blossoms-020/README.MD` 的 runbook 级内容迁移到 `docs/`，README 改为摘要 + 链接集合。
