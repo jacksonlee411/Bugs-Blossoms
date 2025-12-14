@@ -171,6 +171,7 @@
 - 专题手册（按主题拆分，避免 CONTRIBUTING 变成“大杂烩”）：
   - Runbook（可执行流程、应急/排障）：建议统一放在 `docs/runbooks/`（例如 Authz、HRM、Atlas/Goose、备份/迁移等）。
   - Guide（相对稳定的概念/约定）：建议统一放在 `docs/guides/`（例如代码结构、模块约定、文档写作规范入口等）。
+  - 静态资源（截图/图表）：建议统一放在 `docs/assets/`（按主题分子目录，避免散落在 `docs/` 根目录）。
 - AI/代理规则（“执法”文档）：`AGENTS.md`
   - 作为“必须遵循”的最小集合；其余文档引用它，而不复制它。
 
@@ -239,16 +240,27 @@
 4. **“活体”与“归档”必须标注**：归档类长文统一迁移到 `docs/Archived/` 并在标题/文件头部标注 `[Archived]`；需要长期维护的活体指南统一放到 `docs/guides/` 或 `docs/ARCHITECTURE.md` 并标注“维护责任与更新频率”。
 5. **新建文档门禁（New Doc Gate）**（防止文档熵增，约束增量）：
    - **放置门禁（Placement）**：禁止在仓库根目录新增 `.md`；根目录仅允许白名单文件：`README.MD`、`AGENTS.md`、`CLAUDE.md`、`GEMINI.md`（如后续撤销 Claude/Gemini，则同步收缩白名单）。
-   - **分类存放（Routing）**：新增文档必须落入 `docs/` 分区：
+   - **分类存放（Routing）**：新增仓库级文档默认落入 `docs/` 分区：
      - 流程/操作手册/排障/应急：`docs/runbooks/`
      - 概念/约定/架构指南（活体）：`docs/guides/` 或 `docs/ARCHITECTURE.md`
      - 计划/记录：`docs/dev-plans/` 或 `docs/dev-records/`（必须遵循 `docs/dev-plans/000-docs-format.md`）
      - 归档快照（非活体）：`docs/Archived/`（标题/文件头标注 `[Archived]`）
+     - 图片/图表/静态资源：`docs/assets/`（避免散落在 `docs/` 根目录或其他目录）
+   - **模块级文档豁免（Co-location Exception）**：允许在 `modules/{module}/` 下就近存放与该模块强关联的文档：
+     - 允许新增 `modules/{module}/README.md`
+     - 允许新增 `modules/{module}/docs/**`（用于模块内的说明、实现细节与图片等）
+     - 该豁免仅用于“模块内部细节”，不用于仓库级 runbook/规范/流程（仓库级文档仍归类到 `docs/`）
    - **命名门禁（Naming）**：对“新增文件”生效（不追溯历史文件）：
      - `docs/runbooks/`、`docs/guides/`、`docs/Archived/`：必须使用 `kebab-case.md`，禁止空格/驼峰。
+     - `docs/assets/`：目录与文件名建议使用 `kebab-case`（全小写，禁止空格/驼峰），并按主题分子目录（例如 `docs/assets/authz/`、`docs/assets/hrm/`）。
      - `docs/dev-plans/`、`docs/dev-records/`：遵循 `docs/dev-plans/000-docs-format.md` 的编号/命名约定（不强制 kebab-case，避免与现有编号体系冲突）。
    - **可发现性门禁（Discovery）**：任意新增文档必须在 `AGENTS.md` 的 Doc Map/专题入口新增链接，避免产生“孤儿文档”。
-   - **门禁落地（Enforcement）**：执行阶段建议新增 `make check docs`（仅在 `.md` 变更时触发），自动校验“路径/命名/是否被 AGENTS 链接”，并接入 CI 作为质量门禁的一部分。
+   - **门禁落地（Enforcement）**：执行阶段建议新增 `make check docs`（仅在 `.md` / `docs/assets/**` / `modules/**/README.md` / `modules/**/docs/**` 变更时触发），自动校验：
+     - 根目录新增 `.md` 是否违反白名单
+     - `docs/` 下新增文件是否符合“目录归类 + 命名规则”
+     - 新增文档是否被 `AGENTS.md` Doc Map/专题入口链接（仓库级文档）
+     - 图片是否落入 `docs/assets/`（仓库级文档）或 `modules/{module}/docs/`（模块级文档）
+     并接入 CI 作为质量门禁的一部分。
 
 ### 5.9 `AGENTS.md` 主干化（SSOT Trunk）方案
 
@@ -291,7 +303,7 @@
 - 对 `AGENTS.md` 去重并明确“以 Makefile/devhub.yml 为准”。
 - 将 `CLAUDE.md`、`GEMINI.md` 的通用规则改为引用 AGENTS/CONTRIBUTING（保留差异化内容）。
 - 新增归档落点：创建 `docs/Archived/`，并将 `docs/dev-records/R200r-Go语言ERP系统最佳实践.md` 标记为 `[Archived]` 后迁移到该目录；在 `docs/ARCHITECTURE.md` 沉淀活体架构约定。
-- 引入“新建文档门禁”：新增 `make check docs` 并接入 CI（仅 `.md` 变更触发），校验路径/命名/AGENTS 链接，确保新增文档不会破坏收敛结构。
+- 引入“新建文档门禁”：创建 `docs/assets/`（静态资源归口）；新增 `make check docs` 并接入 CI（按 `.md`、`docs/assets/**`、`modules/**/README.md`、`modules/**/docs/**` 变更触发），校验路径/命名/AGENTS 链接与模块级豁免，确保新增文档不会破坏收敛结构。
 
 阶段 3（P2：README 信息架构优化）
 - 将 `README.MD` 的 runbook 级内容迁移到 `docs/`，README 改为摘要 + 链接集合。
