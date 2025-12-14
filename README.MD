@@ -7,6 +7,7 @@
 - [Discord Community](https://discord.gg/zKeTEZAQqF): Join our community for support and Q&A
 - [Contribution Guide](docs/CONTRIBUTING.MD): Learn how to contribute to the project
 - [Developer Rules (SSOT)](AGENTS.md): Local checks, workflows, and doc gates
+- [Multi-worktree local Docker isolation](docs/dev-plans/011B-worktree-local-dev-docker-isolation.md): Avoid port/volume conflicts
 - [Setup Demo](https://github.com/iota-uz/sdk-demo): Learn how to setup IOTA-SDK
 - [Demo stand](https://demo.iotaerp.com): Explore the SDK UI
 - [Docker hub](https://hub.docker.com/r/iotauz/sdk) - Official Docker images
@@ -107,6 +108,70 @@ go install github.com/iota-uz/devhub/cmd/devhub@latest
 ```
 
 Learn more in the [DevHub documentation](https://github.com/iota-uz/devhub).
+
+---
+
+## 🧩 HRM sqlc 工作流
+
+`modules/hrm` 的 SQL 现已统一使用 sqlc 生成。修改 HRM 表结构或 SQL 时请遵循以下顺序：
+
+1. 维护迁移或 schema，并同步更新 `docs/dev-records/hrm-sql-inventory.md`（新增/调整查询都要登记）。
+2. 运行 `scripts/db/export_hrm_schema.sh` 导出最新 schema（可通过 `SKIP_MIGRATE=1` 跳过自动迁移）。
+3. 执行 `make sqlc-generate`（或 `make generate`，它会自动调用该目标）以重建 `modules/hrm/infrastructure/sqlc/**`。
+4. `git status --short` 确认没有遗漏的生成文件，再提交 PR。
+
+CI 中新增的 `hrm-sqlc` 过滤器会在涉及 HRM SQL / schema / sqlc.yaml 变更时强制执行上述流程，并拒绝包含未提交生成结果的 PR。
+
+---
+
+## 🧭 HRM Atlas + Goose 流水线
+
+HRM 使用 Atlas 做 plan/lint（质量门禁），使用 goose 执行迁移（`migrations/hrm/*.sql`，goose 格式）。基线产物：
+
+- Atlas 配置：根目录 `atlas.hcl`（从环境变量 `DB_URL` / `ATLAS_DEV_URL` 读取连接串）
+- Schema source：
+  - `modules/hrm/infrastructure/atlas/core_deps.sql`（HRM 外键依赖的最小 Core stub）
+  - `modules/hrm/infrastructure/persistence/schema/hrm-schema.sql`（HRM 目标结构）
+- 迁移目录：`migrations/hrm/*.sql`（goose 格式，文件名前缀为数字版本号）
+- 工作日志：`docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`
+
+推荐流程：
+
+1. **安装 Atlas CLI（一次性）**
+   ```bash
+   make atlas-install   # 从 GitHub 构建 atlas v0.38.0 并安装到 $(go env GOPATH)/bin
+   ```
+2. **安装 goose CLI（一次性）**
+   ```bash
+   make goose-install   # 安装 goose v3.26.0 到 $(go env GOPATH)/bin
+   ```
+3. **更新 schema 定义**：更新 HRM schema SQL（`modules/hrm/infrastructure/persistence/schema/hrm-schema.sql`），如涉及外键依赖同步更新 `modules/hrm/infrastructure/atlas/core_deps.sql`。
+3. **Dry-run 计划**：
+   ```bash
+   # 建议使用独立的 target/dev DB，避免与业务库/测试库互相污染
+   DB_NAME=iota_erp_hrm_atlas ATLAS_DEV_DB_NAME=hrm_dev make db plan
+   ```
+   该命令会连接 Postgres 并打印 SQL 计划（stdout），不写入磁盘。
+4. **应用迁移（goose）**：
+   ```bash
+   DB_NAME=iota_erp_hrm_atlas HRM_MIGRATIONS=1 make db migrate up
+   ```
+   当 `HRM_MIGRATIONS=1` 时，`Makefile` 会调用 `scripts/db/run_goose.sh`，使用 `postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}` 作为 DSN。  
+   - 回滚最近一次：`GOOSE_STEPS=1 make db migrate down HRM_MIGRATIONS=1`  
+   - redo：`GOOSE_STEPS=1 make db migrate redo HRM_MIGRATIONS=1`  
+   - 状态：`make db migrate status HRM_MIGRATIONS=1`
+5. **导出 schema & 重建 sqlc**：
+   ```bash
+   scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1
+   make sqlc-generate
+   ```
+6. **提交前检查**：
+   ```bash
+   DB_NAME=iota_erp_hrm_atlas ATLAS_DEV_DB_NAME=hrm_dev make db lint
+   ```
+   `make db lint` 会运行 `atlas migrate lint --env ci --git-base origin/main`，确保缺失迁移 / hash 漂移会被阻止。
+
+> 所有 Atlas/Goose 操作请在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md` 补充记录，方便后续审计和回溯。
 
 ---
 

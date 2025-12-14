@@ -71,6 +71,27 @@ Ensure these tools are installed before you begin:
    ```
    Windows: If `make` is unavailable, install via [GnuWin32](http://gnuwin32.sourceforge.net/packages/make.htm) or use [Git Bash](https://gitforwindows.org/)
 
+### 多 Worktree 本地开发（可选，但推荐）
+
+如果你在同一台机器上用 `git worktree` 同时维护多个工作目录，建议为每个 worktree 单独隔离 Docker Compose 的 project/端口/数据卷，避免出现：
+- Redis/Postgres 端口冲突（例如 `6379` 被占用导致 `docker compose up redis` 失败）
+- 不同 worktree 共享同一份 named volume 导致数据互相污染
+
+推荐做法（详见 `docs/dev-plans/011B-worktree-local-dev-docker-isolation.md`）：
+
+1. 在每个 worktree 生成/补齐 `.env.local`（不提交）：
+   ```bash
+   make dev-env
+   ```
+2. 启动 DB/Redis（按 `.env.local` 隔离端口与 project）：
+   ```bash
+   docker compose --env-file .env.local -f compose.dev.yml up -d db redis
+   ```
+3. 初始化数据库：
+   ```bash
+   make db migrate up && make db seed
+   ```
+
 4. **Run PostgreSQL**:
    ```bash
    make db local
@@ -140,14 +161,17 @@ Running the matching commands locally ensures your branch passes the `quality-ga
 
 ### HRM Atlas + Goose
 
-- HRM 表结构以 `modules/hrm/infrastructure/atlas/schema.hcl` 为唯一声明式来源，Atlas 配置位于仓库根目录 `atlas.hcl`。
-- 新迁移由 `atlas migrate diff --env dev --dir file://migrations/hrm --to file://modules/hrm/infrastructure/atlas/schema.hcl` 生成；Dry-run 可通过 `make db plan`（内部调用 `atlas migrate diff --dry-run`）。
-- 使用 `HRM_MIGRATIONS=1 make db migrate up` 触发 `scripts/db/run_goose.sh`，Goose 会对 `migrations/hrm/changes_<unix>.{up,down}.sql` 进行 apply/rollback。  
+- Atlas 配置位于仓库根目录 `atlas.hcl`，schema source 使用 SQL：
+  - `modules/hrm/infrastructure/atlas/core_deps.sql`（HRM 外键依赖的最小 Core stub）
+  - `modules/hrm/infrastructure/persistence/schema/hrm-schema.sql`（HRM 目标结构）
+- 迁移目录为 `migrations/hrm/*.sql`（goose 格式，文件名前缀为数字版本号）。
+- Dry-run 计划：建议使用独立的 target/dev DB，执行 `DB_NAME=iota_erp_hrm_atlas ATLAS_DEV_DB_NAME=hrm_dev make db plan`（输出 SQL plan，不写入磁盘）。
+- 使用 `HRM_MIGRATIONS=1 make db migrate up` 触发 `scripts/db/run_goose.sh`，Goose 会对 `migrations/hrm/*.sql` 执行 apply/rollback。  
   - 回滚：`GOOSE_STEPS=1 make db migrate down HRM_MIGRATIONS=1`  
   - redo：`GOOSE_STEPS=1 make db migrate redo HRM_MIGRATIONS=1`  
   - 状态：`make db migrate status HRM_MIGRATIONS=1`
 - 迁移执行完毕后必须运行 `scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1 && make sqlc-generate`，保持 schema/sqlc 与数据库一致。
-- `make db lint` 会执行 `atlas migrate lint --env ci --git-base origin/main`，CI 通过新的 `hrm-atlas` 过滤器强制该步骤；任何缺失的迁移或 `atlas.sum`/`schema.hcl` 漂移都会导致 PR 失败。
+- `make db lint` 会执行 `atlas migrate lint --env ci --git-base origin/main`（需要 `ATLAS_DEV_DB_NAME` 指向干净的隔离库），CI 通过 `hrm-atlas` 过滤器强制该步骤；任何缺失的迁移或 `atlas.sum` 漂移都会导致 PR 失败。
 - 所有 Atlas / Goose 演练请写入 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`，确保有可追踪的“命令 → 结果”记录。
 
 ## 🔐 Casbin 授权与策略草稿流程

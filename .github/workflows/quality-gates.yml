@@ -109,7 +109,7 @@ jobs:
       - name: Install pg_formatter for SQL formatting
         run: |
           sudo apt-get update
-          sudo apt-get install -y pgformatter
+          sudo apt-get install -y pgformatter postgresql-client
 
       - name: Download Go dependencies
         run: go mod download
@@ -117,6 +117,10 @@ jobs:
       - name: Install Atlas CLI
         if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
         run: make atlas-install
+
+      - name: Install goose CLI
+        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
+        run: make goose-install
 
       - name: Regenerate templ artifacts
         if: ${{ steps.changed-files.outputs.templ == 'true' }}
@@ -183,7 +187,15 @@ jobs:
 
       - name: Run HRM sqlc generate
         if: ${{ steps.changed-files.outputs.hrm-sqlc == 'true' }}
-        run: make sqlc-generate
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: iota_erp
+        run: |
+          scripts/db/export_hrm_schema.sh
+          make sqlc-generate
 
       - name: Ensure sqlc artifacts are committed
         if: ${{ steps.changed-files.outputs.hrm-sqlc == 'true' }}
@@ -234,8 +246,8 @@ jobs:
           DB_PORT: 5432
           DB_USER: postgres
           DB_PASSWORD: postgres
-          DB_NAME: iota_erp
-          HRM_MIGRATIONS: "1"
+          DB_NAME: iota_erp_hrm_atlas
+          ATLAS_DEV_DB_NAME: hrm_dev
         run: make db plan
 
       - name: Run HRM Atlas lint
@@ -245,8 +257,20 @@ jobs:
           DB_PORT: 5432
           DB_USER: postgres
           DB_PASSWORD: postgres
-          DB_NAME: iota_erp
+          DB_NAME: iota_erp_hrm_atlas
+          ATLAS_DEV_DB_NAME: hrm_dev
         run: make db lint
+
+      - name: Run HRM goose migrations (smoke)
+        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: iota_erp_hrm_atlas
+          HRM_MIGRATIONS: "1"
+        run: make db migrate up
 
       - name: Ensure atlas artifacts are committed
         if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
