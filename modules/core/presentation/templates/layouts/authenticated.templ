@@ -7,6 +7,7 @@ import (
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/dialog"
 	"github.com/iota-uz/iota-sdk/components/base/toast"
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/sidebar"
 	"github.com/iota-uz/iota-sdk/components/spotlight"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/mappers"
@@ -225,6 +226,7 @@ templ Authenticated(props AuthenticatedProps) {
 	}
 	@Base(&props.BaseProps) {
 		@toast.Container()
+		@authzcomponents.AuthzClient()
 		@MobileSidebar(sidebarProps)
 		<div
 			x-data="{

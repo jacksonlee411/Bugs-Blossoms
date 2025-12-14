@@ -57,5 +57,7 @@ type LogsPageProps struct {
 	ActiveTab      string
 	Authentication AuthenticationSection
 	Action         ActionSection
+	CanView        bool
+	CanRequest     bool
 	CanDebug       bool
 }

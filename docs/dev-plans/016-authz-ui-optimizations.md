@@ -221,3 +221,10 @@
 1. **业务页面体验对齐**：补齐 HRM/Logging 等业务页“部分授权”统一模式（禁用 + 申请入口 + 权限状态提示）（对齐 P0-6）。
 2. **403 契约回归**：补齐 HTMX/REST/非 HTMX 的 403 契约与 fallback 回归验证清单（对齐 P0-8/014D/015B4）。
 3. **语义深化（P1）**：继续推进 p/g 语义深化（例如更完整的 role->permission explainability/排障能力）（对齐 P1-1）。
+
+#### P0-8：403 契约与 fallback 回归验证清单（建议）
+- **REST(JSON)**：对任意受保护 endpoint，带 `Accept: application/json` 时返回 `403` 且 `Content-Type: application/json`；payload 至少包含 `error/object/action/subject/domain/missing_policies/suggest_diff/request_url/debug_url/base_revision/request_id`（其中 `base_revision/request_id` 允许为空但推荐透出）。
+- **HTMX(HTML)**：对页面类 endpoint，带 `Hx-Request: true` 且非 JSON Accept 时返回 `403`，并设置 `Hx-Retarget: body`、`Hx-Reswap: innerHTML`；body 渲染 `components/authorization/unauthorized.templ`（至少包含 `data-authz-container` 与 `data-request-url="/core/api/authz/requests"`）。
+- **非 HTMX(HTML)**：对页面类 endpoint，非 JSON Accept 时返回 `403` 并渲染 `unauthorized.templ`；若缺失 PageContext（极端 fallback），允许退化为 `http.Error` 的纯文本 `Forbidden:` 信息，但需确保不会 200/静默失败。
+- **Request ID/Revision**：设置 `X-Request-ID` 时，JSON payload 的 `request_id` 与 UI 展示应一致；`base_revision` 需与 `config/access/policy.csv.rev` 保持同步（过期时由 API 通过 `X-Authz-Base-Revision`/meta 提示刷新）。
+- **自动化覆盖建议**：至少覆盖 Core/HRM/Logging 三模块的 `ensure*Authz`（JSON/HTMX/HTML fallback）与关键 API（`/core/api/authz/requests` 的 `AUTHZ_INVALID_REQUEST`、`Hx-Trigger: showErrorToast/notify`）。

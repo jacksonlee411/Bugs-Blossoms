@@ -38,33 +38,54 @@ templ Index(props *viewmodels.LogsPageProps) {
 
 templ Content(props *viewmodels.LogsPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	{{ canView := pageCtx != nil && pageCtx.CanAuthz("logging.logs", "view") }}
-	if !canView {
-		@authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{
-			Object:        "logging.logs",
-			Action:        "view",
-			Operation:     "logging.logs view",
-			State:         pageCtx.AuthzState(),
-			Domain:        "logging",
-			RequestURL:    "/core/api/authz/requests",
-			ShowInspector: props.CanDebug,
-			CanDebug:      props.CanDebug,
-		})
-	} else {
-		<div class="m-6 space-y-4">
-			if props.CanDebug {
-				@authzcomponents.PolicyInspector(&authzcomponents.PolicyInspectorProps{
-					State:      pageCtx.AuthzState(),
-					Object:     "logging.logs",
-					Action:     "view",
-					Domain:     "logging",
-					RequestURL: "/core/api/authz/requests",
-					CanDebug:   props.CanDebug,
-				})
-			}
-			<div class="flex items-center justify-between">
-				<h1 class="text-2xl font-medium">{ pageCtx.T("NavigationLinks.Logs") }</h1>
+	{{ canView := props != nil && props.CanView }}
+	<div class="m-6 space-y-4">
+		if props.CanDebug {
+			@authzcomponents.PolicyInspector(&authzcomponents.PolicyInspectorProps{
+				State:      pageCtx.AuthzState(),
+				Object:     "logging.logs",
+				Action:     "view",
+				Domain:     "logging",
+				RequestURL: "/core/api/authz/requests",
+				CanDebug:   props.CanDebug,
+			})
+		}
+		<div class="flex items-center justify-between">
+			<h1 class="text-2xl font-medium">{ pageCtx.T("NavigationLinks.Logs") }</h1>
+		</div>
+		if !canView {
+			<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-900/30 px-3 py-2 text-sm text-amber-100">
+				<span>{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
+				<div class="flex flex-wrap items-center gap-2">
+					if props.CanRequest {
+						<form
+							class="flex items-center gap-2"
+							hx-post="/core/api/authz/requests"
+							hx-target="body"
+							hx-swap="none"
+							hx-on::after-request="window.handleAuthzRequest && window.handleAuthzRequest(event)"
+						>
+							<input type="hidden" name="object" value="logging.logs"/>
+							<input type="hidden" name="action" value="view"/>
+							<input type="hidden" name="domain" value="logging"/>
+							<input type="hidden" name="diff" value="[]"/>
+							<input type="hidden" name="request_access" value="1"/>
+							<input
+								type="hidden"
+								name="reason"
+								value={ pageCtx.T("Authz.Unauthorized.ReasonDefault", map[string]any{"Operation": pageCtx.T("NavigationLinks.Logs")}) }
+							/>
+							<button class="btn btn-xs btn-primary" type="submit">
+								{ pageCtx.T("Authz.Unauthorized.Apply") }
+							</button>
+						</form>
+					}
+				</div>
 			</div>
+		}
+		<div class={ templ.Classes(
+			templ.KV("opacity-60 pointer-events-none select-none", !canView),
+		) }>
 			<div class="bg-surface-600 border border-primary rounded-lg">
 				<div class="flex flex-wrap gap-2 p-4">
 					<button
@@ -93,7 +114,7 @@ templ Content(props *viewmodels.LogsPageProps) {
 				@TabContent(props)
 			</div>
 		</div>
-	}
+	</div>
 }
 
 templ TabContent(props *viewmodels.LogsPageProps) {
