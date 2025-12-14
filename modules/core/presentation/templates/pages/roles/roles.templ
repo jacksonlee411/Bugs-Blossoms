@@ -20,9 +20,9 @@ type IndexPageProps struct {
 templ RoleRow(role *viewmodels.Role) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{attrs := templ.Attributes{
-		"id":    fmt.Sprintf("role-%s", role.ID),
-		"class": "hide-on-load",
-	}
+	"id":    fmt.Sprintf("role-%s", role.ID),
+	"class": "hide-on-load",
+}
 	}}
 	{{ canView := pageCtx.CanAuthz("core.roles", "view") }}
 	{{ buttonAttrs := templ.Attributes{} }}
