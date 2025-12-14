@@ -4,6 +4,7 @@ import (
 	"fmt"
 	icons "github.com/iota-uz/icons/phosphor"
 	"github.com/iota-uz/iota-sdk/components/base/button"
+	"strings"
 )
 
 type Props struct {
@@ -17,6 +18,24 @@ type Props struct {
 }
 
 templ Confirmation(p *Props) {
+	{{
+		headingID := fmt.Sprintf("%s-heading", strings.TrimSpace(p.Action))
+		if strings.TrimSpace(p.Action) == "" {
+			headingID = "dialog-heading"
+		}
+		closeLabel := strings.TrimSpace(p.CancelText)
+		if closeLabel == "" {
+			closeLabel = "Close"
+		}
+		attrs := templ.Attributes{
+			"role":            "dialog",
+			"aria-modal":      "true",
+			"aria-labelledby": headingID,
+		}
+		for k, v := range p.Attrs {
+			attrs[k] = v
+		}
+	}}
 	<div
 		x-data="dialog"
 		{ templ.Attributes{fmt.Sprintf("@%s.window", p.Action): "toggle"}... }
@@ -24,12 +43,19 @@ templ Confirmation(p *Props) {
 		<dialog
 			class="dialog dialog-rounded dialog-btt shadow-lg mb-0 rounded-b-none md:mb-auto md:rounded-b-lg"
 			x-bind="dialog"
-			{ p.Attrs... }
+			{ attrs... }
 		>
 			<form method="dialog">
 				<header class="flex items-center gap-3 justify-between px-4 py-3 border-b border-primary">
-					<h3 class="font-medium">{ p.Heading }</h3>
-					@button.Secondary(button.Props{Size: button.SizeSM, Fixed: true, Rounded: true}) {
+					<h3 class="font-medium" id={ headingID }>{ p.Heading }</h3>
+					@button.Secondary(button.Props{
+						Size:    button.SizeSM,
+						Fixed:   true,
+						Rounded: true,
+						Attrs: templ.Attributes{
+							"aria-label": closeLabel,
+						},
+					}) {
 						@icons.XCircle(icons.Props{Size: "20"})
 					}
 				</header>

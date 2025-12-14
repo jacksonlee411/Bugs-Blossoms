@@ -80,12 +80,18 @@
     "Copied": "Copied!"
   },
   "Spotlight": {
+    "Open": "Open search",
     "Placeholder": "Search...",
     "NothingFound": "Nothing found",
     "Actions": {
       "AddUser": "Add user",
       "AddAccount": "Add account"
     }
+  },
+  "Theme": {
+    "System": "System theme",
+    "Light": "Light theme",
+    "Dark": "Dark theme"
   },
   "Status": "Status",
   "ErrorPages": {
@@ -536,6 +542,9 @@
       "AddRule": "Add rule",
       "SubmitDraft": "Submit Draft",
       "BulkRemove": "Bulk Remove",
+      "BulkRemoveConfirm": "Stage removal of {{.Count}} rules?",
+      "BulkRemoveUndo": "Undo",
+      "BulkRemoveUndoHint": "Staged removal of {{.Count}} rules.",
       "SelectAll": "Select all",
       "RoleHint": "Staging only affects the current role and domain; submitting clears it.",
       "SubmitHint": "Staged %d changes; submitting clears it.",
@@ -577,6 +586,7 @@
   "PerPage": "Per page",
   "PermissionSets": "Permissions",
   "Cancel": "Cancel",
+  "Close": "Close",
   "Back": "Back",
   "Add": "Add",
   "Remove": "Remove",

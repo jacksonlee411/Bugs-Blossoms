@@ -21,6 +21,8 @@ templ Spotlight() {
 	>
 		<button
 			@click="open()"
+			type="button"
+			aria-label={ intl.MustT(ctx, "Spotlight.Open") }
 			class="flex items-center justify-center w-9 h-9 rounded-full bg-surface-400 text-100 cursor-pointer"
 		>
 			@icons.MagnifyingGlass(icons.Props{

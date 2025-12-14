@@ -53,6 +53,7 @@ templ UserRow(user *viewmodels.User, rowProps *base.TableRowProps) {
 		editAttrs := templ.Attributes{
 			"class": "btn-fixed",
 		}
+		editAttrs["aria-label"] = pageCtx.T("Edit")
 		if !pageCtx.CanAuthz("core.users", "update") {
 			editAttrs["data-authz-disabled"] = "true"
 			editAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")

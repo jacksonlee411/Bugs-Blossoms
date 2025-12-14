@@ -11,6 +11,9 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"fmt"
 	twmerge "github.com/Oudwins/tailwind-merge-go"
+	"math"
+	"strconv"
+	"strings"
 )
 
 type Variant string
@@ -39,7 +42,53 @@ func computeHashColor(name string) string {
 	for i := 0; i < len(name); i++ {
 		hash = int(name[i]) + ((hash << 5) - hash)
 	}
-	return colors[hash%len(colors)]
+	idx := hash % len(colors)
+	if idx < 0 {
+		idx += len(colors)
+	}
+	return colors[idx]
+}
+
+func contrastTextColor(hex string) string {
+	r, g, b, ok := parseHexColor(hex)
+	if !ok {
+		return "#ffffff"
+	}
+
+	l := relativeLuminance(r, g, b)
+	contrastWhite := (1.0 + 0.05) / (l + 0.05)
+	contrastDark := (l + 0.05) / 0.05
+	if contrastDark > contrastWhite {
+		return "#131313"
+	}
+	return "#ffffff"
+}
+
+func parseHexColor(hex string) (r, g, b int, ok bool) {
+	s := strings.TrimSpace(strings.TrimPrefix(hex, "#"))
+	if len(s) != 6 {
+		return 0, 0, 0, false
+	}
+	val, err := strconv.ParseUint(s, 16, 24)
+	if err != nil {
+		return 0, 0, 0, false
+	}
+	return int((val >> 16) & 0xFF), int((val >> 8) & 0xFF), int(val & 0xFF), true
+}
+
+func relativeLuminance(r, g, b int) float64 {
+	toLinear := func(v int) float64 {
+		s := float64(v) / 255.0
+		if s <= 0.03928 {
+			return s / 12.92
+		}
+		return math.Pow((s+0.055)/1.055, 2.4)
+	}
+
+	rl := toLinear(r)
+	gl := toLinear(g)
+	bl := toLinear(b)
+	return 0.2126*rl + 0.7152*gl + 0.0722*bl
 }
 
 type Props struct {
@@ -70,10 +119,11 @@ func Avatar(props Props) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		bg := computeHashColor(props.Initials)
 		var templ_7745c5c3_Var2 = []any{
 			twmerge.Merge(
 				// TODO: sizes should be enums
-				"w-9 h-9 font-medium flex items-center justify-center cursor-pointer text-white",
+				"w-9 h-9 font-medium flex items-center justify-center cursor-pointer",
 				props.Class.String(),
 			),
 			templ.KV("rounded-full", props.Variant != Square),
@@ -101,9 +151,9 @@ func Avatar(props Props) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(templ.SafeCSS(fmt.Sprintf("background-color: %s", computeHashColor(props.Initials))))
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templruntime.SanitizeStyleAttributeValues(templ.SafeCSS(fmt.Sprintf("background-color: %s; color: %s", bg, contrastTextColor(bg))))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/avatar/avatar.templ`, Line: 55, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/avatar/avatar.templ`, Line: 105, Col: 98}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -132,7 +182,7 @@ func Avatar(props Props) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(props.ImageURL)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/avatar/avatar.templ`, Line: 59, Col: 24}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/avatar/avatar.templ`, Line: 109, Col: 24}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -159,7 +209,7 @@ func Avatar(props Props) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(props.Initials)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/avatar/avatar.templ`, Line: 70, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/avatar/avatar.templ`, Line: 120, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {

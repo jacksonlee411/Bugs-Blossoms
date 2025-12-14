@@ -80,12 +80,18 @@
     "Copied": "已复制"
   },
   "Spotlight": {
+    "Open": "打开搜索",
     "Placeholder": "搜索...",
     "NothingFound": "未找到任何内容",
     "Actions": {
       "AddUser": "添加用户",
       "AddAccount": "添加账户"
     }
+  },
+  "Theme": {
+    "System": "系统主题",
+    "Light": "浅色主题",
+    "Dark": "深色主题"
   },
   "Status": "状态",
   "ErrorPages": {
@@ -539,6 +545,9 @@
       "AddRule": "新增策略",
       "SubmitDraft": "提交草稿",
       "BulkRemove": "批量撤销",
+      "BulkRemoveConfirm": "确定要暂存撤销 {{.Count}} 条规则吗？",
+      "BulkRemoveUndo": "撤销本次操作",
+      "BulkRemoveUndoHint": "已暂存撤销 {{.Count}} 条规则。",
       "SelectAll": "全选",
       "RoleHint": "暂存仅作用于当前角色与域，提交后自动清空。",
       "SubmitHint": "已暂存 %d 条，提交草稿后清空",
@@ -580,6 +589,7 @@
   "PerPage": "每页",
   "PermissionSets": "权限",
   "Cancel": "取消",
+  "Close": "关闭",
   "Back": "返回",
   "Add": "添加",
   "Remove": "移除",

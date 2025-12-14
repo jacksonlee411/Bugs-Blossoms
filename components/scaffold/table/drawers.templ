@@ -50,6 +50,7 @@ type DetailAction struct {
 }
 
 templ DefaultDrawer(props DefaultDrawerProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	@dialog.Drawer(dialog.DrawerProps{
 		Direction: dialog.RTL,
 		Action:    "open-default-drawer",
@@ -68,7 +69,7 @@ templ DefaultDrawer(props DefaultDrawerProps) {
 							{ props.Title }
 						</h3>
 						<div>
-							<button class="cursor-pointer">
+							<button class="cursor-pointer" type="submit" aria-label={ pageCtx.T("Close") }>
 								@icons.XCircle(icons.Props{Size: "20"})
 							</button>
 						</div>

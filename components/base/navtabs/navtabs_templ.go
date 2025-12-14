@@ -232,9 +232,9 @@ func Button(value string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var13 string
-		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("getTabClasses('%s')", value))
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("{'text-slate-900': isActive('%s'), 'text-slate-200 hover:text-slate-100': !isActive('%s')}", value, value))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/navtabs/navtabs.templ`, Line: 53, Col: 58}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/base/navtabs/navtabs.templ`, Line: 53, Col: 136}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {

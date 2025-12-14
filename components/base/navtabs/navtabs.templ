@@ -50,7 +50,7 @@ templ Button(value string) {
 		x-bind:tabindex={ fmt.Sprintf("isActive('%s') ? '0' : '-1'", value) }
 		@click={ fmt.Sprintf("setActiveTab('%s')", value) }
 		class="relative z-10 py-2 px-3 text-sm font-medium rounded-xl transition-colors duration-200 flex-1 text-center !cursor-pointer"
-		x-bind:class={ fmt.Sprintf("getTabClasses('%s')", value) }
+		x-bind:class={ fmt.Sprintf("{'text-slate-900': isActive('%s'), 'text-slate-200 hover:text-slate-100': !isActive('%s')}", value, value) }
 	>
 		{ children... }
 	</button>

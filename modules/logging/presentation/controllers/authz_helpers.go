@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	corepermissions "github.com/iota-uz/iota-sdk/modules/core/permissions"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
@@ -126,10 +128,6 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 		return
 	}
 
-	if htmx.IsHxRequest(r) {
-		w.Header().Set("Hx-Retarget", "body")
-		w.Header().Set("Hx-Reswap", "innerHTML")
-	}
 	if _, ok := composables.TryUsePageCtx(r.Context()); ok {
 		canDebug := composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil
 		props := &authzcomponents.UnauthorizedProps{
@@ -147,10 +145,69 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 			CanDebug:      canDebug,
 		}
 		w.WriteHeader(http.StatusForbidden)
-		templ.Handler(authzcomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
+		if htmx.IsHxRequest(r) {
+			w.Header().Set("Hx-Retarget", "body")
+			w.Header().Set("Hx-Reswap", "innerHTML")
+			templ.Handler(authzcomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
+			return
+		}
+		templ.Handler(unauthorizedPage(props), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
 	http.Error(w, payload.Message, http.StatusForbidden)
+}
+
+func unauthorizedPage(props *authzcomponents.UnauthorizedProps) templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+		pageCtx := composables.UsePageCtx(ctx)
+		title := strings.TrimSpace(pageCtx.T("Authz.Unauthorized.Title"))
+		if title == "" {
+			title = "Unauthorized"
+		}
+
+		content := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
+			if _, err := io.WriteString(w, `<main class="mx-auto w-full max-w-5xl p-6">`); err != nil {
+				return err
+			}
+			if _, err := io.WriteString(w, `<h1 class="sr-only">`+templ.EscapeString(title)+`</h1>`); err != nil {
+				return err
+			}
+			if _, err := io.WriteString(w, `<div class="flex justify-center">`); err != nil {
+				return err
+			}
+			if err := authzcomponents.Unauthorized(props).Render(ctx, w); err != nil {
+				return err
+			}
+			if _, err := io.WriteString(w, `</div></main>`); err != nil {
+				return err
+			}
+			return nil
+		})
+
+		currentUser, err := composables.UseUser(ctx)
+		if err == nil && currentUser != nil {
+			if _, headErr := layouts.UseHead(ctx); headErr == nil {
+				if _, sidebarErr := layouts.UseSidebarProps(ctx); sidebarErr == nil {
+					layout := layouts.Authenticated(layouts.AuthenticatedProps{
+						BaseProps: layouts.BaseProps{
+							Title: title,
+						},
+					})
+					return layout.Render(templ.WithChildren(ctx, content), w)
+				}
+			}
+		}
+
+		if _, headErr := layouts.UseHead(ctx); headErr == nil {
+			base := layouts.Base(&layouts.BaseProps{
+				Title:        title,
+				WebsocketURL: "/ws",
+			})
+			return base.Render(templ.WithChildren(ctx, content), w)
+		}
+
+		return content.Render(ctx, w)
+	})
 }
 
 func tenantIDFromContext(r *http.Request) uuid.UUID {

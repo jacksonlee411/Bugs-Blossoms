@@ -80,12 +80,18 @@
     "Copied": "Nusxalandi"
   },
   "Spotlight": {
+    "Open": "Qidiruvni ochish",
     "Placeholder": "Qidirish...",
     "NothingFound": "Hech narsa topilmadi",
     "Actions": {
       "AddUser": "Foydalanuvchi qo'shish",
       "AddAccount": "Hisob qo'shish"
     }
+  },
+  "Theme": {
+    "System": "Tizim mavzusi",
+    "Light": "Yorug' mavzu",
+    "Dark": "Qorong'i mavzu"
   },
   "Status": "Holat",
   "ErrorPages": {
@@ -536,6 +542,9 @@
       "AddRule": "Qoida qo'shish",
       "SubmitDraft": "Qoralamani yuborish",
       "BulkRemove": "Ommaviy o'chirish",
+      "BulkRemoveConfirm": "{{.Count}} ta qoida o'chirilishini vaqtincha saqlaysizmi?",
+      "BulkRemoveUndo": "Bekor qilish",
+      "BulkRemoveUndoHint": "{{.Count}} ta qoida o'chirilishi vaqtincha saqlandi.",
       "SelectAll": "Hammasini belgilash",
       "RoleHint": "Loyiha faqat joriy rol va domen uchun amal qiladi; yuborilgach tozalanadi.",
       "SubmitHint": "Loyihada %d ta o‘zgarish; yuborilgach tozalanadi.",
@@ -577,6 +586,7 @@
   "PerPage": "Sahifada",
   "PermissionSets": "Ruxsatlar",
   "Cancel": "Bekor qilish",
+  "Close": "Yopish",
   "Back": "Orqaga",
   "Add": "Qo'shish",
   "Remove": "O'chirish",

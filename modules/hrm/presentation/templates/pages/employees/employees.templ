@@ -57,6 +57,9 @@ templ EmployeesTable(props *IndexPageProps) {
 								Size:  button.SizeSM,
 								Class: "btn-fixed",
 								Href:  fmt.Sprintf("/hrm/employees/%s", employee.ID),
+								Attrs: templ.Attributes{
+									"aria-label": pageCtx.T("Edit"),
+								},
 							}) {
 								@icons.PencilSimple(icons.Props{Size: "20"})
 							}

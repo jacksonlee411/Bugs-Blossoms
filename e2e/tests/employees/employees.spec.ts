@@ -39,8 +39,8 @@ test.describe('employees CRUD operations', () => {
 		if (response) {
 			expect([401, 403]).toContain(response.status());
 		}
-		await expect(page.getByText('Permission required', { exact: false })).toBeVisible();
-		const container = page.locator('[data-authz-container]');
+		await expect(page.getByRole('heading', { name: /Permission required/i, level: 2 })).toBeVisible();
+		const container = page.locator('section[data-authz-container]');
 		await expect(container).toBeVisible();
 		await expect(container).toHaveAttribute('data-domain', 'hrm');
 		await expect(container).toHaveAttribute('data-object', 'hrm.employees');

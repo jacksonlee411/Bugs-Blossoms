@@ -211,7 +211,7 @@ templ NewGroupDrawer() {
 							{ pageCtx.T("Groups.Meta.New.Title") }
 						</h3>
 						<div>
-							<button class="cursor-pointer">
+							<button class="cursor-pointer" type="submit" aria-label={ pageCtx.T("Close") }>
 								@icons.XCircle(icons.Props{Size: "20"})
 							</button>
 						</div>
@@ -248,7 +248,7 @@ templ EditGroupDrawer(props *EditFormProps) {
 							{ pageCtx.T("Groups.Meta.Edit.Title") }
 						</h3>
 						<div>
-							<button class="cursor-pointer">
+							<button class="cursor-pointer" type="submit" aria-label={ pageCtx.T("Close") }>
 								@icons.XCircle(icons.Props{Size: "20"})
 							</button>
 						</div>

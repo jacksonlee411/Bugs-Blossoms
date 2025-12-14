@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/iota-uz/iota-sdk/components/copy_button"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
@@ -34,220 +35,231 @@ templ RequestDetail(vm *viewmodels.AuthzRequestDetail) {
 	{{ _ = templ.URL("") }}
 	{{ statusKey := statusMessageKey(vm.Status) }}
 	{{ statusLabel := pageCtx.T(statusKey) }}
-	<main class="mx-auto max-w-5xl px-4 py-6 space-y-6">
-		<header class="flex items-start justify-between gap-4 flex-wrap">
-			<div class="space-y-2">
-				<h1 class="text-xl font-semibold text-surface-50">
-					{ pageCtx.T("Authz.RequestDetail.Title") }
-				</h1>
-				<div class="flex items-center gap-2 text-xs text-surface-200">
-					<span>{ pageCtx.T("Authz.Unauthorized.RequestID") }:</span>
-					<span class="font-mono text-surface-50" id="authz-request-id">{ vm.ID }</span>
-					@copy_button.CopyButton(copy_button.Props{
-						Text:     vm.ID,
-						Size:     "14",
-						Variant:  copy_button.VariantMinimal,
-						ShowText: false,
-					})
-				</div>
-				if vm.Reason != "" {
-					<p class="text-sm text-surface-200">
-						<span class="font-medium">{ pageCtx.T("Authz.Unauthorized.Reason") }:</span>
-						<span class="ml-1">{ vm.Reason }</span>
-					</p>
-				}
-			</div>
-			<div class="space-y-2 text-right text-xs text-surface-200">
-				<span class={ "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium", vm.StatusClass }>
-					{ statusLabel }
-				</span>
-				<div>
-					<span>{ pageCtx.T("CreatedAt") }:</span>
-					<span class="ml-1 font-mono text-surface-50">{ vm.CreatedAt }</span>
-				</div>
-				if vm.UpdatedAt != "" {
-					<div>
-						<span>{ pageCtx.T("UpdatedAt") }:</span>
-						<span class="ml-1 font-mono text-surface-50">{ vm.UpdatedAt }</span>
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{Title: pageCtx.T("Authz.RequestDetail.Title")},
+	}) {
+		<main class="mx-auto max-w-5xl px-4 py-6 space-y-6">
+			<header class="flex items-start justify-between gap-4 flex-wrap">
+				<div class="space-y-2">
+					<h1 class="text-xl font-semibold text-surface-50">
+						{ pageCtx.T("Authz.RequestDetail.Title") }
+					</h1>
+					<div class="flex items-center gap-2 text-xs text-surface-200">
+						<span>{ pageCtx.T("Authz.Unauthorized.RequestID") }:</span>
+						<span class="font-mono text-surface-50" id="authz-request-id">{ vm.ID }</span>
+						@copy_button.CopyButton(copy_button.Props{
+							Text:     vm.ID,
+							Size:     "14",
+							Variant:  copy_button.VariantMinimal,
+							ShowText: false,
+						})
 					</div>
-				}
-			</div>
-		</header>
-		<section class="grid gap-4 md:grid-cols-3">
-			<div class="space-y-2 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4 md:col-span-2">
-				<h2 class="text-sm font-semibold text-surface-50">
-					{ pageCtx.T("Authz.RequestDetail.DiffTitle") }
-				</h2>
-				if len(vm.Suggestions) > 0 {
-					<table class="mt-2 w-full table-auto border-collapse text-xs">
-						<thead class="border-b border-surface-400/60 text-left text-surface-200">
-							<tr>
-								<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Subject") }</th>
-								<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Domain") }</th>
-								<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Object") }</th>
-								<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Action") }</th>
-								<th class="py-1 font-medium">{ pageCtx.T("Authz.Effect") }</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y divide-surface-400/40">
-							for _, item := range vm.Suggestions {
-								<tr class="align-top">
-									<td class="py-1 pr-3 font-mono text-surface-100">{ item.Subject }</td>
-									<td class="py-1 pr-3 font-mono text-surface-100">{ item.Domain }</td>
-									<td class="py-1 pr-3 font-mono text-surface-100 break-all">{ item.Object }</td>
-									<td class="py-1 pr-3 font-mono text-surface-100">{ item.Action }</td>
-									<td class="py-1 font-mono text-surface-100">{ item.Effect }</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				} else if len(vm.Diff) > 0 {
-					<table class="mt-2 w-full table-auto border-collapse text-xs">
-						<thead class="border-b border-surface-400/60 text-left text-surface-200">
-							<tr>
-								<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.RequestDetail.Op") }</th>
-								<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.RequestDetail.Path") }</th>
-								<th class="py-1 font-medium">{ pageCtx.T("Authz.RequestDetail.Value") }</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y divide-surface-400/40">
-							for _, item := range vm.Diff {
-								<tr class="align-top">
-									<td class="py-1 pr-3 font-mono text-surface-100">{ strings.ToUpper(item.Op) }</td>
-									<td class="py-1 pr-3 font-mono text-surface-100">{ item.Path }</td>
-									<td class="py-1 text-surface-100 break-all">{ item.Text }</td>
-								</tr>
-							}
-						</tbody>
-					</table>
-				} else {
-					<p class="text-xs text-surface-200">
-						{ pageCtx.T("Authz.RequestDetail.NoDiff") }
-					</p>
-				}
-			</div>
-			<div class="space-y-3 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4">
-				<h2 class="text-sm font-semibold text-surface-50">
-					{ pageCtx.T("Authz.RequestDetail.SummaryTitle") }
-				</h2>
-				<dl class="space-y-1 text-xs text-surface-200">
-					if vm.Object != "" {
-						<div class="flex justify-between gap-2">
-							<dt class="font-medium">{ pageCtx.T("Authz.Object") }</dt>
-							<dd class="font-mono text-surface-50">{ vm.Object }</dd>
-						</div>
-					}
-					if vm.Action != "" {
-						<div class="flex justify-between gap-2">
-							<dt class="font-medium">{ pageCtx.T("Authz.Action") }</dt>
-							<dd class="font-mono text-surface-50">{ vm.Action }</dd>
-						</div>
-					}
-					if vm.Domain != "" {
-						<div class="flex justify-between gap-2">
-							<dt class="font-medium">{ pageCtx.T("Authz.Domain") }</dt>
-							<dd class="font-mono text-surface-50">{ vm.Domain }</dd>
-						</div>
-					}
-					if vm.Requester != "" {
-						<div class="flex justify-between gap-2">
-							<dt class="font-medium">{ pageCtx.T("Authz.Subject") }</dt>
-							<dd class="font-mono text-surface-50">{ vm.Requester }</dd>
-						</div>
-					}
-				</dl>
-				if vm.PRLink != "" {
-					<a
-						href={ templ.URL(vm.PRLink) }
-						target="_blank"
-						rel="noreferrer"
-						class="inline-flex items-center text-xs font-medium text-primary hover:underline"
-					>
-						{ pageCtx.T("Authz.RequestDetail.ViewPR") }
-					</a>
-				}
-				<div class="flex flex-wrap gap-2 pt-2">
-					if vm.CanReview && strings.ToLower(strings.TrimSpace(vm.Status)) == "pending_review" {
-						<form
-							hx-post={ "/core/api/authz/requests/" + vm.ID + "/approve" }
-							hx-target="body"
-							hx-swap="none"
-							hx-on::after-request="if (event.detail.successful) window.location.reload();"
-						>
-							<button type="submit" class="rounded-md bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700">
-								{ pageCtx.T("Authz.RequestDetail.Approve") }
-							</button>
-						</form>
-						<form
-							hx-post={ "/core/api/authz/requests/" + vm.ID + "/reject" }
-							hx-target="body"
-							hx-swap="none"
-							hx-on::after-request="if (event.detail.successful) window.location.reload();"
-						>
-							<button type="submit" class="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700">
-								{ pageCtx.T("Authz.RequestDetail.Reject") }
-							</button>
-						</form>
-					}
-					{{ statusValue := strings.ToLower(strings.TrimSpace(vm.Status)) }}
-					if vm.CanCancel && (statusValue == "draft" || statusValue == "pending_review" || statusValue == "approved") {
-						<form
-							hx-post={ "/core/api/authz/requests/" + vm.ID + "/cancel" }
-							hx-target="body"
-							hx-swap="none"
-							hx-on::after-request="if (event.detail.successful) window.location.reload();"
-						>
-							<button type="submit" class="rounded-md border border-surface-300/70 bg-transparent px-3 py-1 text-xs font-semibold text-surface-50 hover:bg-surface-500/60">
-								{ pageCtx.T("Authz.RequestDetail.Cancel") }
-							</button>
-						</form>
-					}
-					if vm.CanRetryBot && statusValue == "failed" && strings.TrimSpace(vm.RetryToken) != "" {
-						<form
-							hx-post={ "/core/api/authz/requests/" + vm.ID + "/trigger-bot" }
-							hx-target="body"
-							hx-swap="none"
-							hx-on::after-request="if (event.detail.successful) window.location.reload();"
-						>
-							<input type="hidden" name="retry_token" value={ vm.RetryToken }/>
-							<button type="submit" class="rounded-md border border-amber-400/70 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200 hover:bg-amber-500/20">
-								{ pageCtx.T("Authz.Unauthorized.RetryBot") }
-							</button>
-						</form>
-					}
-					if vm.CanRevert {
-						<form
-							hx-post={ "/core/api/authz/requests/" + vm.ID + "/revert" }
-							hx-target="body"
-							hx-swap="none"
-							hx-on::after-request="if (event.detail.successful) window.location.reload();"
-						>
-							<button type="submit" class="rounded-md border border-surface-300/70 bg-transparent px-3 py-1 text-xs font-semibold text-surface-50 hover:bg-surface-500/60">
-								{ pageCtx.T("Authz.RequestDetail.Revert") }
-							</button>
-						</form>
+					if vm.Reason != "" {
+						<p class="text-sm text-surface-200">
+							<span class="font-medium">{ pageCtx.T("Authz.Unauthorized.Reason") }:</span>
+							<span class="ml-1">{ vm.Reason }</span>
+						</p>
 					}
 				</div>
-			</div>
-		</section>
-		<section class="space-y-2 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4">
-			<div class="flex items-center justify-between gap-2">
-				<h2 class="text-sm font-semibold text-surface-50">
-					{ pageCtx.T("Authz.RequestDetail.RawDiffTitle") }
-				</h2>
-				<span class="text-xs text-surface-200">
-					{ pageCtx.T("Authz.RequestDetail.RawDiffFormat") }
-				</span>
-			</div>
-			<pre class="max-h-80 overflow-auto rounded-md bg-surface-900/80 p-3 text-xs text-surface-100"><code>{ vm.DiffJSON }</code></pre>
-		</section>
-		if vm.BotLog != "" {
-			<section class="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/60 p-4">
-				<h2 class="text-sm font-semibold text-amber-100">
-					{ pageCtx.T("Authz.RequestDetail.BotLogTitle") }
-				</h2>
-				<pre class="max-h-60 overflow-auto whitespace-pre-wrap break-words text-xs text-amber-50">{ vm.BotLog }</pre>
+				<div class="space-y-2 text-right text-xs text-surface-200">
+					<span class={ "inline-flex items-center justify-center rounded-full px-3 py-1 text-xs font-medium", vm.StatusClass }>
+						{ statusLabel }
+					</span>
+					<div>
+						<span>{ pageCtx.T("CreatedAt") }:</span>
+						<span class="ml-1 font-mono text-surface-50">{ vm.CreatedAt }</span>
+					</div>
+					if vm.UpdatedAt != "" {
+						<div>
+							<span>{ pageCtx.T("UpdatedAt") }:</span>
+							<span class="ml-1 font-mono text-surface-50">{ vm.UpdatedAt }</span>
+						</div>
+					}
+				</div>
+			</header>
+			<section class="grid gap-4 md:grid-cols-3">
+				<div class="space-y-2 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4 md:col-span-2">
+					<h2 class="text-sm font-semibold text-surface-50">
+						{ pageCtx.T("Authz.RequestDetail.DiffTitle") }
+					</h2>
+					if len(vm.Suggestions) > 0 {
+						<table class="mt-2 w-full table-auto border-collapse text-xs">
+							<thead class="border-b border-surface-400/60 text-left text-surface-200">
+								<tr>
+									<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Subject") }</th>
+									<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Domain") }</th>
+									<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Object") }</th>
+									<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.Action") }</th>
+									<th class="py-1 font-medium">{ pageCtx.T("Authz.Effect") }</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-surface-400/40">
+								for _, item := range vm.Suggestions {
+									<tr class="align-top">
+										<td class="py-1 pr-3 font-mono text-surface-100">{ item.Subject }</td>
+										<td class="py-1 pr-3 font-mono text-surface-100">{ item.Domain }</td>
+										<td class="py-1 pr-3 font-mono text-surface-100 break-all">{ item.Object }</td>
+										<td class="py-1 pr-3 font-mono text-surface-100">{ item.Action }</td>
+										{{ effectLabel := item.Effect }}
+										{{if strings.EqualFold(effectLabel, "allow") {
+	effectLabel = pageCtx.T("Authz.EffectAllow")
+} else if strings.EqualFold(effectLabel, "deny") {
+	effectLabel = pageCtx.T("Authz.EffectDeny")
+}
+										}}
+										<td class="py-1 font-mono text-surface-100">{ effectLabel }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					} else if len(vm.Diff) > 0 {
+						<table class="mt-2 w-full table-auto border-collapse text-xs">
+							<thead class="border-b border-surface-400/60 text-left text-surface-200">
+								<tr>
+									<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.RequestDetail.Op") }</th>
+									<th class="py-1 pr-3 font-medium">{ pageCtx.T("Authz.RequestDetail.Path") }</th>
+									<th class="py-1 font-medium">{ pageCtx.T("Authz.RequestDetail.Value") }</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-surface-400/40">
+								for _, item := range vm.Diff {
+									<tr class="align-top">
+										<td class="py-1 pr-3 font-mono text-surface-100">{ strings.ToUpper(item.Op) }</td>
+										<td class="py-1 pr-3 font-mono text-surface-100">{ item.Path }</td>
+										<td class="py-1 text-surface-100 break-all">{ item.Text }</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					} else {
+						<p class="text-xs text-surface-200">
+							{ pageCtx.T("Authz.RequestDetail.NoDiff") }
+						</p>
+					}
+				</div>
+				<div class="space-y-3 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4">
+					<h2 class="text-sm font-semibold text-surface-50">
+						{ pageCtx.T("Authz.RequestDetail.SummaryTitle") }
+					</h2>
+					<dl class="space-y-1 text-xs text-surface-200">
+						if vm.Object != "" {
+							<div class="flex justify-between gap-2">
+								<dt class="font-medium">{ pageCtx.T("Authz.Object") }</dt>
+								<dd class="font-mono text-surface-50">{ vm.Object }</dd>
+							</div>
+						}
+						if vm.Action != "" {
+							<div class="flex justify-between gap-2">
+								<dt class="font-medium">{ pageCtx.T("Authz.Action") }</dt>
+								<dd class="font-mono text-surface-50">{ vm.Action }</dd>
+							</div>
+						}
+						if vm.Domain != "" {
+							<div class="flex justify-between gap-2">
+								<dt class="font-medium">{ pageCtx.T("Authz.Domain") }</dt>
+								<dd class="font-mono text-surface-50">{ vm.Domain }</dd>
+							</div>
+						}
+						if vm.Requester != "" {
+							<div class="flex justify-between gap-2">
+								<dt class="font-medium">{ pageCtx.T("Authz.Subject") }</dt>
+								<dd class="font-mono text-surface-50">{ vm.Requester }</dd>
+							</div>
+						}
+					</dl>
+					if vm.PRLink != "" {
+						<a
+							href={ templ.URL(vm.PRLink) }
+							target="_blank"
+							rel="noreferrer"
+							class="inline-flex items-center text-xs font-medium text-primary hover:underline"
+						>
+							{ pageCtx.T("Authz.RequestDetail.ViewPR") }
+						</a>
+					}
+					<div class="flex flex-wrap gap-2 pt-2">
+						if vm.CanReview && strings.ToLower(strings.TrimSpace(vm.Status)) == "pending_review" {
+							<form
+								hx-post={ "/core/api/authz/requests/" + vm.ID + "/approve" }
+								hx-target="body"
+								hx-swap="none"
+								hx-on::after-request="if (event.detail.successful) window.location.reload();"
+							>
+								<button type="submit" class="rounded-md bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700">
+									{ pageCtx.T("Authz.RequestDetail.Approve") }
+								</button>
+							</form>
+							<form
+								hx-post={ "/core/api/authz/requests/" + vm.ID + "/reject" }
+								hx-target="body"
+								hx-swap="none"
+								hx-on::after-request="if (event.detail.successful) window.location.reload();"
+							>
+								<button type="submit" class="rounded-md bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700">
+									{ pageCtx.T("Authz.RequestDetail.Reject") }
+								</button>
+							</form>
+						}
+						{{ statusValue := strings.ToLower(strings.TrimSpace(vm.Status)) }}
+						if vm.CanCancel && (statusValue == "draft" || statusValue == "pending_review" || statusValue == "approved") {
+							<form
+								hx-post={ "/core/api/authz/requests/" + vm.ID + "/cancel" }
+								hx-target="body"
+								hx-swap="none"
+								hx-on::after-request="if (event.detail.successful) window.location.reload();"
+							>
+								<button type="submit" class="rounded-md border border-surface-300/70 bg-transparent px-3 py-1 text-xs font-semibold text-surface-50 hover:bg-surface-500/60">
+									{ pageCtx.T("Authz.RequestDetail.Cancel") }
+								</button>
+							</form>
+						}
+						if vm.CanRetryBot && statusValue == "failed" && strings.TrimSpace(vm.RetryToken) != "" {
+							<form
+								hx-post={ "/core/api/authz/requests/" + vm.ID + "/trigger-bot" }
+								hx-target="body"
+								hx-swap="none"
+								hx-on::after-request="if (event.detail.successful) window.location.reload();"
+							>
+								<input type="hidden" name="retry_token" value={ vm.RetryToken }/>
+								<button type="submit" class="rounded-md border border-amber-400/70 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200 hover:bg-amber-500/20">
+									{ pageCtx.T("Authz.Unauthorized.RetryBot") }
+								</button>
+							</form>
+						}
+						if vm.CanRevert {
+							<form
+								hx-post={ "/core/api/authz/requests/" + vm.ID + "/revert" }
+								hx-target="body"
+								hx-swap="none"
+								hx-on::after-request="if (event.detail.successful) window.location.reload();"
+							>
+								<button type="submit" class="rounded-md border border-surface-300/70 bg-transparent px-3 py-1 text-xs font-semibold text-surface-50 hover:bg-surface-500/60">
+									{ pageCtx.T("Authz.RequestDetail.Revert") }
+								</button>
+							</form>
+						}
+					</div>
+				</div>
 			</section>
-		}
-	</main>
+			<section class="space-y-2 rounded-lg border border-surface-400/60 bg-surface-600/60 p-4">
+				<div class="flex items-center justify-between gap-2">
+					<h2 class="text-sm font-semibold text-surface-50">
+						{ pageCtx.T("Authz.RequestDetail.RawDiffTitle") }
+					</h2>
+					<span class="text-xs text-surface-200">
+						{ pageCtx.T("Authz.RequestDetail.RawDiffFormat") }
+					</span>
+				</div>
+				<pre class="max-h-80 overflow-auto rounded-md bg-surface-900/80 p-3 text-xs text-surface-100"><code>{ vm.DiffJSON }</code></pre>
+			</section>
+			if vm.BotLog != "" {
+				<section class="space-y-2 rounded-lg border border-amber-500/60 bg-amber-950/60 p-4">
+					<h2 class="text-sm font-semibold text-amber-100">
+						{ pageCtx.T("Authz.RequestDetail.BotLogTitle") }
+					</h2>
+					<pre class="max-h-60 overflow-auto whitespace-pre-wrap break-words text-xs text-amber-50">{ vm.BotLog }</pre>
+				</section>
+			}
+		</main>
+	}
 }

@@ -77,6 +77,19 @@ func base(props Props) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+
+		attrs := templ.Attributes{}
+		for k, v := range props.Attrs {
+			attrs[k] = v
+		}
+		if props.Disabled && props.Href != "" {
+			if _, ok := attrs["aria-disabled"]; !ok {
+				attrs["aria-disabled"] = "true"
+			}
+			if _, ok := attrs["tabindex"]; !ok {
+				attrs["tabindex"] = "-1"
+			}
+		}
 		if len(props.Href) > 0 {
 			var templ_7745c5c3_Var2 = []any{"shrink-0 btn",
 				variants[props.variant],
@@ -117,7 +130,7 @@ func base(props Props) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, props.Attrs)
+			templ_7745c5c3_Err = templ.RenderAttributes(ctx, templ_7745c5c3_Buffer, attrs)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -150,7 +150,7 @@ func (p *DetailsDropdownProps) render() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</ul></details><details class=\"hidden peer-open:block\" name=\"details-dropdown\"><summary class=\"fixed w-full h-full left-0 top-0\"></summary></details></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</ul></details><details class=\"hidden peer-open:block\" name=\"details-dropdown\"><summary aria-label=\"Close dropdown\" title=\"Close dropdown\" class=\"fixed w-full h-full left-0 top-0\"></summary></details></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -431,20 +431,24 @@ func (c *RolesController) buildPolicyMatrixProps(
 	if canRequest {
 		canStage = composables.CanUser(ctx, permissions.RoleUpdate) == nil
 	}
+	opts := buildAuthzSelectorOptions(entries)
 	matrixEntries, total := mergePolicyMatrixEntries(entries, stagedEntries, params)
 	return &roles.PolicyMatrixProps{
-		RoleID:     fmt.Sprintf("%d", roleEntity.ID()),
-		Entries:    matrixEntries,
-		Total:      total,
-		Page:       params.Page,
-		Limit:      params.Limit,
-		Subject:    params.Subject,
-		Domain:     params.Domain,
-		Type:       params.Type,
-		Search:     params.Search,
-		CanDebug:   true,
-		CanStage:   canStage,
-		CanRequest: canRequest,
+		RoleID:        fmt.Sprintf("%d", roleEntity.ID()),
+		Entries:       matrixEntries,
+		Total:         total,
+		Page:          params.Page,
+		Limit:         params.Limit,
+		ObjectOptions: opts.Objects,
+		ActionOptions: opts.Actions,
+		RoleOptions:   opts.Roles,
+		Subject:       params.Subject,
+		Domain:        params.Domain,
+		Type:          params.Type,
+		Search:        params.Search,
+		CanDebug:      true,
+		CanStage:      canStage,
+		CanRequest:    canRequest,
 		StageTotal: func() int {
 			if stagedEntries == nil {
 				return 0

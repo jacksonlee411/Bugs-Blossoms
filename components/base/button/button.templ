@@ -49,6 +49,20 @@ type Props struct {
 }
 
 templ base(props Props) {
+	{{
+		attrs := templ.Attributes{}
+		for k, v := range props.Attrs {
+			attrs[k] = v
+		}
+		if props.Disabled && props.Href != "" {
+			if _, ok := attrs["aria-disabled"]; !ok {
+				attrs["aria-disabled"] = "true"
+			}
+			if _, ok := attrs["tabindex"]; !ok {
+				attrs["tabindex"] = "-1"
+			}
+		}
+	}}
 	if len(props.Href) > 0 {
 		<a
 			href={ templ.SafeURL(props.Href) }
@@ -61,7 +75,7 @@ templ base(props Props) {
 			templ.KV("btn-loading", props.Loading),
 			templ.KV("btn-disabled", props.Disabled),
 			props.Class }
-			{ props.Attrs... }
+			{ attrs... }
 		>
 			if props.Icon != nil {
 				@props.Icon

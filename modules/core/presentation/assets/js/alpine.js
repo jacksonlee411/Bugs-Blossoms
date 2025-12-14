@@ -106,7 +106,11 @@ async function animationsComplete(el) {
 
 let dialog = (initialState) => ({
   open: initialState || false,
+  lastActive: null,
   toggle() {
+    if (!this.open) {
+      this.lastActive = document.activeElement;
+    }
     this.open = !this.open;
   },
   attrsObserver: new MutationObserver((mutations) => {
@@ -151,10 +155,20 @@ let dialog = (initialState) => ({
     await animationsComplete(dialog);
     dialog.dispatchEvent(dialogEvents.closed);
     this.open = false;
+    const el = this.lastActive;
+    this.lastActive = null;
+    if (el && typeof el.focus === "function" && document.contains(el)) {
+      el.focus();
+    }
   },
   dialog: {
     ["x-effect"]() {
-      if (this.open) this.$el.showModal();
+      if (this.open) {
+        if (!this.lastActive) {
+          this.lastActive = document.activeElement;
+        }
+        this.$el.showModal();
+      }
     },
     async ["x-init"]() {
       this.attrsObserver.observe(this.$el, {
@@ -567,7 +581,7 @@ let navTabs = (defaultValue = '') => ({
   getTabClasses(tabValue) {
     return this.isActive(tabValue)
       ? 'text-slate-900'
-      : 'text-gray-500 hover:text-slate-300';
+      : 'text-slate-200 hover:text-slate-100';
   }
 })
 

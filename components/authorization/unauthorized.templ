@@ -75,7 +75,14 @@ templ requestForm(props RequestFormProps) {
 								<td class="py-1 pr-3 font-mono">{ item.Domain }</td>
 								<td class="py-1 pr-3 font-mono break-all">{ item.Object }</td>
 								<td class="py-1 pr-3 font-mono">{ item.Action }</td>
-								<td class="py-1 font-mono">{ item.Effect }</td>
+								{{ effectLabel := item.Effect }}
+								{{if strings.EqualFold(effectLabel, "allow") {
+	effectLabel = pageCtx.T("Authz.EffectAllow")
+} else if strings.EqualFold(effectLabel, "deny") {
+	effectLabel = pageCtx.T("Authz.EffectDeny")
+}
+								}}
+								<td class="py-1 font-mono">{ effectLabel }</td>
 							</tr>
 						}
 					</tbody>
@@ -104,7 +111,7 @@ templ requestForm(props RequestFormProps) {
 				id="authz-reason"
 				name="reason"
 				type="text"
-				class="w-full rounded-md border border-surface-400/60 bg-surface-500/40 p-2 text-sm text-white"
+				class="w-full rounded-md border border-surface-400/60 bg-surface-500/40 p-2 text-sm text-100"
 				value={ props.Reason }
 				required
 			/>
@@ -112,7 +119,7 @@ templ requestForm(props RequestFormProps) {
 		<div class="flex flex-wrap items-center gap-3">
 			<button
 				type="submit"
-				class="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+				class="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-100 hover:bg-primary/90"
 			>
 				{ submitLabel }
 			</button>
@@ -190,7 +197,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 	>
 		<div class="flex items-start justify-between gap-3">
 			<div class="space-y-2">
-				<h2 class="text-lg font-semibold text-white">
+				<h2 class="text-lg font-semibold text-100">
 					{ pageCtx.T("Authz.Unauthorized.Title") }
 				</h2>
 				<p class="text-sm text-surface-100">
@@ -248,7 +255,7 @@ templ Unauthorized(props *UnauthorizedProps) {
 		<div class="space-y-2 text-xs text-surface-100" data-authz-status-block>
 			<div class="flex items-center gap-2 flex-wrap">
 				<span>{ pageCtx.T("Status") }:</span>
-				<span class="font-semibold text-white" data-authz-status>{ pageCtx.T("Unknown") }</span>
+				<span class="font-semibold text-100" data-authz-status>{ pageCtx.T("Unknown") }</span>
 				<span class="text-surface-200" data-authz-sla>{ pageCtx.T("Authz.SLA.Unknown") }</span>
 			</div>
 			<div class="flex items-center gap-3 flex-wrap">

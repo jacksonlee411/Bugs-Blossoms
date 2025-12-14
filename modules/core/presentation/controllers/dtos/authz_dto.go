@@ -104,8 +104,9 @@ type StagedPolicyEntry struct {
 
 // StagePolicyResponse returns the current staged entries.
 type StagePolicyResponse struct {
-	Data  []StagedPolicyEntry `json:"data"`
-	Total int                 `json:"total"`
+	Data       []StagedPolicyEntry `json:"data"`
+	Total      int                 `json:"total"`
+	CreatedIDs []string            `json:"created_ids,omitempty"`
 }
 
 // DebugResponse provides a detailed Authz.Debug output.

@@ -55,6 +55,9 @@ type UserPolicyColumnProps struct {
 	Type          string
 	Search        string
 	DomainFilter  string
+	ObjectOptions []string
+	ActionOptions []string
+	RoleOptions   []string
 	CanDebug      bool
 	CanStage      bool
 	BaseURL       string
@@ -244,11 +247,11 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 	</div>
 	@userPolicyBoardScriptOnce.Once() {
 		<script>
-			function statusLabel(status, container) {
-				const labels = {
-					pending_review: container?.dataset?.statusPendingReview,
-					approved: container?.dataset?.statusApproved,
-					merged: container?.dataset?.statusMerged,
+				function statusLabel(status, container) {
+					const labels = {
+						pending_review: container?.dataset?.statusPendingReview,
+						approved: container?.dataset?.statusApproved,
+						merged: container?.dataset?.statusMerged,
 					failed: container?.dataset?.statusFailed,
 					rejected: container?.dataset?.statusRejected,
 					canceled: container?.dataset?.statusCanceled,
@@ -390,45 +393,134 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 				};
 			}
 
-			function userPolicyColumnState() {
-				return {
-					selected: [],
-					toggleAll(event) {
-						const checked = event.target.checked;
-						this.selected = [];
-						this.$el.querySelectorAll('input[data-entry]').forEach((input) => {
-							if (input.disabled) return;
-							input.checked = checked;
-							if (checked) {
-								this.selected.push(input.value);
-							}
-						});
-					},
-					bulkRemove() {
-						const inputs = Array.from(this.$el.querySelectorAll('input[data-entry]:checked'));
-						if (!inputs.length) return;
-						const payload = inputs.map((input) => ({
-							type: input.dataset.type,
-							subject: input.dataset.subject,
-							domain: input.dataset.domain,
-							object: input.dataset.object,
-							action: input.dataset.action,
-							effect: input.dataset.effect,
-							stage_kind: "remove",
-						}));
-						this.selected = [];
-						if (typeof htmx !== "undefined") {
-							htmx.ajax("POST", "/core/api/authz/policies/stage", {
-								headers: { "Content-Type": "application/json" },
-								target: "body",
-								swap: "none",
-								body: JSON.stringify(payload),
-							});
+				function userPolicyColumnState() {
+					const bulkUndoKey = "__authzBulkUndo";
+
+					function bulkUndoStore() {
+						if (!window[bulkUndoKey]) {
+							window[bulkUndoKey] = {};
 						}
-					},
-				};
-			}
-		</script>
+						return window[bulkUndoKey];
+					}
+
+					return {
+						selected: [],
+						undo: null,
+						initUndo() {
+							const id = this.$el?.id;
+							if (!id) return;
+							const store = bulkUndoStore();
+							const saved = store[id];
+							if (!saved) return;
+							const maxAgeMs = 2 * 60 * 1000;
+							if (saved.ts && Date.now() - saved.ts > maxAgeMs) {
+								delete store[id];
+								return;
+							}
+							this.undo = saved;
+						},
+						undoText() {
+							const count = this.undo?.count || (this.undo?.ids?.length || 0);
+							const template = this.$el?.dataset?.bulkRemoveUndoHint || "";
+							return template.replace("__COUNT__", String(count));
+						},
+						toggleAll(event) {
+							const checked = event.target.checked;
+							this.selected = [];
+							this.$el.querySelectorAll('input[data-entry]').forEach((input) => {
+								if (input.disabled) return;
+								input.checked = checked;
+								if (checked) {
+									this.selected.push(input.value);
+								}
+							});
+						},
+						async bulkRemove() {
+							const inputs = Array.from(this.$el.querySelectorAll('input[data-entry]:checked'));
+							if (!inputs.length) return;
+							const confirmTemplate = this.$el?.dataset?.bulkRemoveConfirm || "";
+							const confirmText = confirmTemplate.replace("__COUNT__", String(inputs.length));
+							if (confirmText && !confirm(confirmText)) {
+								return;
+							}
+							const payload = inputs.map((input) => ({
+								type: input.dataset.type,
+								subject: input.dataset.subject,
+								domain: input.dataset.domain,
+								object: input.dataset.object,
+								action: input.dataset.action,
+								effect: input.dataset.effect,
+								stage_kind: "remove",
+							}));
+							let resp;
+							let data;
+							try {
+								resp = await fetch("/core/api/authz/policies/stage", {
+									method: "POST",
+									headers: { "Content-Type": "application/json", "HX-Request": "true" },
+									body: JSON.stringify(payload),
+								});
+								if (!resp.ok) return;
+								data = await resp.json();
+							} catch (_) {
+								return;
+							}
+
+							this.selected = [];
+							const createdIDs = data?.created_ids || data?.createdIds || [];
+							if (Array.isArray(createdIDs) && createdIDs.length > 0) {
+								const store = bulkUndoStore();
+								const id = this.$el?.id;
+								const undo = { ids: createdIDs, count: inputs.length, ts: Date.now() };
+								this.undo = undo;
+								if (id) {
+									store[id] = undo;
+								}
+							}
+
+							const total = data?.total ?? data?.Total ?? 0;
+							if (typeof htmx !== "undefined") {
+								htmx.trigger(document.body, "policies:staged", { total });
+							} else {
+								document.body.dispatchEvent(new CustomEvent("policies:staged", { detail: { total } }));
+							}
+						},
+						async undoBulkRemove() {
+							const ids = this.undo?.ids || [];
+							if (!Array.isArray(ids) || ids.length === 0) return;
+
+							let resp;
+							let data;
+							try {
+								resp = await fetch("/core/api/authz/policies/stage", {
+									method: "DELETE",
+									headers: { "Content-Type": "application/json", "HX-Request": "true" },
+									body: JSON.stringify({ ids }),
+								});
+								if (!resp.ok) return;
+								data = await resp.json();
+							} catch (_) {
+								return;
+							}
+
+							const store = bulkUndoStore();
+							const id = this.$el?.id;
+							if (id) {
+								delete store[id];
+							}
+							this.undo = null;
+							this.selected = [];
+
+							const total = data?.total ?? data?.Total ?? 0;
+							if (typeof htmx !== "undefined") {
+								htmx.trigger(document.body, "policies:staged", { total });
+							} else {
+								document.body.dispatchEvent(new CustomEvent("policies:staged", { detail: { total } }));
+							}
+						},
+					};
+				}
+			</script>
 	}
 }
 
@@ -523,7 +615,14 @@ templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 							<span class="font-mono">{ entry.Action }</span>
 						}
 						@base.TableCell(base.TableCellProps{}) {
-							<span class="font-mono">{ entry.Effect }</span>
+							{{ effectLabel := entry.Effect }}
+							{{if strings.EqualFold(effectLabel, "allow") {
+	effectLabel = pageCtx.T("Authz.EffectAllow")
+} else if strings.EqualFold(effectLabel, "deny") {
+	effectLabel = pageCtx.T("Authz.EffectDeny")
+}
+							}}
+							<span class="font-mono">{ effectLabel }</span>
 						}
 						@base.TableCell(base.TableCellProps{}) {
 							<div class="flex flex-wrap gap-2 items-center">
@@ -595,6 +694,9 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 	{{ refreshURL := fmt.Sprintf("%s&page=%d&limit=%d&domain=%s&q=%s", baseURL, props.Page, props.Limit, url.QueryEscape(props.DomainFilter), url.QueryEscape(props.Search)) }}
 	{{ pages := totalPages(props.Total, props.Limit) }}
 	{{ columnID := fmt.Sprintf("user-policy-%s", props.Column) }}
+	{{ objectListID := fmt.Sprintf("authz-policy-object-options-%s", props.Column) }}
+	{{ actionListID := fmt.Sprintf("authz-policy-action-options-%s", props.Column) }}
+	{{ roleListID := fmt.Sprintf("authz-policy-role-options-%s", props.Column) }}
 	{{ formDomain := props.Domain }}
 	if formDomain == "" {
 		{{ formDomain = props.DomainFilter }}
@@ -610,6 +712,9 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 		hx-target={ fmt.Sprintf("#%s", columnID) }
 		hx-swap="outerHTML"
 		x-data="userPolicyColumnState()"
+		x-init="initUndo()"
+		data-bulk-remove-confirm={ pageCtx.T("Authz.Stage.BulkRemoveConfirm", map[string]any{"Count": "__COUNT__"}) }
+		data-bulk-remove-undo-hint={ pageCtx.T("Authz.Stage.BulkRemoveUndoHint", map[string]any{"Count": "__COUNT__"}) }
 	>
 		<div class="flex items-center justify-between gap-3">
 			<div class="flex items-center gap-2">
@@ -658,6 +763,17 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 					</button>
 				}
 			</div>
+		</div>
+		<div
+			x-show="undo && undo.ids && undo.ids.length"
+			class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-900/30 px-3 py-2 text-xs text-amber-100"
+			role="status"
+			aria-live="polite"
+		>
+			<span x-text="undoText()"></span>
+			<button class="btn btn-xs" type="button" @click="undoBulkRemove()">
+				{ pageCtx.T("Authz.Stage.BulkRemoveUndo") }
+			</button>
 		</div>
 		<form
 			class="flex flex-wrap gap-2 items-center text-sm"
@@ -729,8 +845,6 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 								<option value="deny">{ pageCtx.T("Authz.EffectDeny") }</option>
 							</select>
 						</div>
-					} else {
-						<input type="hidden" name="effect" value="allow"/>
 					}
 				</div>
 				if props.Type == "g" {
@@ -740,9 +854,9 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 						Attrs: templ.Attributes{
 							"name":     "object",
 							"required": "true",
+							"list":     roleListID,
 						},
 					})
-					<input type="hidden" name="action" value="*"/>
 				} else {
 					@input.Text(&input.Props{
 						Label:       pageCtx.T("Authz.Object"),
@@ -750,6 +864,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 						Attrs: templ.Attributes{
 							"name":     "object",
 							"required": "true",
+							"list":     objectListID,
 						},
 					})
 					@input.Text(&input.Props{
@@ -758,9 +873,25 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 						Attrs: templ.Attributes{
 							"name":     "action",
 							"required": "true",
+							"list":     actionListID,
 						},
 					})
 				}
+				<datalist id={ objectListID }>
+					for _, option := range props.ObjectOptions {
+						<option value={ option }></option>
+					}
+				</datalist>
+				<datalist id={ actionListID }>
+					for _, option := range props.ActionOptions {
+						<option value={ option }></option>
+					}
+				</datalist>
+				<datalist id={ roleListID }>
+					for _, option := range props.RoleOptions {
+						<option value={ option }></option>
+					}
+				</datalist>
 				<div class="flex justify-end gap-2">
 					@button.Secondary(button.Props{
 						Size: button.SizeSM,
@@ -890,7 +1021,14 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 							}
 							@base.TableCell(base.TableCellProps{}) {
 								<div class="flex items-center gap-2">
-									<span>{ entry.Effect }</span>
+									{{ effectLabel := entry.Effect }}
+									{{if strings.EqualFold(effectLabel, "allow") {
+	effectLabel = pageCtx.T("Authz.EffectAllow")
+} else if strings.EqualFold(effectLabel, "deny") {
+	effectLabel = pageCtx.T("Authz.EffectDeny")
+}
+									}}
+									<span>{ effectLabel }</span>
 									if entry.Staged {
 										{{ badgeClass := "text-[11px] px-2 py-0.5 rounded-full border bg-green-700 text-white border-green-500" }}
 										if entry.StageKind == "remove" {

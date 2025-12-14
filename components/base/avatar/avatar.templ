@@ -3,6 +3,9 @@ package avatar
 import (
 	"fmt"
 	twmerge "github.com/Oudwins/tailwind-merge-go"
+	"math"
+	"strconv"
+	"strings"
 )
 
 type Variant string
@@ -31,7 +34,53 @@ func computeHashColor(name string) string {
 	for i := 0; i < len(name); i++ {
 		hash = int(name[i]) + ((hash << 5) - hash)
 	}
-	return colors[hash%len(colors)]
+	idx := hash % len(colors)
+	if idx < 0 {
+		idx += len(colors)
+	}
+	return colors[idx]
+}
+
+func contrastTextColor(hex string) string {
+	r, g, b, ok := parseHexColor(hex)
+	if !ok {
+		return "#ffffff"
+	}
+
+	l := relativeLuminance(r, g, b)
+	contrastWhite := (1.0 + 0.05) / (l + 0.05)
+	contrastDark := (l + 0.05) / 0.05
+	if contrastDark > contrastWhite {
+		return "#131313"
+	}
+	return "#ffffff"
+}
+
+func parseHexColor(hex string) (r, g, b int, ok bool) {
+	s := strings.TrimSpace(strings.TrimPrefix(hex, "#"))
+	if len(s) != 6 {
+		return 0, 0, 0, false
+	}
+	val, err := strconv.ParseUint(s, 16, 24)
+	if err != nil {
+		return 0, 0, 0, false
+	}
+	return int((val >> 16) & 0xFF), int((val >> 8) & 0xFF), int(val & 0xFF), true
+}
+
+func relativeLuminance(r, g, b int) float64 {
+	toLinear := func(v int) float64 {
+		s := float64(v) / 255.0
+		if s <= 0.03928 {
+			return s / 12.92
+		}
+		return math.Pow((s+0.055)/1.055, 2.4)
+	}
+
+	rl := toLinear(r)
+	gl := toLinear(g)
+	bl := toLinear(b)
+	return 0.2126*rl + 0.7152*gl + 0.0722*bl
 }
 
 type Props struct {
@@ -42,17 +91,18 @@ type Props struct {
 }
 
 templ Avatar(props Props) {
+	{{ bg := computeHashColor(props.Initials) }}
 	<div
 		class={
 			twmerge.Merge(
 				// TODO: sizes should be enums
-				"w-9 h-9 font-medium flex items-center justify-center cursor-pointer text-white",
+				"w-9 h-9 font-medium flex items-center justify-center cursor-pointer",
 				props.Class.String(),
 			),
 			templ.KV("rounded-full", props.Variant != Square),
 			templ.KV("rounded-lg", props.Variant == Square),
 		}
-		style={ templ.SafeCSS(fmt.Sprintf("background-color: %s", computeHashColor(props.Initials))) }
+		style={ templ.SafeCSS(fmt.Sprintf("background-color: %s; color: %s", bg, contrastTextColor(bg))) }
 	>
 		if props.ImageURL != "" {
 			<img

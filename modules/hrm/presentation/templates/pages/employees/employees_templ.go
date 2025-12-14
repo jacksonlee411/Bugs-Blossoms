@@ -234,6 +234,9 @@ func EmployeesTable(props *IndexPageProps) templ.Component {
 									Size:  button.SizeSM,
 									Class: "btn-fixed",
 									Href:  fmt.Sprintf("/hrm/employees/%s", employee.ID),
+									Attrs: templ.Attributes{
+										"aria-label": pageCtx.T("Edit"),
+									},
 								}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
 								if templ_7745c5c3_Err != nil {
 									return templ_7745c5c3_Err
@@ -299,7 +302,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("NavigationLinks.Employees"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 75, Col: 43}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 78, Col: 43}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -406,7 +409,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Employees.List.New"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 136, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 139, Col: 39}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -440,7 +443,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ReasonDefault", map[string]any{"Operation": pageCtx.T("Employees.List.New")}))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 154, Col: 124}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 157, Col: 124}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
@@ -453,7 +456,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 				var templ_7745c5c3_Var20 string
 				templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.Apply"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 157, Col: 48}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 160, Col: 48}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 				if templ_7745c5c3_Err != nil {
@@ -466,7 +469,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ApplyHint"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 159, Col: 92}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 162, Col: 92}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -484,7 +487,7 @@ func EmployeesContent(props *IndexPageProps) templ.Component {
 				var templ_7745c5c3_Var22 string
 				templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ApplyHint"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 162, Col: 91}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/hrm/presentation/templates/pages/employees/employees.templ`, Line: 165, Col: 91}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 				if templ_7745c5c3_Err != nil {
