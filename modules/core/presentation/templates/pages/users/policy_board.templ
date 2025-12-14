@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	icons "github.com/iota-uz/icons/phosphor"
-	"github.com/iota-uz/iota-sdk/components/copy_button"
 	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/dialog"
 	"github.com/iota-uz/iota-sdk/components/base/input"
 	"github.com/iota-uz/iota-sdk/components/base/tab"
+	"github.com/iota-uz/iota-sdk/components/copy_button"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
@@ -342,10 +342,18 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 				DefaultValue: "effective",
 			}) {
 				@tab.List(tab.ListProps{}) {
-					@tab.Button("effective") { { pageCtx.T("Users.Permissions.Effective") } }
-					@tab.Button("direct") { { pageCtx.T("Users.Permissions.Direct") } }
-					@tab.Button("overrides") { { pageCtx.T("Users.Permissions.Overrides") } }
-					@tab.Button("inherited") { { pageCtx.T("Users.Permissions.Inherited") } }
+					@tab.Button("effective") {
+						{ pageCtx.T("Users.Permissions.Effective") }
+					}
+					@tab.Button("direct") {
+						{ pageCtx.T("Users.Permissions.Direct") }
+					}
+					@tab.Button("overrides") {
+						{ pageCtx.T("Users.Permissions.Overrides") }
+					}
+					@tab.Button("inherited") {
+						{ pageCtx.T("Users.Permissions.Inherited") }
+					}
 				}
 				<div class="mt-4 space-y-4">
 					<div x-show="selectedTab === 'effective'">
@@ -713,15 +721,15 @@ templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 						@base.TableCell(base.TableCellProps{}) {
 							{ entry.Domain }
 						}
-					@base.TableCell(base.TableCellProps{}) {
-						<span class="font-mono break-all">{ entry.Object }</span>
-					}
-					@base.TableCell(base.TableCellProps{}) {
-						<span class="font-mono break-all">{ entry.Action }</span>
-					}
-					@base.TableCell(base.TableCellProps{}) {
-						{{ effectLabel := entry.Effect }}
-						{{if strings.EqualFold(effectLabel, "allow") {
+						@base.TableCell(base.TableCellProps{}) {
+							<span class="font-mono break-all">{ entry.Object }</span>
+						}
+						@base.TableCell(base.TableCellProps{}) {
+							<span class="font-mono break-all">{ entry.Action }</span>
+						}
+						@base.TableCell(base.TableCellProps{}) {
+							{{ effectLabel := entry.Effect }}
+							{{if strings.EqualFold(effectLabel, "allow") {
 	effectLabel = pageCtx.T("Authz.EffectAllow")
 } else if strings.EqualFold(effectLabel, "deny") {
 	effectLabel = pageCtx.T("Authz.EffectDeny")

@@ -191,49 +191,49 @@ templ EditForm(props *EditFormProps) {
 				class="h-20 shadow-t-lg border-t w-full flex items-center justify-end px-8 bg-surface-300 border-t-primary mt-auto gap-4"
 				x-show="selectedTab === 'userinfo'"
 			>
-			<form
-				id="delete-form"
-				hx-delete={ fmt.Sprintf("/users/%s", props.User.ID) }
-				hx-trigger="submit"
-				hx-target="closest .content"
-				hx-swap="innerHTML"
-				hx-indicator="#delete-user-btn"
-				hx-disabled-elt="find button"
-			>
-				if !props.CanDelete {
-					@button.Danger(button.Props{
-						Disabled: true,
-						Size:     button.SizeMD,
-						Attrs:    deleteAttrs,
-					}) {
-						{ pageCtx.T("Delete") }
+				<form
+					id="delete-form"
+					hx-delete={ fmt.Sprintf("/users/%s", props.User.ID) }
+					hx-trigger="submit"
+					hx-target="closest .content"
+					hx-swap="innerHTML"
+					hx-indicator="#delete-user-btn"
+					hx-disabled-elt="find button"
+				>
+					if !props.CanDelete {
+						@button.Danger(button.Props{
+							Disabled: true,
+							Size:     button.SizeMD,
+							Attrs:    deleteAttrs,
+						}) {
+							{ pageCtx.T("Delete") }
+						}
+					} else {
+						@button.Danger(button.Props{
+							Disabled: !canDelete,
+							Size:     button.SizeMD,
+							Attrs:    deleteAttrs,
+						}) {
+							{ pageCtx.T("Delete") }
+						}
 					}
-				} else {
-					@button.Danger(button.Props{
-						Disabled: !canDelete,
+				</form>
+				<form
+					id="save-form"
+					method="post"
+					hx-post={ fmt.Sprintf("/users/%s", props.User.ID) }
+					hx-indicator="#save-btn"
+					hx-target="#edit-content"
+					hx-swap="outerHTML"
+				>
+					@button.Primary(button.Props{
+						Disabled: !props.User.CanUpdate || !canUpdate,
 						Size:     button.SizeMD,
-						Attrs:    deleteAttrs,
+						Attrs:    saveAttrs,
 					}) {
-						{ pageCtx.T("Delete") }
+						{ pageCtx.T("Save") }
 					}
-				}
-			</form>
-			<form
-				id="save-form"
-				method="post"
-				hx-post={ fmt.Sprintf("/users/%s", props.User.ID) }
-				hx-indicator="#save-btn"
-				hx-target="#edit-content"
-				hx-swap="outerHTML"
-			>
-				@button.Primary(button.Props{
-					Disabled: !props.User.CanUpdate || !canUpdate,
-					Size:     button.SizeMD,
-					Attrs:    saveAttrs,
-				}) {
-					{ pageCtx.T("Save") }
-				}
-			</form>
+				</form>
 			</div>
 		}
 		if !canUpdate {
