@@ -95,6 +95,14 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 		recordForbiddenCapability(state, r, logsAuthzObject, "view", authzutil.CapabilityKey(logsAuthzObject, "view"))
 	}
 
+	if !canView {
+		accept := strings.ToLower(r.Header.Get("Accept"))
+		if strings.Contains(accept, "application/json") || htmx.IsHxRequest(r) {
+			writeForbiddenResponse(w, r, logsAuthzObject, "view")
+			return
+		}
+	}
+
 	var err error
 	if canView {
 		switch tab {

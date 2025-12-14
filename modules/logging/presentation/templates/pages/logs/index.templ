@@ -83,9 +83,11 @@ templ Content(props *viewmodels.LogsPageProps) {
 				</div>
 			</div>
 		}
-		<div class={ templ.Classes(
+		<div
+			class={ templ.Classes(
 			templ.KV("opacity-60 pointer-events-none select-none", !canView),
-		) }>
+		) }
+		>
 			<div class="bg-surface-600 border border-primary rounded-lg">
 				<div class="flex flex-wrap gap-2 p-4">
 					<button
