@@ -1,6 +1,7 @@
 # DEV-RECORD-001：文档一致性审计与收敛方案（Docs Audit & Consolidation）
 
-更新时间：2025-12-14  
+**状态**: 草拟中（2025-12-14 06:36 UTC）
+
 范围：仅针对文档信息一致性与维护成本；不涉及代码/配置改动。
 
 ## 1. 背景与目标
@@ -290,23 +291,28 @@
 - `docs/CONTRIBUTING.MD`：只保留贡献者上手与 CI 对齐矩阵；涉及规则时引用 AGENTS。
 - `README.MD`：只做对外索引与链接（包含 AGENTS/CONTRIBUTING/SUPERADMIN/runbooks）。
 
-## 6. 分阶段落地步骤（建议）
+## 6. 实施步骤（Milestones）
 
-阶段 0（P0：先把 SSOT 主干打牢，后续迁移才不会回潮）
-- 重排并主干化 `AGENTS.md`：补齐“事实源索引/触发器矩阵/文档地图/维护政策”，并完成内部去重与冻结政策范围说明。
+1. [ ] 阶段 0（P0）：SSOT 主干先行（避免回潮）
+   - [ ] 重排并主干化 `AGENTS.md`：补齐“事实源索引/触发器矩阵/文档地图/维护政策”，并完成内部去重与冻结政策范围说明。
 
-阶段 1（必须，优先级 P0：修复误导信息）
-- 修复 `docs/CONTRIBUTING.MD` 的 Web app 端口（8080 → 3200）。
-- 修复 `docs/SUPERADMIN.md` 的本地运行方式与默认端口说明（明确 `make superadmin dev` 与默认 4000；区分开发/构建）。
+2. [ ] 阶段 1（P0）：修复误导信息（降低上手成本）
+   - [ ] 修复 `docs/CONTRIBUTING.MD` 的 Web app 端口（8080 → 3200）。
+   - [ ] 修复 `docs/SUPERADMIN.md` 的本地运行方式与默认端口说明（明确 `make superadmin dev` 与默认 4000；区分开发/构建）。
 
-阶段 2（P1：降低重复）
-- 对 `AGENTS.md` 去重并明确“以 Makefile/devhub.yml 为准”。
-- 将 `CLAUDE.md`、`GEMINI.md` 的通用规则改为引用 AGENTS/CONTRIBUTING（保留差异化内容）。
-- 新增归档落点：创建 `docs/Archived/`，并将 `docs/dev-records/R200r-Go语言ERP系统最佳实践.md` 标记为 `[Archived]` 后迁移到该目录；在 `docs/ARCHITECTURE.md` 沉淀活体架构约定。
-- 引入“新建文档门禁”：创建 `docs/assets/`（静态资源归口）；新增 `make check docs` 并接入 CI（按 `.md`、`docs/assets/**`、`modules/**/README.md`、`modules/**/docs/**` 变更触发），校验路径/命名/AGENTS 链接与模块级豁免，确保新增文档不会破坏收敛结构。
+3. [ ] 阶段 2（P1）：降低重复（减少维护面）
+   - [ ] 对 `AGENTS.md` 去重并明确“以 `Makefile`/`devhub.yml` 为准”。
+   - [ ] 将 `CLAUDE.md`、`GEMINI.md` 的通用规则改为引用 `AGENTS.md`/`docs/CONTRIBUTING.MD`（保留差异化内容）。
+   - [ ] R200r 归档拆分：
+     - [X] 创建 `docs/Archived/` 与 `docs/Archived/README.md`（已完成）
+     - [ ] 将 `docs/dev-records/R200r-Go语言ERP系统最佳实践.md` 标记为 `[Archived]` 并迁移到 `docs/Archived/`
+     - [ ] 新建 `docs/ARCHITECTURE.md` 并沉淀可长期维护的活体架构约定（由 `AGENTS.md` 引用）
+   - [ ] 引入“新建文档门禁”：
+     - [ ] 创建 `docs/assets/`（仓库级文档静态资源归口）
+     - [ ] 新增 `make check docs` 并接入 CI（按 `.md`、`docs/assets/**`、`modules/**/README.md`、`modules/**/docs/**` 变更触发），校验路径/命名/`AGENTS.md` 链接与模块级豁免
 
-阶段 3（P2：README 信息架构优化）
-- 将 `README.MD` 的 runbook 级内容迁移到 `docs/`，README 改为摘要 + 链接集合。
+4. [ ] 阶段 3（P2）：README 信息架构优化（README 变索引）
+   - [ ] 将 `README.MD` 的 runbook 级内容迁移到 `docs/`，README 改为摘要 + 链接集合。
 
 ## 7. 验收标准（Definition of Done）
 
