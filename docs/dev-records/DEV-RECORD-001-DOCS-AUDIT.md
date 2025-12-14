@@ -1,4 +1,4 @@
-# DEV-PLAN-016：文档一致性审计与收敛方案（Docs Audit & Consolidation）
+# DEV-RECORD-001：文档一致性审计与收敛方案（Docs Audit & Consolidation）
 
 更新时间：2025-12-14  
 范围：仅针对文档信息一致性与维护成本；不涉及代码/配置改动。
@@ -165,4 +165,3 @@
 - `/home/shangmeilin/Bugs-Blossoms-020/docs/SUPERADMIN.md` 明确区分：本地开发入口（Makefile）与构建/部署入口（Dockerfile/二进制）。
 - `/home/shangmeilin/Bugs-Blossoms-020/AGENTS.md` 不再存在重复段落，且对冻结政策的适用范围有清晰说明。
 - `/home/shangmeilin/Bugs-Blossoms-020/README.MD` 不再承载大量 runbook 细节，改为稳定入口与索引。
-
