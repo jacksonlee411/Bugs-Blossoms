@@ -10,6 +10,8 @@ import (
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/components/base/dialog"
 	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/components/base/tab"
+	"github.com/iota-uz/iota-sdk/components/copy_button"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
@@ -19,6 +21,30 @@ import (
 
 func displayRoleName(value string) string {
 	return strings.TrimPrefix(strings.TrimSpace(value), "role:")
+}
+
+func shortenToken(value string) string {
+	text := strings.TrimSpace(value)
+	if text == "" {
+		return ""
+	}
+	if len(text) <= 28 {
+		return text
+	}
+	return text[:12] + "…" + text[len(text)-8:]
+}
+
+func shortenSubject(value string) string {
+	text := strings.TrimSpace(value)
+	if text == "" {
+		return ""
+	}
+	parts := strings.Split(text, ":")
+	if len(parts) < 2 {
+		return shortenToken(text)
+	}
+	parts[len(parts)-1] = shortenToken(parts[len(parts)-1])
+	return strings.Join(parts, ":")
 }
 
 type UserPolicyRequestStatus struct {
@@ -125,6 +151,56 @@ func totalPages(total, limit int) int {
 	return pages
 }
 
+templ UserPolicyBoardMeta(label string, value string) {
+	if strings.TrimSpace(value) == "" {
+		return
+	}
+	<div class="flex items-center gap-2 rounded-full border border-primary bg-surface-300 px-3 py-1">
+		<span class="text-[11px] font-semibold uppercase tracking-wide text-secondary-200">{ label }</span>
+		<span class="font-mono text-[12px] text-secondary-100" title={ value }>{ shortenSubject(value) }</span>
+		@copy_button.CopyButton(copy_button.Props{
+			Text:    value,
+			Size:    "14",
+			Variant: copy_button.VariantMinimal,
+			Class:   "text-secondary-200 hover:text-secondary-50",
+		})
+	</div>
+}
+
+templ UserPolicyBoardAddMenu(canStage bool) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if !canStage {
+		return
+	}
+	<details class="relative">
+		<summary class="list-none">
+			<button class="btn btn-xs btn-primary" type="button">
+				{ pageCtx.T("Create") }
+			</button>
+		</summary>
+		<ul class="absolute right-0 mt-2 w-56 rounded-md border border-primary bg-surface-300 p-1 text-sm shadow-sm">
+			<li>
+				<button
+					type="button"
+					class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
+					@click="$dispatch('open-stage-policy-direct')"
+				>
+					{ pageCtx.T("Users.Permissions.Direct") }
+				</button>
+			</li>
+			<li>
+				<button
+					type="button"
+					class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
+					@click="$dispatch('open-stage-policy-overrides')"
+				>
+					{ pageCtx.T("Users.Permissions.Overrides") }
+				</button>
+			</li>
+		</ul>
+	</details>
+}
+
 templ UserPolicyBoard(props *UserPolicyBoardProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{boardState, _ := templ.JSONString(map[string]any{
@@ -134,6 +210,10 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 })
 	}}
 	{{ clearURL := fmt.Sprintf("/core/api/authz/policies/stage?subject=%s", url.QueryEscape(props.Subject)) }}
+	{{ filterDomain := props.Effective.DomainFilter }}
+	if strings.TrimSpace(filterDomain) == "" {
+		{{ filterDomain = props.DefaultDomain }}
+	}
 	<div
 		class="space-y-4"
 		id="user-policy-board"
@@ -156,9 +236,10 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 		<div class="flex items-start justify-between flex-wrap gap-3">
 			<div class="space-y-1">
 				<h3 class="text-lg font-semibold">{ pageCtx.T("Users.Tabs.Permissions") }</h3>
-				<p class="text-sm text-secondary-300">
-					{ fmt.Sprintf("%s: %s · %s: %s", pageCtx.T("Authz.Subject"), props.Subject, pageCtx.T("Authz.Domain"), props.DefaultDomain) }
-				</p>
+				<div class="flex flex-wrap gap-2 text-sm text-secondary-300">
+					@UserPolicyBoardMeta(pageCtx.T("Authz.Subject"), props.Subject)
+					@UserPolicyBoardMeta(pageCtx.T("Authz.Domain"), props.DefaultDomain)
+				</div>
 			</div>
 			<div class="flex items-center gap-2 flex-wrap">
 				if props.StageTotal > 0 {
@@ -185,11 +266,46 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 							{ pageCtx.T("Authz.Unauthorized.Apply") }
 						</button>
 					</form>
-				} else {
+				} else if !props.CanStage && !props.CanRequest {
 					<span class="text-xs text-secondary-200">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
+				} else {
+					@UserPolicyBoardAddMenu(props.CanStage)
 				}
 			</div>
 		</div>
+		<form
+			class="flex flex-wrap items-center gap-2 rounded-lg border border-primary bg-surface-400 p-3 text-sm"
+			hx-get={ props.BaseURL }
+			hx-target="#user-policy-board"
+			hx-swap="outerHTML"
+			hx-push-url="true"
+			hx-trigger="change from:(form select), keyup delay:400ms from:(form input)"
+		>
+			@input.Text(&input.Props{
+				Placeholder: pageCtx.T("Authz.Domain"),
+				Attrs: templ.Attributes{
+					"name":  "domain",
+					"value": filterDomain,
+				},
+			})
+			@input.Text(&input.Props{
+				Placeholder: pageCtx.T("Search"),
+				Attrs: templ.Attributes{
+					"name":  "q",
+					"value": props.Effective.Search,
+				},
+			})
+			<button
+				class="btn btn-xs"
+				type="button"
+				hx-get={ props.BaseURL }
+				hx-target="#user-policy-board"
+				hx-swap="outerHTML"
+				hx-push-url="true"
+			>
+				{ pageCtx.T("Clear") }
+			</button>
+		</form>
 		<div class="space-y-2 text-xs">
 			<div class="text-secondary-200">{ pageCtx.T("Authz.SLA.Expected") }</div>
 			<template x-if="requests.length > 0">
@@ -222,14 +338,41 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 				{ pageCtx.T("Authz.Unauthorized.ApplyHint") }
 			</div>
 		} else {
-			<div class="space-y-4">
-				@UserEffectivePolicies(&props.Effective)
-				<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-					@UserPolicyColumn(&props.Inherited)
-					@UserPolicyColumn(&props.Direct)
-					@UserPolicyColumn(&props.Overrides)
+			@tab.Root(tab.Props{
+				DefaultValue: "effective",
+			}) {
+				@tab.List(tab.ListProps{}) {
+					@tab.Button("effective") {
+						{ pageCtx.T("Users.Permissions.Effective") }
+					}
+					@tab.Button("direct") {
+						{ pageCtx.T("Users.Permissions.Direct") }
+					}
+					@tab.Button("overrides") {
+						{ pageCtx.T("Users.Permissions.Overrides") }
+					}
+					@tab.Button("inherited") {
+						{ pageCtx.T("Users.Permissions.Inherited") }
+					}
+				}
+				<div class="mt-4 space-y-4">
+					<div x-show="selectedTab === 'effective'">
+						@UserEffectivePolicies(&props.Effective)
+					</div>
+					<div x-show="selectedTab === 'direct'">
+						@UserPolicyColumn(&props.Direct)
+					</div>
+					<div x-show="selectedTab === 'overrides'">
+						@UserPolicyColumn(&props.Overrides)
+					</div>
+					<div x-show="selectedTab === 'inherited'">
+						<div class="rounded-lg border border-dashed border-secondary-400 bg-surface-400 p-4 text-sm text-secondary-200">
+							{ pageCtx.T("Users.Permissions.InheritedHint") }
+						</div>
+						@UserPolicyColumn(&props.Inherited)
+					</div>
 				</div>
-			</div>
+			}
 		}
 		@corecomponents.AuthzWorkspace(corecomponents.AuthzWorkspaceProps{
 			Subject:       props.Subject,
@@ -519,8 +662,8 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 							}
 						},
 					};
-				}
-			</script>
+			}
+		</script>
 	}
 }
 
@@ -548,43 +691,13 @@ templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 				</span>
 			</div>
 		</div>
-		<form
-			class="flex flex-wrap gap-2 items-center text-sm"
-			hx-get={ baseURL }
-			hx-target={ fmt.Sprintf("#%s", sectionID) }
-			hx-swap="outerHTML"
-			hx-trigger="change from:(form select), keyup delay:400ms from:(form input)"
-		>
-			<input type="hidden" name="column" value="effective"/>
-			<input type="hidden" name="page" value="1"/>
-			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", props.Limit) }/>
-			@input.Text(&input.Props{
-				Placeholder: pageCtx.T("Authz.Domain"),
-				Attrs: templ.Attributes{
-					"name": "domain",
-					"value": func() string {
-						if props.DomainFilter != "" {
-							return props.DomainFilter
-						}
-						return props.DefaultDomain
-					}(),
-				},
-			})
-			@input.Text(&input.Props{
-				Placeholder: pageCtx.T("Search"),
-				Attrs: templ.Attributes{
-					"name":  "q",
-					"value": props.Search,
-				},
-			})
-		</form>
 		<div class="border border-primary rounded-lg overflow-hidden">
 			{{columns := []*base.TableColumn{
 	&base.TableColumn{Label: pageCtx.T("Authz.Domain"), Key: "domain"},
 	&base.TableColumn{Label: pageCtx.T("Authz.Object"), Key: "object"},
 	&base.TableColumn{Label: pageCtx.T("Authz.Action"), Key: "action"},
 	&base.TableColumn{Label: pageCtx.T("Authz.Effect"), Key: "effect", Class: "w-28"},
-	&base.TableColumn{Label: pageCtx.T("Users.Permissions.Sources"), Key: "sources", Class: "w-72"},
+	&base.TableColumn{Label: pageCtx.T("Users.Permissions.Sources"), Key: "sources", Class: "w-56"},
 }
 			}}
 			@base.Table(base.TableProps{
@@ -601,7 +714,7 @@ templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 						}
 					}
 				}
-				for _, entry := range props.Entries {
+				for idx, entry := range props.Entries {
 					@base.TableRow(base.TableRowProps{
 						Attrs: templ.Attributes{"class": "border-b border-primary"},
 					}) {
@@ -609,10 +722,10 @@ templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 							{ entry.Domain }
 						}
 						@base.TableCell(base.TableCellProps{}) {
-							<span class="font-mono">{ entry.Object }</span>
+							<span class="font-mono break-all">{ entry.Object }</span>
 						}
 						@base.TableCell(base.TableCellProps{}) {
-							<span class="font-mono">{ entry.Action }</span>
+							<span class="font-mono break-all">{ entry.Action }</span>
 						}
 						@base.TableCell(base.TableCellProps{}) {
 							{{ effectLabel := entry.Effect }}
@@ -625,38 +738,89 @@ templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 							<span class="font-mono">{ effectLabel }</span>
 						}
 						@base.TableCell(base.TableCellProps{}) {
-							<div class="flex flex-wrap gap-2 items-center">
-								if entry.Direct {
-									<span class="text-[11px] px-2 py-0.5 rounded-full border border-primary text-primary">
-										{ pageCtx.T("Users.Permissions.Source.Direct") }
-									</span>
-								}
-								for _, source := range entry.Roles {
-									{{ chainNames := make([]string, 0, len(source.Chain)) }}
-									for _, roleSubject := range source.Chain {
-										{{ chainNames = append(chainNames, displayRoleName(roleSubject)) }}
-									}
-									{{ chainLabel := strings.Join(chainNames, " → ") }}
-									if source.PoliciesURL != "" && pageCtx.CanAuthz("core.roles", "view") {
-										<a
-											href={ templ.URL(source.PoliciesURL) }
-											class="text-[11px] px-2 py-0.5 rounded-full border border-secondary-300 text-secondary-100 hover:border-primary hover:text-primary"
-											target="_blank"
-											rel="noreferrer"
-											x-tooltip.raw={ fmt.Sprintf(pageCtx.T("Users.Permissions.Source.RoleChain"), chainLabel) }
-										>
-											{ displayRoleName(source.Subject) }
-										</a>
-									} else {
-										<span
-											class="text-[11px] px-2 py-0.5 rounded-full border border-secondary-300 text-secondary-100"
-											x-tooltip.raw={ fmt.Sprintf(pageCtx.T("Users.Permissions.Source.RoleChain"), chainLabel) }
-										>
-											{ displayRoleName(source.Subject) }
+							{{ roleCount := len(entry.Roles) }}
+							<div class="flex items-center justify-between gap-2">
+								<div class="flex flex-wrap items-center gap-2">
+									if entry.Direct {
+										<span class="text-[11px] px-2 py-0.5 rounded-full border border-primary text-primary">
+											{ pageCtx.T("Users.Permissions.Source.Direct") }
 										</span>
 									}
-								}
+									if roleCount > 0 {
+										<span class="text-[11px] px-2 py-0.5 rounded-full border border-secondary-300 text-secondary-100">
+											{ fmt.Sprintf("%d", roleCount) } { pageCtx.T("Roles.Meta.List.Title") }
+										</span>
+									}
+								</div>
+								<button
+									type="button"
+									class="btn btn-xs"
+									@click={ fmt.Sprintf("$dispatch('open-effective-sources-%d')", idx) }
+									aria-label={ pageCtx.T("Users.Permissions.Sources") }
+								>
+									@icons.MagnifyingGlass(icons.Props{Size: "16"})
+								</button>
 							</div>
+							@dialog.StdViewDrawer(dialog.StdDrawerProps{
+								ID:     fmt.Sprintf("effective-sources-%d", idx),
+								Title:  pageCtx.T("Users.Permissions.Sources"),
+								Action: fmt.Sprintf("open-effective-sources-%d", idx),
+							}) {
+								<div class="space-y-4 p-4 text-sm">
+									<div class="rounded-md border border-primary bg-surface-400 p-3">
+										<div class="text-xs font-semibold uppercase tracking-wide text-secondary-200">
+											{ pageCtx.T("Users.Permissions.Effective") }
+										</div>
+										<div class="mt-2 grid grid-cols-1 gap-2 font-mono text-xs text-secondary-100">
+											<div><span class="text-secondary-300">{ pageCtx.T("Authz.Domain") }:</span> { entry.Domain }</div>
+											<div><span class="text-secondary-300">{ pageCtx.T("Authz.Object") }:</span> { entry.Object }</div>
+											<div><span class="text-secondary-300">{ pageCtx.T("Authz.Action") }:</span> { entry.Action }</div>
+											<div><span class="text-secondary-300">{ pageCtx.T("Authz.Effect") }:</span> { entry.Effect }</div>
+										</div>
+									</div>
+									<div class="space-y-2">
+										<div class="text-xs font-semibold uppercase tracking-wide text-secondary-200">
+											{ pageCtx.T("Users.Permissions.Sources") }
+										</div>
+										if entry.Direct {
+											<div class="rounded-md border border-secondary-300 bg-surface-400 p-3">
+												<div class="font-medium">{ pageCtx.T("Users.Permissions.Source.Direct") }</div>
+											</div>
+										}
+										if len(entry.Roles) == 0 {
+											<div class="text-sm text-secondary-300">{ pageCtx.T("Empty") }</div>
+										} else {
+											<div class="space-y-2">
+												for _, source := range entry.Roles {
+													{{ chainNames := make([]string, 0, len(source.Chain)) }}
+													for _, roleSubject := range source.Chain {
+														{{ chainNames = append(chainNames, displayRoleName(roleSubject)) }}
+													}
+													{{ chainLabel := strings.Join(chainNames, " → ") }}
+													<div class="rounded-md border border-secondary-300 bg-surface-400 p-3">
+														<div class="flex items-center justify-between gap-2">
+															<div class="font-medium">{ displayRoleName(source.Subject) }</div>
+															if source.PoliciesURL != "" && pageCtx.CanAuthz("core.roles", "view") {
+																<a
+																	href={ templ.URL(source.PoliciesURL) }
+																	class="btn btn-xs"
+																	target="_blank"
+																	rel="noreferrer"
+																>
+																	@icons.ArrowSquareOut(icons.Props{Size: "16"})
+																</a>
+															}
+														</div>
+														<div class="mt-2 text-xs text-secondary-200">
+															{ fmt.Sprintf(pageCtx.T("Users.Permissions.Source.RoleChain"), chainLabel) }
+														</div>
+													</div>
+												}
+											</div>
+										}
+									</div>
+								</div>
+							}
 						}
 					}
 				}
@@ -704,6 +868,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 	if formDomain == "" {
 		{{ formDomain = props.DefaultDomain }}
 	}
+	{{ canEdit := props.CanStage && props.Column != "inherited" }}
 	<div
 		id={ columnID }
 		class="border border-primary rounded-lg p-3 space-y-3 bg-surface-400"
@@ -733,7 +898,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 						{ fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal) }
 					</span>
 				}
-				if props.CanStage {
+				if canEdit {
 					<input
 						type="checkbox"
 						class="checkbox checkbox-xs border-primary bg-surface-500"
@@ -743,16 +908,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 				}
 			</div>
 			<div class="flex items-center gap-2">
-				if props.CanStage {
-					@button.Primary(button.Props{
-						Size: button.SizeXS,
-						Attrs: templ.Attributes{
-							"type":   "button",
-							"@click": "$dispatch('open-stage-policy')",
-						},
-					}) {
-						{ pageCtx.T("Create") }
-					}
+				if canEdit {
 					<button
 						type="button"
 						class="btn btn-xs btn-warning"
@@ -775,43 +931,10 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 				{ pageCtx.T("Authz.Stage.BulkRemoveUndo") }
 			</button>
 		</div>
-		<form
-			class="flex flex-wrap gap-2 items-center text-sm"
-			hx-get={ baseURL }
-			hx-target={ fmt.Sprintf("#%s", columnID) }
-			hx-swap="outerHTML"
-			hx-trigger="change from:(form select), keyup delay:400ms from:(form input)"
-		>
-			<input type="hidden" name="column" value={ props.Column }/>
-			<input type="hidden" name="page" value="1"/>
-			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", props.Limit) }/>
-			@input.Text(&input.Props{
-				Placeholder: pageCtx.T("Authz.Domain"),
-				Attrs: templ.Attributes{
-					"name": "domain",
-					"value": func() string {
-						if props.DomainFilter != "" {
-							return props.DomainFilter
-						}
-						if props.Domain != "" {
-							return props.Domain
-						}
-						return props.DefaultDomain
-					}(),
-				},
-			})
-			@input.Text(&input.Props{
-				Placeholder: pageCtx.T("Search"),
-				Attrs: templ.Attributes{
-					"name":  "q",
-					"value": props.Search,
-				},
-			})
-		</form>
 		@dialog.StdViewDrawer(dialog.StdDrawerProps{
 			ID:     fmt.Sprintf("stage-policy-%s", props.Column),
 			Title:  pageCtx.T("Authz.Stage.AddRule"),
-			Action: "open-stage-policy",
+			Action: fmt.Sprintf("open-stage-policy-%s", props.Column),
 		}) {
 			<form
 				class="space-y-4 p-4"
@@ -898,7 +1021,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 						Attrs: templ.Attributes{
 							"type":           "button",
 							"formnovalidate": "true",
-							"@click":         "$dispatch('open-stage-policy')",
+							"@click":         fmt.Sprintf("$dispatch('open-stage-policy-%s')", props.Column),
 						},
 					}) {
 						{ pageCtx.T("Cancel") }
@@ -916,7 +1039,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 		}
 		<div class="border border-primary rounded-lg overflow-hidden">
 			{{ columns := []*base.TableColumn{} }}
-			if props.CanStage {
+			if canEdit {
 				{{ columns = append(columns, &base.TableColumn{Label: "", Key: "select", Class: "w-10"}) }}
 			}
 			if props.Type == "g" {
@@ -963,7 +1086,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 					@base.TableRow(base.TableRowProps{
 						Attrs: templ.Attributes{"class": rowClass},
 					}) {
-						if props.CanStage {
+						if canEdit {
 							@base.TableCell(base.TableCellProps{}) {
 								<input
 									type="checkbox"
@@ -1006,18 +1129,18 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 						}
 						if props.Type != "g" {
 							@base.TableCell(base.TableCellProps{}) {
-								{ entry.Subject }
+								<span class="font-mono break-all" title={ entry.Subject }>{ shortenSubject(entry.Subject) }</span>
 							}
 						}
 						@base.TableCell(base.TableCellProps{}) {
-							{ entry.Domain }
+							<span class="font-mono break-all" title={ entry.Domain }>{ entry.Domain }</span>
 						}
 						if props.Type != "g" {
 							@base.TableCell(base.TableCellProps{}) {
-								{ entry.Object }
+								<span class="font-mono break-all" title={ entry.Object }>{ entry.Object }</span>
 							}
 							@base.TableCell(base.TableCellProps{}) {
-								{ entry.Action }
+								<span class="font-mono break-all" title={ entry.Action }>{ entry.Action }</span>
 							}
 							@base.TableCell(base.TableCellProps{}) {
 								<div class="flex items-center gap-2">
@@ -1062,7 +1185,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 										@icons.ArrowSquareOut(icons.Props{Size: "16"})
 									</a>
 								}
-								if entry.Staged && props.CanStage && entry.StageID != "" {
+								if entry.Staged && canEdit && entry.StageID != "" {
 									@button.Secondary(button.Props{
 										Size: button.SizeXS,
 										Attrs: templ.Attributes{
@@ -1074,7 +1197,7 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 									}) {
 										{ pageCtx.T("Delete") }
 									}
-								} else if props.CanStage && !entry.Staged {
+								} else if canEdit && !entry.Staged {
 									@button.Secondary(button.Props{
 										Size: button.SizeXS,
 										Attrs: templ.Attributes{
@@ -1093,6 +1216,8 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 										<input type="hidden" name="stage_kind" value="remove"/>
 										{ pageCtx.T("Delete") }
 									}
+								} else if props.Column == "inherited" {
+									<span class="text-xs text-secondary-400">{ pageCtx.T("Users.Permissions.InheritedHintShort") }</span>
 								} else {
 									<span class="text-xs text-secondary-400">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
 								}

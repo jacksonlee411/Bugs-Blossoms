@@ -234,6 +234,8 @@
     },
     "Permissions": {
       "Inherited": "继承权限",
+      "InheritedHint": "继承权限来自角色/组分配；请在“用户信息”里调整角色/组，并在“有效权限汇总”中查看最终生效结果。",
+      "InheritedHintShort": "只读（在用户信息中调整）",
       "Direct": "直接权限",
       "Overrides": "覆盖权限",
       "Effective": "有效权限汇总",
@@ -274,6 +276,7 @@
       "NotAllowed": "无法删除：您是此租户中的唯一用户"
     }
   },
+  "Clear": "清除",
   "Create": "创建",
   "Roles": {
     "Meta": {

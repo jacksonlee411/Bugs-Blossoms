@@ -132,5 +132,6 @@ modules/{module}/
 - HRM Atlas+Goose：`docs/runbooks/hrm-atlas-goose.md`
 - PostgreSQL 17 迁移：`docs/runbooks/postgres17-migration.md`
 - 文档规范：`docs/dev-plans/000-docs-format.md`
+- Core 用户权限页 IA 优化：`docs/dev-plans/016A-core-users-permissions-ia.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`

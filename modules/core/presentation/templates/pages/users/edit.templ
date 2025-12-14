@@ -62,10 +62,11 @@ templ EditForm(props *EditFormProps) {
 		saveAttrs["x-tooltip.raw"] = pageCtx.T("Authz.Unauthorized.ApplyHint")
 	}
 	<div class="flex flex-col justify-between h-[calc(100vh-4rem)]" id="edit-content">
-		<div class="flex-1 overflow-y-auto p-6">
-			@tab.Root(tab.Props{
-				DefaultValue: "userinfo",
-			}) {
+		@tab.Root(tab.Props{
+			DefaultValue: "userinfo",
+			Class:        "flex flex-col h-full",
+		}) {
+			<div class="flex-1 overflow-y-auto p-6">
 				@tab.List(tab.ListProps{}) {
 					@tab.Button("userinfo") {
 						{ pageCtx.T("Users.Tabs.UserInfo") }
@@ -185,56 +186,56 @@ templ EditForm(props *EditFormProps) {
 						})
 					}
 				</div>
-			}
-		</div>
-		<div
-			x-data
-			class="h-20 shadow-t-lg border-t w-full flex items-center justify-end px-8 bg-surface-300 border-t-primary mt-auto gap-4"
-		>
-			<form
-				id="delete-form"
-				hx-delete={ fmt.Sprintf("/users/%s", props.User.ID) }
-				hx-trigger="submit"
-				hx-target="closest .content"
-				hx-swap="innerHTML"
-				hx-indicator="#delete-user-btn"
-				hx-disabled-elt="find button"
+			</div>
+			<div
+				class="h-20 shadow-t-lg border-t w-full flex items-center justify-end px-8 bg-surface-300 border-t-primary mt-auto gap-4"
+				x-show="selectedTab === 'userinfo'"
 			>
-				if !props.CanDelete {
-					@button.Danger(button.Props{
-						Disabled: true,
-						Size:     button.SizeMD,
-						Attrs:    deleteAttrs,
-					}) {
-						{ pageCtx.T("Delete") }
+				<form
+					id="delete-form"
+					hx-delete={ fmt.Sprintf("/users/%s", props.User.ID) }
+					hx-trigger="submit"
+					hx-target="closest .content"
+					hx-swap="innerHTML"
+					hx-indicator="#delete-user-btn"
+					hx-disabled-elt="find button"
+				>
+					if !props.CanDelete {
+						@button.Danger(button.Props{
+							Disabled: true,
+							Size:     button.SizeMD,
+							Attrs:    deleteAttrs,
+						}) {
+							{ pageCtx.T("Delete") }
+						}
+					} else {
+						@button.Danger(button.Props{
+							Disabled: !canDelete,
+							Size:     button.SizeMD,
+							Attrs:    deleteAttrs,
+						}) {
+							{ pageCtx.T("Delete") }
+						}
 					}
-				} else {
-					@button.Danger(button.Props{
-						Disabled: !canDelete,
+				</form>
+				<form
+					id="save-form"
+					method="post"
+					hx-post={ fmt.Sprintf("/users/%s", props.User.ID) }
+					hx-indicator="#save-btn"
+					hx-target="#edit-content"
+					hx-swap="outerHTML"
+				>
+					@button.Primary(button.Props{
+						Disabled: !props.User.CanUpdate || !canUpdate,
 						Size:     button.SizeMD,
-						Attrs:    deleteAttrs,
+						Attrs:    saveAttrs,
 					}) {
-						{ pageCtx.T("Delete") }
+						{ pageCtx.T("Save") }
 					}
-				}
-			</form>
-			<form
-				id="save-form"
-				method="post"
-				hx-post={ fmt.Sprintf("/users/%s", props.User.ID) }
-				hx-indicator="#save-btn"
-				hx-target="#edit-content"
-				hx-swap="outerHTML"
-			>
-				@button.Primary(button.Props{
-					Disabled: !props.User.CanUpdate || !canUpdate,
-					Size:     button.SizeMD,
-					Attrs:    saveAttrs,
-				}) {
-					{ pageCtx.T("Save") }
-				}
-			</form>
-		</div>
+				</form>
+			</div>
+		}
 		if !canUpdate {
 			<div class="mt-4">
 				@authzcomponents.Unauthorized(&authzcomponents.UnauthorizedProps{
