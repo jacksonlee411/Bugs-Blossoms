@@ -1,5 +1,7 @@
 # Contributing Guide
 
+> 仓库级开发规则、变更触发器与文档门禁以 `AGENTS.md` 为主干 SSOT；本文件聚焦贡献者上手与 CI 对齐操作。
+
 ## ⚙️ Prerequisites
 
 Ensure these tools are installed before you begin:
@@ -91,7 +93,7 @@ Ensure these tools are installed before you begin:
    ```
 
 8. **Access the application**:
-   - Web app: [http://localhost:8080](http://localhost:8080)
+   - Web app: [http://localhost:3200](http://localhost:3200)
    - Login credentials:
      - Email: `test@gmail.com`
      - Password: `TestPass123!`

@@ -1,6 +1,6 @@
-# R200r. 基于Go语言实现数据库ERP系统的最佳实践（参考）
+# [Archived] R200r. 基于 Go 语言实现数据库 ERP 系统的最佳实践（参考）
 
-> 参考来源：/home/shangmeilin/cube-castle/docs/development-plans/200-Go语言ERP系统最佳实践.md
+> 归档说明：此文档作为“决策快照/历史参考”保留，不再作为活体规范维护；活体架构约定以 `docs/ARCHITECTURE.md` 与 `AGENTS.md` 为准。
 
 > 更新记录（2025-12-01 12:41）：DEV-PLAN-005/005T 已完成，`quality-gates` workflow、`scripts/run-go-tests.sh` 及相关文档同步到主仓库，为后续落地 R200 所列 go-cleanarch、Atlas、队列/Casbin 等工具链提供统一的门禁与本地复现环境。
 

@@ -1,6 +1,6 @@
 # DEV-RECORD-001：文档一致性审计与收敛方案（Docs Audit & Consolidation）
 
-**状态**: 草拟中（2025-12-14 06:36 UTC）
+**状态**: 已完成（2025-12-14 07:11 UTC）
 
 范围：仅针对文档信息一致性与维护成本；不涉及代码/配置改动。
 
@@ -22,7 +22,7 @@
 - `README.MD`
 - `docs/CONTRIBUTING.MD`
 - `docs/SUPERADMIN.md`
-- `docs/dev-records/R200r-Go语言ERP系统最佳实践.md`
+- `docs/Archived/r200r-go-erp-best-practices.md`
 - `docs/dev-plans/000-docs-format.md`
 
 用于核对“真实实施进展/配置”的关键依据（同样列出仓库相对路径）：
@@ -53,11 +53,10 @@
 ### 3.2 明确存在的“文档漂移/冲突点”
 
 1) 端口信息不一致，影响上手：
-- `docs/CONTRIBUTING.MD` 仍写 Web app 为 `http://localhost:8080`，但仓库默认服务端口为 `3200`（`pkg/configuration/environment.go`，`devhub.yml`）。
+- 已修复：`docs/CONTRIBUTING.MD` Web app 端口与默认配置对齐为 `http://localhost:3200`（以 `pkg/configuration/environment.go` 与 `devhub.yml` 为准）。
 
 2) Superadmin 的本地运行方式与端口示例混乱：
-- `docs/SUPERADMIN.md` 多处示例使用 `3000`，但仓库 `make superadmin` 默认走 `4000`（`Makefile`）。
-- `docs/SUPERADMIN.md` 多处使用 `go build` 方式示例，而 `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` 明确建议“不要跑 go build（用 go vet）”。这里建议调整为：文档可以保留“构建产物/容器化需要 go build”的场景，但应明确区分“本地开发检查”与“产物构建”。
+- 已修复：`docs/SUPERADMIN.md` 明确本地开发推荐使用 `make superadmin dev`（默认 `4000`），并保留“构建产物场景可用 `go build`”的说明以避免与本地检查混淆。
 
 3) 信息重复严重，导致后续维护成本高：
 - `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` 三份文件中存在大量重叠规则/命令/DDD 结构说明，且文本粒度不同，易漂移。
@@ -67,7 +66,7 @@
 - `AGENTS.md` 声明 `modules/billing`、`modules/crm`、`modules/finance` 冻结；但仓库的对外文档（`README.MD`、`docs/CONTRIBUTING.MD`）仍包含相关模块描述/路径示例。需要明确该政策的“适用范围”（内用/阶段性/分支特定），否则会造成贡献者误判。
 
 5) 最佳实践与规范文档的定位模糊：
-- `docs/dev-records/R200r-Go语言ERP系统最佳实践.md` 虽位于 `dev-records` 目录，但包含“更新记录”且被多个 Plan 引用为理论基线，实际上扮演了“Living Architecture Guide”的角色。其内容（工具链、分层架构）与 `AGENTS.md` 高度重叠，若不明确两者关系（理论 vs 执法），极易产生漂移。
+- `docs/Archived/r200r-go-erp-best-practices.md` 作为历史快照保留，但其内容（工具链、分层架构）曾与 `AGENTS.md` 高度重叠。为降低漂移成本，活体约定已迁移到 `docs/ARCHITECTURE.md`，本文件仅保留归档引用。
 - `docs/dev-plans/000-docs-format.md` 定义了文档规范，但在 `docs/CONTRIBUTING.MD` 中未被引用，导致新贡献者难以发现该标准。
 
 ## 4. 各文档的职责（Purpose）与调整建议
@@ -126,7 +125,7 @@
 - 本地开发入口与端口：增加“本地开发建议使用 `Makefile` 的 `make superadmin dev`”并明确默认端口（当前为 4000）；
 - 区分“本地开发检查 vs 构建产物”：保留 `go build` 场景时，明确其用途是“构建二进制/容器产物”，不要与“本地改动后该跑什么检查”混淆。
 
-### 4.7 `docs/dev-records/R200r-Go语言ERP系统最佳实践.md`
+### 4.7 `docs/Archived/r200r-go-erp-best-practices.md`
 
 定位（建议）：
 - 理论基线与深度参考（Reference）：解释“为什么要这样做”，作为 `AGENTS.md` 的理论支撑。
@@ -217,7 +216,7 @@
 
 | 文件 | 决策点 | 建议执行 |
 | :--- | :--- | :--- |
-| `docs/dev-records/R200r-Go语言ERP系统最佳实践.md` | （已决策）该文件定位为“历史记录/决策快照”，不再作为活体参考 | 执行阶段直接拆分：将该文件头部标记为 `[Archived]`，并迁移到 `docs/Archived/`；同时在 `docs/ARCHITECTURE.md`（新建）中沉淀需要长期维护的“活体”架构约定，并由 AGENTS 引用 |
+| `docs/Archived/r200r-go-erp-best-practices.md` | （已决策）该文件定位为“历史记录/决策快照”，不再作为活体参考 | 执行阶段直接拆分：为该文件标记 `[Archived]` 并迁移到 `docs/Archived/`；同时在 `docs/ARCHITECTURE.md` 中沉淀需要长期维护的“活体”架构约定，并由 AGENTS 引用 |
 
 ### 5.7 变更触发器表（防漂移机制：改了什么必须同步哪里）
 
@@ -256,7 +255,7 @@
      - `docs/assets/`：目录与文件名建议使用 `kebab-case`（全小写，禁止空格/驼峰），并按主题分子目录（例如 `docs/assets/authz/`、`docs/assets/hrm/`）。
      - `docs/dev-plans/`、`docs/dev-records/`：遵循 `docs/dev-plans/000-docs-format.md` 的编号/命名约定（不强制 kebab-case，避免与现有编号体系冲突）。
    - **可发现性门禁（Discovery）**：任意新增文档必须在 `AGENTS.md` 的 Doc Map/专题入口新增链接，避免产生“孤儿文档”。
-   - **门禁落地（Enforcement）**：执行阶段建议新增 `make check docs`（仅在 `.md` / `docs/assets/**` / `modules/**/README.md` / `modules/**/docs/**` 变更时触发），自动校验：
+   - **门禁落地（Enforcement）**：执行阶段建议新增 `make check doc`（仅在 `.md` / `docs/assets/**` / `modules/**/README.md` / `modules/**/docs/**` 变更时触发），自动校验：
      - 根目录新增 `.md` 是否违反白名单
      - `docs/` 下新增文件是否符合“目录归类 + 命名规则”
      - 新增文档是否被 `AGENTS.md` Doc Map/专题入口链接（仓库级文档）
@@ -293,26 +292,26 @@
 
 ## 6. 实施步骤（Milestones）
 
-1. [ ] 阶段 0（P0）：SSOT 主干先行（避免回潮）
-   - [ ] 重排并主干化 `AGENTS.md`：补齐“事实源索引/触发器矩阵/文档地图/维护政策”，并完成内部去重与冻结政策范围说明。
+1. [X] 阶段 0（P0）：SSOT 主干先行（避免回潮）
+   - [X] 重排并主干化 `AGENTS.md`：补齐“事实源索引/触发器矩阵/文档地图/维护政策”，并完成内部去重与冻结政策范围说明。
 
-2. [ ] 阶段 1（P0）：修复误导信息（降低上手成本）
-   - [ ] 修复 `docs/CONTRIBUTING.MD` 的 Web app 端口（8080 → 3200）。
-   - [ ] 修复 `docs/SUPERADMIN.md` 的本地运行方式与默认端口说明（明确 `make superadmin dev` 与默认 4000；区分开发/构建）。
+2. [X] 阶段 1（P0）：修复误导信息（降低上手成本）
+   - [X] 修复 `docs/CONTRIBUTING.MD` 的 Web app 端口（8080 → 3200）。
+   - [X] 修复 `docs/SUPERADMIN.md` 的本地运行方式与默认端口说明（明确 `make superadmin dev` 与默认 4000；区分开发/构建）。
 
-3. [ ] 阶段 2（P1）：降低重复（减少维护面）
-   - [ ] 对 `AGENTS.md` 去重并明确“以 `Makefile`/`devhub.yml` 为准”。
-   - [ ] 将 `CLAUDE.md`、`GEMINI.md` 的通用规则改为引用 `AGENTS.md`/`docs/CONTRIBUTING.MD`（保留差异化内容）。
-   - [ ] R200r 归档拆分：
-     - [X] 创建 `docs/Archived/` 与 `docs/Archived/README.md`（已完成）
-     - [ ] 将 `docs/dev-records/R200r-Go语言ERP系统最佳实践.md` 标记为 `[Archived]` 并迁移到 `docs/Archived/`
-     - [ ] 新建 `docs/ARCHITECTURE.md` 并沉淀可长期维护的活体架构约定（由 `AGENTS.md` 引用）
-   - [ ] 引入“新建文档门禁”：
-     - [ ] 创建 `docs/assets/`（仓库级文档静态资源归口）
-     - [ ] 新增 `make check docs` 并接入 CI（按 `.md`、`docs/assets/**`、`modules/**/README.md`、`modules/**/docs/**` 变更触发），校验路径/命名/`AGENTS.md` 链接与模块级豁免
+3. [X] 阶段 2（P1）：降低重复（减少维护面）
+   - [X] 对 `AGENTS.md` 去重并明确“以 `Makefile`/`devhub.yml` 为准”。
+   - [X] 将 `CLAUDE.md`、`GEMINI.md` 的通用规则改为引用 `AGENTS.md`/`docs/CONTRIBUTING.MD`（保留差异化内容）。
+   - [X] R200r 归档拆分：
+     - [X] 创建 `docs/Archived/` 与 `docs/Archived/index.md`（已完成）
+     - [X] 将 `docs/dev-records/R200r-Go语言ERP系统最佳实践.md` 标记为 `[Archived]` 并迁移为 `docs/Archived/r200r-go-erp-best-practices.md`
+     - [X] 新建 `docs/ARCHITECTURE.md` 并沉淀可长期维护的活体架构约定（由 `AGENTS.md` 引用）
+   - [X] 引入“新建文档门禁”：
+     - [X] 创建 `docs/assets/`（仓库级文档静态资源归口）
+     - [X] 新增 `make check doc` 并接入 CI（按 `.md`、`docs/assets/**`、`modules/**/README.md`、`modules/**/docs/**` 变更触发），校验路径/命名/`AGENTS.md` 链接与模块级豁免
 
-4. [ ] 阶段 3（P2）：README 信息架构优化（README 变索引）
-   - [ ] 将 `README.MD` 的 runbook 级内容迁移到 `docs/`，README 改为摘要 + 链接集合。
+4. [X] 阶段 3（P2）：README 信息架构优化（README 变索引）
+   - [X] 将 `README.MD` 的 runbook 级内容迁移到 `docs/`，README 改为摘要 + 链接集合。
 
 ## 7. 验收标准（Definition of Done）
 

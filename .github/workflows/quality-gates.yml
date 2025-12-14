@@ -77,6 +77,9 @@ jobs:
               - 'modules/core/services/**'
               - 'modules/core/presentation/controllers/**'
 
+      - name: Check new-doc gate
+        run: make check doc
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:

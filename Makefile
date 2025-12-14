@@ -213,10 +213,13 @@ check:
 		go run ./cmd/cleanarchguard -config .gocleanarch.yml; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "tr" ]; then \
 		go run cmd/command/main.go check_tr_keys; \
+	elif [ "$(word 2,$(MAKECMDGOALS))" = "doc" ]; then \
+		bash ./scripts/docs/check.sh; \
 	else \
-		echo "Usage: make check [lint|tr]"; \
+		echo "Usage: make check [lint|tr|doc]"; \
 		echo "  lint - Run golangci-lint (checks for unused variables/functions)"; \
 		echo "  tr   - Check translations for completeness"; \
+		echo "  doc  - Check new-doc gate (paths/naming/AGENTS links)"; \
 	fi
 
 # sdk-tools CLI management
@@ -267,12 +270,12 @@ setup: deps css
 	make check lint
 
 # Prevents make from treating the argument as an undefined target
-watch coverage verbose docker score report linux docker-base docker-prod up down restart logs local stop reset seed migrate install help imports:
+watch coverage verbose docker score report linux docker-base docker-prod up down restart logs local stop reset seed migrate install help imports doc:
 	@:
 
 .PHONY: deps db test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
         down restart logs local stop reset watch coverage verbose docker score report \
-        dev fmt lint tr linux docker-base docker-prod run server sdk-tools install help
+	        dev fmt lint tr doc linux docker-base docker-prod run server sdk-tools install help
 # HRM sqlc generation
 sqlc-generate:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0 generate -f sqlc.yaml
