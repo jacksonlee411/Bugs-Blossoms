@@ -2,6 +2,8 @@
 
 **状态**: ✅ 已完成（2025-12-02 20:00）
 
+> 注意：本计划在后续实现中出现“文档与仓库资产漂移”。请以 `docs/dev-plans/011A-atlas-goose-baseline-gapfix.md` 的口径为准（包含实际存在的路径、命令与 CI 行为）。
+
 ## 背景
 - DEV-PLAN-009 的第二项重点任务要求以 Atlas diff 生成 up/down SQL，再交由 goose/golang-migrate 执行，形成可重复的迁移工作流（`docs/dev-plans/009-r200-tooling-alignment.md:21-49`）。
 - DEV-PLAN-010 已在 HRM 模块交付 sqlc 基线、`sqlc.yaml`、`scripts/db/export_hrm_schema.sh` 等资产（`docs/dev-plans/010-sqlc-baseline.md:5-40`），但迁移仍靠手写 SQL，schema 来源也未与 Atlas 串联。

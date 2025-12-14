@@ -5,8 +5,8 @@ CREATE TABLE tenants (
     phone varchar(255),
     email varchar(255),
     is_active boolean NOT NULL DEFAULT TRUE,
-    logo_id int REFERENCES uploads (id) ON DELETE SET NULL,
-    logo_compact_id int REFERENCES uploads (id) ON DELETE SET NULL,
+    logo_id int,
+    logo_compact_id int,
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
@@ -26,6 +26,12 @@ CREATE TABLE uploads (
     UNIQUE (tenant_id, hash),
     UNIQUE (tenant_id, slug)
 );
+
+ALTER TABLE tenants
+    ADD CONSTRAINT tenants_logo_id_fkey FOREIGN KEY (logo_id) REFERENCES uploads (id) ON DELETE SET NULL;
+
+ALTER TABLE tenants
+    ADD CONSTRAINT tenants_logo_compact_id_fkey FOREIGN KEY (logo_compact_id) REFERENCES uploads (id) ON DELETE SET NULL;
 
 CREATE TABLE passports (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -203,4 +209,3 @@ CREATE INDEX uploads_tenant_id_idx ON uploads (tenant_id);
 CREATE INDEX roles_tenant_id_idx ON roles (tenant_id);
 
 CREATE INDEX user_groups_tenant_id_idx ON user_groups (tenant_id);
-

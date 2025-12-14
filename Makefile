@@ -4,6 +4,9 @@ TAILWIND_OUTPUT := modules/core/presentation/assets/css/main.min.css
 ATLAS_BIN_DIR ?= $(shell go env GOPATH)/bin
 ATLAS_VERSION ?= v0.38.0
 ATLAS ?= $(ATLAS_BIN_DIR)/atlas
+GOOSE_BIN_DIR ?= $(shell go env GOPATH)/bin
+GOOSE_VERSION ?= v3.26.0
+GOOSE ?= $(GOOSE_BIN_DIR)/goose
 
 .PHONY: authz-pack
 authz-pack:
@@ -29,6 +32,11 @@ atlas-install:
 	cd /tmp/atlas-src-install && git checkout tags/$(ATLAS_VERSION)
 	cd /tmp/atlas-src-install/cmd/atlas && GOWORK=off go mod tidy
 	cd /tmp/atlas-src-install/cmd/atlas && GOWORK=off go build -o $(ATLAS_BIN_DIR)/atlas .
+
+.PHONY: goose-install
+goose-install:
+	GOWORK=off go install github.com/pressly/goose/v3/cmd/goose@$(GOOSE_VERSION)
+	$(GOOSE) -version
 
 # Generate code documentation
 docs:
@@ -81,12 +89,25 @@ db:
 			go run cmd/command/main.go migrate $(word 3,$(MAKECMDGOALS)); \
 		fi; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "plan" ]; then \
+		TARGET_DB_NAME="$(DB_NAME)"; \
 		DB_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"; \
-		DEV_DB_NAME="${ATLAS_DEV_DB_NAME:-$(DB_NAME)}"; \
+		DEV_DB_NAME="$${ATLAS_DEV_DB_NAME:-hrm_dev}"; \
 		DEV_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$$DEV_DB_NAME?sslmode=disable"; \
-		$(ATLAS) schema diff --from $$DB_URL --to file://modules/hrm/infrastructure/atlas/schema.hcl --dev-url $$DEV_URL --format '{{ sql . }}'; \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$TARGET_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$TARGET_DB_NAME"; \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$DEV_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$DEV_DB_NAME"; \
+		TMP_SCHEMA="$$(mktemp -t hrm_atlas_schema_XXXXXX.sql)"; \
+		trap 'rm -f "$$TMP_SCHEMA"' EXIT; \
+		cat modules/hrm/infrastructure/atlas/core_deps.sql modules/hrm/infrastructure/persistence/schema/hrm-schema.sql > "$$TMP_SCHEMA"; \
+		TO_URL="file:///$${TMP_SCHEMA#/}"; \
+		$(ATLAS) schema diff --from $$DB_URL --to $$TO_URL --dev-url $$DEV_URL --format '{{ sql . }}'; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "lint" ]; then \
-		$(ATLAS) migrate lint --env ci --git-base origin/main; \
+		TARGET_DB_NAME="$(DB_NAME)"; \
+		DB_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"; \
+		DEV_DB_NAME="$${ATLAS_DEV_DB_NAME:-hrm_dev}"; \
+		DEV_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$$DEV_DB_NAME?sslmode=disable"; \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$TARGET_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$TARGET_DB_NAME"; \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$DEV_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$DEV_DB_NAME"; \
+		DB_URL="$$DB_URL" ATLAS_DEV_URL="$$DEV_URL" $(ATLAS) migrate lint --env ci --git-base origin/main; \
 	else \
 		echo "Usage: make db [local|stop|clean|reset|seed|migrate]"; \
 		echo "  local   - Start local PostgreSQL database"; \
@@ -270,12 +291,12 @@ setup: deps css
 	make check lint
 
 # Prevents make from treating the argument as an undefined target
-watch coverage verbose docker score report linux docker-base docker-prod up down restart logs local stop reset seed migrate install help imports doc:
+watch coverage verbose docker score report linux docker-base docker-prod up down redo status restart logs local stop reset seed migrate plan lint install help imports doc:
 	@:
 
 .PHONY: deps db test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
         down restart logs local stop reset watch coverage verbose docker score report \
-	        dev fmt lint tr doc linux docker-base docker-prod run server sdk-tools install help
+        dev fmt lint tr doc linux docker-base docker-prod run server sdk-tools install help atlas-install goose-install plan
 # HRM sqlc generation
 sqlc-generate:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0 generate -f sqlc.yaml
