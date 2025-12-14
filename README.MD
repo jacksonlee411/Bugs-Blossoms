@@ -6,6 +6,7 @@
 
 - [Discord Community](https://discord.gg/zKeTEZAQqF): Join our community for support and Q&A
 - [Contribution Guide](docs/CONTRIBUTING.MD): Learn how to contribute to the project
+- [Developer Rules (SSOT)](AGENTS.md): Local checks, workflows, and doc gates
 - [Setup Demo](https://github.com/iota-uz/sdk-demo): Learn how to setup IOTA-SDK
 - [Demo stand](https://demo.iotaerp.com): Explore the SDK UI
 - [Docker hub](https://hub.docker.com/r/iotauz/sdk) - Official Docker images
@@ -27,100 +28,22 @@
 
 ## ✅ Quality Gates
 
-- `.github/workflows/quality-gates.yml` runs on every push to `main`/`dev` and on all pull requests. It pins Go 1.24.10, installs templ/Tailwind/golangci-lint/pgformatter, and uploads `coverage.out`, `coverage.html`, and `migrate.log` artifacts.
-- Costly checks are scoped to file changes: `.templ`/Tailwind assets trigger `make generate` + `make css` + `git status`, locale JSON triggers `make check tr`, and migrations/schema SQL trigger PostgreSQL 17 + Redis smoke migrations (`make db migrate up/down` + `make db seed`).
-- Unit/integration tests always run with PostgreSQL 17/Redis containers, ensuring parity between local development and CI.
-- Clean architecture 008 守护：`.gocleanarch.yml` 约束了 modules/*/{domain,services,presentation,infrastructure} 之间的依赖，`make check lint` 和 `quality-gates` 的 lint job 都会运行 go-cleanarch（仅在 Go 代码或该配置文件变更时触发）。
+- `quality-gates` workflow enforces formatting, linting, tests, template regeneration, locale checks, and PostgreSQL 17 migration smoke tests.
+- Run the matching local commands before pushing: see [Contribution Guide](docs/CONTRIBUTING.MD) and `AGENTS.md`.
 
-**Before pushing**, run the commands that match your changes so you know `quality-gates` will pass:
+## 🔐 Authz
 
-- Go code: `go fmt ./... && go vet ./... && make check lint`
-- Clean architecture: `.gocleanarch.yml` 描述了 domain/services/presentation/infrastructure 的依赖图谱，`make check lint` 会自动运行 go-cleanarch（本地与 CI 均复用）。
-- Tests: `make test` (or `go test -v ./...`)
-- Templates/Tailwind assets: `make generate && make css` followed by `git status --short`
-- Locales: `make check tr`
-- Schema/migrations: `make db migrate up && make db seed`
-- Finance 模块的集成测试暂时停用，如需修改 `modules/finance/**` 请在本地运行相关 `go test` 并附上结果。
+- 策略草稿 API：`docs/runbooks/authz-policy-draft-api.md`
+- Bot 流程与应急：`docs/runbooks/AUTHZ-BOT.md`
 
-## 🔐 Authz Policy Draft API
+## 🧩 HRM
 
-- 修改 `config/access/policies/**` 后运行 `make authz-pack`，它会同时重建聚合策略 `config/access/policy.csv` 以及 `config/access/policy.csv.rev`（供 `pkg/authz/version` 读取 base revision）。
-- Core 模块注册了 `PolicyDraftService` 与 `/core/api/authz/**` 控制器，可用来创建/审批/调试策略草稿；所有端点都需要对应的 `Authz.*` 权限。
-- 常用端点：
-  - `GET /core/api/authz/policies` —— 返回当前聚合策略列表（仅 `Authz.Debug` 可见）。
-  - `POST /core/api/authz/requests` —— 创建策略草稿；`POST /requests/{id}/approve|reject|cancel|trigger-bot|revert` 负责生命周期操作。
-- `GET /core/api/authz/debug?subject=...&object=...&action=...` —— 调试接口，仅 `Authz.Debug` 可见，支持 `attr.<key>=<value>` 注入 ABAC 属性，并带有 `20 req/min/IP` 速率限制；响应包含 `allowed`、`mode`、`latency_ms`、`trace.matched_policy` 以及回显的 request/attributes。
-- 403 响应契约（HX/REST 统一）：未经授权返回 `application/json`，示例 `{\"error\":\"forbidden\",\"object\":\"logging.logs\",\"action\":\"view\",\"subject\":\"user:<uuid>\",\"domain\":\"tenant:<id>\",\"missing_policies\":[...],\"suggest_diff\":[...],\"request_url\":\"/core/api/authz/requests\",\"debug_url\":\"/core/api/authz/debug?subject=...&object=...&action=...\"}`。
-- Core 用户权限页：Policy Board 支持 g/p 暂存、批量撤销与域筛选，Tab 顶部按钮提交草稿/申请权限；提交后 UI 轮询 `/core/api/authz/requests`（≤5 分钟 SLA）并展示 request_id。
-- Unauthorized 占位与前端 props：统一透出 `object`、`action`、`subject`、`domain`、`missing_policies`、`suggest_diff`、`request_url`、`debug_url`，并写入页面 `data-*` 便于 015B 组件复用；导航/Quick Links/Sidebar/Spotlight 入口均通过 `AuthzObject/AuthzAction` 或 `.RequireAuthz` 过滤，未授权用户不可见。
-- UI 授权申请与反馈：业务页面的 Unauthorized/PolicyInspector 统一提交到 `/core/api/authz/requests`，响应包含 `request_id`、`estimated_sla_expires_at`、`view_url`、`can_retry_bot`、`retry_token`；前端轮询 15s 更新状态，终态或 30s 内缓存命中即停止，基线过期会在 HX-Trigger 中附带 `base_revision` 与 toast 提示；`status=failed` 时可携带 `retry_token` 调用 `POST /core/api/authz/requests/{id}/trigger-bot?retry_token=...`（同 request 60s 冷却），终态自动隐藏重试入口；非 HTMX 场景返回标准 JSON/错误页并附错误码/i18n key，可用 flash/fallback 展示。
+- sqlc 工作流：`docs/runbooks/hrm-sqlc.md`
+- Atlas + Goose：`docs/runbooks/hrm-atlas-goose.md`
 
-示例：
+## 🐘 PostgreSQL 17（本地）
 
-```bash
-REVISION=$(jq -r .revision config/access/policy.csv.rev)
-curl -X POST http://localhost:3200/core/api/authz/requests \
-  -H "Content-Type: application/json" \
-  -b sid=<session_cookie> \
-  -d '{
-    "object": "core.users",
-    "action": "read",
-    "reason": "Grant reporting access",
-    "base_revision": "'"$REVISION"'",
-    "diff": [{"op":"add","path":"/p/-","value":["role:reporting","core.users","read","global","allow"]}]
-  }'
-```
-
-Authz.Debug 示例（携带 request id 方便审计）：
-
-```bash
-curl "http://localhost:3200/core/api/authz/debug?subject=role:core.superadmin&domain=global&object=core.users&action=list&attr.ip=10.0.0.1" \
-  -H "X-Request-Id: authz-debug-sample" \
-  -b sid=<session_cookie>
-# => {
-#   "allowed": true,
-#   "mode": "enforce",
-#   "latency_ms": 3,
-#   "request": {...},
-#   "attributes": {"ip":"10.0.0.1"},
-#   "trace": {"matched_policy":["role:core.superadmin","*","*","*","allow"]}
-# }
-```
-
-### Authz Bot & PR 流程
-
-- Bot 可通过 `scripts/authz/bot.sh run [--once]` 启动；需要以下环境变量（脚本会自动加载仓库根目录的 `.env.local`，推荐在其中设置）：
-  - `AUTHZ_BOT_GITHUB_TOKEN`：具备 `repo` 权限的 PAT，用于创建/更新 PR。
-  - 可选 `AUTHZ_BOT_GIT_TOKEN`：若本地 remote 仍为 SSH，可临时注入 HTTPS 令牌。
-  - `AUTHZ_BOT_GIT_REMOTE`/`AUTHZ_BOT_GIT_BRANCH_PREFIX`/`AUTHZ_BOT_GIT_AUTHOR`（如需覆盖默认值）。
-- 流程：审批通过的草稿 → 运行 bot → bot 应用 diff、执行 `make authz-pack && make authz-test`、推送分支并调用 GitHub API 开 PR → `PolicyDraftService` 回写 `applied_policy_revision/snapshot/pr_link`，请求状态变为 `merged`。
-- 如需强制释放锁，可执行 `scripts/authz/bot.sh force-release <request-id>`，它会清空 `policy_change_requests.bot_lock/bot_locked_at`，便于重试。
-- 回滚：调用 `/core/api/authz/requests/{id}/revert` 生成新草稿，或手动 revert bot 创建的 PR，再由 bot 重跑一次。
-- 更多手动/应急步骤、缓存策略与回滚说明请参见 `docs/runbooks/AUTHZ-BOT.md`。
-
-### PostgreSQL 17 迁移与备份
-
-1. **备份旧数据**（如果之前运行的是 `postgres:15`）：  
-   ```bash
-   docker compose -f compose.dev.yml down db
-   docker run --rm --network host -v sdk-data:/var/lib/postgresql/data postgres:15 \
-     pg_dump -h localhost -p 5438 -U postgres -F c -b -v -f /tmp/pg15-backup.dump iota_erp
-   ```
-   将 `/tmp/pg15-backup.dump` 复制到安全位置。
-
-2. **清理旧卷并切换到 17**：  
-   ```bash
-   docker volume rm sdk-data
-   docker compose -f compose.dev.yml up -d db redis
-   ```
-
-3. **重新迁移与种子**：  
-   ```bash
-   DB_HOST=localhost DB_PORT=5438 DB_NAME=iota_erp DB_USER=postgres DB_PASSWORD=postgres make db migrate up
-   DB_HOST=localhost DB_PORT=5438 DB_NAME=iota_erp DB_USER=postgres DB_PASSWORD=postgres make db seed
-   ```
-
-若需要从备份恢复，可使用 `pg_restore` 将 `pg15-backup.dump` 导入新的 `postgres:17` 实例。
+- 迁移与备份：`docs/runbooks/postgres17-migration.md`
 
 ---  
 
@@ -184,67 +107,6 @@ go install github.com/iota-uz/devhub/cmd/devhub@latest
 ```
 
 Learn more in the [DevHub documentation](https://github.com/iota-uz/devhub).
-
----
-
-## 🧩 HRM sqlc 工作流
-
-`modules/hrm` 的 SQL 现已统一使用 sqlc 生成。修改 HRM 表结构或 SQL 时请遵循以下顺序：
-
-1. 维护迁移或 schema，并同步更新 `docs/dev-records/hrm-sql-inventory.md`（新增/调整查询都要登记）。
-2. 运行 `scripts/db/export_hrm_schema.sh` 导出最新 schema（可通过 `SKIP_MIGRATE=1` 跳过自动迁移）。
-3. 执行 `make sqlc-generate`（或 `make generate`，它会自动调用该目标）以重建 `modules/hrm/infrastructure/sqlc/**`。
-4. `git status --short` 确认没有遗漏的生成文件，再提交 PR。
-
-CI 中新增的 `hrm-sqlc` 过滤器会在涉及 HRM SQL / schema / sqlc.yaml 变更时强制执行上述流程，并拒绝包含未提交生成结果的 PR。
-
----
-
-## 🧭 HRM Atlas + Goose 流水线
-
-HRM 聚合已经迁入 `migrations/hrm/`，并由 Atlas 生成 SQL、goose 负责执行。基线产物：
-
-- 目标 schema：`modules/hrm/infrastructure/atlas/schema.hcl`
-- Atlas 配置：根目录 `atlas.hcl`（`dev`/`test`/`ci` 环境复用 `DB_*` 环境变量）
-- 迁移目录：`migrations/hrm/changes_<unix>.{up,down}.sql`
-- 工作日志：`docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`
-
-推荐流程：
-
-1. **安装 Atlas CLI（一次性）**
-   ```bash
-   make atlas-install   # 从 GitHub 构建 atlas v0.38.0 并安装到 $(go env GOPATH)/bin
-   ```
-2. **更新 schema 定义**：编辑 `modules/hrm/infrastructure/atlas/schema.hcl`（或补充 include），确保与 HRM 期望结构一致。
-3. **Dry-run 计划**：
-   ```bash
-   make db plan
-   # 等价于 atlas migrate diff --env dev --dir file://migrations/hrm --to file://modules/hrm/infrastructure/atlas/schema.hcl --dry-run
-   ```
-   该命令会连接本地 Postgres（使用现有 `DB_*` 环境变量）并打印 SQL 计划，不写入磁盘。
-4. **生成迁移**：
-   ```bash
-   atlas migrate diff --env dev \
-     --dir file://migrations/hrm \
-     --to file://modules/hrm/infrastructure/atlas/schema.hcl
-   ```
-   输出文件位于 `migrations/hrm/changes_<unix>.{up,down}.sql`，并自动更新 `migrations/hrm/atlas.sum`。
-5. **应用迁移（goose）**：
-   ```bash
-   make db migrate up HRM_MIGRATIONS=1
-   ```
-   当 `HRM_MIGRATIONS=1` 时，`Makefile` 会调用 `scripts/db/run_goose.sh`，使用 `postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}` 作为 DSN。  
-   - 回滚最近一次：`GOOSE_STEPS=1 make db migrate down HRM_MIGRATIONS=1`  
-   - redo：`GOOSE_STEPS=1 make db migrate redo HRM_MIGRATIONS=1`  
-   - 状态：`make db migrate status HRM_MIGRATIONS=1`
-6. **导出 schema & 重建 sqlc**：
-   ```bash
-   scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1
-   make sqlc-generate
-   ```
-7. **提交前检查**：`make db lint` 会运行 `atlas migrate lint --env ci --git-base origin/main`，确保缺失迁移 / hash 漂移会被阻止。
-
-> 所有 Atlas/Goose 操作请在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md` 补充记录，方便后续审计和回溯。
 
 ---
 

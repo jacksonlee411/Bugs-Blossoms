@@ -3,7 +3,7 @@
 **状态**: ✅ 已完成（2025-12-02 10:00）
 
 ## 背景
-- `docs/dev-records/R200r-Go语言ERP系统最佳实践.md:207-320` 建议 ERP 优先采用 SQL-first 的 sqlc，在编译期生成类型安全的数据访问层，避免 ORMapper 运行期开销。
+- `docs/Archived/r200r-go-erp-best-practices.md:207-320` 建议 ERP 优先采用 SQL-first 的 sqlc，在编译期生成类型安全的数据访问层，避免 ORMapper 运行期开销。
 - 仓库当前以手写 `sqlx` 查询为主，SQL 分散在 `modules/*/infrastructure` 与 `pkg` 目录，缺乏统一的声明位置与生成脚本，难以复用/审查。
 - DEV-PLAN-009 将 sqlc 作为 R200 工具链引入路线的第一阶段，需要明确 PoC、配置、CI 集成与文档动作，让后续 Atlas/Asynq/Casbin 等方案有可复用的数据访问基线。
 - 根据最新决策，本计划的实施范围 **限定在 `modules/hrm` 模块及其所需的共享基础设施（例如 pkg/db、scripts、工具链）**，其他业务模块不在本期改造内。

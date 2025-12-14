@@ -3,7 +3,7 @@
 **状态**: 规划中（2025-01-14 12:00）
 
 ## 背景
-- R200 文档在 `docs/dev-records/R200r-Go语言ERP系统最佳实践.md:207-470` 总结了 ERP 项目应优先采纳的工具链（编译期数据访问、Atlas 迁移规划、后台队列、Casbin 授权、事务性发件箱等）。
+- R200 文档在 `docs/Archived/r200r-go-erp-best-practices.md:207-470` 总结了 ERP 项目应优先采纳的工具链（编译期数据访问、Atlas 迁移规划、后台队列、Casbin 授权、事务性发件箱等）。
 - 当前仓库虽已建立 DDD + 模块化单体架构（AGENTS.md:6-96）并运行质量门禁（README.MD:28-41），但在上述领域仍以手写脚本或 ad-hoc 方案为主，缺乏统一工具化支撑。
 - 2025-12-01 完成的 DEV-PLAN-005/005T 为全仓库提供了统一的 lint/test/变更追踪脚本（`scripts/run-go-tests.sh`、`quality-gates`），后续在此基础上引入 R200 工具链，可直接挂到既有 Makefile/CI 路径上，避免重复造轮子。
 - 为避免重复造轮子，需要制定一份与 R200 指南对齐的引入路线图，明确评估、PoC、集成与文档同步步骤。
@@ -15,23 +15,23 @@
 
 ## 重点方案
 1. **数据访问生成器（sqlc）**
-   - 依据 `docs/dev-records/R200r-Go语言ERP系统最佳实践.md:207-320`，已决定以 sqlc（SQL-first，零运行时开销）作为事实来源工具，暂不评估 Ent，保持 DBA 友好的 SQL 生命周期。
+   - 依据 `docs/Archived/r200r-go-erp-best-practices.md:207-320`，已决定以 sqlc（SQL-first，零运行时开销）作为事实来源工具，暂不评估 Ent，保持 DBA 友好的 SQL 生命周期。
    - 任务：归档需要生成的 SQL 查询、在 Makefile/CI 中增加 `sqlc generate` 流程，并在 CONTRIBUTING 中说明如何同步生成代码及更新 `sqlc.yaml`。
 
 2. **Atlas + goose/golang-migrate 联动**
-   - R200 建议使用 Atlas diff 自动生成 up/down SQL，再由 goose/golang-migrate 执行（`docs/dev-records/R200r-Go语言ERP系统最佳实践.md:247-320`）。
+   - R200 建议使用 Atlas diff 自动生成 up/down SQL，再由 goose/golang-migrate 执行（`docs/Archived/r200r-go-erp-best-practices.md:247-320`）。
    - 任务：编写 `schema.hcl`（或声明式 schema 文件）+ Atlas 配置，新增 `make db plan`/`make db apply` 等目标，并在 CI 中运行 atlas 计划校验，减少手写 down 造成的风险。
 
 3. **持久化后台任务队列（Asynq）**
-   - 文档指出 ERP 中的报表/导入/通知应由可靠队列驱动，禁止在 HTTP 请求中直接 `go func`，结合当前技术栈已决定采用 Asynq（Go 原生，依赖 Redis），暂不评估 Faktory（`docs/dev-records/R200r-Go语言ERP系统最佳实践.md:320-420`）。
+   - 文档指出 ERP 中的报表/导入/通知应由可靠队列驱动，禁止在 HTTP 请求中直接 `go func`，结合当前技术栈已决定采用 Asynq（Go 原生，依赖 Redis），暂不评估 Faktory（`docs/Archived/r200r-go-erp-best-practices.md:320-420`）。
    - 任务：梳理现有后台任务，完成 Asynq PoC，固化 producer/worker 模式，在 README/运营文档中说明 Redis/Asynq 依赖、监控方式与回滚策略。
 
 4. **Casbin 授权引擎**
-   - R200 强调 ERP 权限需要 RBAC+ABAC 组合，推荐 Casbin（`docs/dev-records/R200r-Go语言ERP系统最佳实践.md:420-470`）。
+   - R200 强调 ERP 权限需要 RBAC+ABAC 组合，推荐 Casbin（`docs/Archived/r200r-go-erp-best-practices.md:420-470`）。
    - 任务：盘点现有权限逻辑，确定模型（如 RBAC with domains + ABAC 表达式），在 `modules/*/permissions` 或 `config/access` 维护 model/policy 文件，并在 `pkg/authz` 构建统一的 Casbin 适配层。
 
 5. **事务性发件箱（Transactional Outbox）**
-   - 为保证模块间异步事件与数据库状态一致，R200 建议实现 outbox 表 + relay（`docs/dev-records/R200r-Go语言ERP系统最佳实践.md:360-420`）。
+   - 为保证模块间异步事件与数据库状态一致，R200 建议实现 outbox 表 + relay（`docs/Archived/r200r-go-erp-best-practices.md:360-420`）。
    - 任务：设计 outbox schema、插入/轮询逻辑（可先接内存事件总线），在至少一个业务流程（例如 Inventory→Finance）完成端到端验证，并在文档中记录落地指南。
    - 可选方案：`github.com/ThreeDotsLabs/watermill` SQL Outbox 组件（Postgres/MySQL 轮询 + Relay）、Debezium Outbox Event Router（依赖 Kafka Connect WAL/binlog，将 outbox 表自动投递到 Kafka）、`github.com/looplab/eventhorizon` 等事件溯源框架自带的 outbox/relay，或项目内自研轻量实现（遵循 R200 推荐的事务 + relay 模式并补上幂等/重试）。
 

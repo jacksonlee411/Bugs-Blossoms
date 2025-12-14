@@ -82,6 +82,8 @@ Super admin users have:
 
 The Super Admin server uses the **same environment variables** as the main application. This is intentional - both servers share the same database and core configuration.
 
+> 本地开发提示：仓库默认开发端口/数据库端口以 `devhub.yml` 与 `.env.example` 为准（常见为 `PORT=3200`、`DB_PORT=5438`）；`make superadmin dev` 会覆盖端口与 `ORIGIN`，默认使用 `4000`。
+
 **Required Variables:**
 ```bash
 # Core Application
@@ -127,13 +129,16 @@ docker tag iota-sdk-superadmin:latest your-registry/iota-sdk-superadmin:latest
 docker push your-registry/iota-sdk-superadmin:latest
 ```
 
-**Local Build:**
+**Local Development (Recommended):**
 ```bash
-# Build binary
-go build -o run_superadmin cmd/superadmin/main.go
+# Hot reload (uses Air config + overrides PORT/ORIGIN)
+make superadmin dev
+```
 
-# Run locally
-./run_superadmin
+**Local Build (Binary Artifact):**
+```bash
+# Build binary for deployment scenarios (this is not a "lint check")
+go build -o run_superadmin cmd/superadmin/main.go
 ```
 
 ---
@@ -383,8 +388,8 @@ cd iota-sdk
 
 2. **Configure Environment:**
 ```bash
-cp .env.example .env.superadmin
-# Edit .env.superadmin with your settings
+cp .env.example .env
+# Edit .env with your settings (shared with main app)
 ```
 
 3. **Run Database Migrations:**
@@ -398,18 +403,14 @@ make db migrate up
 psql $DATABASE_URL -f scripts/create-superadmin.sql
 ```
 
-5. **Build and Run:**
+5. **Run Super Admin Server (recommended):**
 ```bash
-# Build
-go build -o run_superadmin cmd/superadmin/main.go
-
-# Run
-./run_superadmin
+make superadmin dev
 ```
 
 6. **Access Server:**
 ```
-http://localhost:3000
+http://localhost:4000
 ```
 
 ### Development with DevHub
@@ -417,8 +418,8 @@ http://localhost:3000
 If using [DevHub](https://github.com/iota-uz/devhub):
 
 ```bash
-# Add superadmin service to devhub.yaml
-devhub add superadmin go run cmd/superadmin/main.go
+# Add superadmin service to devhub.yml (example)
+devhub add superadmin make superadmin dev
 
 # Start all services including superadmin
 devhub start

@@ -1,199 +1,136 @@
 # 请总是用中文回复。
-# CLAUDE.md - IOTA SDK Guide
 
-## Overview
-DO NOT COMMENT EXECESSIVELY. Instead, write clear and concise code that is self-explanatory.
+# AGENTS.md（主干 SSOT）
 
-### Code Quality & Format (与 CI 对齐)
-- 推送前必须运行与 CI 相同的检查，避免远程 Quality Gates 报红。
-- 必跑：`make check lint`（包含 golangci-lint + cleanarch 等规则，例如 canonicalheader/errchkjson/testifylint），以及相关路径的 `go test`（例如 `go test ./modules/logging/...`）。
-- 根据改动范围追加：模板/样式改动跑 `templ generate && make css`；多语言改动跑 `make check tr`；authz 相关跑 `make authz-test`/`make authz-lint`。
-- 不要仅依赖 `gofmt` 或单纯的 `go test`，它们覆盖不到 CI 的 lint 规则。
+本文件是仓库内“如何开发/如何验证/如何组织文档与规则”的**主干入口**。优先阅读本文件，并通过链接跳转到其他专题文档；避免在多个文档里复制同一套规则，减少漂移。
 
-## 项目现状
-- 项目仍处于早期开发阶段，尚未投产，所有特性以快速验证为主。
-- 当前仅由单一开发者负责全栈交付，可在保证质量前提下省略非必要的审批与跨组沟通流程，直接按照本指南自行决策。
-- 当前阶段不考虑灰度与回滚，直接按已测试通过的 enforce 路径上线；若未来需灰度，再在 dev-plan 中单独补充。
+## 0. TL;DR（最常见变更要跑什么）
 
-## Module Architecture
+- Go 代码：`go fmt ./... && go vet ./... && make check lint && make test`
+- `.templ`/Tailwind 相关：`make generate && make css`，然后 `git status --short` 必须为空
+- 多语言 JSON：`make check tr`
+- 迁移/Schema：`make db migrate up && make db seed`（可选 `make db migrate down`）
+- Authz：`make authz-test && make authz-lint`（以及相关包的 `go test`）
+- 文档新增/整理：`make check doc`
 
-Each module follows a strict **Domain-Driven Design (DDD)** pattern with clear layer separation:
+> 说明：命令细节以 `Makefile` 为准；本文件只维护“入口与触发器”，尽量不复制脚本内部实现。
+
+## 1. 事实源（不要复制细节，统一引用）
+
+- 本地开发服务编排：`devhub.yml`
+- 本地命令入口：`Makefile`
+- 示例环境变量：`.env.example`
+- CI 门禁：`.github/workflows/quality-gates.yml`
+- Lint/架构约束：`.golangci.yml`、`.gocleanarch.yml`
+
+## 2. 变更触发器矩阵（与 CI 对齐）
+
+| 你改了什么 | 本地必跑 | 备注 |
+| --- | --- | --- |
+| 任意 Go 代码 | `go fmt ./... && go vet ./... && make check lint && make test` | 不要仅跑 `gofmt`/`go test`，它们覆盖不到 CI lint |
+| `.templ` / Tailwind / presentation assets | `make generate && make css` + `git status --short` | 生成物必须提交，否则 CI 会失败 |
+| `modules/**/presentation/locales/**/*.json` | `make check tr` | |
+| `migrations/**` 或 `modules/**/infrastructure/persistence/schema/**` | `make db migrate up && make db seed` | CI 会跑 PG17 + migrate smoke |
+| Authz（`config/access/**` / `pkg/authz/**` / `scripts/authz/**` 等） | `make authz-test && make authz-lint` | 另见 `docs/runbooks/AUTHZ-BOT.md` |
+| HRM sqlc（`sqlc.yaml` / `modules/hrm/infrastructure/sqlc/**` 等） | `scripts/db/export_hrm_schema.sh` + `make sqlc-generate` + `git status --short` | |
+| HRM Atlas/Goose（`modules/hrm/infrastructure/atlas/**` / `migrations/hrm/**` 等） | `make db plan && make db lint` | 另见 dev-plan 对应章节 |
+| 新增/调整文档 | `make check doc` | 门禁见“文档收敛与门禁” |
+
+## 3. 开发与编码规则（仓库级合约）
+
+### 3.1 基本编码风格
+
+- DO NOT COMMENT EXCESSIVELY：用清晰、可读的代码表达意图，不要堆注释。
+- 错误处理使用 `pkg/serrors`（遵循项目标准错误类型）。
+- UI 交互使用 `pkg/htmx`，优先复用 `components/` 组件。
+- NEVER read `*_templ.go`（templ 生成文件不可读且无意义）。
+- 不要手动对齐缩进：用 `go fmt`/`templ fmt`/已有工具完成格式化。
+
+### 3.2 工具使用红线
+
+- DO NOT USE `sed` 做文件内容修改。
+- 未经用户明确批准，禁止通过 `git checkout --` / `git restore` / `git reset` / `git clean` 丢弃或回退未提交改动。
+
+### 3.3 契约文档优先（Contract First）
+
+- 新增或调整功能（尤其是 API/数据库/鉴权/交互契约变化）前，必须在 `docs/dev-plans/` 新建或更新相应计划文档（遵循 `docs/dev-plans/000-docs-format.md`，可基于 `docs/dev-plans/001-technical-design-template.md`）。
+- 代码变更应是对文档契约的履行：文档是“意图”，代码是“实现”；若实现过程中发生范围/契约变化，应先更新计划文档再改代码。
+- 例外：仅修复拼写/格式、或不改变外部行为的极小重构，可不强制新增计划文档；但一旦涉及迁移、权限、接口、数据契约，必须按本条执行。
+
+## 4. 架构与目录约束（DDD + CleanArchGuard）
+
+每个模块遵循 DDD 分层，依赖约束由 `.gocleanarch.yml` 定义，`make check lint` 会同时执行 golangci-lint 与 cleanarchguard。
 
 ```
 modules/{module}/
-├── domain/                     # Pure business logic
-│   ├── aggregates/{entity}/    # Complex business entities
-│   │   ├── {entity}.go         # Entity interface
-│   │   ├── {entity}_impl.go    # Entity implementation
-│   │   ├── {entity}_events.go  # Domain events
-│   │   └── {entity}_repository.go # Repository interface
-│   ├── entities/{entity}/      # Simpler domain entities
-│   └── value_objects/          # Immutable domain concepts
-├── infrastructure/             # External concerns
-│   └── persistence/
-│       ├── models/models.go    # Database models
-│       ├── {entity}_repository.go # Repository implementations
-│       ├── {module}_mappers.go # Domain-to-DB mapping
-│       ├── schema/{module}-schema.sql # SQL schema
-│       └── setup_test.go       # Test utilities
-├── services/                   # Business logic orchestration
-│   ├── {entity}_service.go     # Service implementation
-│   ├── {entity}_service_test.go # Service tests
-│   └── setup_test.go           # Test setup
-├── presentation/               # UI and API layer
-│   ├── controllers/
-│   │   ├── {entity}_controller.go # HTTP handlers
-│   │   ├── {entity}_controller_test.go # Controller tests
-│   │   ├── dtos/{entity}_dto.go # Data transfer objects
-│   │   └── setup_test.go       # Test utilities
-│   ├── templates/
-│   │   ├── pages/{entity}/     # Entity-specific pages
-│   │   │   ├── list.templ      # List view
-│   │   │   ├── edit.templ      # Edit form
-│   │   │   └── new.templ       # Create form
-│   │   └── components/         # Reusable UI components
-│   ├── viewmodels/             # Presentation models
-│   ├── mappers/mappers.go      # Domain-to-presentation mapping
-│   └── locales/                # Internationalization
-│       ├── en.json             # English translations
-│       ├── ru.json             # Russian translations
-│       └── uz.json             # Uzbek translations
-├── module.go                   # Module registration
-├── links.go                    # Navigation items
-└── permissions/constants.go    # RBAC permissions
+├── domain/
+├── infrastructure/
+├── services/
+└── presentation/
 ```
 
-## Creating New Entities (Repositories, Services, Controllers)
+更完整的“活体架构说明”以 `docs/ARCHITECTURE.md` 为准（由本文件引用，不在多处复制）。
 
-### 1. Domain Layer
-- Create domain entity in `modules/{module}/domain/aggregates/{entity_name}/`
-- Define repository interface with CRUD operations and domain events
-- Follow existing patterns (see `payment_category` or `expense_category`)
+## 5. 新增实体（Repository/Service/Controller）最短路径
 
-### 2. Infrastructure Layer
-- Add database model to `modules/{module}/infrastructure/persistence/models/models.go`
-- Create repository implementation in `modules/{module}/infrastructure/persistence/{entity_name}_repository.go`
-- Add domain-to-database mappers in `modules/{module}/infrastructure/persistence/{module}_mappers.go`
+1. Domain：`modules/{module}/domain/aggregates/{entity_name}/`（接口、实现、事件、Repository 接口）
+2. Infrastructure：`modules/{module}/infrastructure/persistence/`（model、repo 实现、mappers）
+3. Services：`modules/{module}/services/`（构造器 `NewEntityService(repo, eventPublisher)`）
+4. Presentation：controller/DTO/viewmodel/mapper + `.templ` 页面
+5. Locales：`modules/{module}/presentation/locales/**`
+6. 注册：`modules/{module}/links.go` + `modules/{module}/module.go`
+7. 验证：按“变更触发器矩阵”跑命令
 
-### 3. Service Layer
-- Create service in `modules/{module}/services/{entity_name}_service.go`
-- Include event publishing and business logic methods
-- Follow constructor pattern: `NewEntityService(repo, eventPublisher)`
+## 6. Authz（Casbin）工作流（摘要）
 
-### 4. Presentation Layer
-- Create DTOs in `modules/{module}/presentation/controllers/dtos/{entity_name}_dto.go`
-- Create controller in `modules/{module}/presentation/controllers/{entity_name}_controller.go`
-- Create viewmodel in `modules/{module}/presentation/viewmodels/{entity_name}_viewmodel.go`
-- Add mapper in `modules/{module}/presentation/mappers/mappers.go`
+- 政策碎片：修改 `config/access/policies/**` 后运行 `make authz-pack`（会生成 `config/access/policy.csv` 与 `config/access/policy.csv.rev`，不要手改聚合文件）。
+- 测试与校验：Authz 相关改动必须跑 `make authz-test && make authz-lint`。
+- Bot：见 `docs/runbooks/AUTHZ-BOT.md`。
 
-### 5. Templates (if needed)
-- Create templ files in `modules/{module}/presentation/templates/pages/{entity_name}/`
-- Common templates: `list.templ`, `edit.templ`, `new.templ`
-- Run `templ generate` after creating/modifying .templ files
+## 7. HRM（sqlc / Atlas+Goose）工作流（摘要）
 
-### 6. Localization
-- Add translations to all locale files in `modules/{module}/presentation/locales/`
-- Include NavigationLinks, Meta (titles), List, and Single sections
+- sqlc：影响 `sqlc.yaml` / `modules/hrm/infrastructure/sqlc/**` / `modules/hrm/infrastructure/persistence/**/*.sql` / `docs/dev-records/hrm-sql-inventory.md` 时：先 `scripts/db/export_hrm_schema.sh`，再 `make sqlc-generate`，最后 `git status --short` 必须为空。
+- Atlas/Goose：HRM schema 以 `modules/hrm/infrastructure/atlas/schema.hcl` 为权威；`make db plan` 做 dry-run，`make db lint` 跑 atlas lint；执行 HRM 迁移用 `HRM_MIGRATIONS=1 make db migrate up`。
 
-### 7. Registration
-- Add navigation item to `modules/{module}/links.go`
-- Register service and controller in `modules/{module}/module.go`:
-  - Add service to `app.RegisterServices()` call
-  - Add controller to `app.RegisterControllers()` call  
-  - Add quick links to `app.QuickLinks().Add()` call
+## 8. 文档收敛与门禁（New Doc Gate）
 
-### 8. Verification
-- Run `go vet ./...` to verify compilation
-- Run `templ generate && make css` if templates were modified
+目标：防止文档熵增；新增文档必须可发现、可归类、可维护。
 
-### Casbin / Authorization
-- Update modular policy fragments under `config/access/policies/**`, then run `make authz-pack` to regenerate `config/access/policy.csv`.
-- `make authz-pack` 同时会生成/刷新 `config/access/policy.csv.rev`，`pkg/authz/version.Provider` 依赖该文件提供 base revision；不要手动编辑。
-- Core 模块暴露 `/core/api/authz/**` API：`GET /policies`、`GET /requests`、`POST /requests` 及 `POST /requests/{id}/approve|reject|cancel|trigger-bot|revert`，调用前确保用户拥有 `Authz.*` 权限；若收到 `AUTHZ_INVALID_REQUEST`，请检查请求体的 `base_revision` 是否落后 `config/access/policy.csv.rev`。
-  - 示例：`curl -b sid=<sid> -X POST /core/api/authz/requests -d '{"object":"core.users","action":"read","diff":[...]}' -H 'Content-Type: application/json'`.
-- `GET /core/api/authz/debug` 仅对 `Authz.Debug` 权限开放，必需 `subject/object/action` 查询参数，可选 `domain` 与 `attr.<key>=<value>` 形式的 ABAC 属性；接口自带 `20 req/min/IP` 限流，响应包含 `allowed/mode/latency_ms/request/attributes/trace.matched_policy`，并在日志与 `authz_debug_requests_total|latency_seconds` 指标中记录 request id 与 tenant。
-- 403 契约：未经授权返回 JSON，字段包含 `error/object/action/subject/domain/missing_policies/suggest_diff/request_url/debug_url`，示例见 README/CONTRIBUTING；HX/REST 统一格式。
-- Run `make authz-test` (compiles `pkg/authz` plus helper packages) before committing any authz-related Go changes.
-- Run `make authz-lint` to execute policy packing and the deterministic parity fixtures (`scripts/authz/verify --fixtures ...`). CI hooks onto the same targets.
-- Use `go run ./scripts/authz/export -dsn <dsn> -out <path> -dry-run` for audited exports (requires `ALLOWED_ENV=production_export`).
-- Use `go run ./scripts/authz/verify --sample 0.2` for on-demand parity checks against a live database (set `AUTHZ_MODE`/`AUTHZ_FLAG_CONFIG` as needed).
-- Authz Bot：使用 `scripts/authz/bot.sh run [--once]` 消化 `policy_change_requests`，需要注入 `AUTHZ_BOT_GITHUB_TOKEN`（PR 用 PAT）及可选 `AUTHZ_BOT_GIT_TOKEN`（推送用 PAT）；如遇死锁，执行 `scripts/authz/bot.sh force-release <request-id>` 清空 `bot_lock` 后重试。
+- 仓库根目录禁止新增 `.md`（白名单：`README.MD`、`AGENTS.md`、`CLAUDE.md`、`GEMINI.md`）。
+- 仓库级文档分类：
+  - 操作/排障：`docs/runbooks/`
+  - 概念/架构/参考：`docs/guides/` 或 `docs/ARCHITECTURE.md`
+  - 计划/记录：`docs/dev-plans/`、`docs/dev-records/`（遵循 `docs/dev-plans/000-docs-format.md`）
+  - 静态资源（截图/图表）：`docs/assets/`
+  - 归档快照：`docs/Archived/`（标题/头部标注 `[Archived]`，不作为活体 SSOT）
+- 模块级豁免（就近存放实现细节）：
+  - 允许 `modules/{module}/README.md`
+  - 允许 `modules/{module}/docs/**`（含模块内图片）
+- 命名（新增文件）：
+  - `docs/runbooks/`、`docs/guides/`、`docs/Archived/`：`kebab-case.md`
+  - `docs/assets/`：目录与文件名建议全小写 `kebab-case`（图片也同理）
+- 可发现性：新增仓库级文档必须在本文件的“文档地图（Doc Map）”中新增链接。
+- 门禁：`make check doc`（执行阶段由 CI 触发，仅在文档/资源变更时运行）。
 
-### 授权 UI/反馈使用提示
-- 403 场景统一渲染 `components/authorization/unauthorized.templ`，props 必须包含 `object/action/subject/domain/base_revision/missing_policies/suggest_diff/request_url/debug_url`；HTMX 提交 `/core/api/authz/requests` 后会在 HX-Trigger 中返回 `request_id`、SLA、view_url、重试 token。
-- 前端脚本每 15s 轮询 `/core/api/authz/requests/{id}`，终态或 30s 内缓存命中即暂停；失焦暂停、回到前台强制刷新一次；`status=failed` 时若有权限可携带 `retry_token` 调用 `/trigger-bot`，同 request 60s 冷却。
-- 后端错误统一用 `HX-Trigger: {"showErrorToast":{...},"notify":{...}}` 传递，`AUTHZ_INVALID_REQUEST` 会附带 `X-Authz-Base-Revision`/meta 提醒刷新；非 HTMX 场景返回 JSON/标准错误页并附错误码/i18n key。
-- 模板/locale 变更后运行 `templ generate && make css`、`make check tr`；authz 相关改动跑 `make check lint` 与 `go test ./modules/core/... ./components/authorization/...`。
+## 9. 模块冻结政策（Billing / CRM / Finance）
 
-## Tool use
-- DO NOT USE `sed` for file manipulation
-- 未经用户明确批准，禁止通过 `git checkout --` / `git restore` / `git reset` / `git clean` 等操作丢弃或回退任何未提交改动（即使不在本次任务范围）。如需只提交部分变更，优先使用 `git add -p`，或先与用户确认是否 `stash`/拆分提交。
+- 冻结范围：`modules/billing`、`modules/crm`、`modules/finance`
+- 规则：禁止修改上述目录下任何代码/SQL/模板/资源文件，除非经计划批准并解除冻结声明。
+- 说明：质量门禁与脚本已对冻结模块做了排除；遇到冻结模块故障无需修复，保持快照即可。
 
-### Code Quality & Format (与 CI 对齐)
-- 推送前必须运行与 CI 相同的检查，避免远程 Quality Gates 报红。
-- 必跑：`make check lint`（包含 golangci-lint + cleanarch 等规则，例如 canonicalheader/errchkjson/testifylint），以及相关路径的 `go test`（例如 `go test ./modules/logging/...`）。
-- 根据改动范围追加：模板/样式改动跑 `templ generate && make css`；多语言改动跑 `make check tr`；authz 相关跑 `make authz-test`/`make authz-lint`。
-- 不要仅依赖 `gofmt` 或单纯的 `go test`，它们覆盖不到 CI 的 lint 规则。
+## 10. 文档地图（Doc Map）
 
-## HRM sqlc 指南
-- HRM SQL 与 schema 必须通过 `scripts/db/export_hrm_schema.sh` 更新（可设置 `SKIP_MIGRATE=1` 仅导出 schema）。
-- 任意影响 `sqlc.yaml`、`modules/hrm/infrastructure/sqlc/**`、`modules/hrm/infrastructure/persistence/**/*.sql` 或 `docs/dev-records/hrm-sql-inventory.md` 的改动都要运行 `make sqlc-generate`。`make generate` 会自动调用该目标。
-- sqlc 生成的内容全部位于 `modules/hrm/infrastructure/sqlc/**`，生成后必须 `git status --short` 确认无遗留 diff。CI 的 `hrm-sqlc` 过滤器也会执行同样检查。
-- 变更 HRM SQL 时记得同步维护《HRM SQL Inventory》，方便评审追踪迁移进度。
-
-## HRM Atlas + Goose
-- HRM schema 的权威定义位于 `modules/hrm/infrastructure/atlas/schema.hcl`，配套配置在仓库根目录 `atlas.hcl`（`dev/test/ci` 环境复用 `DB_*` 变量）。
-- 生成迁移：`atlas migrate diff --env dev --dir file://migrations/hrm --to file://modules/hrm/infrastructure/atlas/schema.hcl`，Dry-run 可用 `make db plan`。
-- 执行迁移：`make db migrate up HRM_MIGRATIONS=1`（当 `HRM_MIGRATIONS=1` 时会调用 `scripts/db/run_goose.sh`，使用 goose 操作 `migrations/hrm/changes_<unix>.{up,down}.sql`）。
-  - 回滚最新步骤：`GOOSE_STEPS=1 make db migrate down HRM_MIGRATIONS=1`
-  - redo：`GOOSE_STEPS=1 make db migrate redo HRM_MIGRATIONS=1`
-  - 查看链路：`make db migrate status HRM_MIGRATIONS=1`
-- `make db lint` 会运行 `atlas migrate lint --env ci --git-base origin/main`，CI 通过新建的 `hrm-atlas` 过滤器强制该检查。
-- Atlas/Goose 的操作日志请登记在 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`。
-
-## Build/Lint/Test Commands
-- After changes to css or .templ files: `templ generate && make css`
-- After changes to Go code: `go vet ./...` (Do NOT run `go build` as it is not needed)
-- Run all tests: `make test` or `go test -v ./...` 
-- Run single test: `go test -v ./path/to/package -run TestName`
-- Run specific subtest: `go test -v ./path/to/package -run TestName/SubtestName`
-- Check translation files: `make check tr`
-- Apply migrations: `make db migrate up`
-- Default database runtime: PostgreSQL 17 (local compose + CI)
-
-### Quality Gates
-- `.github/workflows/quality-gates.yml` runs on every push to `main`/`dev` and on all PRs. It enforces Go fmt/vet, `make check lint`, unit/integration tests, templ/Tailwind regeneration (with `git status`), locale checks, and PostgreSQL 17 migration smoke tests with `migrate.log` artifacts.
-- Before pushing, run the commands tied to your change scope:
-  - Go code: `go fmt ./... && go vet ./... && make check lint && make test`
-  - `.templ`/Tailwind assets: `make generate && make css` then ensure `git status --short` is clean
-  - Locale JSON: `make check tr`
-  - Migrations/schema SQL: `make db migrate up && make db seed` (optional `make db migrate down`)
-
-## Architecture Guard
-- `.gocleanarch.yml` 定义了 domain/services/presentation/infrastructure 与 pkg/cmd/shared 层的依赖约束。
-- `make check lint` 会先执行 golangci-lint，再运行 `go run ./cmd/cleanarchguard -config .gocleanarch.yml`。
-- `quality-gates` 的 lint job 在 Go 文件或 `.gocleanarch.yml` 变更时自动触发，同样复用该命令。
-
-## Code Style Guidelines
-- Use `go fmt` for formatting. Do not indent code manually.
-- Use Go v1.24.10 and follow standard Go idioms
-- File organization: group related functionality in modules/ or pkg/ directories
-- Naming: use camelCase for variables, PascalCase for exported functions/types
-- Testing: table-driven tests with descriptive names (TestFunctionName_Scenario), use the `require` and `assert` packages from `github.com/stretchr/testify`
-- Error handling: use pkg/serrors for standard error types
-- Type safety: use strong typing and avoid interface{} where possible
-- Follow existing patterns for database operations with jmoiron/sqlx
-- For UI components, follow the existing templ/htmx patterns
-- NEVER read *_templ.go files, they contain no useful information since they are generated by templ generate (make generate) command from .templ files
-
-## UI Implementation Guidelines
-
-### HTMX Best Practices
-- Use `htmx.IsHxRequest(r)` to check if a request is from HTMX
-- Use `htmx.SetTrigger(w, "eventName", payload)` for setting HTMX response triggers
-
-## 模块冻结政策（Billing / CRM / Finance）
-
-- `modules/billing`, `modules/crm`, `modules/finance` 已进入长期冻结状态，暂停一切新特性、重构与 Bug 修复；除非产品委员会重新解冻，否则禁止修改这些目录下的任何代码、SQL、模板与资源文件。
-- 质量门禁（`quality-gates` workflow）、本地测试脚本与 `sql` 格式化步骤均已排除上述模块，它们不会参与 `go test`、`go vet`、`golangci-lint`、`pg_format` 等自动化检查。遇到故障也无需修复，保持当前快照即可。
-- 若业务需求确实需要调整，请先更新 dev-plan 并经负责人批准，随后在 AGENTS.md 中撤销冻结声明，再恢复质量门禁与测试范围。
+- 对外入口：`README.MD`（摘要 + 链接索引）
+- 贡献者指南：`docs/CONTRIBUTING.MD`（上手与 CI 对齐矩阵）
+- Superadmin：`docs/SUPERADMIN.md`（独立部署与本地开发入口）
+- 活体架构：`docs/ARCHITECTURE.md`
+- Guides 入口：`docs/guides/index.md`
+- 静态资源约定：`docs/assets/index.md`
+- Authz Policy Draft API：`docs/runbooks/authz-policy-draft-api.md`
+- Authz Bot：`docs/runbooks/AUTHZ-BOT.md`
+- HRM sqlc：`docs/runbooks/hrm-sqlc.md`
+- HRM Atlas+Goose：`docs/runbooks/hrm-atlas-goose.md`
+- PostgreSQL 17 迁移：`docs/runbooks/postgres17-migration.md`
+- 文档规范：`docs/dev-plans/000-docs-format.md`
+- 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
+- 归档区说明：`docs/Archived/index.md`
