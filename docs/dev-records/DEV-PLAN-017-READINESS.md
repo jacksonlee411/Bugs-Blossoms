@@ -2,6 +2,8 @@
 
 该记录用于 DEV-PLAN-017（`pkg/outbox`）实施过程中的可追溯验证：每次关键变更（接口契约、schema/查询口径、重试语义、并发策略、指标口径）都应在此记录执行命令与结果。
 
+配套 Runbook：`docs/runbooks/transactional-outbox.md`
+
 ## 环境信息（填写）
 - 日期（UTC）：2025-12-15
 - 分支 / PR：feature/dev-plan-017（https://github.com/jacksonlee411/Bugs-Blossoms/pull/43）

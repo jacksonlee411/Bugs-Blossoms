@@ -354,6 +354,7 @@ type Dispatcher interface {
 - 数据级：不建议删除未发布数据；若必须清理，需按表/tenant/time window 明确范围并保留审计记录。
 
 ### 10.4 排障与重放（Runbook 口径，M1 必须写清）
+> 配套 Runbook：`docs/runbooks/transactional-outbox.md`（启用/指标/排障 SQL 入口）
 > outbox 默认为 at-least-once；任何重放都可能产生重复副作用，必须确保消费者幂等（以 `event_id` 为键）。
 
 - **查询积压**：
