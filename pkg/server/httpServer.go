@@ -27,7 +27,7 @@ type HTTPServer struct {
 	MethodNotAllowedHandler http.Handler
 }
 
-func (s *HTTPServer) Start(socketAddress string) error {
+func (s *HTTPServer) Router() *mux.Router {
 	r := mux.NewRouter()
 	r.Use(s.Middlewares...)
 	for _, controller := range s.Controllers {
@@ -42,5 +42,13 @@ func (s *HTTPServer) Start(socketAddress string) error {
 	}
 	r.NotFoundHandler = notFoundHandler
 	r.MethodNotAllowedHandler = notAllowedHandler
-	return http.ListenAndServe(socketAddress, gziphandler.GzipHandler(r))
+	return r
+}
+
+func (s *HTTPServer) Handler() http.Handler {
+	return gziphandler.GzipHandler(s.Router())
+}
+
+func (s *HTTPServer) Start(socketAddress string) error {
+	return http.ListenAndServe(socketAddress, s.Handler())
 }

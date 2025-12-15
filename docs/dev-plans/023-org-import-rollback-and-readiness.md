@@ -51,11 +51,11 @@
   - 检查 `parent_code` 是否存在（或在当前批次中创建）。
   - 检查时间片重叠（Overlap Check）：查询 DB 中该实体的现有时间片，模拟插入看是否触发 EXCLUDE 约束。
 - **Phase 3: Apply (Transactional)**
-  - 开启事务（db backend）或调用 API 批量入口（api backend，优先走 `POST /org/batch` 以复用 024/026 的校验、审计与事件发布路径）。
+  - 开启事务（db backend）或调用 API 批量入口（api backend，优先走 `POST /org/api/batch` 以复用 024/026 的校验、审计与事件发布路径）。
   - 按依赖顺序写入：`org_nodes` -> `org_node_slices` -> `org_edges` -> `positions` -> `org_assignments`（`org_edges` 的 `path/depth` 由触发器维护）。
   - 失败则全量回滚。
   - 事件与缓存一致性：
-    - **db backend**：不直接触发应用内缓存失效；若在应用运行期间做 merge，需在执行后调用 026 的 `/org/snapshot` 或重启应用以完成对账/缓存重建（直到 outbox/relay 落地）。
+    - **db backend**：不直接触发应用内缓存失效；若在应用运行期间做 merge，需在执行后调用 026 的 `/org/api/snapshot` 或重启应用以完成对账/缓存重建（直到 outbox/relay 落地）。
     - **api backend**：由服务端在同一事务内写入 outbox 并发布 `OrgChanged/OrgAssignmentChanged`（对齐 022），触发下游（Authz/缓存/索引）更新。
 
 ### 4. 回滚策略 (Rollback)

@@ -9,7 +9,7 @@
   - 事件字段若在下游（Authz/缓存/报表）消费后再改名/改语义，会导致跨模块回放与纠偏成本急剧上升。
 - **业务价值**：
   - 通过“占位表先行 + 契约冻结（v1 Topic）”，为后续 024/025/026 的实现提供可直接编码的落点，降低返工与漂移风险。
-  - 为 026 的 outbox/relay 与 `/org/snapshot` 纠偏链路提供一致的事件语义（valid time vs transaction time）。
+  - 为 026 的 outbox/relay 与 `/org/api/snapshot` 纠偏链路提供一致的事件语义（valid time vs transaction time）。
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
@@ -141,7 +141,7 @@ flowchart LR
 | `requester_id` | `uuid` | `not null` |  | FK → `users.id` |
 | `status` | `text` | `not null` | `draft` | `draft/submitted/approved/rejected/cancelled`（预留） |
 | `payload_schema_version` | `int` | `not null` | `1` | 向后兼容 |
-| `payload` | `jsonb` | `not null` |  | 建议复用 026 的 `/org/batch` body 结构 |
+| `payload` | `jsonb` | `not null` |  | 建议复用 026 的 `/org/api/batch` body 结构 |
 | `notes` | `text` | `null` |  | 备注 |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
@@ -210,7 +210,7 @@ flowchart LR
   - `assignment.rescinded`
 
 ### 5.5 `org.changed.v1` 的 `new_values` 结构（选定）
-> v1 以“最小可用快照”为准：下游若需要完整时间线与路径，走 026 的 `/org/snapshot` 纠偏。
+> v1 以“最小可用快照”为准：下游若需要完整时间线与路径，走 026 的 `/org/api/snapshot` 纠偏。
 
 `entity_type` 取值必须为 `org_node` 或 `org_edge`。
 
@@ -314,7 +314,7 @@ flowchart LR
 
 ## 10. 运维、回滚与降级 (Ops / Rollback)
 - 迁移回滚：新表/索引若导致冲突，按 021 的迁移目录回滚最新步（`GOOSE_STEPS=1 ... down` 或等价机制；最终口径以仓库迁移工具链为准）。
-- 契约演进：若事件字段需调整，只允许通过发布新 Topic 版本（`v2`）演进；旧版保留一段兼容期并提供 `/org/snapshot` 纠偏。
+- 契约演进：若事件字段需调整，只允许通过发布新 Topic 版本（`v2`）演进；旧版保留一段兼容期并提供 `/org/api/snapshot` 纠偏。
 
 ## 11. 任务清单（落地追踪）
 1. [ ] **Schema 与迁移**：在 `modules/org/infrastructure/atlas/schema.hcl` 补充 4.1~4.4 的表/索引/约束，生成迁移并通过 lint。

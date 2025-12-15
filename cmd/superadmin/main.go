@@ -151,6 +151,7 @@ func main() {
 		Configuration: conf,
 		Application:   app,
 		Pool:          pool,
+		Entrypoint:    "superadmin",
 	}
 
 	// Create server first - this sets up core middleware including RequestParams

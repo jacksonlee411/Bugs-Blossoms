@@ -1,0 +1,121 @@
+version: 1
+
+# 说明：
+# - 本文件用于支撑 DEV-PLAN-018：全局路由策略统一。
+# - 作为 route-lint 与全局错误处理（404/405）route_class 判定的同源输入（避免口径漂移）。
+# - 仅列“顶层入口/单例入口”，不枚举所有子路由；子路由通过前缀匹配覆盖。
+
+entrypoints:
+  server:
+    # Static / assets
+    - prefix: /assets
+      class: static
+    - prefix: /static
+      class: static
+
+    # UI upload write endpoint (POST) + static uploads prefix
+    - prefix: /uploads
+      class: ui
+
+    # AuthN
+    - prefix: /login
+      class: authn
+    - prefix: /logout
+      class: authn
+    - prefix: /oauth
+      class: authn
+
+    # Core UI root exceptions (legacy, keep)
+    - prefix: /account
+      class: ui
+    - prefix: /settings
+      class: ui
+    - prefix: /users
+      class: ui
+    - prefix: /roles
+      class: ui
+    - prefix: /groups
+      class: ui
+    - prefix: /spotlight
+      class: ui
+
+    # Core Authz UI + internal API SSOT
+    - prefix: /core/authz
+      class: ui
+    - prefix: /core/api/authz
+      class: internal_api
+
+    # Public API namespace (versioned)
+    - prefix: /api/v1
+      class: public_api
+
+    # Legacy / migration windows (see DEV-PLAN-018 appendix B)
+    - prefix: /api/lens/events
+      class: internal_api
+    - prefix: /api/website/ai-chat
+      class: public_api
+    - prefix: /query
+      class: internal_api
+    - prefix: /playground
+      class: dev_only
+    - prefix: /_dev
+      class: dev_only
+
+    # Ops
+    - prefix: /debug/prometheus
+      class: ops
+    - prefix: /health
+      class: ops
+
+    # Test-only
+    - prefix: /__test__
+      class: test
+
+    # Websocket
+    - prefix: /ws
+      class: websocket
+
+    # Webhooks (legacy bindings)
+    - prefix: /twilio
+      class: webhook
+    - prefix: /billing
+      class: webhook
+
+    # Legacy UI
+    - prefix: /logs
+      class: ui
+    - prefix: /bi-chat
+      class: ui
+    - prefix: /project-stages
+      class: ui
+
+    # Superadmin paths are reachable on the main server via module registration.
+    - prefix: /superadmin
+      class: ui
+    - prefix: /metrics
+      class: ui
+
+  superadmin:
+    # Static / assets
+    - prefix: /assets
+      class: static
+    - prefix: /static
+      class: static
+
+    # UI upload write endpoint (POST) + static uploads prefix
+    - prefix: /uploads
+      class: ui
+
+    # AuthN
+    - prefix: /login
+      class: authn
+    - prefix: /logout
+      class: authn
+    - prefix: /oauth
+      class: authn
+
+    # Superadmin UI
+    - prefix: /superadmin
+      class: ui
+    - prefix: /metrics
+      class: ui

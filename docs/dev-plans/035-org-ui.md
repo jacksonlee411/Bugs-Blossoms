@@ -126,12 +126,16 @@ graph TD
 ## 5. 接口契约 (API Contracts)
 > 标准：需要同时定义页面路由、HTMX partial 的 URL/Method/参数与错误行为；Authz 失败需返回统一 403 契约并渲染 Unauthorized 组件。
 >
-> 约定：同一路由允许同时服务 UI（HTML/HTMX）与 API（JSON），但必须遵循清晰的内容协商优先级，避免“HTMX 误拿 JSON / API 误拿 HTML”。
+> 约定：UI 路由（`/org/*`）主要服务 HTML/HTMX；显式 `Accept: application/json` 时可返回 JSON 用于 E2E/诊断，但正式内部 API 应调用 `/org/api/*`（见 DEV-PLAN-026）。
 
 ### 5.0 内容协商规则（优先级）
-1. **HTMX 优先**：若请求头包含 `Hx-Request: true`，则返回 HTML（partial），忽略 `Accept`。
-2. **API 次之**：若非 HTMX 且 `Accept` 包含 `application/json`，则返回 JSON（成功与错误都为 JSON）。
+> 对齐 `docs/dev-plans/018-routing-strategy.md` 的 5.1：显式 JSON（`Accept`）优先于 HTMX（`Hx-Request`）。
+
+1. **显式 JSON**：若 `Accept` 包含 `application/json`，返回 JSON（用于 E2E/诊断；避免 JSON 请求误拿 HTML）。
+2. **HTMX Partial**：若 `Hx-Request: true`，返回 HTML（partial/OOB）。
 3. **默认页面**：其它情况返回 HTML（full page）。
+
+说明：若同时满足 `Accept: application/json` 与 `Hx-Request: true`，以 **JSON 优先**；常规 HTMX 请求通常不会显式请求 JSON。
 
 > 说明：403 Forbidden 的 payload/组件输出遵循项目统一 authz 契约（参考 `components/authorization/unauthorized.templ` 与 `modules/core/authzutil` 的 forbidden payload）。
 

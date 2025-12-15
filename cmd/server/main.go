@@ -94,6 +94,7 @@ func main() {
 		Configuration: conf,
 		Application:   app,
 		Pool:          pool,
+		Entrypoint:    "server",
 	}
 	serverInstance, err := server.Default(options)
 	if err != nil {

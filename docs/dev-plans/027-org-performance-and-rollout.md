@@ -37,7 +37,7 @@
 ```mermaid
 graph TD
     A[org-perf / go test -bench] -->|db backend| B[Org Repo/Service]
-    A -->|api backend| C[HTTP: GET /org/hierarchies...]
+    A -->|api backend| C[HTTP: GET /org/api/hierarchies...]
     C --> D[Org Controllers]
     D --> B
     B --> E[(Postgres 17)]
@@ -86,8 +86,8 @@ graph TD
   - `make org-perf-bench`：运行基准并输出 `./tmp/org-perf/report.json`（路径可配置）。
 
 ### 5.2 API 基准目标（对齐 024/026）
-- `GET /org/hierarchies?type=OrgUnit&effective_date=`（024 定义，M1 树概览）
-- `GET /org/snapshot?effective_date=&include=`（026 定义，全量对账/纠偏；基准仅作为参考，不作为 M1 200ms 硬门槛）
+- `GET /org/api/hierarchies?type=OrgUnit&effective_date=`（024 定义，M1 树概览）
+- `GET /org/api/snapshot?effective_date=&include=`（026 定义，全量对账/纠偏；基准仅作为参考，不作为 M1 200ms 硬门槛）
 
 ## 6. 核心逻辑与算法 (Business Logic & Algorithms)
 ### 6.1 基准执行算法（统一口径）
@@ -133,12 +133,12 @@ graph TD
 - **依赖**：
   - `docs/dev-plans/021-org-schema-and-constraints.md`：表/索引/约束可用（PG17）。
   - `docs/dev-plans/023-org-import-rollback-and-readiness.md`：数据导入/回滚工具可用（用于灰度剧本的执行面）。
-  - `docs/dev-plans/024-org-crud-mainline.md`：树读入口与最小主链可运行（`GET /org/hierarchies...`）。
+  - `docs/dev-plans/024-org-crud-mainline.md`：树读入口与最小主链可运行（`GET /org/api/hierarchies...`）。
   - `docs/dev-plans/026-org-api-authz-and-events.md`：Authz/缓存基线/outbox 闭环（灰度期间便于纠偏与缓存失效）。
 - **里程碑**：
   1. [ ] 基准数据集生成/导入入口落地（固定 1k profile）。
   2. [ ] DB 基准（repo/service）可运行并产出 JSON 报告。
-  3. [ ] API 基准（`/org/hierarchies`）可运行并产出报告（参考指标）。
+  3. [ ] API 基准（`/org/api/hierarchies`）可运行并产出报告（参考指标）。
   4. [ ] 性能预算达标或形成明确降级方案（含 feature flag 与回滚命令）。
   5. [ ] 灰度发布/回滚剧本定稿并演练（dry-run + apply）。
   6. [ ] Readiness 记录补齐（命令/耗时/结果/环境）。
