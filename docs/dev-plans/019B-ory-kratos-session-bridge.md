@@ -113,6 +113,19 @@ PoC 行为（在不改变表单字段名的前提下）：
   - `identity.id`
   - `identity.traits.tenant_id` / `identity.traits.email`
 
+### 5.4 Kratos 错误消息到 UI 的映射（标准化）
+目标：不引入新的 UI 体系，复用现有 `/login` 页面结构（`errorsMap` + `error` flash）。
+
+- 全局错误（Global）：
+  - 来源：`flow.ui.messages` 或非字段错误（如 CSRF/flow 过期）。
+  - 映射：写入 `shared.SetFlash(w, "error", ...)`，在页面顶部用现有 Alert/Toast 机制展示。
+- 字段错误（Field）：
+  - 来源：`flow.ui.nodes[].messages`（按 node 的 `attributes.name` 归类）。
+  - 映射：写入 `shared.SetFlashMap(w, "errorsMap", ...)`，并按本地表单字段名对齐：
+    - Kratos `password_identifier` → 本地表单 `Email`
+    - Kratos `password` → 本地表单 `Password`
+  - 备注：未知字段/无法归类的消息降级为全局错误，避免“报错但页面无提示”。
+
 ## 6. 核心逻辑与算法 (Business Logic & Algorithms)
 ### 6.1 租户解析（未登录场景）
 新增中间件（或在 login controller 内部实现 PoC 版本）：
@@ -155,6 +168,10 @@ sess := sessionService.Create(ctx, u.ID, tenantID, ip, userAgent)
 setSidCookie(sess.Token)
 ```
 
+关键约束（避免一致性陷阱）：
+- PoC 优先走 **API flow（服务端代理）**：只有当本地 user/session 落库成功后才给浏览器下发 `sid` cookie；避免出现“Kratos 已登录但应用未登录”的割裂状态。
+- user 绑定必须幂等：同一 `(tenant_id, email)` 重试不会创建重复用户；`kratos_identity_id` 写回允许重复执行但必须防串号（identity mismatch 直接拒绝并告警）。
+
 ### 6.3 兼容性与回滚
 - legacy 与 kratos 两条路径必须并存，且切换仅依赖 `IDENTITY_MODE`。
 - 回滚时不需要清理 `kratos_identity_id` 数据；它只是映射信息。
@@ -169,7 +186,8 @@ setSidCookie(sess.Token)
 2. [ ] 实现 tenant 解析并注入 ctx（至少覆盖 `/login`）。
 3. [ ] 实现 Kratos 密码登录链路（API flow）与错误渲染映射。
 4. [ ] 实现 identity → 本地 user 绑定（含 `kratos_identity_id` 列与约束）。
-5. [ ] 灰度开关与回滚手册（见第 10 节）。
+5. [ ] 本地开发体验（DX）：更新 `devhub.yml`/Makefile 增加可选 Kratos 依赖的一键启动方式；默认保持 `IDENTITY_MODE=legacy`，让不做身份域相关开发的同学无需启动 Kratos。
+6. [ ] 灰度开关与回滚手册（见第 10 节）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - [ ] `IDENTITY_MODE=legacy` 时，现有登录与 Google OAuth 不受影响。

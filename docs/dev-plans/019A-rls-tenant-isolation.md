@@ -43,6 +43,11 @@ flowchart TD
   - 选定：不使用 `current_setting(..., true)`，缺失上下文时直接报错，尽早暴露注入遗漏。
 - **决策 3：应用 DB 连接账号不得为 superuser / BYPASSRLS**
   - 说明：PostgreSQL 的 superuser 或带 `BYPASSRLS` 的角色会绕过 RLS；PoC 必须使用普通应用角色验证隔离有效性。
+- **决策 4：系统级组件（Outbox Relay / 后台 Job）不直接依赖“放宽 RLS”**
+  - 说明：Outbox Relay/后台 Job 往往需要跨租户扫描队列（当前 outbox relay 的 claim 查询即是全表扫描 + SKIP LOCKED）。
+  - 策略：
+    - PoC 阶段：**不对系统级队列表（如 `<module>_outbox`）启用 RLS**（系统表作为单独安全域处理）。
+    - 若未来确需对系统表启用 RLS：使用**专用连接池/专用 DB role**（可 BYPASSRLS 或通过更细粒度 policy 允许 system role），并补齐审计与最小权限；禁止使用 “`current_setting(...) IS NULL` 则放行” 这类会把注入遗漏变成跨租户可读的策略。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
 ### 4.1 PoC 表（现状）
@@ -98,12 +103,12 @@ PoC 要求覆盖两类事务入口：
 推荐实现一个统一 helper（示意接口）：
 ```go
 // pkg/routing/rls or pkg/repo/rls（以仓库约定为准）
-func ApplyTenantRLS(ctx context.Context, tx repo.Tx) error
+func ApplyTenantRLS(ctx context.Context, tx pgx.Tx) error
 ```
 
 实现策略（伪代码）：
 ```go
-func ApplyTenantRLS(ctx context.Context, tx repo.Tx) error {
+func ApplyTenantRLS(ctx context.Context, tx pgx.Tx) error {
   if os.Getenv("RLS_ENFORCE") != "enforce" {
     return nil
   }
@@ -116,7 +121,14 @@ func ApplyTenantRLS(ctx context.Context, tx repo.Tx) error {
 }
 ```
 
-### 6.2 失败模式与错误处理
+### 6.2 非事务访问防护（fail-fast）
+当 `RLS_ENFORCE=enforce` 且访问了启用 RLS 的表时：
+- 必须在显式事务中完成注入；否则 Postgres 会 fail-closed（报错/无数据），容易在开发期表现为“数据凭空消失/偶发报错”。
+- 为避免“隐式失败”，建议在访问 RLS 表的 repo/service 层提供明确的 guard：
+  - `RequireTx(ctx)`：若 ctx 中不存在 `pgx.Tx`，直接返回可读错误（提示使用 `composables.InTx` 包裹）。
+  - `InTenantTx(ctx, fn)`：对外提供统一入口，内部完成 `BEGIN + ApplyTenantRLS + fn + COMMIT/ROLLBACK`。
+
+### 6.3 失败模式与错误处理
 - 缺失 tenant：注入失败，返回应用错误（建议使用 `pkg/serrors` 包装为可观测错误）。
 - DB 返回 `unrecognized configuration parameter`：表示未创建 GUC（Postgres 允许自定义 `app.*`，通常不会发生）；需记录为配置错误。
 - DB 返回 `invalid input syntax for type uuid`：表示注入值不合法，属于严重 bug（应触发告警）。
@@ -124,6 +136,9 @@ func ApplyTenantRLS(ctx context.Context, tx repo.Tx) error {
 ## 7. 安全与鉴权 (Security & Authz)
 - RLS 只解决“数据隔离”，不替代 Casbin（业务授权仍必须在应用层完成）。
 - superadmin/跨租户操作必须使用明确的旁路机制（例如专用连接账号 + 审计），不得通过普通租户链路隐式绕过。
+- **系统组件与 RLS**：
+  - Outbox Relay / 后台 Job 的“跨租户扫描”属于系统能力，不应通过放宽 RLS policy 来绕过隔离。
+  - PoC 阶段明确：仅对业务表（如 `employees`）启用 RLS；系统队列表不启用。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 1. [ ] 选择 PoC 表：`employees`（已定）。
@@ -136,6 +151,7 @@ func ApplyTenantRLS(ctx context.Context, tx repo.Tx) error {
 - **行为**：
   - [ ] tenant=A 的上下文下，读取 tenant=B 的行必须失败（无数据或报错）。
   - [ ] 未设置 `app.current_tenant` 时，对启用 RLS 的表进行查询必须 fail-closed（按 policy 选择“报错”口径）。
+  - [ ] 启用 RLS 的业务表不影响系统组件（例如 outbox relay 仍可跨租户扫描其队列表）。
 - **工程**：
   - [ ] `go fmt ./... && go vet ./... && make check lint` 通过。
   - [ ] 若涉及 migrations：按 AGENTS 触发器执行 `make db migrate up && make db seed` 并记录结果。
