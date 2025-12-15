@@ -11,4 +11,4 @@ if [[ ${#packages[@]} -eq 0 ]]; then
   exit 0
 fi
 
-GOWORK=off go test "$@" "${packages[@]}"
+GOWORK=off go test -buildvcs=false "$@" "${packages[@]}"

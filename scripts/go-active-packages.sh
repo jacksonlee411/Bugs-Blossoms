@@ -14,7 +14,7 @@ fi
 
 cd "$REPO_ROOT"
 
-packages="$(GOWORK=off go list ./...)"
+packages="$(GOWORK=off go list -buildvcs=false ./...)"
 if [[ -n "${EXCLUDE_PATTERN}" ]]; then
   packages="$(printf "%s\n" "${packages}" | grep -Ev "${EXCLUDE_PATTERN}" || true)"
 fi
