@@ -90,6 +90,11 @@ type OpenTelemetryOptions struct {
 	ServiceName string `env:"OTEL_SERVICE_NAME" envDefault:"sdk"`
 }
 
+type PrometheusOptions struct {
+	Enabled bool   `env:"PROMETHEUS_METRICS_ENABLED" envDefault:"false"`
+	Path    string `env:"PROMETHEUS_METRICS_PATH" envDefault:"/debug/prometheus"`
+}
+
 type ClickOptions struct {
 	URL            string `env:"CLICK_URL" envDefault:"https://my.click.uz"`
 	MerchantID     int64  `env:"CLICK_MERCHANT_ID"`
@@ -150,18 +155,39 @@ type AuthzOptions struct {
 	Mode           string `env:"AUTHZ_MODE" envDefault:"shadow"`
 }
 
+type OutboxOptions struct {
+	RelayEnabled         bool          `env:"OUTBOX_RELAY_ENABLED" envDefault:"true"`
+	RelayTables          string        `env:"OUTBOX_RELAY_TABLES" envDefault:""`
+	RelayPollInterval    time.Duration `env:"OUTBOX_RELAY_POLL_INTERVAL" envDefault:"1s"`
+	RelayBatchSize       int           `env:"OUTBOX_RELAY_BATCH_SIZE" envDefault:"100"`
+	RelayLockTTL         time.Duration `env:"OUTBOX_RELAY_LOCK_TTL" envDefault:"60s"`
+	RelayMaxAttempts     int           `env:"OUTBOX_RELAY_MAX_ATTEMPTS" envDefault:"25"`
+	RelaySingleActive    bool          `env:"OUTBOX_RELAY_SINGLE_ACTIVE" envDefault:"true"`
+	RelayDispatchTimeout time.Duration `env:"OUTBOX_RELAY_DISPATCH_TIMEOUT" envDefault:"30s"`
+
+	LastErrorMaxBytes int `env:"OUTBOX_LAST_ERROR_MAX_BYTES" envDefault:"2048"`
+
+	CleanerEnabled       bool          `env:"OUTBOX_CLEANER_ENABLED" envDefault:"true"`
+	CleanerTables        string        `env:"OUTBOX_CLEANER_TABLES" envDefault:""`
+	CleanerInterval      time.Duration `env:"OUTBOX_CLEANER_INTERVAL" envDefault:"1m"`
+	CleanerRetention     time.Duration `env:"OUTBOX_CLEANER_RETENTION" envDefault:"168h"`
+	CleanerDeadRetention time.Duration `env:"OUTBOX_CLEANER_DEAD_RETENTION" envDefault:"0"`
+}
+
 type Configuration struct {
 	Database         DatabaseOptions
 	Google           GoogleOptions
 	Twilio           TwilioOptions
 	Loki             LokiOptions
 	OpenTelemetry    OpenTelemetryOptions
+	Prometheus       PrometheusOptions
 	Click            ClickOptions
 	Payme            PaymeOptions
 	Octo             OctoOptions
 	Stripe           StripeOptions
 	RateLimit        RateLimitOptions
 	Authz            AuthzOptions
+	Outbox           OutboxOptions
 	ActionLogEnabled bool `env:"ACTION_LOG_ENABLED" envDefault:"false"`
 
 	RedisURL         string        `env:"REDIS_URL" envDefault:"localhost:6379"`
