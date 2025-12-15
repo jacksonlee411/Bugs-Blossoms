@@ -134,9 +134,11 @@ modules/{module}/
 - PostgreSQL 17 迁移：`docs/runbooks/postgres17-migration.md`
 - 文档规范：`docs/dev-plans/000-docs-format.md`
 - Core 用户权限页 IA 优化：`docs/dev-plans/016A-core-users-permissions-ia.md`
+- Core 用户权限页签 UI/交互优化：`docs/dev-plans/016B-core-users-permissions-ui.md`
 - Transactional Outbox 工具链（DEV-PLAN-017）：`docs/dev-plans/017-transactional-outbox.md`
 - DEV-PLAN-017 Readiness：`docs/dev-records/DEV-PLAN-017-READINESS.md`
 - 全局路由策略统一（DEV-PLAN-018）：`docs/dev-plans/018-routing-strategy.md`
 - DEV-PLAN-018A 路由策略评审输入：`docs/dev-plans/018A-routing-strategy-review.md`
+- 多租户工具链选型与落地（DEV-PLAN-019）：`docs/dev-plans/019-multi-tenant-toolchain.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
