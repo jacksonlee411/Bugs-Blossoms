@@ -9,6 +9,7 @@
 - **现状盘点（示例，非穷举）**：
   - UI（HTML/HTMX）：`/hrm/employees`、`/logs`、`/finance/*`、`/warehouse/*` 等。
   - 内部 API（JSON）：`/core/api/authz/*`，以及少量 `/_dev`、`/api/*` 风格的内部端点。
+  - AuthN（认证边界）：`/login`、`/logout`、`/oauth/*`。
   - Webhooks/第三方回调：`/twilio`、支付网关回调（路径可能由配置决定）。
   - 运维/测试：`/health`、`/__test__/*`、`/ws`、`/assets/*`。
 - **痛点**：
@@ -38,7 +39,7 @@ graph TD
   U[UI Routes<br/>HTML + HTMX] -->|may call| IA[Internal API<br/>JSON + HX headers]
   U -->|GET only| P[Public pages<br/>HTML]
   C[Clients/CLI/Integrations] --> PA[Public API<br/>/api/v1/* JSON]
-  X[External Providers] --> WH[Webhooks<br/>/integrations/* or legacy paths]
+  X[External Providers] --> WH[Webhooks<br/>/webhooks/* or legacy paths]
   Ops[Ops/CI] --> H[Health/Ready/Metrics]
   E2E[E2E runner] --> T[__test__ endpoints]
 ```
@@ -47,33 +48,63 @@ graph TD
 - **决策 1：保留“软隔离”，新增能力走“强命名空间”**
   - 原因：项目已存在 UI 路由 + 内部 JSON API + webhooks 混存的现实；全量硬隔离需要大规模迁移与外部对接变更，性价比不高。
   - 策略：从现在开始，新增/重构路由必须落在明确命名空间；存量逐步迁移并保留 alias/redirect。
-- **决策 2：对外 API 强制 `/api/v1/*`，内部 API 统一 `/core/api/*`**
+- **决策 2：对外 API 强制 `/api/v1/*`，内部 API 统一 `/{module}/api/*`**
   - `/api/v1/*`：稳定、版本化、面向程序消费（CLI/下游系统/自动化），默认 JSON-only。
-  - `/core/api/*`：面向本应用 UI 的内部 JSON API（含 HTMX 触发头），默认 session-based（同源）而非 token-based。
-  - 说明：现有 `/core/api/authz/*` 已被 UI 广泛依赖；因此选择以它为内部 API 的统一前缀，减少迁移成本。
+  - `/{module}/api/*`：面向本应用 UI 的内部 JSON API（含 HTMX 触发头），默认 session-based（同源）而非 token-based。
+  - 说明：内部 API 与模块边界对齐（例如 core 内部 API 为 `/core/api/*`，天然承接既有的 `/core/api/authz/*`，并避免出现“所有模块 API 都挂在 core 下”的语义负担）。
 - **决策 3：UI 成功响应以 HTML 为主；JSON 主要用于内部/对外 API 与“错误诊断”**
   - UI（HTML/HTMX）侧不追求“成功也返回 JSON”，避免前端二次渲染与协议复杂化。
   - 允许 UI 路由在显式 `Accept: application/json` 时返回 JSON（至少 403 forbidden payload），用于 E2E/调试/自动化断言。
+- **决策 4：Webhooks 与 Ops 采用独立一级前缀（新增强制，存量渐进/例外）**
+  - Webhooks 推荐统一在 `/webhooks/{provider}/*`；存量已绑定外部平台的路径可保留为 legacy（需在例外清单登记安全基线）。
+  - Ops 推荐统一在 `/_ops/*`；存量 `/health`、`/debug/prometheus` 作为顶层例外保留并纳入安全基线。
+
+### 3.3 ADR-018-01：内部 API 前缀裁决（必须对齐 Org）
+> 目标：消除 “`/api/*` 语义歧义”，并让新增路由可被 reviewer 与门禁稳定判定其类别（UI/Internal/Public/Webhooks/Ops/Test）。
+
+- **裁决**：内部 JSON API **按模块归属**使用 `/{module}/api/{capability}/...`（例如：core 为 `/core/api/*`，org 为 `/org/api/*`）。
+- **强约束**：
+  - `/api/v1/*` **仅用于对外 API**（版本化）；除 `/api/v1/*` 外，禁止新增任何 `/api/*` 路由。
+  - 现存 `/api/*` 存量端点必须迁移到对应命名空间，并在迁移窗口期保留 alias（写请求/回调类端点不得依赖 redirect）。
+- **与 Org 系列计划对齐**：
+  - `/org/*` 保留给 Org UI（HTML/HTMX）。
+  - Org 内部 API 统一为 `/org/api/*`（Session + Authz，JSON-only）。
+  - 若未来需要“真正对外”的 Org API，则必须走 `/api/v1/org/*`（不得复用 UI Session cookie；认证模型需显式声明）。
+  - 以上要求必须同步落盘到 `docs/dev-plans/020-organization-lifecycle.md` 与 `docs/dev-plans/026-org-api-authz-and-events.md`。
 
 ## 4. 路由命名空间与约束 (Route Space & Constraints)
 ### 4.1 顶层前缀（规范）
+> 说明：仓库内至少存在两个 HTTP 服务入口（`cmd/server` 与 `cmd/superadmin`），它们加载的模块与路由集合并不完全一致；同一路径（例如 `/`）在不同入口可能语义不同。本表描述“全仓库的路由分类与命名空间约束”，并允许按入口取子集实现。
+
 | 类别 | 前缀 | 默认返回 | 认证模型 | 备注 |
 |---|---|---|---|---|
 | UI（Authenticated） | `/{module}/...` + 少量根路径（如 `/settings`） | HTML | Session（cookie） | HTMX partial 通过 `Hx-Request` 返回 |
-| UI（Public） | `/login`、`/`（公开页）等 | HTML | 可选 | 以现有实现为准 |
-| 内部 API（Internal） | `/core/api/{capability}/...` | JSON | Session（cookie） | 可设置 `HX-Trigger/Hx-Push-Url` 等响应头 |
-| 对外 API（Public） | `/api/v1/{domain}/...` | JSON | Token/Key（按模块定义） | 强制版本化；禁止返回 HTML |
-| Webhooks（Inbound） | `/integrations/{provider}/...`（推荐） | JSON/表单 | Provider 签名校验 | 存量路径允许保留（如 `/twilio`） |
-| 运维（Ops） | `/health`（可扩展 `/readyz` `/metrics`） | JSON/text | 无/受限 | 以运维需求为准 |
+| AuthN（认证边界） | `/login`、`/logout`、`/oauth/*` | HTML/redirect | Anonymous（可选 Session） | 不属于业务 UI 模块；需明确其“允许未认证访问”的边界 |
+| UI（Public） | `/`（公开页）等 | HTML | Anonymous | 如无公开页，可不新增；避免将“需要登录”的页面误归类为 public |
+| 内部 API（Internal） | `/{module}/api/{capability}/...` | JSON | Session（cookie） | JSON-only；可设置 `HX-Trigger/HX-Redirect/Hx-Push-Url` 等响应头 |
+| 对外 API（Public） | `/api/v1/{domain}/...` | JSON | Token/Key 或 Anonymous（按模块定义） | 强制版本化；禁止返回 HTML；若允许匿名必须补齐 anti-abuse（限流/验证码/审计等） |
+| Webhooks（Inbound） | `/webhooks/{provider}/...`（新增推荐） | JSON/表单 | Provider 签名校验 | 存量路径允许保留（如 `/twilio`、`/billing/*`），但需登记安全基线 |
+| 运维（Ops） | `/_ops/*`（新增推荐）+ legacy（`/health`、`/debug/prometheus`） | JSON/text | 无/受限 | 建议通过网关/内网白名单/BasicAuth 做访问控制 |
 | 测试（Test only） | `/__test__/*` | JSON | 配置开关 | 仅在 `EnableTestEndpoints` 开启时存在 |
-| 静态资源 | `/assets/*` | file | 无 | 仅静态 |
+| 静态资源 | `/assets/*`、`/{UPLOADS_PATH}/*`（默认 `/static/*`） | file | 无 | build assets 与上传文件前缀需区分并纳入缓存策略 |
 | WebSocket | `/ws` | WS | Session | 仅升级连接 |
+| GraphQL（Legacy 例外） | `/query`、`/playground`、`/query/*` | JSON/HTML | Session（推荐） | `/playground` 默认生产关闭；`/query` 若保留则按内部能力处理（JSON-only + AuthN/Authz 基线） |
+| Dev-only | `/_dev/*` | HTML/JSON | Session/可选 | 必须明确仅开发/测试环境启用，避免生产暴露 |
 
 ### 4.2 路径命名约束（规范）
 - 路径 segment 一律小写，推荐 `kebab-case`（允许保留历史路径，如 `/bi-chat`、`/__test__`）。
 - 资源命名优先使用复数名词：`/employees`、`/payments`、`/requests`。
 - 操作型子路由（非纯 REST）统一采用后缀动词：`/requests/{id}/approve`（存量保留），新增应避免随意扩散“动作路由”。
 - 不允许新增“语义不明”的顶层前缀（例如随意引入 `/api2`、`/internal`）；新增前缀必须先更新本计划并评审通过。
+
+### 4.3 例外清单与登记规则（规范）
+- 所有路由必须能被归类到 4.1 的某一类别；若路径形态不符合其类别的默认前缀（例如 UI 不是 `/{module}/...`、API 不在 `/{module}/api/*` 或 `/api/v1/*`），则视为**例外**。
+- 每个例外必须登记在“附录 B”，并明确：
+  - 归类（route_class）与入口（server/superadmin）；
+  - 保留原因（外部平台绑定/历史兼容/二进制差异等）；
+  - 迁移目标（若要迁移）与兼容策略（alias/redirect/弃用窗口）；
+  - 安全基线（AuthN/Authz/签名校验/anti-abuse/环境开关）。
+- 新增例外属于“路由契约变更”，必须先更新本计划再引入代码实现。
 
 ## 5. 内容协商与返回契约 (Negotiation & Contracts)
 ### 5.1 UI 路由的协商规则（建议统一实现）
@@ -84,22 +115,35 @@ graph TD
 2. **HTMX partial**：若 `Hx-Request: true`，返回 HTML partial（或 OOB），并允许使用 `HX-*` 响应头。
 3. **默认整页**：返回 HTML full page。
 
-### 5.2 内部 API（`/core/api/*`）契约
+### 5.2 内部 API（`/{module}/api/*`）契约
 - 成功与失败均返回 JSON；不得返回 HTML（避免 UI 与 API 混淆）。
 - 允许在 HTMX 调用场景下设置 `HX-Trigger/HX-Redirect/Hx-Push-Url` 等响应头，但 body 仍保持 JSON。
 - 认证与鉴权：
   - 默认按 Session + Authz 能力校验；
-  - 403 统一返回 forbidden payload（字段口径与现有 `modules/core/authzutil.BuildForbiddenPayload` 对齐）。
+  - 403 统一返回 forbidden payload（字段口径与现有 `modules/core/authzutil.BuildForbiddenPayload` 对齐），且**不依赖 `Accept` 协商**（内部 API 必须 JSON-only）。
 
 ### 5.3 对外 API（`/api/v1/*`）契约
 - JSON-only；错误统一 envelope（`code/message/details/request_id` 等）并可演进版本。
-- 认证模型按模块定义（token/key），不得复用 UI Session cookie 作为唯一凭证（避免跨站/CSRF 风险）。
+- 认证模型按模块定义（token/key 或明确允许匿名），不得复用 UI Session cookie 作为唯一凭证（避免跨站/CSRF 风险）。
 
 ### 5.4 403 Forbidden 的统一口径
 - JSON：返回统一 forbidden payload（object/action/domain/subject/missing_policies/debug_url/base_revision/request_id）。
 - HTML：
   - full page：渲染 Unauthorized 页面（复用 `components/authorization/unauthorized.templ`）。
   - HTMX：返回 Unauthorized partial，并设置 `Hx-Retarget: body`、`Hx-Reswap: innerHTML`（与现有实现对齐）。
+
+### 5.5 404/405/500 等全局错误返回契约（必须对齐）
+> 背景：即使单个 controller 做到了 JSON-only，仍可能在“未命中路由/方法不允许/全局 panic”时走到全局 handler；这些路径同样必须遵循命名空间契约。
+
+- 对 `/{module}/api/*` 与 `/api/v1/*`：
+  - 404/405/500 等错误必须返回 `application/json`，不得渲染 HTML 页面或返回纯文本。
+  - 错误 payload：
+    - 内部 API：可复用现有 `APIError` 形态（或等价的 `code/message/request_id`）。
+    - 对外 API：必须返回 5.3 定义的错误 envelope。
+- 对 UI 路由：
+  - 默认返回 HTML（整页或 HTMX partial）；当 `Accept: application/json` 时允许返回 JSON（用于 E2E/诊断）。
+- 实现提示（落地任务）：
+  - `NotFoundHandler`/`MethodNotAllowedHandler` 需要基于 `r.URL.Path` 做 route_class 判定（例如：`/api/v1/*`、`/{module}/api/*` 等），再选择对应 responder；避免“API 命名空间下出现 HTML 404”。
 
 ## 6. 中间件与控制器组织 (Middleware & Controller Conventions)
 > 目标：让“路由类别”决定默认 middleware stack，减少控制器自由发挥导致的不一致。
@@ -110,7 +154,7 @@ graph TD
 
 ### 6.2 内部 API 推荐栈（示意）
 - `Authorize()` → `RequireAuthorization()` → `ProvideUser()` → `ProvideLocalizer()` →（可选）`WithTransaction()`
-- 默认不需要 `NavItems/WithPageContext`（除非需要渲染 Unauthorized HTML；但 `/core/api/*` 默认应返回 JSON）。
+- 默认不需要 `NavItems/WithPageContext`（内部 API 必须保持 JSON-only；避免在 API 层渲染 Unauthorized HTML）。
 
 ### 6.3 Key() 语义（建议）
 - 控制器的 `Key()` 建议返回稳定标识（优先使用其 basePath），便于日志/诊断与测试一致性；避免返回与路由无关的常量字符串（存量不强制改，但新增需遵循）。
@@ -122,6 +166,7 @@ graph TD
   - 必须进行 provider 签名校验、时间戳/重放保护与 IP allowlist（如适用）。
   - 必须与租户隔离策略明确（例如通过 header/路径/回调字段映射 tenant）。
 - **测试端点**：`/__test__/*` 必须受配置开关保护，且默认在生产关闭。
+- **Dev-only 端点**：`/_dev/*` 与 `/playground` 必须受配置开关保护且默认生产关闭（应在“是否注册 controller”层面生效，而非仅依赖前端隐藏）。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 ### 8.1 依赖
@@ -129,15 +174,19 @@ graph TD
 - 现有 authz forbidden payload 口径（`modules/core/authzutil`）。
 
 ### 8.2 里程碑与任务清单
-1. [ ] **路由盘点**：输出当前顶层前缀与路由类别清单（UI/Internal API/Public API/Webhooks/Ops/Test），标注“是否符合 4.1”。
-2. [ ] **策略落盘**：将本计划作为 SSOT，补齐例外清单（存量路径必须说明为何不能迁移）。
-3. [ ] **实现统一协商工具**（可选但推荐）：
-   - [ ] 提供 `pkg/http/negotiation` 或等价 helper：统一判断 `Accept JSON`/`Hx-Request`/默认 HTML。
-   - [ ] 提供统一的 forbidden responder（HTML/HTMX/JSON）。
-4. [ ] **试点迁移（最小改动）**：
-   - [ ] 选择 1 个内部端点从 `/api/*` 迁到 `/core/api/*`（保留旧路径 alias 一段时间）。
-   - [ ] 选择 1 个 UI 模块对齐 5.1 的协商优先级（补齐 E2E 断言）。
-5. [ ] **新增约束**：
+0. [ ] **ADR 对齐**：固化 3.3 的裁决，并同步更新 Org 系列计划的 API 前缀（`docs/dev-plans/020-organization-lifecycle.md`、`docs/dev-plans/026-org-api-authz-and-events.md`）。
+1. [ ] **路由盘点**：输出当前顶层前缀与路由类别清单（UI/Internal API/Public API/Webhooks/Ops/Test），标注“是否符合 4.1”；将结果落盘到附录 B。
+2. [ ] **策略落盘**：补齐例外清单与迁移策略（存量路径必须说明为何不能迁移/迁移目标/兼容策略/安全基线）。
+3. [ ] **统一 responder/协商工具**（推荐）：
+   - [ ] 提供统一的 route_class 判定与 responder：HTML/HTMX/JSON forbidden + JSON error envelope。
+   - [ ] 让内部 API 的 forbidden/error 不受 `Accept` 影响（保持 JSON-only）。
+4. [ ] **全局错误契约落地**：
+   - [ ] 让 `NotFoundHandler`/`MethodNotAllowedHandler` 在 `/{module}/api/*` 与 `/api/v1/*` 下返回 JSON（见 5.5）。
+5. [ ] **试点迁移（最小改动）**：
+   - [ ] 将 `/api/lens/events/*` 迁移到 `/core/api/lens/events/*`（保留 alias；写请求不得依赖 redirect）。
+   - [ ] 将 `/api/website/ai-chat/*` 迁移到 `/api/v1/website/ai-chat/*`（并明确其认证/anti-abuse 基线）。
+6. [ ] **新增约束（可验证）**：
+   - [ ] 增加 route-lint（测试或 lint 规则）：禁止新增非版本化 `/api/*`，并校验例外清单与路由注册一致。
    - [ ] PR 模板/Reviewer checklist 增加“路由类别与命名空间”校验点。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
@@ -146,18 +195,49 @@ graph TD
   - [ ] 明确存量例外清单与迁移策略（8.2）。
 - 行为验收：
   - [ ] 至少 1 个试点模块落地统一协商规则（5.1）且不破坏现有 UI 行为。
-  - [ ] 内部 API（`/core/api/*`）与对外 API（`/api/v1/*`）不会返回 HTML（JSON-only）。
+  - [ ] 内部 API（`/{module}/api/*`）与对外 API（`/api/v1/*`）不会返回 HTML（JSON-only），包含 404/405 等全局错误路径（5.5）。
   - [ ] 403 forbidden payload 字段口径一致，E2E 可稳定断言（参考现有 authz gating 用例）。
+- 安全验收：
+  - [ ] `/_dev/*` 与 `/playground` 默认在生产不可用（配置开关关闭时应为 404）。
 - 门禁：
   - [ ] 新增/更新文档通过 `make check doc`。
 
 ## 10. 运维与监控 (Ops & Monitoring)
-- 访问日志字段建议包含：`route_class(ui|internal_api|public_api|webhook|ops|test)`、`path_template`、`request_id`、`tenant_id`（如可得）、`authz_object/action`（如适用）。
-- 建议为 `/core/api/*` 与 `/api/v1/*` 分别设置独立的 rate limit key（按 endpoint + tenant/user），避免 UI 行为影响对外 API 或反之。
+- 访问日志字段建议包含：`route_class(ui|authn|internal_api|public_api|webhook|ops|test|static|websocket|dev_only)`、`path_template`、`request_id`、`tenant_id`（如可得）、`authz_object/action`（如适用）。
+- 建议为 `/{module}/api/*` 与 `/api/v1/*` 分别设置独立的 rate limit key（按 endpoint + tenant/user），避免 UI 行为影响对外 API 或反之。
 
 --- 
 
 ## 附录 A：存量路径处理原则（摘要）
 - **外部平台已绑定的回调路径**：优先保留（记录为例外），只做签名校验与安全基线补齐。
-- **内部调用广泛的路径（如 `/core/api/authz/*`）**：保留并作为内部 API 的“标准前缀”。
-- **历史偶发/开发工具路径（如 `/_dev`）**：仅在开发环境启用，并明确不进入对外文档与稳定契约。
+- **内部调用广泛的路径（如 `/core/api/authz/*`）**：保留并作为 `/{module}/api/*` 内部 API 规范的“典型样例”。
+- **历史偶发/开发工具路径（如 `/_dev`）**：必须受配置开关保护（默认生产关闭），并明确不进入对外文档与稳定契约。
+
+## 附录 B：顶层入口盘点与例外清单（规范性）
+> 说明：本表用于支撑 reviewer 与后续 route-lint；只列“顶层入口/单例入口”，不枚举所有子路由。
+>
+> 字段含义：
+> - **处理策略**：`keep`（长期保留）/`migrate`（需迁移）/`gate`（环境开关）/`legacy`（短期保留，后续裁撤）。
+
+| 顶层入口/前缀 | 类别（route_class） | 处理策略 | 迁移目标/备注 |
+|---|---|---|---|
+| `/assets/*` | static | keep | build 静态资源；长期白名单 |
+| `/{UPLOADS_PATH}/*`（默认 `/static/*`） | static | keep | 上传文件静态前缀；需明确缓存策略 |
+| `/uploads` | ui | keep | 根路径写接口（POST，返回 HTML/HTMX）；后续可评估是否收敛到 `/core/api/uploads` |
+| `/login`、`/logout`、`/oauth/*` | authn | keep | AuthN 边界入口；必须允许 anonymous 访问 |
+| `/account`、`/settings`、`/users`、`/roles`、`/groups`、`/spotlight` | ui | keep | core 的根路径 UI 例外（非 `/{module}/...`） |
+| `/core/authz` | ui | keep | 权限申请 UI（HTML） |
+| `/core/api/authz/*` | internal_api | keep | 既成事实的内部 API SSOT |
+| `/api/lens/events/*` | internal_api | migrate | 迁移到 `/core/api/lens/events/*`，保留 alias 窗口期 |
+| `/api/website/ai-chat/*` | public_api | migrate | 迁移到 `/api/v1/website/ai-chat/*` 并补齐 anti-abuse/审计 |
+| `/query`、`/query/*` | internal_api | legacy | 若保留则补齐 AuthN/Authz 并确保 JSON-only；否则迁移或下线 |
+| `/playground` | dev_only | gate | 默认生产关闭（配置开关） |
+| `/_dev/*` | dev_only | gate | 默认生产关闭（配置开关） |
+| `/debug/prometheus` | ops | keep | 建议网关层白名单/BasicAuth |
+| `/health` | ops | keep | 健康检查；长期白名单 |
+| `/__test__/*` | test | gate | 受 `ENABLE_TEST_ENDPOINTS` 开关保护，默认生产关闭 |
+| `/ws` | websocket | keep | Websocket 升级入口 |
+| `/twilio` | webhook | legacy | 外部平台绑定路径；需补齐签名校验/重放保护/租户映射 |
+| `/billing/*` | webhook | legacy | 冻结模块存量回调；短期仅登记安全基线，待解冻再迁移 |
+| `/logs`、`/bi-chat`、`/project-stages/*` | ui | legacy | 非 `/{module}/...` 的 UI 存量入口；评估是否迁移到模块前缀下 |
+| `/superadmin/*`、`/metrics` | ui | keep | superadmin 入口；注意 `/metrics` 不等于 Prometheus scrape |
