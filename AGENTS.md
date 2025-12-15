@@ -139,5 +139,6 @@ modules/{module}/
 - DEV-PLAN-017 Readiness：`docs/dev-records/DEV-PLAN-017-READINESS.md`
 - 全局路由策略统一（DEV-PLAN-018）：`docs/dev-plans/018-routing-strategy.md`
 - DEV-PLAN-018A 路由策略评审输入：`docs/dev-plans/018A-routing-strategy-review.md`
+- 多租户工具链选型与落地（DEV-PLAN-019）：`docs/dev-plans/019-multi-tenant-toolchain.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
