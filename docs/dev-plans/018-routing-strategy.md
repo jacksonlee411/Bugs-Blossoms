@@ -115,6 +115,10 @@ graph TD
 2. **HTMX partial**：若 `Hx-Request: true`，返回 HTML partial（或 OOB），并允许使用 `HX-*` 响应头。
 3. **默认整页**：返回 HTML full page。
 
+说明：
+- 若同时满足 `Accept: application/json` 与 `Hx-Request: true`，以 **JSON 优先**（便于 E2E/诊断稳定拿到 JSON；避免“JSON 请求拿到 HTML partial”）。
+- 常规 HTMX 请求的 `Accept` 通常为 `text/html`，因此不会触发 JSON 分支；如某个 HTMX 调用需要 HTML partial，应避免显式请求 JSON。
+
 ### 5.2 内部 API（`/{module}/api/*`）契约
 - 成功与失败均返回 JSON；不得返回 HTML（避免 UI 与 API 混淆）。
 - 允许在 HTMX 调用场景下设置 `HX-Trigger/HX-Redirect/Hx-Push-Url` 等响应头，但 body 仍保持 JSON。
@@ -159,6 +163,25 @@ graph TD
 ### 6.3 Key() 语义（建议）
 - 控制器的 `Key()` 建议返回稳定标识（优先使用其 basePath），便于日志/诊断与测试一致性；避免返回与路由无关的常量字符串（存量不强制改，但新增需遵循）。
 
+### 6.4 Webhooks 推荐栈（必须可被基础设施层强制）
+> 目标：避免 webhook 的签名校验/重放保护/CSRF 豁免分散在各 controller，形成安全策略漂移。
+
+- 约束：
+  - 新增 webhook 必须落在 `/webhooks/{provider}/*`（存量 legacy 需登记在附录 B，并给出迁移/安全基线）。
+  - webhook 的安全中间件必须在“路由构建层（mux subrouter）”按前缀强制绑定，而不是由每个 controller 自行选择性配置。
+- 推荐栈（示意）：
+  - `VerifyProviderSignature()` → `ReplayProtection()` →（未来如有）`CSRFExempt()` → `WithTransaction()`（按需）→ handler
+  - 默认不依赖 Session/Cookie，不应复用 `Authorize()/ProvideUser()` 作为唯一凭证来源。
+
+### 6.5 Ops 推荐栈与访问基线（必须明确）
+> 目标：避免 `/health`、`/debug/prometheus`、`/_ops/*` 在生产“默认公网可达”。
+
+- 访问基线（生产必须满足其一）：
+  1. 网关/负载均衡层内网隔离或 CIDR allowlist；或
+  2. BasicAuth / 静态 token（header）等应用侧鉴权；或
+  3. 专用 `OpsGuard` 中间件（按配置启用，拒绝非允许来源）。
+- 建议：在 `pkg/middleware` 提供 `OpsGuard`（或等价）并在路由构建层为 ops 前缀统一绑定；避免每个 controller 自行配置。
+
 ## 7. 安全与鉴权 (Security & Authz)
 - **同源与 Cookie**：UI 与内部 API 默认依赖同源 Session；内部 API 禁止被跨站调用（建议在边界处增加 Origin/Referer 校验或同站策略说明）。
 - **CSRF**：如未来引入 CSRF 机制，应优先覆盖“会改数据的 UI 写请求 + 内部 API 写请求”，并给出 HTMX 传 token 的标准方案。
@@ -186,7 +209,10 @@ graph TD
    - [ ] 将 `/api/lens/events/*` 迁移到 `/core/api/lens/events/*`（保留 alias；写请求不得依赖 redirect）。
    - [ ] 将 `/api/website/ai-chat/*` 迁移到 `/api/v1/website/ai-chat/*`（并明确其认证/anti-abuse 基线）。
 6. [ ] **新增约束（可验证）**：
-   - [ ] 增加 route-lint（测试或 lint 规则）：禁止新增非版本化 `/api/*`，并校验例外清单与路由注册一致。
+   - [ ] 增加 route-lint（测试或 lint 规则）：
+     - 禁止新增非版本化 `/api/*`（允许 `/api/v1/*`）。
+     - 新增“顶层例外/legacy 前缀”必须同步更新附录 B（或等价 allowlist 文件），否则视为违规。
+     - 冻结模块（billing/crm/finance）的 legacy 路由仅允许存在于 allowlist 中；禁止在非冻结模块引入新的 legacy 前缀（防止破窗效应）。
    - [ ] PR 模板/Reviewer checklist 增加“路由类别与命名空间”校验点。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
@@ -199,6 +225,8 @@ graph TD
   - [ ] 403 forbidden payload 字段口径一致，E2E 可稳定断言（参考现有 authz gating 用例）。
 - 安全验收：
   - [ ] `/_dev/*` 与 `/playground` 默认在生产不可用（配置开关关闭时应为 404）。
+  - [ ] Webhooks 入口（`/webhooks/*` + legacy）具备签名校验与重放保护基线（不得依赖 controller 自由发挥）。
+  - [ ] Ops 入口满足访问基线（网关 allowlist / BasicAuth / OpsGuard 至少一种），不得默认公网可达。
 - 门禁：
   - [ ] 新增/更新文档通过 `make check doc`。
 
@@ -229,7 +257,7 @@ graph TD
 | `/core/authz` | ui | keep | 权限申请 UI（HTML） |
 | `/core/api/authz/*` | internal_api | keep | 既成事实的内部 API SSOT |
 | `/api/lens/events/*` | internal_api | migrate | 迁移到 `/core/api/lens/events/*`，保留 alias 窗口期 |
-| `/api/website/ai-chat/*` | public_api | migrate | 迁移到 `/api/v1/website/ai-chat/*` 并补齐 anti-abuse/审计 |
+| `/api/website/ai-chat/*` | public_api | migrate | 当前实现更像匿名 public integration；默认迁移到 `/api/v1/website/ai-chat/*` 并补齐 anti-abuse/审计；若后续改为同源 Session 内部交互，则必须改为 `/website/api/ai-chat/*` 并更新本表 |
 | `/query`、`/query/*` | internal_api | legacy | 若保留则补齐 AuthN/Authz 并确保 JSON-only；否则迁移或下线 |
 | `/playground` | dev_only | gate | 默认生产关闭（配置开关） |
 | `/_dev/*` | dev_only | gate | 默认生产关闭（配置开关） |

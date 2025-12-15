@@ -36,6 +36,7 @@
   - 显式 `Accept: application/json` 返回 JSON；
   - HTMX 请求设置 `Hx-Retarget: body`、`Hx-Reswap: innerHTML` 返回 Unauthorized partial；
   - 否则返回整页 Unauthorized。
+  - **澄清**：协商优先级应为 **JSON（显式 Accept）> HTMX（Hx-Request）> HTML**（见 018 的 5.1），不要反转为 “HTMX > JSON”，否则 E2E/诊断会在 HTMX 场景下拿不到稳定 JSON。
 
 ### 3.2 “/api/*” 在仓库内并非都表示对外 API
 - `/api/lens/events` 与 `/api/website/ai-chat` 明显是“应用内部交互端点”（与 UI 同源协作），但路径形态会被误解为“对外 API”，与 018 的痛点描述一致。
@@ -100,6 +101,8 @@
 - 明确“冻结模块路径的处理策略”：列为长期例外或待解冻后迁移（避免 reviewer 期待短期收敛）。
 - **明确 Webhooks 与 Ops 路由策略**：建议 Webhooks 使用独立一级前缀（如 `/webhooks/*`）以隔离中间件策略；建议 Ops 路由标准化或明确列为永久白名单。
 - 明确“试点迁移候选”优先级：建议从 `modules/core` 与 `modules/website` 的 `/api/*` 存量端点开始，按 alias/redirect 渐进迁移。
+- route-lint 必须可执行且可维护：建议以 018 的“附录 B 例外清单（或等价 allowlist 文件）”作为白名单来源；禁止新增非版本化 `/api/*`，并阻止在非冻结模块引入新的 legacy 前缀（防止破窗效应）。
+- Webhooks/Ops 中间件应在路由构建层强制绑定：避免由 controller 自行选择性配置导致签名校验/访问控制漂移。
 
 ### 6.3 对 DEV-PLAN-020/026 的对齐建议（取决于 6.1 的选项）
 - 若选项 A：将 Org JSON API 统一迁移到 `/org/api/*`，并声明 `/org/*` 为 UI（HTML/HTMX）。
