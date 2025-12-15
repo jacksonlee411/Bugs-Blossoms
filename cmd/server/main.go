@@ -21,6 +21,7 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/outbox"
 	eventbusdispatcher "github.com/iota-uz/iota-sdk/pkg/outbox/dispatchers/eventbus"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/lib/pq"
 	"github.com/sirupsen/logrus"
@@ -112,52 +113,58 @@ func startOutboxBackground(
 ) {
 	outboxLog := logger.WithField("component", "outbox")
 
-	relayTables, err := outbox.ParseIdentifierList(conf.Outbox.RelayTables)
-	if err != nil {
-		outboxLog.WithError(err).Warn("outbox: invalid OUTBOX_RELAY_TABLES; relay disabled")
+	relayTables, relayTablesErr := outbox.ParseIdentifierList(conf.Outbox.RelayTables)
+	if relayTablesErr != nil {
+		outboxLog.WithError(relayTablesErr).Warn("outbox: invalid OUTBOX_RELAY_TABLES; relay disabled")
 		relayTables = nil
 	}
 
-	cleanerTables, err := outbox.ParseIdentifierList(conf.Outbox.CleanerTables)
-	if err != nil {
-		outboxLog.WithError(err).Warn("outbox: invalid OUTBOX_CLEANER_TABLES; cleaner disabled")
-		cleanerTables = nil
-	}
-	if len(cleanerTables) == 0 {
+	cleanerTables := []pgx.Identifier(nil)
+	if conf.Outbox.CleanerTables == "" {
 		cleanerTables = relayTables
-	}
-
-	eb, ok := bus.(eventbus.EventBusWithError)
-	if !ok {
-		outboxLog.Warn("outbox: eventbus does not support PublishE; relay/cleaner not started")
-		return
-	}
-	dispatcher := eventbusdispatcher.New(eb)
-
-	if conf.Outbox.RelayEnabled && len(relayTables) > 0 {
-		for _, table := range relayTables {
-			relay, err := outbox.NewRelay(pool, table, dispatcher, outbox.RelayOptions{
-				PollInterval:    conf.Outbox.RelayPollInterval,
-				BatchSize:       conf.Outbox.RelayBatchSize,
-				LockTTL:         conf.Outbox.RelayLockTTL,
-				MaxAttempts:     conf.Outbox.RelayMaxAttempts,
-				SingleActive:    conf.Outbox.RelaySingleActive,
-				LastErrorMaxLen: conf.Outbox.LastErrorMaxBytes,
-				DispatchTimeout: conf.Outbox.RelayDispatchTimeout,
-				Logger:          outboxLog.WithField("table", outbox.TableLabel(table)),
-			})
-			if err != nil {
-				outboxLog.WithError(err).Warn("outbox: failed to create relay")
-				continue
-			}
-			go func(r *outbox.Relay) {
-				if err := r.Run(context.Background()); err != nil {
-					outboxLog.WithError(err).Error("outbox: relay stopped")
-				}
-			}(relay)
+	} else {
+		var cleanerTablesErr error
+		cleanerTables, cleanerTablesErr = outbox.ParseIdentifierList(conf.Outbox.CleanerTables)
+		if cleanerTablesErr != nil {
+			outboxLog.WithError(cleanerTablesErr).Warn("outbox: invalid OUTBOX_CLEANER_TABLES; cleaner disabled")
+			cleanerTables = nil
 		}
-	} else if conf.Outbox.RelayEnabled && len(relayTables) == 0 {
-		outboxLog.Info("outbox: relay enabled but OUTBOX_RELAY_TABLES is empty")
+	}
+
+	if conf.Outbox.RelayEnabled {
+		if len(relayTables) == 0 {
+			if relayTablesErr == nil {
+				outboxLog.Info("outbox: relay enabled but OUTBOX_RELAY_TABLES is empty")
+			}
+		} else {
+			eb, ok := bus.(eventbus.EventBusWithError)
+			if !ok {
+				outboxLog.Warn("outbox: eventbus does not support PublishE; relay not started")
+			} else {
+				dispatcher := eventbusdispatcher.New(eb)
+				for _, table := range relayTables {
+					relay, err := outbox.NewRelay(pool, table, dispatcher, outbox.RelayOptions{
+						PollInterval:    conf.Outbox.RelayPollInterval,
+						BatchSize:       conf.Outbox.RelayBatchSize,
+						LockTTL:         conf.Outbox.RelayLockTTL,
+						MaxAttempts:     conf.Outbox.RelayMaxAttempts,
+						SingleActive:    conf.Outbox.RelaySingleActive,
+						LastErrorMaxLen: conf.Outbox.LastErrorMaxBytes,
+						DispatchTimeout: conf.Outbox.RelayDispatchTimeout,
+						Logger:          outboxLog.WithField("table", outbox.TableLabel(table)),
+					})
+					if err != nil {
+						outboxLog.WithError(err).Warn("outbox: failed to create relay")
+						continue
+					}
+					go func(r *outbox.Relay) {
+						if err := r.Run(context.Background()); err != nil {
+							outboxLog.WithError(err).Error("outbox: relay stopped")
+						}
+					}(relay)
+				}
+			}
+		}
 	}
 
 	if conf.Outbox.CleanerEnabled && len(cleanerTables) > 0 {
