@@ -52,6 +52,9 @@ sequenceDiagram
   - PoC 约束：Kratos Public 与应用必须在同一 `tenant_domain` 下（端口不同可接受），使浏览器能把 Kratos session cookie 发送到应用回调端点。
 - **决策 3：SSO 连接以租户配置驱动**
   - PoC 用配置文件表达（避免 DB 迁移扩大范围）；后续如要支持租户自助管理，再落库与 UI（需独立计划/门禁）。
+- **决策 4：回调桥接必须可重试（避免“Kratos 有 Session 但应用无 Session”）**
+  - SSO 场景下 Kratos 通常会在浏览器侧持有 session cookie；若应用侧本地 session 创建失败，用户会处于“已完成联邦登录但无法进入应用”的割裂状态。
+  - PoC 要求：`/login/sso/callback` 逻辑幂等、可重复调用；并在 `/login` 提供可选的“继续完成登录/重试桥接”路径（见 §6.4）。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
 ### 4.1 SSO 连接配置（PoC：配置文件）
@@ -135,6 +138,13 @@ setSidCookie(sid)
 redirect(next)
 ```
 
+### 6.4 桥接失败的自愈/重试（PoC）
+当 `/login/sso/callback` 在“本地落库/发 cookie”阶段失败时（例如 DB 短暂不可用）：
+- 用户已在 Kratos 侧具备 session cookie，但应用侧没有 `sid`。
+- PoC 要求提供至少一种可重试路径（两者可选其一或同时支持）：
+  1. **回调可重试**：对 `/login/sso/callback` 做幂等处理（绑定 identity、创建 session），用户刷新即可重试。
+  2. **登录页自动修复**：`GET /login` 检测 Kratos session（通过 whoami）且本地未登录时，提示“检测到已完成 SSO，点击继续”并触发桥接（避免用户卡死在登录页）。
+
 ## 7. 安全与鉴权 (Security & Authz)
 - `connection` 必须进行租户归属校验，避免用户通过路径探测使用其他租户的 IdP 配置。
 - callback 端点必须校验 `tenant_id` 一致性（host 解析的 tenant 与 identity.traits.tenant_id / 本地 user.tenant_id 一致）。
@@ -145,12 +155,15 @@ redirect(next)
 2. [ ] 部署 Jackson（dev compose）并准备一个可用的 demo IdP（或使用 Jackson 示例 IdP）。
 3. [ ] 在 Kratos 配置 OIDC provider 指向 Jackson（静态配置）。
 4. [ ] 实现 `/login` SSO 入口渲染与 `/login/sso/*` 路由。
-5. [ ] 完成 end-to-end：SSO 登录 → 本地 sid session → 可访问受保护页面。
+5. [ ] 本地开发体验（DX）：更新 `devhub.yml`/Makefile 增加 Jackson 的可选一键启动，并提供“仅打开 SSO/仅打开 Kratos”的组合方式。
+6. [ ] 完成 end-to-end：SSO 登录 → 本地 sid session → 可访问受保护页面。
+7. [ ] 实现桥接失败自愈/重试路径（§6.4），并将其纳入验收。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - [ ] 未启用 SSO 的租户：登录页不展示 SSO 按钮，且访问 `/login/sso/{connection}` 返回 403/404。
 - [ ] 启用 SSO 的租户：完成一次 SSO 登录后，本地 `sid` session 生效。
 - [ ] 回调时 tenant 不一致或 connection 不属于租户：拒绝并记录结构化日志。
+- [ ] 桥接失败可恢复：模拟本地 session 创建失败后，再次访问 `/login/sso/callback` 或 `/login` 能完成桥接并进入应用。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 ### 10.1 关键日志字段（建议）
