@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,25 +29,67 @@ var singleton = sync.OnceValue(func() *Configuration {
 })
 
 func LoadEnv(envFiles []string) (int, error) {
-	exists := make([]bool, len(envFiles))
-	for i, file := range envFiles {
-		if fs.FileExists(file) {
-			exists[i] = true
-		}
+	existingFiles, _, err := resolveEnvFiles(envFiles)
+	if err != nil {
+		return 0, err
 	}
-
-	existingFiles := make([]string, 0, len(envFiles))
-	for i, file := range envFiles {
-		if exists[i] {
-			existingFiles = append(existingFiles, file)
-		}
-	}
-
 	if len(existingFiles) == 0 {
 		return 0, nil
 	}
-
 	return len(existingFiles), godotenv.Load(existingFiles...)
+}
+
+func resolveEnvFiles(envFiles []string) (existing []string, attempted []string, err error) {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	repoRoot := wd
+	if root, ok := findGoModRoot(wd); ok {
+		repoRoot = root
+	}
+
+	existing = make([]string, 0, len(envFiles))
+	attempted = make([]string, 0, len(envFiles)*2)
+
+	for _, file := range envFiles {
+		if strings.TrimSpace(file) == "" {
+			continue
+		}
+
+		wdPath := filepath.Join(wd, file)
+		attempted = append(attempted, wdPath)
+		if fs.FileExists(wdPath) {
+			existing = append(existing, wdPath)
+			continue
+		}
+
+		if repoRoot != wd {
+			rootPath := filepath.Join(repoRoot, file)
+			attempted = append(attempted, rootPath)
+			if fs.FileExists(rootPath) {
+				existing = append(existing, rootPath)
+				continue
+			}
+		}
+	}
+
+	return existing, attempted, nil
+}
+
+func findGoModRoot(start string) (string, bool) {
+	dir := start
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
 }
 
 type DatabaseOptions struct {
@@ -263,10 +306,17 @@ func (c *Configuration) load(envFiles []string) error {
 		return err
 	}
 	if n == 0 {
-		wd, _ := os.Getwd()
 		log.Println("No .env files found. Tried:")
-		for _, file := range envFiles {
-			log.Println(filepath.Join(wd, file))
+		_, attempted, attemptedErr := resolveEnvFiles(envFiles)
+		if attemptedErr != nil || len(attempted) == 0 {
+			wd, _ := os.Getwd()
+			for _, file := range envFiles {
+				log.Println(filepath.Join(wd, file))
+			}
+		} else {
+			for _, p := range attempted {
+				log.Println(p)
+			}
 		}
 	}
 	if err := env.Parse(c); err != nil {
