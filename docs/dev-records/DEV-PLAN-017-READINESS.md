@@ -2,10 +2,12 @@
 
 该记录用于 DEV-PLAN-017（`pkg/outbox`）实施过程中的可追溯验证：每次关键变更（接口契约、schema/查询口径、重试语义、并发策略、指标口径）都应在此记录执行命令与结果。
 
+配套 Runbook：`docs/runbooks/transactional-outbox.md`
+
 ## 环境信息（填写）
-- 日期（UTC）：
-- 分支 / PR：
-- Git Revision：
+- 日期（UTC）：2025-12-15
+- 分支 / PR：feature/dev-plan-017（https://github.com/jacksonlee411/Bugs-Blossoms/pull/43）
+- Git Revision：6f799b54（主要实现：95968402；server wiring 修正：58c9fe53）
 - 数据库：
   - Postgres 版本：
   - DSN/连接信息（脱敏后）：
@@ -18,11 +20,12 @@
 
 | 时间 (UTC) | 环境 | 命令 | 预期 | 实际 | 结果 |
 | --- | --- | --- | --- | --- | --- |
-|  | 本地 | `go fmt ./...` | 格式化无 diff |  |  |
-|  | 本地 | `go vet ./...` | 无 vet 报错 |  |  |
-|  | 本地 | `make check lint` | golangci-lint + cleanarchguard 通过 |  |  |
-|  | 本地 | `make test` | 测试全通过 |  |  |
-|  | 本地 | `go test ./pkg/outbox/...` | outbox 单测/集成测试通过 |  |  |
+| 2025-12-15 01:33 UTC | 本地 | `go fmt ./...` | 格式化无 diff | 无 diff | 通过 |
+| 2025-12-15 01:33 UTC | 本地 | `go vet ./...` | 无 vet 报错 | 无输出 | 通过 |
+| 2025-12-15 01:33 UTC | 本地 | `make check lint` | golangci-lint + cleanarchguard 通过 | 0 issues | 通过 |
+| 2025-12-15 01:33 UTC | 本地 | `make test` | 测试全通过 | PASS | 通过 |
+| 2025-12-15 01:33 UTC | 本地 | `go test ./pkg/outbox/...` | outbox 单测/集成测试通过 | 已由 `make test` 覆盖 | 通过 |
+|  | 本地 | `OUTBOX_TEST_DSN=... go test -tags=integration ./pkg/outbox -run TestRelay_Integration` | 真实 PG 集成测试通过 | 未执行（待提供 DSN） | 未执行 |
 
 > 如本计划引入/修改迁移（例如新增 `<module>_outbox` 表），请补充：
 > - `make db migrate up` / `make db seed`（或模块对应迁移命令）
@@ -49,4 +52,3 @@
 ### 5) 指标与日志
 - [ ] 指标：enqueue/dispatch/pending/dead 等关键指标可观测（附截图或输出片段）
 - [ ] 日志字段包含 `table/topic/event_id/tenant_id/sequence/attempts`（附日志片段）
-

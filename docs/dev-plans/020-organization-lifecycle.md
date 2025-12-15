@@ -106,17 +106,18 @@
 - **后续**：`OrgLifecycleService`（change request 审批流）、`OrgRetroService`、`OrgSecurityService`、`OrgBusinessProcessAdapter` 在 M3+ 再加入。
 
 ### Presentation Layer & API
-- Controller 前缀 `/org`：
-  - `GET /org/hierarchies?type=OrgUnit&effective_date=`：返回树概览，支持 display_order 排序，属性提供显式值与继承解析值。
-  - `POST /org/nodes` / `PATCH /org/nodes/{id}`：节点 CRUD（含有效期、重名、父子校验）；支持字段 code/name/i18n_names/legal_entity_id/company_code/location_id/display_order；删除改为 `PATCH` 设置 `end_date` 或状态 `Retired`，误创建支持 Rescind；预留 change request 草稿/提交接口（无审批流，仅存档）。
-  - `POST /org/positions`（可选）/ `POST /org/assignments`：Assignment 以 Position 为锚点；若未显式传 position_id，默认创建一对一 Position 再绑定；支持 `assignment_type`（primary/matrix/dotted）；`PATCH /org/assignments/{id}` / `GET /org/assignments?subject=person:{id}`：人员分配时间线。
-  - `POST /org/role-assignments`（占位）/ `GET /org/role-assignments?role=HRBP`：组织角色分配查询。
-  - API 设计区分“修正”与“更新”：`PATCH /org/nodes/{id}` 用于常规更新（创建新时间片），`POST /org/nodes/{id}:correct` 用于修正历史数据（原地修改），后者需要更高权限（如 `Org.Admin`）。
+- UI（templ，HTML/HTMX）：前缀 `/org/...`（体验完善由 035 负责；M1 可只交付最小页面骨架）。
+- 内部 API（JSON-only）：前缀 `/org/api/...`（对齐 `docs/dev-plans/018-routing-strategy.md` 的 `/{module}/api/*`）
+  - `GET /org/api/hierarchies?type=OrgUnit&effective_date=`：返回树概览，支持 display_order 排序，属性提供显式值与继承解析值。
+  - `POST /org/api/nodes` / `PATCH /org/api/nodes/{id}`：节点 CRUD（含有效期、重名、父子校验）；支持字段 code/name/i18n_names/legal_entity_id/company_code/location_id/display_order；删除改为 `PATCH` 设置 `end_date` 或状态 `Retired`，误创建支持 Rescind；预留 change request 草稿/提交接口（无审批流，仅存档）。
+  - `POST /org/api/positions`（可选）/ `POST /org/api/assignments`：Assignment 以 Position 为锚点；若未显式传 position_id，默认创建一对一 Position 再绑定；支持 `assignment_type`（primary/matrix/dotted）；`PATCH /org/api/assignments/{id}` / `GET /org/api/assignments?subject=person:{id}`：人员分配时间线。
+  - `POST /org/api/role-assignments`（占位）/ `GET /org/api/role-assignments?role=HRBP`：组织角色分配查询。
+  - API 设计区分“修正”与“更新”：`PATCH /org/api/nodes/{id}` 用于常规更新（创建新时间片），`POST /org/api/nodes/{id}:correct` 用于修正历史数据（原地修改），后者需要更高权限（如 `Org.Admin`）。
   - 不提供 retro/security/BP/Impact 相关接口于 M1。
 - UI（templ）：
   - M1：树形视图 + 基础表单（节点、Position、分配），日期选择器切换有效期，支持多语言名称编辑、display_order 调整。
   - 拖拽式 Change Request Builder / Impact / Security Inspector / route preview 留作 M4+ backlog。
-- 权限要求：`/org/**` 需 Session+租户校验与 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`，无策略生成前可用特性开关仅对管理员开放。
+- 权限要求：`/org/*`（UI）与 `/org/api/*`（内部 API）均需 Session+租户校验与 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`；无策略生成前可用特性开关仅对管理员开放。
 
 ## 集成与依赖
 - **SOR 边界**：Org 模块为组织层级 SOR；Position 为人员隶属锚点（可自动生成空壳），编制/空岗在 DEV-PLAN-021；HRM 为人 SOR；Finance 为 Cost Center/Company 财务口径 SOR（冻结期间不改 schema）。
@@ -206,7 +207,7 @@ flowchart LR
 
 *   **步骤 3: 准备基础脚本与验证**
     *   **任务**: 编写初步的数据导入/导出脚本和回滚脚本的雏形。
-    *   **任务**: M1 阶段优先交付 **DB backend**（事务直写、dry-run、manifest 回滚），用于造数与快速回滚；待 026 的 `/org/batch` 与 outbox/审计路径稳定后，再补 **API backend** 以复用校验/审计/事件闭环。
+    *   **任务**: M1 阶段优先交付 **DB backend**（事务直写、dry-run、manifest 回滚），用于造数与快速回滚；待 026 的 `/org/api/batch` 与 outbox/审计路径稳定后，再补 **API backend** 以复用校验/审计/事件闭环。
     *   **任务**: 确保项目通过 `make check lint`、`go test ./modules/org/...`（或相关路径），必要时补充 bench/seed 脚本的空壳以便后续填充；验证失败时必须提供回滚/清理脚本。
 
 ### **阶段 1 (M1 里程碑): 最小可用主数据链**
@@ -275,7 +276,7 @@ flowchart LR
 
 - DEV-PLAN-021（步骤 1，Schema 与约束）：先行完成核心表/约束迁移及 `make db lint` + 上下行验证，解锁后续开发。
 - DEV-PLAN-022（步骤 2，占位表与事件契约）：依赖 021，补占位表与事件契约，完成 sqlc/atlas 生成校验。
-- DEV-PLAN-023（步骤 3，导入/回滚与 readiness）：依赖 021-022，优先交付 DB backend（dry-run + manifest 回滚）与 readiness；待 026 的 `/org/batch` 就绪后补 API backend 以复用审计与事件闭环。
+- DEV-PLAN-023（步骤 3，导入/回滚与 readiness）：依赖 021-022，优先交付 DB backend（dry-run + manifest 回滚）与 readiness；待 026 的 `/org/api/batch` 就绪后补 API backend 以复用审计与事件闭环。
 - DEV-PLAN-024（步骤 4，主链 CRUD）：依赖 021-023，交付 Person→Position→Org CRUD 与租户/Session 守卫。
 - DEV-PLAN-025（步骤 5，时间约束与审计）：依赖 024，补有效期/冻结窗口/Correct-Update-Rescind 审计。
 - DEV-PLAN-017（步骤 6 前置，Transactional Outbox 工具链）：在 026 落地前先完成 `pkg/outbox`（Publisher/Relay/Cleaner）与标准 schema/查询口径，确保 relay 投递有 `error` 边界、支持重试与重放。

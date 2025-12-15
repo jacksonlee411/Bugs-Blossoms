@@ -21,7 +21,7 @@
   - 022：仅负责占位表与事件**契约定义**；024 复用契约类型，不新增自定义字段。
   - 023：仅负责 CSV 导入/回滚工具；024 不做批量导入。
   - 025：负责冻结窗口、Correct/Update/Rescind 的审计与时间线强校验（含 ShiftBoundary）；024 仅实现主链 CRUD 的基础写路径并预留扩展点。
-  - 026：负责 `pkg/authz` 接入与策略片段、事件投递闭环（outbox/对账/缓存失效）、`/org/snapshot` 与 `/org/batch`；024 不在本计划内落地这些增强能力。
+  - 026：负责 `pkg/authz` 接入与策略片段、事件投递闭环（outbox/对账/缓存失效）、`/org/api/snapshot` 与 `/org/api/batch`；024 不在本计划内落地这些增强能力。
   - 035：负责完整 Org UI；024 仅提供最小可用页面用于开发验证。
 
 ## 依赖与里程碑
@@ -48,17 +48,17 @@
 - `org_assignments`：人员分配时间片（`position_id/subject_type/subject_id/pernr/assignment_type/is_primary + effective_date/end_date`），primary 唯一与重叠由约束兜底。
 
 ### 3. API 入口（对齐 020；Authz/批量/对账在 026）
-- 读：
-  - `GET /org/hierarchies?type=OrgUnit&effective_date=`：树概览（M1 仅 OrgUnit）。
-  - `GET /org/assignments?subject=person:{id}&effective_date=`：人员分配时间线。
-- 写（M1 主链）：
-  - `POST /org/nodes`：创建节点（写入 `org_nodes` + 首个 `org_node_slices` + `org_edges`（非 root））。
-  - `PATCH /org/nodes/{id}`：按 Insert 语义新增时间片（end_date 自动计算；细节在 025）。
-  - `POST /org/assignments`：创建 primary assignment；可不传 `position_id` 触发自动创建空壳 Position。
-  - `PATCH /org/assignments/{id}`：按 Insert 语义更新（M1 可先仅支持字段子集，复杂分支在 025）。
+- 读（Internal API，对齐 018）：
+  - `GET /org/api/hierarchies?type=OrgUnit&effective_date=`：树概览（M1 仅 OrgUnit）。
+  - `GET /org/api/assignments?subject=person:{id}&effective_date=`：人员分配时间线。
+- 写（M1 主链，Internal API）：
+  - `POST /org/api/nodes`：创建节点（写入 `org_nodes` + 首个 `org_node_slices` + `org_edges`（非 root））。
+  - `PATCH /org/api/nodes/{id}`：按 Insert 语义新增时间片（end_date 自动计算；细节在 025）。
+  - `POST /org/api/assignments`：创建 primary assignment；可不传 `position_id` 触发自动创建空壳 Position。
+  - `PATCH /org/api/assignments/{id}`：按 Insert 语义更新（M1 可先仅支持字段子集，复杂分支在 025）。
 - 预留但不在 024 完整落地：
-  - `POST /org/nodes/{id}:correct`、`POST /org/nodes/{id}:rescind` 等高权限写入（行为审计与冻结窗口在 025）。
-  - `GET /org/snapshot`、`POST /org/batch`（在 026）。
+  - `POST /org/api/nodes/{id}:correct`、`POST /org/api/nodes/{id}:rescind` 等高权限写入（行为审计与冻结窗口在 025）。
+  - `GET /org/api/snapshot`、`POST /org/api/batch`（在 026）。
 
 ### 4. 写入语义与校验（基础路径在 024；强约束/审计在 025）
 - Update（Insert）：请求仅提交 `effective_date`（缺省 `time.Now()`），服务层按 025 的 Insert 算法计算 `end_date` 并在同事务内完成“截断旧片段 + 插入新片段”。
