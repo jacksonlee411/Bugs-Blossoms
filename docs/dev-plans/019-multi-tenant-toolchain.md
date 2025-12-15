@@ -1,6 +1,6 @@
 # DEV-PLAN-019：多租户工具链选型与落地
 
-**状态**: 规划中（2025-12-15 12:30 UTC）
+**状态**: 规划中（2025-12-15 13:47 UTC）
 
 ## 背景
 - `DEV-PLAN-009` 第 6 项提出了“多租户管理工具链评估”的需求。当前系统依赖简单的 `tenant_id` 字段过滤（逻辑隔离）和自建的用户表，缺乏统一的身份认证（Identity）、强数据隔离（Isolation）和企业级 SSO 能力。
@@ -18,6 +18,13 @@
 ### 非目标（Non-Goals）
 - 本计划不在 M1 内交付：SCIM/目录同步、跨租户数据迁移/合并、生产级 HA/灾备、完整的 IAM 管理后台替换。
 - 本计划不承诺一次性把所有模块/所有查询全部切到 RLS（将按模块/表逐步推进）。
+
+## 子计划（按 DEV-PLAN-001 拆分）
+> 本文作为总纲/选型与全局契约入口；落地实现的“代码级详细设计”以子计划为准。
+
+- `DEV-PLAN-019A`：PostgreSQL RLS 强租户隔离（PoC）—— `docs/dev-plans/019A-rls-tenant-isolation.md`
+- `DEV-PLAN-019B`：ORY Kratos 接入与本地 Session 桥接（PoC）—— `docs/dev-plans/019B-ory-kratos-session-bridge.md`
+- `DEV-PLAN-019C`：BoxyHQ Jackson 企业 SSO（PoC）—— `docs/dev-plans/019C-jackson-enterprise-sso.md`
 
 ## 选型对比（对齐 DEV-PLAN-009 的“对比矩阵”要求）
 
