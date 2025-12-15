@@ -133,5 +133,6 @@ modules/{module}/
 - PostgreSQL 17 迁移：`docs/runbooks/postgres17-migration.md`
 - 文档规范：`docs/dev-plans/000-docs-format.md`
 - Core 用户权限页 IA 优化：`docs/dev-plans/016A-core-users-permissions-ia.md`
+- Core 用户权限页签 UI/交互优化：`docs/dev-plans/016B-core-users-permissions-ui.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
