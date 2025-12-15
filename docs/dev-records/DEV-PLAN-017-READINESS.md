@@ -4,8 +4,8 @@
 
 ## 环境信息（填写）
 - 日期（UTC）：2025-12-15
-- 分支 / PR：feature/dev-plan-017
-- Git Revision：7a4fb631c6be9f5752bd06127cf3c6a4cb3d3b63
+- 分支 / PR：feature/dev-plan-017（https://github.com/jacksonlee411/Bugs-Blossoms/pull/43）
+- Git Revision：95968402c34794bd7acf2d0f2ee432bf068c384b
 - 数据库：
   - Postgres 版本：
   - DSN/连接信息（脱敏后）：

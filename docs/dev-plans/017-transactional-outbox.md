@@ -403,5 +403,6 @@ type Dispatcher interface {
 - [X] Server 接入：通过 `OUTBOX_RELAY_TABLES/OUTBOX_CLEANER_TABLES` 启动后台 relay/cleaner
 - [X] Metrics 接入：可选暴露 Prometheus 抓取端点（`PROMETHEUS_METRICS_ENABLED`）
 - [X] 门禁：`go fmt ./... && go vet ./... && make check lint && make test`
+- [X] PR：`feature/dev-plan-017` -> `main`（https://github.com/jacksonlee411/Bugs-Blossoms/pull/43，`95968402`）
 - [ ] 待落地：选择首个模块创建 `<module>_outbox` 迁移，并在业务事务内 `Enqueue`（契约落地样例）
 - [ ] 待验证：配置 `OUTBOX_TEST_DSN` 运行 `integration` 集成测试，并把结果登记到 `docs/dev-records/DEV-PLAN-017-READINESS.md`
