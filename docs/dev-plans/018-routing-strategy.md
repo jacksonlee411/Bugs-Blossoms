@@ -141,6 +141,7 @@ graph TD
 ### 5.5 404/405/500 等全局错误返回契约（必须对齐）
 > 背景：即使单个 controller 做到了 JSON-only，仍可能在“未命中路由/方法不允许/全局 panic”时走到全局 handler；这些路径同样必须遵循命名空间契约。
 
+- allowlist（route_class SSOT）：`config/routing/allowlist.yaml`（按 entrypoint 区分 `server/superadmin`）。
 - 对 `/{module}/api/*` 与 `/api/v1/*`：
   - 404/405/500 等错误必须返回 `application/json`，不得渲染 HTML 页面或返回纯文本。
   - 错误 payload：
@@ -242,26 +243,24 @@ graph TD
 - 现有 authz forbidden payload 口径（`modules/core/authzutil`）。
 
 ### 8.2 里程碑与任务清单
-0. [ ] **ADR 对齐**：固化 3.3 的裁决，并同步更新 Org 系列计划的 API 前缀（`docs/dev-plans/020-organization-lifecycle.md`、`docs/dev-plans/026-org-api-authz-and-events.md`）。
-1. [ ] **路由盘点**：输出当前顶层前缀与路由类别清单（UI/Internal API/Public API/Webhooks/Ops/Test），标注“是否符合 4.1”；将结果落盘到附录 B。
-2. [ ] **策略落盘**：补齐例外清单与迁移策略（存量路径必须说明为何不能迁移/迁移目标/兼容策略/安全基线）。
+0. [x] **ADR 对齐**：固化 3.3 的裁决，并同步更新 Org 系列计划的 API 前缀（`docs/dev-plans/020-organization-lifecycle.md`、`docs/dev-plans/026-org-api-authz-and-events.md`）。
+1. [x] **路由盘点**：输出当前顶层前缀与路由类别清单（UI/Internal API/Public API/Webhooks/Ops/Test），标注“是否符合 4.1”；将结果落盘到附录 B。
+2. [x] **策略落盘**：补齐例外清单与迁移策略（存量路径必须说明为何不能迁移/迁移目标/兼容策略/安全基线）。
 3. [ ] **统一 responder/协商工具**（推荐）：
-   - [ ] 提供统一的 route_class 判定与 responder：HTML/HTMX/JSON forbidden + JSON error envelope。
-   - [ ] 让内部 API 的 forbidden/error 不受 `Accept` 影响（保持 JSON-only）。
-4. [ ] **全局错误契约落地**：
-   - [ ] 让 `NotFoundHandler`/`MethodNotAllowedHandler` 在 `/{module}/api/*` 与 `/api/v1/*` 下返回 JSON（见 5.5）。
-5. [ ] **试点迁移（最小改动）**：
-   - [ ] 将 `/api/lens/events/*` 迁移到 `/core/api/lens/events/*`（保留 alias；写请求不得依赖 redirect）。
-   - [ ] 将 `/api/website/ai-chat/*` 迁移到 `/api/v1/website/ai-chat/*`（并明确其认证/anti-abuse 基线）。
+   - [x] allowlist + route_class 分类工具（同源输入）：`config/routing/allowlist.yaml` + `pkg/routing/*`。
+   - [ ] 统一 403 forbidden responder：在 `/{module}/api/*` 与 `/api/v1/*` 下 JSON-only（不依赖 `Accept`）。
+   - [ ] 统一 500 responder：在 `/{module}/api/*` 与 `/api/v1/*` 下 JSON-only（含 panic 路径），并对齐 error envelope。
+4. [x] **全局错误契约落地**：
+   - [x] `NotFoundHandler`/`MethodNotAllowedHandler` 在 `/{module}/api/*` 与 `/api/v1/*` 下返回 JSON（见 5.5），实现见 `modules/core/presentation/controllers/errors_controller.go` + `internal/server/default.go`。
+5. [x] **试点迁移（最小改动）**：
+   - [x] `/api/lens/events/*` → `/core/api/lens/events/*`（保留 alias），见 `modules/core/presentation/controllers/lens_events_controller.go`。
+   - [x] `/api/website/ai-chat/*` → `/api/v1/website/ai-chat/*`（保留 alias），见 `modules/website/module.go` + `modules/website/presentation/controllers/aichat_api_controller.go`。
 6. [ ] **新增约束（可验证）**：
-   - [ ] 增加 route-lint（测试或 lint 规则）：
-     - 禁止新增非版本化 `/api/*`（允许 `/api/v1/*`）。
-     - 新增“顶层例外/legacy 前缀”必须同步更新附录 B（或等价 allowlist 文件），否则视为违规。
-     - 冻结模块（billing/crm/finance）的 legacy 路由仅允许存在于 allowlist 中（冻结政策见仓库根 `AGENTS.md`）；禁止在非冻结模块引入新的 legacy 前缀（防止破窗效应）。
-     - 推荐实现：**运行时路由检测（go test）**
-       - 构建 server/superadmin 的 router（按入口分别跑），使用 `mux.Router.Walk()` 收集 `PathTemplate/PathPrefix`；
-       - 将所有顶层前缀与路由模板按 4.1/4.3 的规则归类并校验（含 `/api/v1`、`/{module}/api`、例外白名单）；
-       - route-lint 的 allowlist 输入与 5.5 的 ClassifyPath 规则保持同源（避免两个系统判定口径漂移）。
+   - [x] 增加 route-lint（go test，运行时路由检测）：`internal/routelint/routelint_test.go`。
+     - [x] 禁止新增非版本化 `/api/*`（允许 `/api/v1/*` 与 allowlist 中登记的 legacy）。
+     - [x] route-lint 与 5.5 的 route_class 判定同源（`config/routing/allowlist.yaml` + `pkg/routing/*`）。
+     - [ ] 扩展：新增“顶层例外/legacy 前缀”必须同步更新 allowlist（以及附录 B），否则视为违规（防止破窗效应）。
+     - [ ] 扩展：冻结模块（billing/crm/finance）的 legacy 前缀只允许存在于 allowlist；禁止在非冻结模块引入新的 legacy 前缀。
    - [ ] PR 模板/Reviewer checklist 增加“路由类别与命名空间”校验点。
 
 ### 8.3 混合控制器重构模式（建议）
