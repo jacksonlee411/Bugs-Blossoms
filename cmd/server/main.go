@@ -119,7 +119,7 @@ func startOutboxBackground(
 		relayTables = nil
 	}
 
-	cleanerTables := []pgx.Identifier(nil)
+	var cleanerTables []pgx.Identifier
 	if conf.Outbox.CleanerTables == "" {
 		cleanerTables = relayTables
 	} else {
