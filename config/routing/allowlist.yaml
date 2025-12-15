@@ -106,6 +106,10 @@ entrypoints:
     - prefix: /uploads
       class: ui
 
+    # Core UI root exceptions (legacy, keep)
+    - prefix: /account
+      class: ui
+
     # AuthN
     - prefix: /login
       class: authn

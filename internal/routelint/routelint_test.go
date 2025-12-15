@@ -3,6 +3,8 @@ package routelint
 import (
 	"context"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -48,6 +50,26 @@ func TestSuperadminRoutes_NoUnversionedAPIExceptAllowlist(t *testing.T) {
 	assertNoUnversionedAPIs(t, router, routing.NewClassifier(rules))
 }
 
+func TestServerRoutes_TopLevelExceptionsMustBeAllowlisted(t *testing.T) {
+	srv := buildMainServerHTTPServer(t)
+	router := srv.Router()
+
+	rules, err := routing.LoadAllowlist("", "server")
+	require.NoError(t, err)
+
+	assertTopLevelExceptionsAreAllowlisted(t, router, routing.NewClassifier(rules))
+}
+
+func TestSuperadminRoutes_TopLevelExceptionsMustBeAllowlisted(t *testing.T) {
+	srv := buildSuperadminHTTPServer(t)
+	router := srv.Router()
+
+	rules, err := routing.LoadAllowlist("", "superadmin")
+	require.NoError(t, err)
+
+	assertTopLevelExceptionsAreAllowlisted(t, router, routing.NewClassifier(rules))
+}
+
 func assertNoUnversionedAPIs(t *testing.T, router *mux.Router, classifier *routing.Classifier) {
 	t.Helper()
 
@@ -70,6 +92,40 @@ func assertNoUnversionedAPIs(t *testing.T, router *mux.Router, classifier *routi
 	if len(offending) > 0 {
 		sort.Strings(offending)
 		t.Fatalf("发现非版本化 /api 前缀路由（未在 allowlist 登记）：\n%s", strings.Join(offending, "\n"))
+	}
+}
+
+func assertTopLevelExceptionsAreAllowlisted(t *testing.T, router *mux.Router, classifier *routing.Classifier) {
+	t.Helper()
+
+	paths := collectRoutePaths(t, router)
+	moduleNames := loadModuleNames(t)
+
+	offendingSet := make(map[string]struct{}, len(paths))
+	for _, p := range paths {
+		if strings.TrimSpace(p) == "" || p == "/" {
+			continue
+		}
+		segment := firstPathSegment(p)
+		if segment == "" {
+			continue
+		}
+		if _, ok := moduleNames[segment]; ok {
+			continue
+		}
+		if _, ok := classifier.MatchAllowlist(p); ok {
+			continue
+		}
+		offendingSet[p] = struct{}{}
+	}
+
+	if len(offendingSet) > 0 {
+		offending := make([]string, 0, len(offendingSet))
+		for p := range offendingSet {
+			offending = append(offending, p)
+		}
+		sort.Strings(offending)
+		t.Fatalf("发现未登记 allowlist 的顶层例外/legacy 前缀路由：\n%s", strings.Join(offending, "\n"))
 	}
 }
 
@@ -101,7 +157,61 @@ func routePath(route *mux.Route) string {
 	if err != nil {
 		return ""
 	}
-	return strings.TrimPrefix(regexp, "^")
+	result := strings.TrimPrefix(regexp, "^")
+	return strings.TrimSuffix(result, "$")
+}
+
+func firstPathSegment(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	path = strings.TrimPrefix(path, "/")
+	if path == "" {
+		return ""
+	}
+	segment, _, _ := strings.Cut(path, "/")
+	return segment
+}
+
+func loadModuleNames(t *testing.T) map[string]struct{} {
+	t.Helper()
+
+	wd, err := os.Getwd()
+	require.NoError(t, err)
+
+	repoRoot, ok := findGoModRoot(wd)
+	require.True(t, ok, "failed to locate go.mod root from %q", wd)
+
+	entries, err := os.ReadDir(filepath.Join(repoRoot, "modules"))
+	require.NoError(t, err)
+
+	result := make(map[string]struct{}, len(entries))
+	for _, e := range entries {
+		if !e.IsDir() {
+			continue
+		}
+		name := strings.TrimSpace(e.Name())
+		if name == "" || strings.HasPrefix(name, ".") {
+			continue
+		}
+		result[name] = struct{}{}
+	}
+	return result
+}
+
+func findGoModRoot(start string) (string, bool) {
+	dir := start
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
 }
 
 func buildMainServerHTTPServer(t *testing.T) *pkgserver.HTTPServer {

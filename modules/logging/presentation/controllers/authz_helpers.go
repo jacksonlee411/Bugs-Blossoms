@@ -26,6 +26,7 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
+	"github.com/iota-uz/iota-sdk/pkg/routing"
 )
 
 const logsAuthzObject = "logging.logs"
@@ -118,8 +119,8 @@ func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, acti
 	state := authz.ViewStateFromContext(r.Context())
 	payload := authzutil.BuildForbiddenPayload(r, state, object, action)
 
-	accept := strings.ToLower(r.Header.Get("Accept"))
-	if strings.Contains(accept, "application/json") {
+	if routing.IsJSONOnlyNamespacePath(r.URL.Path) ||
+		strings.Contains(strings.ToLower(r.Header.Get("Accept")), "application/json") {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		if err := json.NewEncoder(w).Encode(payload); err != nil {

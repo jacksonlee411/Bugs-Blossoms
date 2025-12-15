@@ -71,6 +71,10 @@ func Default(options *DefaultOptions) (*server.HTTPServer, error) {
 	middlewares = append(middlewares,
 		middleware.TracedMiddleware("requestParams"),
 		middleware.RequestParams(),
+		middleware.TracedMiddleware("webhookReplayProtection"),
+		middleware.WebhookReplayProtection(middleware.WebhookReplayProtectionOptions{
+			Entrypoint: options.Entrypoint,
+		}),
 	)
 
 	app.RegisterMiddleware(middlewares...)

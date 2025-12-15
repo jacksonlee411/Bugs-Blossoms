@@ -1,30 +1,19 @@
 package controllers
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
+	"github.com/iota-uz/iota-sdk/pkg/httpapi"
 )
 
 func writeJSON(w http.ResponseWriter, status int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if payload == nil {
-		return
-	}
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		panic(err)
-	}
+	_ = httpapi.WriteJSON(w, status, payload)
 }
 
 func writeJSONError(w http.ResponseWriter, status int, code, message string, meta ...map[string]string) {
-	payload := &dtos.APIError{
-		Code:    code,
-		Message: message,
+	var resolvedMeta map[string]string
+	if len(meta) > 0 {
+		resolvedMeta = meta[0]
 	}
-	if len(meta) > 0 && meta[0] != nil {
-		payload.Meta = meta[0]
-	}
-	writeJSON(w, status, payload)
+	_ = httpapi.WriteError(w, status, code, message, resolvedMeta)
 }

@@ -25,6 +25,8 @@ import (
 
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/constants"
+	"github.com/iota-uz/iota-sdk/pkg/httpapi"
+	"github.com/iota-uz/iota-sdk/pkg/routing"
 )
 
 type LoggerOptions struct {
@@ -298,13 +300,31 @@ func WithLogger(logger *logrus.Logger, opts LoggerOptions) mux.MiddlewareFunc {
 
 						fieldsLogger.WithFields(panicFields).Error("panic recovered in request handler")
 
-						// Set 500 status code so client receives proper HTTP response
-						if !wrappedWriter.statusWritten {
-							wrappedWriter.WriteHeader(http.StatusInternalServerError)
+						if wrappedWriter.statusWritten {
+							return
 						}
 
-						// Re-panic to propagate upstream to process-level recovery
-						panic(recovered)
+						meta := map[string]string{
+							"request_id": requestID,
+							"path":       r.URL.Path,
+						}
+						accept := strings.ToLower(r.Header.Get("Accept"))
+						if routing.IsJSONOnlyNamespacePath(r.URL.Path) || strings.Contains(accept, "application/json") {
+							if err := httpapi.WriteError(
+								wrappedWriter,
+								http.StatusInternalServerError,
+								"INTERNAL_SERVER_ERROR",
+								"internal server error",
+								meta,
+							); err != nil {
+								http.Error(wrappedWriter, "Internal Server Error", http.StatusInternalServerError)
+							}
+						} else {
+							http.Error(wrappedWriter, "Internal Server Error", http.StatusInternalServerError)
+						}
+
+						span.SetAttributes(attribute.Int("http.status_code", http.StatusInternalServerError))
+						span.RecordError(fmt.Errorf("panic: %v", recovered))
 					}
 				}()
 

@@ -25,6 +25,8 @@ func (g *GraphQLController) Key() string {
 }
 
 func (g *GraphQLController) Register(r *mux.Router) {
+	conf := configuration.Use()
+
 	schema := graph.NewExecutableSchema(
 		graph.Config{
 			Resolvers: graph.NewResolver(g.app),
@@ -46,7 +48,10 @@ func (g *GraphQLController) Register(r *mux.Router) {
 	)
 
 	router.Handle("/query", srv)
-	router.Handle("/playground", playground.Handler("GraphQL playground", "/query"))
+	if conf.EnableDevEndpoints {
+		router.Handle("/playground", playground.Handler("GraphQL playground", "/query"))
+		log.Printf("See %s/playground for GraphQL playground", conf.Origin)
+	}
 	for _, schema := range g.app.GraphSchemas() {
 		exec := executor.New(schema.Value)
 		if schema.ExecutorCb != nil {
@@ -54,7 +59,6 @@ func (g *GraphQLController) Register(r *mux.Router) {
 		}
 		router.Handle(path.Join("/query", schema.BasePath), graphql.NewHandler(exec))
 	}
-	log.Printf("See %s/playground for GraphQL playground", configuration.Use().Origin)
 }
 
 func NewGraphQLController(app application.Application) application.Controller {

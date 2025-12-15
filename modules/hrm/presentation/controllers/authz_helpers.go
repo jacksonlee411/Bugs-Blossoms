@@ -20,6 +20,7 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
+	"github.com/iota-uz/iota-sdk/pkg/routing"
 )
 
 const hrmAuthzDomain = "hrm"
@@ -115,7 +116,8 @@ func enforceRequest(ctx context.Context, svc *authz.Service, req authz.Request, 
 func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, action string) {
 	state := authz.ViewStateFromContext(r.Context())
 	payload := authzutil.BuildForbiddenPayload(r, state, object, action)
-	if accept := strings.ToLower(r.Header.Get("Accept")); strings.Contains(accept, "application/json") {
+	if routing.IsJSONOnlyNamespacePath(r.URL.Path) ||
+		strings.Contains(strings.ToLower(r.Header.Get("Accept")), "application/json") {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		if err := json.NewEncoder(w).Encode(payload); err != nil {

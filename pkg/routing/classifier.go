@@ -12,6 +12,18 @@ type Classifier struct {
 	rules []AllowlistRule
 }
 
+func IsPublicAPIPath(path string) bool {
+	return HasPathPrefixOnBoundary(path, "/api/v1")
+}
+
+func IsInternalAPIPath(path string) bool {
+	return internalAPIPrefixPattern.MatchString(path)
+}
+
+func IsJSONOnlyNamespacePath(path string) bool {
+	return IsPublicAPIPath(path) || IsInternalAPIPath(path)
+}
+
 func NewClassifier(rules []AllowlistRule) *Classifier {
 	copied := make([]AllowlistRule, 0, len(rules))
 	for _, rule := range rules {
@@ -45,10 +57,10 @@ func (c *Classifier) ClassifyPath(path string) RouteClass {
 		return class
 	}
 
-	if HasPathPrefixOnBoundary(path, "/api/v1") {
+	if IsPublicAPIPath(path) {
 		return RouteClassPublicAPI
 	}
-	if internalAPIPrefixPattern.MatchString(path) {
+	if IsInternalAPIPath(path) {
 		return RouteClassInternalAPI
 	}
 	return RouteClassUI

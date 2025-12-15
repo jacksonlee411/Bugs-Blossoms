@@ -101,7 +101,7 @@ func (m *Module) Register(app application.Application) error {
 	// handlers.RegisterUserHandler(app)
 
 	//controllers.InitCrudShowcase(app)
-	app.RegisterControllers(
+	controllersToRegister := []application.Controller{
 		controllers.NewHealthController(app),
 		controllers.NewDashboardController(app),
 		controllers.NewLensEventsController(app),
@@ -119,13 +119,19 @@ func (m *Module) Register(app application.Application) error {
 			PermissionSchema: m.options.PermissionSchema,
 		}),
 		controllers.NewGroupsController(app),
-		controllers.NewShowcaseController(app),
-		controllers.NewCrudShowcaseController(app),
 		controllers.NewWebSocketController(app),
 		controllers.NewSettingsController(app),
 		controllers.NewAuthzAPIController(app),
 		controllers.NewAuthzRequestController(app),
-	)
+	}
+	if cfg.EnableDevEndpoints {
+		controllersToRegister = append(
+			controllersToRegister,
+			controllers.NewShowcaseController(app),
+			controllers.NewCrudShowcaseController(app),
+		)
+	}
+	app.RegisterControllers(controllersToRegister...)
 	app.RegisterHashFsAssets(assets.HashFS)
 	app.RegisterGraphSchema(application.GraphSchema{
 		Value: graph.NewExecutableSchema(graph.Config{

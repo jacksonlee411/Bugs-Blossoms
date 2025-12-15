@@ -218,6 +218,9 @@ type Configuration struct {
 	// Test endpoints - only enable in test environment
 	EnableTestEndpoints bool `env:"ENABLE_TEST_ENDPOINTS" envDefault:"false"`
 
+	// Dev-only routes (e.g. /_dev/*, /playground) - disabled in production by default.
+	EnableDevEndpoints bool `env:"ENABLE_DEV_ENDPOINTS" envDefault:"false"`
+
 	logFile *os.File
 	logger  *logrus.Logger
 }
