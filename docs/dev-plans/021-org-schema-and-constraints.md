@@ -38,7 +38,7 @@
 ## 约束实现要点（含设计决策）
 - 触发器与移动策略：`org_edges` 触发器在 `INSERT` 时读取父节点 path，拼接 `path/depth`，并在写前检查 `new_path` 是否形成环；禁止直接 `UPDATE parent_node_id`，移动节点通过“将旧边失效、创建新边”实现，触发器需覆盖该流程的子树更新与防环兜底。
 - 时间线（无空档）：数据库 EXCLUDE 兜底“无重叠”，服务层在新增时间片时需加锁当前有效记录、截断 `end_date` 后插入新片段，保持“无空档”。OrgNode 使用 `org_node_slices` 做时间片演进，`org_nodes` 仅承载稳定标识（供外键引用）；`Correct/Update/ShiftBoundary` 的写语义在 025 定义并实现。
-- 根节点创建：统一通过 API `POST /org/tenants/{tenant_id}/root-node` 创建首个根节点（示例 payload：`{code,name,effective_date}`），若租户已存在根节点则返回冲突；如需初始租户种子，由 seeding 脚本调用同一 API，避免绕过业务校验。
+- 根节点创建：统一通过内部 API `POST /org/api/tenants/{tenant_id}/root-node` 创建首个根节点（示例 payload：`{code,name,effective_date}`），若租户已存在根节点则返回冲突；如需初始租户种子，由 seeding 脚本调用同一 API，避免绕过业务校验。
 - 外键与软删：所有 FK 采用 `ON DELETE RESTRICT` / 默认 `RESTRICT`，与软删 `status='rescinded'` 一致，禁止硬删被引用记录，强制走业务归档。
 - 查询性能与索引：GiST EXCLUDE 保证约束；B-Tree 索引覆盖 `positions` 按 org_node_id+有效期、`org_assignments` 按 subject_id/position_id+有效期、`org_edges` 按 parent_node_id/child_node_id+有效期，path 查询走 GiST。
 
@@ -47,7 +47,7 @@
 2. [ ] Schema 描述：在 `modules/org/infrastructure/atlas/schema.hcl` 写明上述表/约束/扩展/索引（按聚合拆分 include 亦可），保持 `(tenant_id, …)` 复合键。
 3. [ ] 生成迁移：`atlas migrate diff --env dev --dir file://migrations/org --to file://modules/org/infrastructure/atlas/schema.hcl`，产出 `changes_<unix>.{up,down}.sql` 与 `atlas.sum`。命令执行前确保 Postgres 可连（`DB_*`/`ATLAS_DEV_DB_NAME` 已导出）。
 4. [ ] 触发器实现与测试：编写并测试 `org_edges` PL/pgSQL 触发器，覆盖环路拒绝、`path/depth` 维护、直接 `UPDATE parent_node_id` 被拒、移动节点（失效旧边+新边）后子树更新。
-5. [ ] 根节点初始化：实现 `POST /org/tenants/{tenant_id}/root-node` API，定义请求/响应与冲突返回；如需种子，复用该 API，禁止绕过业务校验。
+5. [ ] 根节点初始化：实现 `POST /org/api/tenants/{tenant_id}/root-node` API，定义请求/响应与冲突返回；如需种子，复用该 API，禁止绕过业务校验。
 6. [ ] Lint：运行 `make db lint` 或 `atlas migrate lint --env ci --git-base origin/main --dir file://migrations/org`，保证无破坏性/依赖问题。
 7. [ ] 上下行验证：使用 goose 执行 `goose -dir migrations/org postgres "$DSN" up` / `goose -dir migrations/org postgres "$DSN" down`（$DSN 复用 `postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=disable`），记录时间戳与输出。
 8. [ ] 生成物清理：若触发 `make generate`/`make sqlc-generate`，执行后确认 `git status --short` 干净。

@@ -31,6 +31,7 @@
 - 不在本计划内一次性重写所有控制器与前端引用（避免大范围破坏性变更）。
 - 不引入新的路由框架（继续使用 `gorilla/mux`）。
 - 不强制改变第三方回调路径（支付/短信等通常受外部平台约束），但要求纳入统一分类与安全基线。
+- 不在本计划内引入 OpenAPI/Swagger 自动生成（后续如要纳入，需要独立计划定义范围与门禁）。
 
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.1 路由空间总览（Mermaid）
@@ -122,6 +123,7 @@ graph TD
 ### 5.2 内部 API（`/{module}/api/*`）契约
 - 成功与失败均返回 JSON；不得返回 HTML（避免 UI 与 API 混淆）。
 - 允许在 HTMX 调用场景下设置 `HX-Trigger/HX-Redirect/Hx-Push-Url` 等响应头，但 body 仍保持 JSON。
+- 版本策略：**不做版本化（Always Latest）**，与同仓库 UI 同步发布；不承诺对外部调用者的向后兼容性（需要稳定兼容/对外承诺的接口必须走 `/api/v1/*`）。
 - 认证与鉴权：
   - 默认按 Session + Authz 能力校验；
   - 403 统一返回 forbidden payload（字段口径与现有 `modules/core/authzutil.BuildForbiddenPayload` 对齐），且**不依赖 `Accept` 协商**（内部 API 必须 JSON-only）。
@@ -148,6 +150,31 @@ graph TD
   - 默认返回 HTML（整页或 HTMX partial）；当 `Accept: application/json` 时允许返回 JSON（用于 E2E/诊断）。
 - 实现提示（落地任务）：
   - `NotFoundHandler`/`MethodNotAllowedHandler` 需要基于 `r.URL.Path` 做 route_class 判定（例如：`/api/v1/*`、`/{module}/api/*` 等），再选择对应 responder；避免“API 命名空间下出现 HTML 404”。
+  - route_class 判定必须满足：
+    - **不依赖 `Accept`/`Hx-Request`**（否则会出现“UI 404 因 Accept 变成 JSON”或“HTMX 404 误拿 JSON”的漂移）；
+    - **可维护/可验证**：route-lint 与 NotFound 使用同一套规则来源；
+    - **兜底为 UI（HTML）**：未命中任何已知前缀时，默认为 UI（减少无意的 API 探测/信息泄露面）。
+  - 推荐判定算法（可直接编码）：
+    1. 从“附录 B 顶层入口盘点”（或等价 allowlist 文件）生成一组 `prefix -> route_class` 规则（按入口区分：server/superadmin 各自一份）。
+    2. 按 prefix 长度倒序做**最长前缀匹配**；匹配应做 segment 边界检查（避免 `/api/v1x` 误命中 `/api/v1`）。
+    3. 若未命中 allowlist，再用规则兜底：
+       - `^/api/v1(/|$)` → `public_api`
+       - `^/[^/]+/api(/|$)` → `internal_api`
+    4. 最终兜底：`ui`。
+
+    ```go
+    // 伪代码：仅说明判定顺序与边界规则
+    func ClassifyPath(path string) routeClass {
+      for _, rule := range allowlistSortedByPrefixLenDesc {
+        if hasPrefixOnSegmentBoundary(path, rule.prefix) {
+          return rule.class
+        }
+      }
+      if rePublicAPI.MatchString(path) { return publicAPI }
+      if reInternalAPI.MatchString(path) { return internalAPI }
+      return ui
+    }
+    ```
 
 ## 6. 中间件与控制器组织 (Middleware & Controller Conventions)
 > 目标：让“路由类别”决定默认 middleware stack，减少控制器自由发挥导致的不一致。
@@ -172,6 +199,9 @@ graph TD
 - 推荐栈（示意）：
   - `VerifyProviderSignature()` → `ReplayProtection()` →（未来如有）`CSRFExempt()` → `WithTransaction()`（按需）→ handler
   - 默认不依赖 Session/Cookie，不应复用 `Authorize()/ProvideUser()` 作为唯一凭证来源。
+- 建议的代码抽象（可复用、可强制）：
+  - 在 `pkg/webhooks`（或等价目录）提供 `Verifier` 接口（例如：`VerifySignature(r *http.Request) error`），并提供将 verifier 绑定到 `mux` 子路由的标准 middleware。
+  - provider 特定实现（Stripe/Twilio 等）可按需逐步补齐；M1 只要求“接口 + 强制绑定点 + 统一错误返回与审计字段口径”。
 
 ### 6.5 Ops 推荐栈与访问基线（必须明确）
 > 目标：避免 `/health`、`/debug/prometheus`、`/_ops/*` 在生产“默认公网可达”。
@@ -181,6 +211,21 @@ graph TD
   2. BasicAuth / 静态 token（header）等应用侧鉴权；或
   3. 专用 `OpsGuard` 中间件（按配置启用，拒绝非允许来源）。
 - 建议：在 `pkg/middleware` 提供 `OpsGuard`（或等价）并在路由构建层为 ops 前缀统一绑定；避免每个 controller 自行配置。
+
+### 6.6 Middleware Stack Builder / Factory（推荐落地为强约束）
+> 目标：将 6.1/6.2/6.4/6.5 的“推荐栈”固化为代码层的可复用工厂，避免各模块在 `module.go` 中手工拼装导致遗漏（例如漏掉 `ProvideUser`、未来的 CSRF、或 webhook 的签名校验）。
+
+- 推荐落点：`pkg/server` 或 `pkg/middleware` 提供标准构建器（按 route_class 维度）。
+- 推荐形式（示意，非唯一）：
+  - `NewUIStack(...) []mux.MiddlewareFunc`
+  - `NewInternalAPIStack(...) []mux.MiddlewareFunc`
+  - `NewWebhookStack(providerVerifier ...) []mux.MiddlewareFunc`
+  - `NewOpsStack(...) []mux.MiddlewareFunc`
+- 注册方式（示意）：
+  - 基础设施层创建 `subrouter := r.PathPrefix("/org").Subrouter()`，并统一 `subrouter.Use(NewUIStack(...)...)`；
+  - 模块只负责在已绑定 stack 的 subrouter 上注册具体 handler（避免在模块内再拼 middleware）。
+- 例外规则：
+  - 若某条路由确需偏离标准栈（例如 webhook 需要额外 IP allowlist，或 UI 某页需要匿名访问），必须先在本计划登记为例外并说明原因/安全基线，否则视为违规。
 
 ## 7. 安全与鉴权 (Security & Authz)
 - **同源与 Cookie**：UI 与内部 API 默认依赖同源 Session；内部 API 禁止被跨站调用（建议在边界处增加 Origin/Referer 校验或同站策略说明）。
@@ -212,8 +257,22 @@ graph TD
    - [ ] 增加 route-lint（测试或 lint 规则）：
      - 禁止新增非版本化 `/api/*`（允许 `/api/v1/*`）。
      - 新增“顶层例外/legacy 前缀”必须同步更新附录 B（或等价 allowlist 文件），否则视为违规。
-     - 冻结模块（billing/crm/finance）的 legacy 路由仅允许存在于 allowlist 中；禁止在非冻结模块引入新的 legacy 前缀（防止破窗效应）。
+     - 冻结模块（billing/crm/finance）的 legacy 路由仅允许存在于 allowlist 中（冻结政策见仓库根 `AGENTS.md`）；禁止在非冻结模块引入新的 legacy 前缀（防止破窗效应）。
+     - 推荐实现：**运行时路由检测（go test）**
+       - 构建 server/superadmin 的 router（按入口分别跑），使用 `mux.Router.Walk()` 收集 `PathTemplate/PathPrefix`；
+       - 将所有顶层前缀与路由模板按 4.1/4.3 的规则归类并校验（含 `/api/v1`、`/{module}/api`、例外白名单）；
+       - route-lint 的 allowlist 输入与 5.5 的 ClassifyPath 规则保持同源（避免两个系统判定口径漂移）。
    - [ ] PR 模板/Reviewer checklist 增加“路由类别与命名空间”校验点。
+
+### 8.3 混合控制器重构模式（建议）
+> 背景：存量控制器可能同时包含 HTML/HTMX 与 JSON 的 handler，导致内容协商与错误返回口径容易分散。
+
+- 推荐拆分模式：
+  - `XxxPageController`：只服务 UI（例如 `/users`、`/org/*`），默认返回 HTML（按 5.1 支持显式 JSON 诊断）。
+  - `XxxAPIController`：只服务内部 API（例如 `/core/api/users`、`/org/api/*`），JSON-only（按 5.2/5.5）。
+- 共享方式：
+  - 共享 service/domain 层与 DTO（或 mapper），避免在 controller 层复制校验与错误封装逻辑。
+  - 403/404/500 统一走同一 responder 工具（见 8.2 的“统一 responder/协商工具”与 5.5 的全局错误契约）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - 文档验收：
@@ -243,6 +302,8 @@ graph TD
 
 ## 附录 B：顶层入口盘点与例外清单（规范性）
 > 说明：本表用于支撑 reviewer 与后续 route-lint；只列“顶层入口/单例入口”，不枚举所有子路由。
+>
+> 冻结政策：`modules/billing`、`modules/crm`、`modules/finance` 为冻结模块（见仓库根 `AGENTS.md`），其存量路由在本表中只做登记与安全基线补齐；迁移仅在解冻后进行（或重大安全漏洞例外）。
 >
 > 字段含义：
 > - **处理策略**：`keep`（长期保留）/`migrate`（需迁移）/`gate`（环境开关）/`legacy`（短期保留，后续裁撤）。
