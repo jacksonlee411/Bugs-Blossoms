@@ -107,6 +107,10 @@ func WebhookReplayProtection(opts WebhookReplayProtectionOptions) mux.Middleware
 				next.ServeHTTP(w, r)
 				return
 			}
+			if r.Method != http.MethodPost {
+				next.ServeHTTP(w, r)
+				return
+			}
 			if classifier.ClassifyPath(r.URL.Path) != routing.RouteClassWebhook {
 				next.ServeHTTP(w, r)
 				return
