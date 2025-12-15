@@ -53,8 +53,9 @@ func (m *Module) Register(app application.Application) error {
 			App:      app,
 		}),
 		controllers.NewAIChatAPIController(controllers.AIChatAPIControllerConfig{
-			BasePath: "/api/website/ai-chat",
-			App:      app,
+			BasePath:   "/api/v1/website/ai-chat",
+			AliasPaths: []string{"/api/website/ai-chat"},
+			App:        app,
 		}),
 	)
 	app.RegisterLocaleFiles(&LocaleFiles)

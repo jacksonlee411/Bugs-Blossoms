@@ -20,6 +20,7 @@ type DefaultOptions struct {
 	Configuration *configuration.Configuration
 	Application   application.Application
 	Pool          *pgxpool.Pool
+	Entrypoint    string
 }
 
 func Default(options *DefaultOptions) (*server.HTTPServer, error) {
@@ -74,10 +75,13 @@ func Default(options *DefaultOptions) (*server.HTTPServer, error) {
 
 	app.RegisterMiddleware(middlewares...)
 
+	handlerOpts := controllers.ErrorHandlersOptions{
+		Entrypoint: options.Entrypoint,
+	}
 	serverInstance := server.NewHTTPServer(
 		app,
-		controllers.NotFound(options.Application),
-		controllers.MethodNotAllowed(),
+		controllers.NotFound(options.Application, handlerOpts),
+		controllers.MethodNotAllowed(handlerOpts),
 	)
 	return serverInstance, nil
 }

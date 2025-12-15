@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,12 +24,14 @@ import (
 
 type AIChatAPIControllerConfig struct {
 	BasePath    string
+	AliasPaths  []string
 	App         application.Application
 	Middlewares []mux.MiddlewareFunc // Optional: Additional middleware to apply
 }
 
 type AIChatAPIController struct {
 	basePath    string
+	aliasPaths  []string
 	app         application.Application
 	middlewares []mux.MiddlewareFunc
 }
@@ -36,6 +39,7 @@ type AIChatAPIController struct {
 func NewAIChatAPIController(cfg AIChatAPIControllerConfig) application.Controller {
 	return &AIChatAPIController{
 		basePath:    cfg.BasePath,
+		aliasPaths:  cfg.AliasPaths,
 		app:         cfg.App,
 		middlewares: cfg.Middlewares,
 	}
@@ -46,7 +50,17 @@ func (c *AIChatAPIController) Key() string {
 }
 
 func (c *AIChatAPIController) Register(r *mux.Router) {
-	router := r.PathPrefix(c.basePath).Subrouter()
+	c.registerRoutes(r, c.basePath)
+	for _, alias := range c.aliasPaths {
+		if strings.TrimSpace(alias) == "" || alias == c.basePath {
+			continue
+		}
+		c.registerRoutes(r, alias)
+	}
+}
+
+func (c *AIChatAPIController) registerRoutes(r *mux.Router, basePath string) {
+	router := r.PathPrefix(basePath).Subrouter()
 
 	// Apply custom middlewares first
 	for _, mw := range c.middlewares {

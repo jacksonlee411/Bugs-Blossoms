@@ -29,18 +29,22 @@ func NewLensEventsController(app application.Application) application.Controller
 }
 
 func (c *LensEventsController) Key() string {
-	return "/api/lens/events"
+	return "/core/api/lens/events"
 }
 
 func (c *LensEventsController) Register(r *mux.Router) {
-	router := r.PathPrefix("/api/lens/events").Subrouter()
+	c.registerRoutes(r, "/core/api/lens/events")
+	c.registerRoutes(r, "/api/lens/events") // legacy alias (migration window)
+}
+
+func (c *LensEventsController) registerRoutes(r *mux.Router, basePath string) {
+	router := r.PathPrefix(basePath).Subrouter()
 	router.Use(
 		middleware.Authorize(),
 		middleware.ProvideUser(),
 		middleware.ProvideLocalizer(c.app),
 	)
 
-	// Handle chart events
 	router.HandleFunc("/chart/{panelId}", c.HandleChartEvent).Methods(http.MethodPost)
 }
 
