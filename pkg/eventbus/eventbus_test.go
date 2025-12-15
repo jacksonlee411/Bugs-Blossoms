@@ -3,6 +3,7 @@ package eventbus
 import (
 	"bytes"
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -261,6 +262,60 @@ func TestPublisher_PanicWithNilHandler(t *testing.T) {
 		output := logBuffer.String()
 		if !strings.Contains(output, "panicked") {
 			t.Errorf("nil argument panic should be caught, got: %q", output)
+		}
+	})
+}
+
+func TestPublisher_PublishE(t *testing.T) {
+	t.Parallel()
+
+	t.Run("returns ErrNoSubscribers when none match", func(t *testing.T) {
+		publisher := NewEventPublisher(logrus.New()).(EventBusWithError)
+		err := publisher.PublishE(&args{data: "x"})
+		if !errors.Is(err, ErrNoSubscribers) {
+			t.Fatalf("expected ErrNoSubscribers, got: %v", err)
+		}
+	})
+
+	t.Run("returns joined errors from multiple handlers", func(t *testing.T) {
+		publisher := NewEventPublisher(logrus.New()).(EventBusWithError)
+
+		err1 := errors.New("err1")
+		err2 := errors.New("err2")
+		publisher.Subscribe(func(e *args) error { return err1 })
+		publisher.Subscribe(func(e *args) error { return err2 })
+
+		err := publisher.PublishE(&args{data: "x"})
+		if err == nil {
+			t.Fatalf("expected error")
+		}
+		if !errors.Is(err, err1) || !errors.Is(err, err2) {
+			t.Fatalf("expected joined errors, got: %v", err)
+		}
+	})
+
+	t.Run("panic is surfaced as error and other handlers still run", func(t *testing.T) {
+		publisher := NewEventPublisher(nil).(EventBusWithError)
+		called := false
+		publisher.Subscribe(func(e *args) error { panic("boom") })
+		publisher.Subscribe(func(e *args) error { called = true; return nil })
+
+		err := publisher.PublishE(&args{data: "x"})
+		if err == nil {
+			t.Fatalf("expected error")
+		}
+		if !called {
+			t.Fatalf("expected non-panicking handler to be called")
+		}
+	})
+
+	t.Run("invalid handler return is surfaced as ErrInvalidHandlerReturn", func(t *testing.T) {
+		publisher := NewEventPublisher(nil).(EventBusWithError)
+		publisher.Subscribe(func(e *args) int { return 1 })
+
+		err := publisher.PublishE(&args{data: "x"})
+		if !errors.Is(err, ErrInvalidHandlerReturn) {
+			t.Fatalf("expected ErrInvalidHandlerReturn, got: %v", err)
 		}
 	})
 }

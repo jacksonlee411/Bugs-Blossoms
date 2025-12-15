@@ -1,8 +1,11 @@
 package eventbus
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 
+	"github.com/iota-uz/iota-sdk/pkg/serrors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,6 +20,16 @@ type EventBus interface {
 	Clear()
 	SubscribersCount() int
 }
+
+type EventBusWithError interface {
+	EventBus
+	PublishE(args ...any) error
+}
+
+var (
+	ErrNoSubscribers        = serrors.NewError("EVENTBUS_NO_SUBSCRIBERS", "no matching subscribers", "")
+	ErrInvalidHandlerReturn = serrors.NewError("EVENTBUS_INVALID_HANDLER_RETURN", "invalid handler return signature", "")
+)
 
 type publisherImpl struct {
 	log         *logrus.Logger
@@ -84,7 +97,9 @@ func (p *publisherImpl) Publish(args ...interface{}) {
 				if r := recover(); r != nil {
 					handlerName := v.Type().String()
 					// Log panic with error level and include event args for debugging
-					p.log.Errorf("eventbus: handler %s panicked with args %v: %v", handlerName, args, r)
+					if p.log != nil {
+						p.log.Errorf("eventbus: handler %s panicked with args %v: %v", handlerName, args, r)
+					}
 				}
 			}()
 			v.Call(in)
@@ -94,9 +109,63 @@ func (p *publisherImpl) Publish(args ...interface{}) {
 	}
 
 	if !handled {
-		p.log.Warnf("eventbus.Publish: no matching subscribers for event with args: %v", in)
+		if p.log != nil {
+			p.log.Warnf("eventbus.Publish: no matching subscribers for event with args: %v", in)
+		}
 		return
 	}
+}
+
+func (p *publisherImpl) PublishE(args ...any) error {
+	in := make([]reflect.Value, len(args))
+	for i, arg := range args {
+		in[i] = reflect.ValueOf(arg)
+	}
+
+	handled := false
+	var errs []error
+
+	for _, subscriber := range p.Subscribers {
+		v := reflect.ValueOf(subscriber.Handler)
+		if !MatchSignature(subscriber.Handler, args) {
+			continue
+		}
+
+		handled = true
+
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					handlerName := v.Type().String()
+					panicErr := fmt.Errorf("eventbus: handler %s panicked: %v", handlerName, r)
+					errs = append(errs, panicErr)
+				}
+			}()
+
+			out := v.Call(in)
+			if len(out) == 0 {
+				return
+			}
+			if len(out) != 1 {
+				errs = append(errs, fmt.Errorf("%w: handler %s returned %d values", ErrInvalidHandlerReturn, v.Type().String(), len(out)))
+				return
+			}
+
+			ret := out[0]
+			if ret.Type() != reflect.TypeOf((*error)(nil)).Elem() {
+				errs = append(errs, fmt.Errorf("%w: handler %s return type is %s", ErrInvalidHandlerReturn, v.Type().String(), ret.Type().String()))
+				return
+			}
+			if !ret.IsNil() {
+				errs = append(errs, ret.Interface().(error))
+			}
+		}()
+	}
+
+	if !handled {
+		return ErrNoSubscribers
+	}
+	return errors.Join(errs...)
 }
 
 func (p *publisherImpl) Subscribe(handler interface{}) {
