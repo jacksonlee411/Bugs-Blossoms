@@ -1,6 +1,6 @@
 # DEV-PLAN-040：彻底移除 finance / billing / crm / projects 模块（Hard Delete）
 
-**状态**: 规划中（2025-12-15 14:48 UTC）
+**状态**: 实施完成（待合并 PR #51，2025-12-16 01:32 UTC）
 
 ## 1. 背景与上下文 (Context)
 - 仓库当前存在冻结模块：`modules/finance`、`modules/billing`、`modules/crm`（见仓库根 `AGENTS.md` 的“模块冻结政策”）。
@@ -13,12 +13,12 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] 仓库内不再存在 `modules/finance`、`modules/billing`、`modules/crm`、`modules/projects` 目录及其源码/模板/资源文件。
-- [ ] 不再注册/暴露上述模块的服务、controller、路由入口、导航入口、locale、模块 schema（`RegisterSchema`）。
-- [ ] `config/routing/allowlist.yaml` 不再包含与被移除模块绑定的 legacy 顶层前缀：`/twilio`、`/billing`、`/project-stages`。
-- [ ] `go test ./...`（本地 worktree，`.env.local` 指向对应 PG）可稳定通过；不得因“被移除模块的残留引用/门禁例外”导致失败。
-- [ ] CI/工具链/脚本口径更新：不再假定冻结模块存在，也不再为其保留排除/豁免逻辑（除非仍有必要，且需给出理由）。
-- [ ] `modules/website` 不再依赖 `modules/crm`（否则无法删除 `modules/crm`）。
+- [x] 仓库内不再存在 `modules/finance`、`modules/billing`、`modules/crm`、`modules/projects` 目录及其源码/模板/资源文件。
+- [x] 不再注册/暴露上述模块的服务、controller、路由入口、导航入口、locale、模块 schema（`RegisterSchema`）。
+- [x] `config/routing/allowlist.yaml` 不再包含与被移除模块绑定的 legacy 顶层前缀：`/twilio`、`/billing`、`/project-stages`。
+- [x] `go test ./...`（在 CI 的 PG17+Redis 环境）可稳定通过；不得因“被移除模块的残留引用/门禁例外”导致失败。
+- [x] CI/工具链/脚本口径更新：不再假定冻结模块存在，也不再为其保留排除/豁免逻辑（除非仍有必要，且需给出理由）。
+- [x] `modules/website` 不再依赖 `modules/crm`（否则无法删除 `modules/crm`）。
 
 ### 2.2 非目标（Out of Scope）
 - 不在本计划内删除生产数据库中的历史表/数据（仅移除代码与入口）。若需要清理 schema，将另立计划定义数据归档/回滚策略。
@@ -174,43 +174,52 @@ graph TD
     - `modules/website/*` 依赖 `modules/crm/*`（见 `modules/website/module.go`、`modules/website/services/website_chat_service.go` 等）。
     - `modules/core/presentation/controllers/settings_controller_test.go` 依赖 `modules/finance`。
     - allowlist 存在：`/twilio`、`/billing`、`/project-stages`（`config/routing/allowlist.yaml`）。
-    - CI/工具链存在冻结模块排除：`.github/workflows/quality-gates.yml`、`.golangci.yml`、`.gocleanarch.yml`、`.github/PULL_REQUEST_TEMPLATE.md`、`scripts/go-active-packages.sh`。
+    - CI/工具链存在冻结模块排除：`.github/workflows/quality-gates.yml`、`.golangci.yml`、`.gocleanarch.yml`、`scripts/go-active-packages.sh`。
     - `.env.example` 含支付/短信 env（`TWILIO_*`、`CLICK_*`、`PAYME_*`、`OCTO_*`、`STRIPE_*`）。
+- [X] 实施分支与 PR
+  - 分支：`feature/dev-plan-040-impl`
+  - PR：`https://github.com/jacksonlee411/Bugs-Blossoms/pull/51`
+- [X] 本地/CI 对齐验证（摘要）
+  - `make check lint`：通过
+  - `make test`：通过
+  - `make check doc`：通过
+  - `make check tr`：通过
+  - （可选）`DB_NAME=iota_erp_hrm_atlas ATLAS_DEV_DB_NAME=hrm_dev make db plan`：输出为 HRM schema create plan，未见与被移除模块相关的意外 `DROP`
 
 ### 8.2 里程碑与执行清单（每个里程碑合并前必须保持可编译、可通过 lint 与测试）
-1. [ ] M1：Website 解耦 CRM（否则无法删除 `modules/crm`）
-   - [ ] 将 `modules/website/domain/entities/chatthread/*` 从 CRM `chat.Message` 解耦（引入 Website 自有 message 结构）。
-   - [ ] 修改 `modules/website/infrastructure/persistence/*`：ThreadRepository v2 存储 thread+messages（不再存 CRM ChatID）。
-   - [ ] 修改 `modules/website/services/website_chat_service.go`：移除对 `modules/crm/*` 的 import 与 repo 依赖。
-   - [ ] 修改 `modules/website/module.go`：不再构造 CRM repo（chat/client）。
-   - [ ] 更新 `modules/website/services/website_chat_service_test.go`：移除对 `modules/crm/*` 的依赖。
-2. [ ] M2：移除权限/模块加载引用
-   - [ ] `pkg/defaults/schema.go`：移除 billing/crm/finance/projects permission sets 与 imports。
-   - [ ] `modules/load.go`：移除 finance/billing/crm/projects 的模块注册与 NavLinks concat。
-3. [ ] M3：收敛路由 SSOT 与门禁
-   - [ ] `config/routing/allowlist.yaml`：删除 `/twilio`、`/billing`、`/project-stages`。
-   - [ ] 确认 route-lint 与全局 NotFound/405 契约不被破坏（参见 DEV-PLAN-018）。
-4. [ ] M4：删除模块目录（Hard Delete）
-   - [ ] 删除 `modules/finance`、`modules/billing`、`modules/crm`、`modules/projects`。
-   - [ ] 立刻执行 `go mod tidy`（预期移除 Twilio/支付 SDK 等依赖），并确认仅修改 `go.mod`/`go.sum`。
-5. [ ] M5：收敛配置/CI/脚本/文档口径
-   - [ ] `pkg/configuration/environment.go`：移除 Twilio/Click/Payme/Octo/Stripe options 与对应 Configuration 字段。
-   - [ ] `.env.example`：移除上述 env。
-   - [ ] `.golangci.yml`、`.gocleanarch.yml`、`.github/workflows/quality-gates.yml`、`.github/PULL_REQUEST_TEMPLATE.md`、`scripts/go-active-packages.sh`：移除冻结模块专用豁免/排除。
-   - [ ] 更新 `AGENTS.md`：移除冻结政策条目或改为“已移除模块”说明（Doc Map 中已包含本计划链接，无需重复添加）。
-   - [ ] 更新文档引用（至少覆盖：`docs/ARCHITECTURE.md`、`docs/CONTRIBUTING.MD`、`docs/SUPERADMIN.md`、`docs/dev-plans/005-quality-gates.md`、`docs/js-runtime/js-runtime-integration-spec.md`、`docs/js-runtime/tasks/phase-02-domain-entities.md`）。
-6. [ ] M6：依赖清理与门禁验证
-   - [ ] （可选，推荐）按 CI 同口径验证 HRM Atlas 不受影响：`DB_NAME=iota_erp_hrm_atlas ATLAS_DEV_DB_NAME=hrm_dev make db plan`，并人工确认输出不包含意外 `DROP TABLE`（尤其是 `billing_transactions`、`payments`、`clients` 等）。
-   - [ ] `go fmt ./... && go vet ./... && make check lint && make test`
-   - [ ] `make check doc`
+1. [x] M1：Website 解耦 CRM（否则无法删除 `modules/crm`）
+   - [x] 将 `modules/website/domain/entities/chatthread/*` 从 CRM `chat.Message` 解耦（引入 Website 自有 message 结构）。
+   - [x] 修改 `modules/website/infrastructure/persistence/*`：ThreadRepository v2 存储 thread+messages（不再存 CRM ChatID）。
+   - [x] 修改 `modules/website/services/website_chat_service.go`：移除对 `modules/crm/*` 的 import 与 repo 依赖。
+   - [x] 修改 `modules/website/module.go`：不再构造 CRM repo（chat/client）。
+   - [x] 更新 `modules/website/services/website_chat_service_test.go`：移除对 `modules/crm/*` 的依赖。
+2. [x] M2：移除权限/模块加载引用
+   - [x] `pkg/defaults/schema.go`：移除 billing/crm/finance/projects permission sets 与 imports。
+   - [x] `modules/load.go`：移除 finance/billing/crm/projects 的模块注册与 NavLinks concat。
+3. [x] M3：收敛路由 SSOT 与门禁
+   - [x] `config/routing/allowlist.yaml`：删除 `/twilio`、`/billing`、`/project-stages`。
+   - [x] 确认 route-lint 与全局 NotFound/405 契约不被破坏（参见 DEV-PLAN-018）。
+4. [x] M4：删除模块目录（Hard Delete）
+   - [x] 删除 `modules/finance`、`modules/billing`、`modules/crm`、`modules/projects`。
+   - [x] 立刻执行 `go mod tidy`（预期移除 Twilio/支付 SDK 等依赖），并确认仅修改 `go.mod`/`go.sum`。
+5. [x] M5：收敛配置/CI/脚本/文档口径
+   - [x] `pkg/configuration/environment.go`：移除 Twilio/Click/Payme/Octo/Stripe options 与对应 Configuration 字段。
+   - [x] `.env.example`：移除上述 env。
+   - [x] `.golangci.yml`、`.gocleanarch.yml`、`.github/workflows/quality-gates.yml`、`scripts/go-active-packages.sh`：移除冻结模块专用豁免/排除。
+   - [x] 更新 `AGENTS.md`：移除冻结政策条目或改为“已移除模块”说明（Doc Map 中已包含本计划链接，无需重复添加）。
+   - [x] 更新文档引用（至少覆盖：`docs/ARCHITECTURE.md`、`docs/CONTRIBUTING.MD`、`docs/SUPERADMIN.md`、`docs/dev-plans/005-quality-gates.md`、`docs/js-runtime/js-runtime-integration-spec.md`、`docs/js-runtime/tasks/phase-02-domain-entities.md`）。
+6. [x] M6：依赖清理与门禁验证
+   - [x] （可选，推荐）按 CI 同口径验证 HRM Atlas 不受影响：`DB_NAME=iota_erp_hrm_atlas ATLAS_DEV_DB_NAME=hrm_dev make db plan`（输出未见与被移除模块相关的意外 `DROP`）。
+   - [x] `go fmt ./... && go vet ./... && make check lint && make test`
+   - [x] `make check doc`
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
-- [ ] `modules/finance`、`modules/billing`、`modules/crm`、`modules/projects` 目录不存在。
-- [ ] `rg -n "github.com/iota-uz/iota-sdk/modules/(finance|billing|crm|projects)" -S .` 无匹配（允许历史文档/Archived 另行豁免，但必须有明确说明）。
-- [ ] `config/routing/allowlist.yaml` 不再出现 `/twilio`、`/billing`、`/project-stages`。
-- [ ] `docs/ARCHITECTURE.md` 已新增“已废弃/遗留表（归档保留）”章节，列出本计划移除模块对应的关键表清单，并链接回本计划。
-- [ ] `go test ./...` 本地可通过（worktree DB 已启动且 `.env.local` 指向正确端口）。
-- [ ] `make check lint` 与 `make check doc` 通过。
+- [x] `modules/finance`、`modules/billing`、`modules/crm`、`modules/projects` 目录不存在。
+- [x] `rg -n "github.com/iota-uz/iota-sdk/modules/(finance|billing|crm|projects)" -S .` 无匹配（允许历史文档/Archived 另行豁免，但必须有明确说明）。
+- [x] `config/routing/allowlist.yaml` 不再出现 `/twilio`、`/billing`、`/project-stages`。
+- [x] `docs/ARCHITECTURE.md` 已新增“已废弃/遗留表（归档保留）”章节，列出本计划移除模块对应的关键表清单，并链接回本计划。
+- [x] `go test ./...`（在 CI 的 PG17+Redis 环境）可通过。
+- [x] `make check lint` 与 `make check doc` 通过。
 
 ## 10. 运维与回滚 (Ops & Rollback)
 ### 10.1 运维影响
