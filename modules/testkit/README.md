@@ -120,7 +120,6 @@ Seeds database with predefined scenarios.
 **Available Scenarios:**
 - `minimal`: Basic setup with default tenant and test user
 - `finance`: Finance module focused setup with accounts, categories, and transactions
-- `warehouse`: Warehouse module setup with units, products, and inventory
 - `comprehensive`: Full setup with data across all modules
 
 ### `GET /__test__/seed`
@@ -263,14 +262,10 @@ The environment variable is automatically set in `.github/workflows/quality-gate
 - Counterparties (individuals, companies)
 - Debts (receivable, payable)
 
-### CRM Module
-- Clients with contact information
+  ### CRM Module
+  - Clients with contact information
 
-### Warehouse Module
-- Units of measurement
-- Products with pricing
-
-## Development Notes
+  ## Development Notes
 
 ### Adding New Entity Support
 

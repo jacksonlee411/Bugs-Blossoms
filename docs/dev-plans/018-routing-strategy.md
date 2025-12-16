@@ -26,7 +26,7 @@
   - 项目同时包含：服务端渲染 UI（`templ` + HTMX）、内部 JSON API（用于权限申请/调试/局部交互）、第三方回调（支付/短信/聊天）、测试专用端点以及运维端点。
   - 当前路由命名空间与返回形态存在“不完全一致”的现象：同类能力在不同模块下使用不同前缀/协商规则，导致实现、鉴权与测试口径分散。
 - **现状盘点（示例，非穷举）**：
-  - UI（HTML/HTMX）：`/hrm/employees`、`/logs`、`/finance/*`、`/warehouse/*` 等。
+- UI（HTML/HTMX）：`/hrm/employees`、`/logs`、`/website/ai-chat`、`/bi-chat`、`/superadmin/*` 等。
   - 内部 API（JSON）：`/core/api/authz/*`，以及少量 `/_dev`、`/api/*` 风格的内部端点。
   - AuthN（认证边界）：`/login`、`/logout`、`/oauth/*`。
   - Webhooks/第三方回调：`/twilio`、支付网关回调（路径可能由配置决定）。

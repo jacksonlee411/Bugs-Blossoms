@@ -164,10 +164,7 @@
 | 模块 UI 前缀 | 备注 | 证据（代码） |
 |---|---|---|
 | `/hrm/*`（如 `/hrm/employees`） | 典型模块前缀 | `modules/hrm/presentation/controllers/employee_controller.go` |
-| `/warehouse/*` | 典型模块前缀 | `modules/warehouse/presentation/controllers/*_controller.go` |
-| `/projects/*`、`/project-stages/*` | 典型模块前缀（其中 `project-stages` 不是模块名） | `modules/projects/presentation/controllers/*_controller.go` |
-| `/crm/*` | 典型模块前缀 | `modules/crm/module.go` |
-| `/finance/*` | 典型模块前缀（冻结模块：短期不可改） | `modules/finance/presentation/controllers/*_controller.go` |
+| `/superadmin/*` | 典型模块前缀（Superadmin Server） | `modules/superadmin/presentation/controllers/tenants_controller.go` |
 | `/logs` | 模块 UI 但未使用 `/{module}/...` 前缀（logging 例外） | `modules/logging/presentation/controllers/logs_controller.go` |
 | `/website/*`（如 `/website/ai-chat`） | 典型模块前缀 | `modules/website/module.go` |
 | `/bi-chat` | 非 `/{module}/...` 风格（bichat 例外） | `modules/bichat/presentation/controllers/bichat_controller.go` |

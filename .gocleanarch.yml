@@ -13,11 +13,6 @@ ignore_packages:
   - github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence
   - github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence/models
   # other module-specific adapters
-  - github.com/iota-uz/iota-sdk/modules/warehouse/infrastructure/persistence
-  - github.com/iota-uz/iota-sdk/modules/warehouse/infrastructure/persistence/mappers
-  - github.com/iota-uz/iota-sdk/modules/warehouse/services/positionservice
-  - github.com/iota-uz/iota-sdk/modules/warehouse/services/productservice
-  - github.com/iota-uz/iota-sdk/modules/warehouse/services/inventory_service
   - github.com/iota-uz/iota-sdk/modules/website/infrastructure/cache
   - github.com/iota-uz/iota-sdk/modules/website/infrastructure/persistence
   - github.com/iota-uz/iota-sdk/modules/website/infrastructure/rag

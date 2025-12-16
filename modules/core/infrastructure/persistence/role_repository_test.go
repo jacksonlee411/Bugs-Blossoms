@@ -6,7 +6,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/role"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
-	"github.com/iota-uz/iota-sdk/modules/warehouse/permissions"
+	coreperms "github.com/iota-uz/iota-sdk/modules/core/permissions"
 )
 
 func TestGormRoleRepository_CRUD(t *testing.T) {
@@ -14,14 +14,14 @@ func TestGormRoleRepository_CRUD(t *testing.T) {
 
 	permissionRepository := persistence.NewPermissionRepository()
 	roleRepository := persistence.NewRoleRepository()
-	if err := permissionRepository.Save(f.Ctx, permissions.PositionCreate); err != nil {
+	if err := permissionRepository.Save(f.Ctx, coreperms.UserCreate); err != nil {
 		t.Fatal(err)
 	}
 
 	data := role.New(
 		"test",
 		role.WithDescription("test"),
-		role.WithPermissions([]*permission.Permission{permissions.PositionCreate}),
+		role.WithPermissions([]*permission.Permission{coreperms.UserCreate}),
 	)
 	roleEntity, err := roleRepository.Create(f.Ctx, data)
 	if err != nil {

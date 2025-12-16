@@ -8,7 +8,7 @@ Create the domain model for scripts following IOTA SDK's Domain-Driven Design pa
 - Repository pattern with FindParams for flexible queries
 - Domain events for audit trail and integration
 - Multi-tenant isolation at the repository level
-- All entities must follow the existing patterns from current modules (e.g. core/hrm/warehouse)
+- All entities must follow the existing patterns from current modules (e.g. core/hrm/logging)
 
 ## Task 2.1: Domain Layer (Day 1)
 

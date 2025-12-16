@@ -19,10 +19,9 @@ type TenantSpec struct {
 }
 
 type DataSpec struct {
-	Users     []UserSpec     `json:"users,omitempty"`
-	Finance   *FinanceSpec   `json:"finance,omitempty"`
-	CRM       *CRMSpec       `json:"crm,omitempty"`
-	Warehouse *WarehouseSpec `json:"warehouse,omitempty"`
+	Users   []UserSpec   `json:"users,omitempty"`
+	Finance *FinanceSpec `json:"finance,omitempty"`
+	CRM     *CRMSpec     `json:"crm,omitempty"`
 }
 
 type UserSpec struct {
@@ -118,24 +117,6 @@ type ClientSpec struct {
 	Email     string `json:"email,omitempty"`
 	Phone     string `json:"phone,omitempty"`
 	Ref       string `json:"_ref,omitempty"`
-}
-
-type WarehouseSpec struct {
-	Units    []UnitSpec    `json:"units,omitempty"`
-	Products []ProductSpec `json:"products,omitempty"`
-}
-
-type UnitSpec struct {
-	Title      string `json:"title"`
-	ShortTitle string `json:"shortTitle"`
-	Ref        string `json:"_ref,omitempty"`
-}
-
-type ProductSpec struct {
-	Name    string  `json:"name"`
-	UnitRef string  `json:"unitRef"`
-	Price   float64 `json:"price"`
-	Ref     string  `json:"_ref,omitempty"`
 }
 
 type OptionsSpec struct {

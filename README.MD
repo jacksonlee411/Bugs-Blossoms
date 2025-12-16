@@ -50,8 +50,8 @@
 
 ## A Modular and Configurable ERP Solution
 
-**IOTA SDK** is an open-source, modular, and feature-complete **ERP system** designed to adapt to multiple economic
-sectors, including **finance**, **manufacturing**, and **warehouse management**. Inspired by leading platforms like
+**IOTA SDK** is an open-source, modular, and feature-complete **ERP system** designed to adapt to multiple operational
+domains (e.g. HRM, internal tooling, and platform operations). Inspired by leading platforms like
 Odoo, IOTA SDK provides an intuitive framework to accelerate enterprise operations and unlock efficiency with powerful
 tools and integrations.
 
@@ -60,7 +60,7 @@ tools and integrations.
 ## 🚀 Key Features
 
 - **Configurable Architecture**: Fully modular components to customize workflows.
-- **Industry-Specific Modules**: Finance, manufacturing, warehouse management, and more.
+- **Modular Business Apps**: HRM, BI‑Chat, logging, and more.
 - **GraphQL API**: Simplifies querying and data management.
 - **Open Source**: Fully extensible and transparent.
 
