@@ -75,18 +75,10 @@ entrypoints:
     - prefix: /ws
       class: websocket
 
-    # Webhooks (legacy bindings)
-    - prefix: /twilio
-      class: webhook
-    - prefix: /billing
-      class: webhook
-
     # Legacy UI
     - prefix: /logs
       class: ui
     - prefix: /bi-chat
-      class: ui
-    - prefix: /project-stages
       class: ui
 
     # Superadmin paths are reachable on the main server via module registration.

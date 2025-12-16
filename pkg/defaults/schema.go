@@ -4,13 +4,9 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
 	"github.com/iota-uz/iota-sdk/pkg/rbac"
 
-	billingPerms "github.com/iota-uz/iota-sdk/modules/billing/permissions"
 	corePerms "github.com/iota-uz/iota-sdk/modules/core/permissions"
-	crmPerms "github.com/iota-uz/iota-sdk/modules/crm/permissions"
-	financePerms "github.com/iota-uz/iota-sdk/modules/finance/permissions"
 	hrmPerms "github.com/iota-uz/iota-sdk/modules/hrm/permissions"
 	loggingPerms "github.com/iota-uz/iota-sdk/modules/logging/permissions"
-	projectsPerms "github.com/iota-uz/iota-sdk/modules/projects/permissions"
 	warehousePerms "github.com/iota-uz/iota-sdk/modules/warehouse/permissions"
 )
 
@@ -55,22 +51,14 @@ func (b *permissionSetBuilder) manageSet(resource string, create, read, update, 
 func AllPermissions() []*permission.Permission {
 	// Pre-calculate total capacity to avoid slice re-allocations
 	totalCapacity := len(corePerms.Permissions) +
-		len(billingPerms.Permissions) +
-		len(crmPerms.Permissions) +
-		len(financePerms.Permissions) +
 		len(hrmPerms.Permissions) +
 		len(loggingPerms.Permissions) +
-		len(projectsPerms.Permissions) +
 		len(warehousePerms.Permissions)
 
 	permissions := make([]*permission.Permission, 0, totalCapacity)
 	permissions = append(permissions, corePerms.Permissions...)
-	permissions = append(permissions, billingPerms.Permissions...)
-	permissions = append(permissions, crmPerms.Permissions...)
-	permissions = append(permissions, financePerms.Permissions...)
 	permissions = append(permissions, hrmPerms.Permissions...)
 	permissions = append(permissions, loggingPerms.Permissions...)
-	permissions = append(permissions, projectsPerms.Permissions...)
 	permissions = append(permissions, warehousePerms.Permissions...)
 	return permissions
 }
@@ -105,28 +93,6 @@ func buildModulePermissionSets() []rbac.PermissionSet {
 		core.viewSet("AuthzDebug", corePerms.AuthzDebug),
 	)
 
-	// Finance module
-	finance := newPermissionSetBuilder("Finance")
-	sets = append(sets,
-		finance.viewSet("Payment", financePerms.PaymentRead),
-		finance.manageSet("Payment", financePerms.PaymentCreate, financePerms.PaymentRead, financePerms.PaymentUpdate, financePerms.PaymentDelete),
-		finance.viewSet("Expense", financePerms.ExpenseRead),
-		finance.manageSet("Expense", financePerms.ExpenseCreate, financePerms.ExpenseRead, financePerms.ExpenseUpdate, financePerms.ExpenseDelete),
-		finance.viewSet("ExpenseCategory", financePerms.ExpenseCategoryRead),
-		finance.manageSet("ExpenseCategory", financePerms.ExpenseCategoryCreate, financePerms.ExpenseCategoryRead, financePerms.ExpenseCategoryUpdate, financePerms.ExpenseCategoryDelete),
-		finance.viewSet("Debt", financePerms.DebtRead),
-		finance.manageSet("Debt", financePerms.DebtCreate, financePerms.DebtRead, financePerms.DebtUpdate, financePerms.DebtDelete),
-	)
-
-	// Projects module
-	projects := newPermissionSetBuilder("Projects")
-	sets = append(sets,
-		projects.viewSet("Project", projectsPerms.ProjectRead),
-		projects.manageSet("Project", projectsPerms.ProjectCreate, projectsPerms.ProjectRead, projectsPerms.ProjectUpdate, projectsPerms.ProjectDelete),
-		projects.viewSet("ProjectStage", projectsPerms.ProjectStageRead),
-		projects.manageSet("ProjectStage", projectsPerms.ProjectStageCreate, projectsPerms.ProjectStageRead, projectsPerms.ProjectStageUpdate, projectsPerms.ProjectStageDelete),
-	)
-
 	// Warehouse module
 	warehouse := newPermissionSetBuilder("Warehouse")
 	sets = append(sets,
@@ -140,13 +106,6 @@ func buildModulePermissionSets() []rbac.PermissionSet {
 		warehouse.manageSet("Unit", warehousePerms.UnitCreate, warehousePerms.UnitRead, warehousePerms.UnitUpdate, warehousePerms.UnitDelete),
 		warehouse.viewSet("Inventory", warehousePerms.InventoryRead),
 		warehouse.manageSet("Inventory", warehousePerms.InventoryCreate, warehousePerms.InventoryRead, warehousePerms.InventoryUpdate, warehousePerms.InventoryDelete),
-	)
-
-	// CRM module
-	crm := newPermissionSetBuilder("CRM")
-	sets = append(sets,
-		crm.viewSet("Client", crmPerms.ClientRead),
-		crm.manageSet("Client", crmPerms.ClientCreate, crmPerms.ClientRead, crmPerms.ClientUpdate, crmPerms.ClientDelete),
 	)
 
 	// HRM module
@@ -167,19 +126,5 @@ func buildModulePermissionSets() []rbac.PermissionSet {
 
 // appendRemainingPermissionSets adds remaining modules as individual permission sets
 func appendRemainingPermissionSets(sets []rbac.PermissionSet) []rbac.PermissionSet {
-	// Collect all remaining permissions
-	remainingPermissions := make([]*permission.Permission, 0)
-	remainingPermissions = append(remainingPermissions, billingPerms.Permissions...)
-
-	// Convert each permission to a permission set
-	for _, perm := range remainingPermissions {
-		sets = append(sets, rbac.PermissionSet{
-			Key:         perm.ID.String(),
-			Label:       "Permissions." + perm.Name,
-			Module:      "Core", // Assign to Core module for now
-			Permissions: []*permission.Permission{perm},
-		})
-	}
-
 	return sets
 }
