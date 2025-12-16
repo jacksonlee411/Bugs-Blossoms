@@ -13,7 +13,7 @@ import (
 	"github.com/iota-uz/go-i18n/v2/i18n"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/country"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/phone"
-	"github.com/iota-uz/iota-sdk/modules/crm/domain/aggregates/chat"
+	"github.com/iota-uz/iota-sdk/modules/website/domain/entities/chatthread"
 	"github.com/iota-uz/iota-sdk/modules/website/presentation/controllers/dtos"
 	websiteServices "github.com/iota-uz/iota-sdk/modules/website/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
@@ -159,18 +159,13 @@ func (c *AIChatAPIController) getThreadMessages(
 	writeJSON(w, dtos.ThreadMessagesResponse{Messages: messages})
 }
 
-func transformThreadMessages(messages []chat.Message) []dtos.ThreadMessage {
+func transformThreadMessages(messages []chatthread.Message) []dtos.ThreadMessage {
 	threadMessages := make([]dtos.ThreadMessage, 0, len(messages))
 	for _, msg := range messages {
-		role := "assistant"
-		if msg.Sender().Sender().Type() == chat.ClientSenderType {
-			role = "user"
-		}
-
 		threadMessages = append(threadMessages, dtos.ThreadMessage{
-			Role:      role,
+			Role:      string(msg.Role()),
 			Message:   msg.Message(),
-			Timestamp: msg.CreatedAt().Format(time.RFC3339),
+			Timestamp: msg.Timestamp().Format(time.RFC3339),
 		})
 	}
 	return threadMessages

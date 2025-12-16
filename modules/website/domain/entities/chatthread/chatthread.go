@@ -6,19 +6,26 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/iota-uz/iota-sdk/modules/crm/domain/aggregates/chat"
 )
 
 var (
 	ErrChatThreadNotFound = errors.New("chat thread not found")
+	ErrEmptyMessage       = errors.New("empty message")
+	ErrMessageTooLong     = errors.New("message too long")
+	ErrNoMessages         = errors.New("no messages")
 )
 
-type ChatThread interface {
-	ID() uuid.UUID
-	Timestamp() time.Time
-	ChatID() uint
-	Messages() []chat.Message
-}
+const (
+	MaxMessageLength = 4096
+	MaxMessages      = 200
+)
+
+type Role string
+
+const (
+	RoleUser      Role = "user"
+	RoleAssistant Role = "assistant"
+)
 
 type Repository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (ChatThread, error)
@@ -29,17 +36,31 @@ type Repository interface {
 
 type chatThread struct {
 	id        uuid.UUID
-	timestamp time.Time
-	chatID    uint
-	messages  []chat.Message
+	tenantID  uuid.UUID
+	phone     string
+	createdAt time.Time
+	updatedAt time.Time
+	messages  []Message
 }
 
-func New(chatID uint, messages []chat.Message, opts ...Option) ChatThread {
+type ChatThread interface {
+	ID() uuid.UUID
+	TenantID() uuid.UUID
+	Phone() string
+	CreatedAt() time.Time
+	UpdatedAt() time.Time
+	Messages() []Message
+	AppendMessage(msg Message) ChatThread
+}
+
+func New(tenantID uuid.UUID, phone string, opts ...Option) ChatThread {
 	thread := &chatThread{
 		id:        uuid.New(),
-		timestamp: time.Now(),
-		chatID:    chatID,
-		messages:  messages,
+		tenantID:  tenantID,
+		phone:     phone,
+		createdAt: time.Now(),
+		updatedAt: time.Now(),
+		messages:  nil,
 	}
 
 	for _, opt := range opts {
@@ -59,11 +80,25 @@ func WithID(id uuid.UUID) Option {
 	}
 }
 
-func WithTimestamp(timestamp time.Time) Option {
+func WithCreatedAt(createdAt time.Time) Option {
 	return func(t *chatThread) {
-		if !timestamp.IsZero() {
-			t.timestamp = timestamp
+		if !createdAt.IsZero() {
+			t.createdAt = createdAt
 		}
+	}
+}
+
+func WithUpdatedAt(updatedAt time.Time) Option {
+	return func(t *chatThread) {
+		if !updatedAt.IsZero() {
+			t.updatedAt = updatedAt
+		}
+	}
+}
+
+func WithMessages(messages []Message) Option {
+	return func(t *chatThread) {
+		t.messages = messages
 	}
 }
 
@@ -71,22 +106,34 @@ func (t *chatThread) ID() uuid.UUID {
 	return t.id
 }
 
-func (t *chatThread) Timestamp() time.Time {
-	return t.timestamp
+func (t *chatThread) TenantID() uuid.UUID {
+	return t.tenantID
 }
 
-func (t *chatThread) ChatID() uint {
-	return t.chatID
+func (t *chatThread) Phone() string {
+	return t.phone
 }
 
-func (t *chatThread) Messages() []chat.Message {
-	filteredMessages := make([]chat.Message, 0, len(t.messages))
+func (t *chatThread) CreatedAt() time.Time {
+	return t.createdAt
+}
 
-	for _, msg := range t.messages {
-		if !msg.CreatedAt().Before(t.timestamp) {
-			filteredMessages = append(filteredMessages, msg)
-		}
+func (t *chatThread) UpdatedAt() time.Time {
+	return t.updatedAt
+}
+
+func (t *chatThread) Messages() []Message {
+	return t.messages
+}
+
+func (t *chatThread) AppendMessage(msg Message) ChatThread {
+	if msg == nil {
+		return t
 	}
-
-	return filteredMessages
+	t.messages = append(t.messages, msg)
+	if len(t.messages) > MaxMessages {
+		t.messages = t.messages[len(t.messages)-MaxMessages:]
+	}
+	t.updatedAt = msg.Timestamp()
+	return t
 }

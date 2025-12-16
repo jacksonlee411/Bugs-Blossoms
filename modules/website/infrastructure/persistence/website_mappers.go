@@ -68,13 +68,48 @@ func ToDomainChatThread(model models.ChatThread) (chatthread.ChatThread, error) 
 	if err != nil {
 		return nil, errors.Wrap(err, fmt.Sprintf("failed to parse UUID from string: %s", model.ID))
 	}
-	return chatthread.New(model.ChatID, nil, chatthread.WithTimestamp(model.Timestamp), chatthread.WithID(id)), nil
+
+	tenantID, err := uuid.Parse(model.TenantID)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to parse tenant UUID from string: %s", model.TenantID))
+	}
+
+	messages := make([]chatthread.Message, 0, len(model.Messages))
+	for _, msg := range model.Messages {
+		role := chatthread.Role(msg.Role)
+		m, err := chatthread.NewMessage(role, msg.Message, msg.Timestamp)
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, m)
+	}
+
+	return chatthread.New(
+		tenantID,
+		model.Phone,
+		chatthread.WithCreatedAt(model.CreatedAt),
+		chatthread.WithUpdatedAt(model.UpdatedAt),
+		chatthread.WithMessages(messages),
+		chatthread.WithID(id),
+	), nil
 }
 
 func ToDBChatThread(thread chatthread.ChatThread) models.ChatThread {
+	messages := make([]models.ChatThreadMessage, 0, len(thread.Messages()))
+	for _, msg := range thread.Messages() {
+		messages = append(messages, models.ChatThreadMessage{
+			Role:      string(msg.Role()),
+			Message:   msg.Message(),
+			Timestamp: msg.Timestamp(),
+		})
+	}
+
 	return models.ChatThread{
 		ID:        thread.ID().String(),
-		ChatID:    thread.ChatID(),
-		Timestamp: thread.Timestamp(),
+		TenantID:  thread.TenantID().String(),
+		Phone:     thread.Phone(),
+		CreatedAt: thread.CreatedAt(),
+		UpdatedAt: thread.UpdatedAt(),
+		Messages:  messages,
 	}
 }

@@ -18,9 +18,6 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/country"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/internet"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/phone"
-	"github.com/iota-uz/iota-sdk/modules/crm/domain/aggregates/chat"
-	"github.com/iota-uz/iota-sdk/modules/crm/domain/aggregates/client"
-	"github.com/iota-uz/iota-sdk/modules/crm/infrastructure/persistence"
 	"github.com/iota-uz/iota-sdk/modules/website/domain/entities/aichatconfig"
 	"github.com/iota-uz/iota-sdk/modules/website/domain/entities/cache"
 	"github.com/iota-uz/iota-sdk/modules/website/domain/entities/chatthread"
@@ -64,8 +61,6 @@ type DefaultWebsiteChatCacheConfig struct {
 type WebsiteChatServiceConfig struct {
 	AIConfigRepo       aichatconfig.Repository
 	UserRepo           user.Repository
-	ClientRepo         client.Repository
-	ChatRepo           chat.Repository
 	ThreadRepo         chatthread.Repository
 	AIUserEmail        internet.Email
 	RAGProvider        rag.Provider
@@ -76,8 +71,6 @@ type WebsiteChatServiceConfig struct {
 type WebsiteChatService struct {
 	aiconfigRepo aichatconfig.Repository
 	userRepo     user.Repository
-	clientRepo   client.Repository
-	chatRepo     chat.Repository
 	threadRepo   chatthread.Repository
 	aiUserEmail  internet.Email
 	ragProvider  rag.Provider
@@ -92,8 +85,6 @@ func NewWebsiteChatService(config WebsiteChatServiceConfig) *WebsiteChatService 
 	service := &WebsiteChatService{
 		aiconfigRepo: config.AIConfigRepo,
 		userRepo:     config.UserRepo,
-		clientRepo:   config.ClientRepo,
-		chatRepo:     config.ChatRepo,
 		threadRepo:   config.ThreadRepo,
 		aiUserEmail:  config.AIUserEmail,
 		ragProvider:  config.RAGProvider,
@@ -109,129 +100,41 @@ func NewWebsiteChatService(config WebsiteChatServiceConfig) *WebsiteChatService 
 }
 
 func (s *WebsiteChatService) GetThreadByID(ctx context.Context, threadID uuid.UUID) (chatthread.ChatThread, error) {
-	thread, err := s.threadRepo.GetByID(ctx, threadID)
-	if err != nil {
-		return nil, err
-	}
-	chatEntity, err := s.chatRepo.GetByID(ctx, thread.ChatID())
-	if err != nil {
-		return nil, err
-	}
-	return chatthread.New(
-		chatEntity.ID(),
-		chatEntity.Messages(),
-		chatthread.WithID(thread.ID()),
-		chatthread.WithTimestamp(thread.Timestamp()),
-	), nil
+	return s.threadRepo.GetByID(ctx, threadID)
 }
 
 func (s *WebsiteChatService) CreateThread(ctx context.Context, dto CreateThreadDTO) (chatthread.ChatThread, error) {
-	var member chat.Member
-	p, err := phone.Parse(dto.Phone, dto.Country)
-	if err != nil {
-		return nil, err
+	var normalizedPhone string
+	if strings.TrimSpace(dto.Phone) != "" {
+		p, err := phone.Parse(dto.Phone, dto.Country)
+		if err != nil {
+			return nil, err
+		}
+		normalizedPhone = p.Value()
 	}
-	member, err = s.memberFromPhone(ctx, p)
-	if err != nil {
-		return nil, err
-	}
+
 	tenantID, err := composables.UseTenantID(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	chatEntity := chat.New(
-		member.Sender().(chat.ClientSender).ClientID(),
-		chat.WithMembers([]chat.Member{member}),
-		chat.WithTenantID(tenantID),
-	)
-
-	var createdChat chat.Chat
-	err = composables.InTx(ctx, func(txCtx context.Context) error {
-		v, e := s.chatRepo.Save(txCtx, chatEntity)
-		if e != nil {
-			return e
-		}
-		createdChat = v
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	threadID := uuid.New()
-	thread := chatthread.New(
-		createdChat.ID(),
-		createdChat.Messages(),
-		chatthread.WithID(threadID),
-	)
-	if thread, err = s.threadRepo.Save(ctx, thread); err != nil {
-		return nil, err
-	}
-	return thread, nil
+	thread := chatthread.New(tenantID, normalizedPhone)
+	return s.threadRepo.Save(ctx, thread)
 }
 
 func (s *WebsiteChatService) SendMessageToThread(
 	ctx context.Context,
 	dto SendMessageToThreadDTO,
 ) (chatthread.ChatThread, error) {
-	if dto.Message == "" {
-		return nil, chat.ErrEmptyMessage
-	}
-	thread, err := s.GetThreadByID(ctx, dto.ThreadID)
+	thread, err := s.threadRepo.GetByID(ctx, dto.ThreadID)
 	if err != nil {
 		return nil, err
 	}
 
-	chatEntity, err := s.chatRepo.GetByID(ctx, thread.ChatID())
+	msg, err := chatthread.NewMessage(chatthread.RoleUser, dto.Message, time.Now())
 	if err != nil {
 		return nil, err
 	}
-	var member chat.Member
-	for _, m := range chatEntity.Members() {
-		if m.Transport() != chat.WebsiteTransport {
-			continue
-		}
-		if v, ok := m.Sender().(chat.ClientSender); ok && v.ClientID() == chatEntity.ClientID() {
-			member = m
-			break
-		}
-	}
-
-	if member == nil {
-		return nil, fmt.Errorf("no client member found in chat")
-	}
-
-	t := time.Now()
-	chatEntity = chatEntity.AddMessage(chat.NewMessage(
-		dto.Message,
-		member,
-		chat.WithMessageSentAt(&t),
-		chat.WithMessageCreatedAt(t),
-	))
-	if err != nil {
-		return nil, err
-	}
-
-	var savedChat chat.Chat
-	err = composables.InTx(ctx, func(txCtx context.Context) error {
-		v, e := s.chatRepo.Save(txCtx, chatEntity)
-		if e != nil {
-			return e
-		}
-		savedChat = v
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	updatedThread := chatthread.New(
-		savedChat.ID(),
-		savedChat.Messages(),
-		chatthread.WithID(thread.ID()),
-		chatthread.WithTimestamp(thread.Timestamp()),
-	)
+	updatedThread := thread.AppendMessage(msg)
 	if _, err := s.threadRepo.Save(ctx, updatedThread); err != nil {
 		return nil, err
 	}
@@ -243,69 +146,20 @@ func (s *WebsiteChatService) ReplyToThread(
 	ctx context.Context,
 	dto ReplyToThreadDTO,
 ) (chatthread.ChatThread, error) {
-	thread, err := s.GetThreadByID(ctx, dto.ThreadID)
+	if _, err := s.userRepo.GetByID(ctx, dto.UserID); err != nil {
+		return nil, err
+	}
+
+	thread, err := s.threadRepo.GetByID(ctx, dto.ThreadID)
+	if err != nil {
+		return nil, err
+	}
+	msg, err := chatthread.NewMessage(chatthread.RoleAssistant, dto.Message, time.Now())
 	if err != nil {
 		return nil, err
 	}
 
-	if dto.Message == "" {
-		return nil, chat.ErrEmptyMessage
-	}
-
-	var member chat.Member
-
-	chatEntity, err := s.chatRepo.GetByID(ctx, thread.ChatID())
-	if err != nil {
-		return nil, err
-	}
-	for _, m := range chatEntity.Members() {
-		if m.Transport() != chat.WebsiteTransport {
-			continue
-		}
-
-		if v, ok := m.Sender().(chat.UserSender); ok && v.UserID() == dto.UserID {
-			member = m
-			break
-		}
-	}
-
-	if member == nil {
-		member, err = s.memberFromUserID(ctx, dto.UserID)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	t := time.Now()
-	chatEntity = chatEntity.AddMessage(chat.NewMessage(
-		dto.Message,
-		member,
-		chat.WithMessageSentAt(&t),
-		chat.WithMessageCreatedAt(t),
-	))
-	if err != nil {
-		return nil, err
-	}
-
-	var savedChat chat.Chat
-	err = composables.InTx(ctx, func(txCtx context.Context) error {
-		v, e := s.chatRepo.Save(txCtx, chatEntity)
-		if e != nil {
-			return e
-		}
-		savedChat = v
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	updatedThread := chatthread.New(
-		savedChat.ID(),
-		savedChat.Messages(),
-		chatthread.WithID(thread.ID()),
-		chatthread.WithTimestamp(thread.Timestamp()),
-	)
+	updatedThread := thread.AppendMessage(msg)
 	if _, err := s.threadRepo.Save(ctx, updatedThread); err != nil {
 		return nil, err
 	}
@@ -364,7 +218,7 @@ func (s *WebsiteChatService) ReplyWithAI(ctx context.Context, threadID uuid.UUID
 
 	messages := thread.Messages()
 	if len(messages) == 0 {
-		return nil, chat.ErrNoMessages
+		return nil, chatthread.ErrNoMessages
 	}
 
 	openaiMessages := []openai.ChatCompletionMessageParamUnion{}
@@ -411,7 +265,7 @@ func (s *WebsiteChatService) ReplyWithAI(ctx context.Context, threadID uuid.UUID
 	}
 
 	for _, msg := range messages {
-		if msg.Sender().Sender().Type() == chat.UserSenderType {
+		if msg.Role() == chatthread.RoleAssistant {
 			openaiMessages = append(openaiMessages, openai.AssistantMessage(msg.Message()))
 		} else {
 			openaiMessages = append(openaiMessages, openai.UserMessage(msg.Message()))
@@ -545,96 +399,6 @@ func (s *WebsiteChatService) saveAIResponse(ctx context.Context, config aichatco
 		return err
 	}
 	return s.cache.Set(ctx, key, response)
-}
-
-func (s *WebsiteChatService) memberFromUserID(ctx context.Context, userID uint) (chat.Member, error) {
-	usr, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	tenantID, err := composables.UseTenantID(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return chat.NewMember(
-		chat.NewUserSender(
-			usr.ID(),
-			usr.FirstName(),
-			usr.LastName(),
-		),
-		chat.WebsiteTransport,
-		chat.WithMemberTenantID(tenantID),
-	), nil
-}
-
-func (s *WebsiteChatService) memberFromPhone(ctx context.Context, phoneNumber phone.Phone) (chat.Member, error) {
-	tenantID, err := composables.UseTenantID(ctx)
-	if err != nil {
-		return nil, err
-	}
-	match, err := s.clientRepo.GetByContactValue(ctx, client.ContactTypePhone, phoneNumber.Value())
-	if err == nil {
-		var contactID uint
-		for _, contact := range match.Contacts() {
-			if contact.Type() == client.ContactTypePhone && contact.Value() == phoneNumber.Value() {
-				contactID = contact.ID()
-				break
-			}
-		}
-		return chat.NewMember(
-			chat.NewClientSender(
-				match.ID(),
-				contactID,
-				match.FirstName(),
-				match.LastName(),
-			),
-			chat.WebsiteTransport,
-			chat.WithMemberTenantID(tenantID),
-		), nil
-	} else if err != nil && !errors.Is(err, persistence.ErrClientNotFound) {
-		return nil, err
-	}
-
-	c, err := client.New(
-		phoneNumber.Value(),
-		client.WithPhone(phoneNumber),
-		client.WithTenantID(tenantID),
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	var clientEntity client.Client
-	err = composables.InTx(ctx, func(txCtx context.Context) error {
-		v, e := s.clientRepo.Save(txCtx, c)
-		if e != nil {
-			return e
-		}
-		clientEntity = v
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	var contactID uint
-	for _, contact := range clientEntity.Contacts() {
-		if contact.Type() == client.ContactTypePhone && contact.Value() == phoneNumber.Value() {
-			contactID = contact.ID()
-			break
-		}
-	}
-	member := chat.NewMember(
-		chat.NewClientSender(
-			clientEntity.ID(),
-			contactID,
-			clientEntity.FirstName(),
-			clientEntity.LastName(),
-		),
-		chat.WebsiteTransport,
-		chat.WithMemberTenantID(tenantID),
-	)
-	return member, nil
 }
 
 func getLocaleString(ctx context.Context) string {
