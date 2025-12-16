@@ -120,6 +120,21 @@ Ensure these tools are installed before you begin:
      - Password: `TestPass123!`
    - GraphQL: [http://localhost:3200/query](http://localhost:3200/query)
 
+### 常见问题：登录页 404（租户域名不匹配）
+
+登录页路由本身存在，但应用会先根据请求的 `Host` 头做租户解析；如果找不到对应 `tenants.domain`，会直接返回 `404`（包括 `/login`）。
+
+排查/修复步骤：
+
+1. **确认已迁移+seed**（否则 `tenants` 表不存在也会导致 `404`）：
+   ```bash
+   make db migrate up && make db seed
+   ```
+
+2. **确认访问域名与 `DOMAIN` 一致**：默认租户域名会随 `DOMAIN`（见 `.env` / `.env.example`）写入/更新。
+   - 方案 A（最简单）：把 `.env` 里的 `DOMAIN` 改成 `localhost`，然后再次执行 `make db seed`，最后访问 `http://localhost:3200/login`
+   - 方案 B：保留 `DOMAIN=default.localhost`，在本机添加 hosts 记录 `127.0.0.1 default.localhost`，然后访问 `http://default.localhost:3200/login`
+
 ### Development Tools Manager
 
 For a more convenient development experience, use the DevHub TUI tool to manage all development services from a single interface:
