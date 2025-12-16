@@ -1,6 +1,6 @@
 # DEV-PLAN-019C：BoxyHQ Jackson 企业 SSO（PoC）
 
-**状态**: 规划中（2025-12-15 13:47 UTC）
+**状态**: 规划中（2025-12-16 07:48 UTC）
 
 > 本文是 `DEV-PLAN-019` 的子计划，聚焦 **企业 SSO（Jackson）** 的“代码级详细设计”。RLS 见 `DEV-PLAN-019A`；Kratos 登录与本地会话桥接见 `DEV-PLAN-019B`。
 
@@ -55,6 +55,11 @@ sequenceDiagram
 - **决策 4：回调桥接必须可重试（避免“Kratos 有 Session 但应用无 Session”）**
   - SSO 场景下 Kratos 通常会在浏览器侧持有 session cookie；若应用侧本地 session 创建失败，用户会处于“已完成联邦登录但无法进入应用”的割裂状态。
   - PoC 要求：`/login/sso/callback` 逻辑幂等、可重复调用；并在 `/login` 提供可选的“继续完成登录/重试桥接”路径（见 §6.4）。
+
+### 3.3 系统级前置决策（引用 `DEV-PLAN-019`）
+- **依赖 019B 的 tenant 解析**：`/login`、`/login/sso/*`、`/oauth/google/callback` 必须先按 `r.Host -> tenants.domain` 解析 tenant（lowercase、去端口），且 fail-closed（`404 Not Found`）。
+- **同 host 约束（PoC 固定）**：Kratos Public 与应用必须共享同一 `tenant_domain`（端口可不同），以确保浏览器能把 Kratos session cookie 带到应用的 `/login/sso/callback`。
+- **Cookie Domain（PoC 固定）**：非 production 环境下必须使用 host-only cookie（不设置 `Domain`），避免多租户（多 host）场景下 cookie 互相污染或被浏览器拒收；production 的 Domain 策略另行配置。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
 ### 4.1 SSO 连接配置（PoC：配置文件）

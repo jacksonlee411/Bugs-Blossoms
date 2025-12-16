@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -176,6 +177,9 @@ type Configuration struct {
 
 	TelegramBotToken string `env:"TELEGRAM_BOT_TOKEN"`
 
+	// DEV-PLAN-019A: RLS enforcement mode (disabled/enforce).
+	RLSEnforce string `env:"RLS_ENFORCE" envDefault:"disabled"`
+
 	// Test endpoints - only enable in test environment
 	EnableTestEndpoints bool `env:"ENABLE_TEST_ENDPOINTS" envDefault:"false"`
 
@@ -248,6 +252,10 @@ func (c *Configuration) load(envFiles []string) error {
 	if err := c.RateLimit.Validate(); err != nil {
 		return fmt.Errorf("rate limit configuration error: %w", err)
 	}
+
+	if err := c.validateRLS(); err != nil {
+		return err
+	}
 	f, logger, err := logging.FileLogger(c.LogrusLogLevel(), c.Loki.LogPath)
 	if err != nil {
 		return err
@@ -277,6 +285,25 @@ func (c *Configuration) load(envFiles []string) error {
 		}
 	}
 
+	return nil
+}
+
+func (c *Configuration) validateRLS() error {
+	mode := strings.ToLower(strings.TrimSpace(c.RLSEnforce))
+	if mode == "" {
+		mode = "disabled"
+	}
+	switch mode {
+	case "disabled", "enforce":
+	default:
+		return fmt.Errorf("invalid RLS_ENFORCE=%q (expected disabled|enforce)", c.RLSEnforce)
+	}
+
+	if mode == "enforce" && strings.EqualFold(strings.TrimSpace(c.Database.User), "postgres") {
+		return fmt.Errorf("RLS_ENFORCE=enforce requires a non-superuser DB_USER (postgres will bypass RLS)")
+	}
+
+	c.RLSEnforce = mode
 	return nil
 }
 

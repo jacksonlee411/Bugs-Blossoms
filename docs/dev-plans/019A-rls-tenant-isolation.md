@@ -1,6 +1,6 @@
 # DEV-PLAN-019A：PostgreSQL RLS 强租户隔离（PoC）
 
-**状态**: 规划中（2025-12-15 13:47 UTC）
+**状态**: 进行中（2025-12-16 09:05 UTC）
 
 > 本文是 `DEV-PLAN-019` 的子计划，聚焦 **数据隔离（RLS）** 的“代码级详细设计”。身份域与 SSO 见 `DEV-PLAN-019B/019C`。
 
@@ -11,7 +11,7 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] 在 `hrm.employees`（PoC 表）启用 RLS，并保证跨租户读写在 DB 层被拒绝。
+- [X] 在 `public.employees`（PoC 表）启用 RLS，并保证跨租户读写在 DB 层被拒绝。（2025-12-16 09:05 UTC）
 - [ ] 定义并实现“租户上下文注入”标准：在事务内设置 `app.current_tenant`，RLS policy 仅信任该值。
 - [ ] 明确并落地“连接池下不串租户”的约束：**只使用事务本地变量（`SET LOCAL` / `set_config(..., true)`）**。
 - [ ] 提供 Feature Flag 与回滚路径（DB 与应用两侧），保证 PoC 可控。
@@ -48,6 +48,12 @@ flowchart TD
   - 策略：
     - PoC 阶段：**不对系统级队列表（如 `<module>_outbox`）启用 RLS**（系统表作为单独安全域处理）。
     - 若未来确需对系统表启用 RLS：使用**专用连接池/专用 DB role**（可 BYPASSRLS 或通过更细粒度 policy 允许 system role），并补齐审计与最小权限；禁止使用 “`current_setting(...) IS NULL` 则放行” 这类会把注入遗漏变成跨租户可读的策略。
+
+### 3.3 系统级前置决策（引用 `DEV-PLAN-019`）
+> 本计划的“可实施条件”依赖 `docs/dev-plans/019-multi-tenant-toolchain.md` 的系统级契约（Tenant Domain / 未登录租户解析 / 非 superuser 验证角色 / 读路径事务策略）。
+
+- **DB 角色契约（必须落地）**：PoC 启用 `RLS_ENFORCE=enforce` 时，应用连接必须切到非 superuser 且 `NOBYPASSRLS`（见 `§4.3` 示例 `iota_app`）；否则 RLS 无法被验证。
+- **读路径事务契约（选定）**：PoC 不依赖在所有 GET 路由上挂 `WithTransaction()`；而是要求所有访问 RLS 表的 service/repo 调用在 `InTenantTx`（或等价封装）中执行，并在 `RLS_ENFORCE=enforce` 时 fail-fast。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
 ### 4.1 PoC 表（现状）
@@ -100,6 +106,10 @@ PoC 要求覆盖两类事务入口：
 1. `pkg/composables/db_composables.go:54` 的 `InTx`（服务层常用）
 2. `pkg/middleware/db_middleware.go:11` 的 `WithTransaction`（虽标注 deprecated，但仍存在调用点）
 
+PoC 选定策略：
+- **写路径**：继续兼容既有 `WithTransaction()`（大量写路由已在使用），在该入口处同样注入 `app.current_tenant`。
+- **读路径**：由 service 层统一包裹 `InTenantTx`（避免把 deprecated middleware 扩散到所有 GET 路由，同时覆盖非 HTTP 调用场景）。
+
 推荐实现一个统一 helper（示意接口）：
 ```go
 // pkg/routing/rls or pkg/repo/rls（以仓库约定为准）
@@ -141,20 +151,20 @@ func ApplyTenantRLS(ctx context.Context, tx pgx.Tx) error {
   - PoC 阶段明确：仅对业务表（如 `employees`）启用 RLS；系统队列表不启用。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
-1. [ ] 选择 PoC 表：`employees`（已定）。
-2. [ ] 引入 `RLS_ENFORCE` 开关与统一注入 helper，并在事务入口处调用。
-3. [ ] 本地/CI 通过非 superuser 账号验证 RLS 生效。
-4. [ ] 在 migrations 中为 `employees` 启用 RLS + policy（或在 PoC 环境先手工执行并记录）。
+1. [X] 选择 PoC 表：`employees`（已定）。（2025-12-16 09:05 UTC）
+2. [X] 引入 `RLS_ENFORCE` 开关与统一注入 helper，并在事务入口处调用。（2025-12-16 09:05 UTC）
+3. [X] 本地通过非 superuser 账号验证 RLS 生效：`make db rls-role` + `HRM_MIGRATIONS=1 make db migrate up` + psql 验证。（2025-12-16 09:05 UTC）
+4. [X] 在 migrations 中为 `employees` 启用 RLS + policy，并更新 HRM schema 文件。（2025-12-16 09:05 UTC）
 5. [ ] 扩展到第二张表（可选），验证模板可复制。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **行为**：
-  - [ ] tenant=A 的上下文下，读取 tenant=B 的行必须失败（无数据或报错）。
-  - [ ] 未设置 `app.current_tenant` 时，对启用 RLS 的表进行查询必须 fail-closed（按 policy 选择“报错”口径）。
+  - [X] tenant=A 的上下文下，读取 tenant=B 的行必须失败（无数据或报错）。（2025-12-16 09:05 UTC）
+  - [X] 未设置 `app.current_tenant` 时，对启用 RLS 的表进行查询必须 fail-closed（报错）。（2025-12-16 09:05 UTC）
   - [ ] 启用 RLS 的业务表不影响系统组件（例如 outbox relay 仍可跨租户扫描其队列表）。
 - **工程**：
-  - [ ] `go fmt ./... && go vet ./... && make check lint` 通过。
-  - [ ] 若涉及 migrations：按 AGENTS 触发器执行 `make db migrate up && make db seed` 并记录结果。
+  - [X] `go fmt ./... && go vet ./... && make check lint && make test` 通过。（2025-12-16 09:05 UTC）
+  - [X] migrations 验证：`make db migrate up && make db seed && HRM_MIGRATIONS=1 make db migrate up && make db lint`。（2025-12-16 09:05 UTC）
 
 ## 10. 运维与监控 (Ops & Monitoring)
 ### 10.1 日志字段（建议）

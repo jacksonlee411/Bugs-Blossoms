@@ -105,7 +105,7 @@ PORT=3000  # Different container, so same var name is fine
 # Authentication
 GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-client-secret
-GOOGLE_REDIRECT_URL=https://superadmin.yourdomain.com/auth/google/callback
+GOOGLE_REDIRECT_URL=https://superadmin.yourdomain.com/oauth/google/callback
 
 # Optional: OpenTelemetry
 OTEL_ENABLED=true

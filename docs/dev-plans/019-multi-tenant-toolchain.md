@@ -1,6 +1,6 @@
 # DEV-PLAN-019：多租户工具链选型与落地
 
-**状态**: 规划中（2025-12-15 13:47 UTC）
+**状态**: 进行中（2025-12-16 09:05 UTC）
 
 ## 背景
 - `DEV-PLAN-009` 第 6 项提出了“多租户管理工具链评估”的需求。当前系统依赖简单的 `tenant_id` 字段过滤（逻辑隔离）和自建的用户表，缺乏统一的身份认证（Identity）、强数据隔离（Isolation）和企业级 SSO 能力。
@@ -81,6 +81,35 @@ flowchart TD
 - **Kratos 集成策略**：PoC 优先采用“应用代理调用 Kratos Public API + 本地 Session 桥接”，避免前端跨域/CORS 并复用现有 `/login` 页面与 cookie/session 机制。
 - **RLS 注入策略**：连接池下避免串租户；PoC 统一在事务内使用 `set_config('app.current_tenant', ..., true)`（或 `SET LOCAL`）设置租户上下文，且策略采用 `current_setting('app.current_tenant')` 走 fail-closed。
 - **SSO 链路定位**：Jackson 作为 **OIDC Provider**（对接企业 IdP），Kratos 作为 **OIDC Client**（其 OIDC 登录方法指向 Jackson），应用侧不直接对接 OIDC 协议细节（PoC 先走 Kratos）。
+
+## 系统级前置决策（Implementation Preconditions）
+> 本节是 `DEV-PLAN-019` 的“系统级契约”补充：不先确定并落地这些前置项，`019A/019B/019C` 的 PoC 会出现不稳定行为（串租户、RLS 失效、登录/SSO 回调失败等）。
+
+### 1）租户域名契约（Tenant Domain Contract）
+- **选定（SSOT）**：租户域名以数据库 `tenants.domain` 为权威；仅保存 hostname（不含 scheme/path/query），用于把 `r.Host` 映射到 tenant。
+- **规范化**：
+  - `tenants.domain` 存储值必须为 `lowercase(hostname)`，且不包含端口。
+  - 请求侧解析：对 `r.Host` 先去端口再 `strings.ToLower`，得到 `host` 后执行 `TenantService.GetByDomain(ctx, host)`。
+- **开发环境默认值**：PoC 默认 tenant 域名为 `default.localhost`（与 `modules/core/seed/seed_tenant.go` 对齐）。若历史迁移/种子存在不一致（例如 `default.example.com`），必须在 PoC 落地时统一（实现方式见 `019B/019A` 的依赖条目）。
+- **验收口径**：同一套 DB 数据下，`Host=default.localhost(:port)` 必须稳定解析到默认 tenant；未命中 tenant 时必须 fail-closed（不得回退到跨租户查询）。
+
+### 2）未登录租户解析策略（Fail-Closed）
+- **选定**：所有未登录入口必须先解析 tenant，再进行任何身份查询或外部跳转；缺失/不匹配时直接拒绝。
+- **覆盖范围（最小集）**：`/login`（GET/POST）、`/oauth/google/callback`、`/login/sso/{connection}`、`/login/sso/callback`。
+- **失败语义**：tenant 不存在/不可用时返回 `404 Not Found`（避免泄露 tenant 枚举面），并记录结构化日志字段：`request_id`, `host`, `path`。
+- **验收口径**：同一 email 在多租户存在时，登录与 OAuth callback 必须以 host 解析到的 tenant 为准；不得发生“跨租户命中”。
+
+### 3）RLS 验证用 DB 角色契约（Non-superuser, No BYPASSRLS）
+- **选定**：当 `RLS_ENFORCE=enforce` 时，应用必须使用**非 superuser 且无 `BYPASSRLS`** 的数据库账号连接（否则 RLS PoC 无法被验证且可能在生产产生误判）。
+- **最小权限原则**：PoC 阶段仅授予业务表（如 `employees`）的必要 DML 权限；系统表/队列表（如 outbox）不纳入本次 RLS 范围。
+- **验收口径**：用该账号连接数据库后，跨租户读写对启用 RLS 的表必须 fail-closed（无数据或报错），同租户正常。
+
+### 4）RLS 读路径事务策略（No Tx, No RLS）
+- **选定**：只要访问启用 RLS 的表，就必须在**显式事务**内先注入 `app.current_tenant`（`set_config(..., true)` / `SET LOCAL`）；不得依赖连接池 session 级设置。
+- **实现契约**：
+  - 统一提供 `InTenantTx(ctx, fn)`（或等价 helper），内部完成 `BEGIN + 注入 app.current_tenant + fn + COMMIT/ROLLBACK`。
+  - 当 `RLS_ENFORCE=enforce` 且调用方未在事务内访问 RLS 表时，应 fail-fast（优先在应用层返回清晰错误，而不是把“无数据/SQL 报错”传播到 UI）。
+- **验收口径**：PoC 表的读请求（例如 HRM 员工列表）在开启 RLS 后必须稳定可用；不会因为未开启事务而出现“偶发消失/偶发报错”。
 
 ## 接口契约（API Contracts，集成层）
 
@@ -229,11 +258,11 @@ func LoginWithKratos(ctx context.Context, email, password string) (*http.Cookie,
 ## 实施步骤
 
 ### 1. 数据隔离增强 (RLS PoC)
-1. [ ] **RLS 原型验证**
+1. [X] **RLS 原型验证** —— 已在本地 DB 用 `iota_app` 验证 fail-closed + 租户隔离（2025-12-16 09:05 UTC）
    - 在 `modules/hrm` 选取关键表（如 `employees`）启用 RLS。
    - 编写 SQL 策略（建议 fail-closed）：`CREATE POLICY tenant_isolation ON employees USING (tenant_id = current_setting('app.current_tenant')::uuid);`。
    - 验证：在不带 `WHERE` 的查询中，通过事务内 `SET LOCAL app.current_tenant = ...` 控制可见性。
-2. [ ] **基础设施适配**
+2. [X] **基础设施适配** —— 已落地事务入口注入 + 读写统一事务封装（2025-12-16 09:05 UTC）
    - 以现有事务/连接池入口为落点：`pkg/composables/db_composables.go`（`BeginTx` / `InTx` / `UseTx`）与 `pkg/repo/repo.go`（Tx 抽象）。
    - PoC 约束：访问启用 RLS 的表时，必须在显式事务中执行；在 `BEGIN` 后第一时间执行 `SET LOCAL app.current_tenant = ...`（或 `SELECT set_config('app.current_tenant', ..., true)`）。
    - 租户来源：统一使用 `composables.UseTenantID(ctx)`（当前租户上下文已在 `pkg/middleware/auth.go` 从 session/user 注入）。
@@ -267,12 +296,12 @@ func LoginWithKratos(ctx context.Context, email, password string) (*http.Cookie,
    - 新增仓库级文档时，在 `AGENTS.md` 的 Doc Map 中补充链接，确保可发现性。
 
 ## 验收标准（PoC Readiness）
-- [ ] **RLS 可验证**：对 `employees` 启用 RLS 后，跨租户读取必须失败（无数据或报错）；同租户读取正常。
-- [ ] **RLS 注入路径明确**：所有访问 RLS 表的路径均在事务内设置 `app.current_tenant`，并能从 `composables.UseTenantID(ctx)` 获取租户。
+- [X] **RLS 可验证**：对 `employees` 启用 RLS 后，跨租户读取必须失败（无数据或报错）；同租户读取正常。（2025-12-16 09:05 UTC）
+- [X] **RLS 注入路径明确**：事务入口统一注入 `app.current_tenant`，并提供 `InTenantTx` 作为读路径契约入口。（2025-12-16 09:05 UTC）
 - [ ] **Kratos 登录可用**：能通过现有登录页完成登录；失败时能渲染 Flow 错误；成功后创建本地 Session 并能访问受保护页面。
 - [ ] **Jackson 最小链路**：能通过 Jackson 的 OIDC 链路完成一次联邦登录并落回应用本地 Session（可用 demo IdP/fixtures）。
 - [ ] **可灰度/可回滚**：`IDENTITY_MODE`/`RLS_ENFORCE`/租户 allowlist 等开关可用，且文档中有明确回滚步骤。
-- [ ] **本地门禁通过**：`go fmt ./... && go vet ./... && make check lint`（如涉及迁移/前端生成物，按 AGENTS 触发器矩阵补跑）。
+- [X] **本地门禁通过**：`go fmt ./... && go vet ./... && make check lint && make test && make check doc && make db migrate up && make db seed && HRM_MIGRATIONS=1 make db migrate up && make db lint`（2025-12-16 09:05 UTC）
 
 ## 交付物
 - `docs/dev-plans/019-multi-tenant-toolchain.md` (本计划)。

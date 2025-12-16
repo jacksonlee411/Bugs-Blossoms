@@ -27,7 +27,7 @@ function loadEnvironmentConfig() {
 		DB_HOST: process.env.DB_HOST || 'localhost',
 		DB_PORT: parseInt(process.env.DB_PORT || String(defaultPort)),
 		DB_NAME: process.env.DB_NAME || 'iota_erp_e2e',
-		BASE_URL: process.env.BASE_URL || 'http://localhost:3201',
+		BASE_URL: process.env.BASE_URL || 'http://default.localhost:3201',
 	};
 }
 

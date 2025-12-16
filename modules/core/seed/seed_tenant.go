@@ -2,6 +2,7 @@ package seed
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/tenant"
@@ -14,26 +15,35 @@ func CreateDefaultTenant(ctx context.Context, app application.Application) error
 	conf := configuration.Use()
 	logger := conf.Logger()
 	tenantRepository := persistence.NewTenantRepository()
+	defaultTenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	desiredDomain := "default.localhost"
+
 	// Create a new tenant with a fixed UUID for the default tenant
 	defaultTenant := tenant.New(
 		"Default",
-		tenant.WithID(uuid.MustParse("00000000-0000-0000-0000-000000000001")),
-		tenant.WithDomain("default.localhost"),
+		tenant.WithID(defaultTenantID),
+		tenant.WithDomain(desiredDomain),
 	)
-	existingTenants, err := tenantRepository.List(ctx)
-	if err != nil {
-		logger.Errorf("Failed to list tenants: %v", err)
-		return err
-	}
 
-	if len(existingTenants) > 0 {
+	existing, err := tenantRepository.GetByID(ctx, defaultTenantID)
+	if err == nil && existing != nil {
+		if conf.GoAppEnvironment != configuration.Production {
+			current := strings.ToLower(strings.TrimSpace(existing.Domain()))
+			if current != desiredDomain {
+				existing.SetDomain(desiredDomain)
+				if _, err := tenantRepository.Update(ctx, existing); err != nil {
+					logger.Errorf("Failed to update default tenant domain: %v", err)
+					return err
+				}
+				logger.Infof("Updated default tenant domain to %s", desiredDomain)
+			}
+		}
 		logger.Infof("Default tenant already exists")
 		return nil
 	}
 
 	logger.Infof("Creating default tenant")
-	_, err = tenantRepository.Create(ctx, defaultTenant)
-	if err != nil {
+	if _, err := tenantRepository.Create(ctx, defaultTenant); err != nil {
 		logger.Errorf("Failed to create default tenant: %v", err)
 		return err
 	}

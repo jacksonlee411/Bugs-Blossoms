@@ -76,6 +76,7 @@ func (c *LoginController) Key() string {
 func (c *LoginController) Register(r *mux.Router) {
 	getRouter := r.PathPrefix("/").Subrouter()
 	getRouter.Use(
+		middleware.RequireTenantFromHost(c.app),
 		middleware.ProvideLocalizer(c.app),
 		middleware.WithPageContext(),
 	)
@@ -84,6 +85,7 @@ func (c *LoginController) Register(r *mux.Router) {
 
 	setRouter := r.PathPrefix("/login").Subrouter()
 	setRouter.Use(
+		middleware.RequireTenantFromHost(c.app),
 		middleware.ProvideLocalizer(c.app),
 		middleware.WithTransaction(),
 		middleware.IPRateLimitPeriod(10, time.Minute), // 10 login attempts per minute per IP
