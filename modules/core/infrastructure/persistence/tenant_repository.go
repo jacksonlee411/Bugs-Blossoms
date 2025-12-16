@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/go-faster/errors"
 	"github.com/google/uuid"
@@ -58,6 +59,7 @@ func (r *TenantRepository) GetByDomain(ctx context.Context, domain string) (*ten
 }
 
 func (r *TenantRepository) Create(ctx context.Context, t *tenant.Tenant) (*tenant.Tenant, error) {
+	domain := strings.ToLower(strings.TrimSpace(t.Domain()))
 	query := `
 		INSERT INTO tenants (id, name, domain, phone, email, is_active, logo_id, logo_compact_id, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -82,7 +84,7 @@ func (r *TenantRepository) Create(ctx context.Context, t *tenant.Tenant) (*tenan
 		query,
 		t.ID().String(),
 		t.Name(),
-		t.Domain(),
+		domain,
 		phoneValue,
 		emailValue,
 		t.IsActive(),
@@ -103,6 +105,7 @@ func (r *TenantRepository) Create(ctx context.Context, t *tenant.Tenant) (*tenan
 }
 
 func (r *TenantRepository) Update(ctx context.Context, t *tenant.Tenant) (*tenant.Tenant, error) {
+	domain := strings.ToLower(strings.TrimSpace(t.Domain()))
 	query := `
 		UPDATE tenants
 		SET name = $1, domain = $2, phone = $3, email = $4, is_active = $5, logo_id = $6, logo_compact_id = $7, updated_at = $8
@@ -127,7 +130,7 @@ func (r *TenantRepository) Update(ctx context.Context, t *tenant.Tenant) (*tenan
 		ctx,
 		query,
 		t.Name(),
-		t.Domain(),
+		domain,
 		phoneValue,
 		emailValue,
 		t.IsActive(),

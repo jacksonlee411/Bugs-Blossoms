@@ -150,3 +150,8 @@ func (t *Tenant) SetEmail(e internet.Email) {
 	t.email = e
 	t.updatedAt = time.Now()
 }
+
+func (t *Tenant) SetDomain(domain string) {
+	t.domain = domain
+	t.updatedAt = time.Now()
+}

@@ -11,6 +11,8 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/hrm/domain/aggregates/employee"
 	employeesqlc "github.com/iota-uz/iota-sdk/modules/hrm/infrastructure/sqlc/employee"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
+	"github.com/iota-uz/iota-sdk/pkg/configuration"
+	"github.com/iota-uz/iota-sdk/pkg/constants"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -200,6 +202,11 @@ func (g *GormEmployeeRepository) Delete(ctx context.Context, id uint) error {
 }
 
 func (g *GormEmployeeRepository) employeeQueries(ctx context.Context) (*employeesqlc.Queries, error) {
+	if configuration.Use().RLSEnforce == "enforce" {
+		if ctx.Value(constants.TxKey) == nil {
+			return nil, gerrors.New("rls enforced: employee queries require an explicit transaction")
+		}
+	}
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return nil, err

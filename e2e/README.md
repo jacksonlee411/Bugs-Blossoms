@@ -223,7 +223,7 @@ DB_USER=postgres
 DB_PASSWORD=postgres
 
 # Server Configuration
-BASE_URL=http://localhost:3201  # E2E server URL
+BASE_URL=http://default.localhost:3201  # E2E server URL (tenant host required)
 PORT=3201
 SERVER_HOST=localhost
 

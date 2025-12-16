@@ -1,6 +1,6 @@
 # DEV-PLAN-019B：ORY Kratos 接入与本地 Session 桥接（PoC）
 
-**状态**: 规划中（2025-12-15 13:47 UTC）
+**状态**: 进行中（2025-12-16 09:05 UTC）
 
 > 本文是 `DEV-PLAN-019` 的子计划，聚焦 **身份域（Kratos）** 的“代码级详细设计”。RLS 见 `DEV-PLAN-019A`；企业 SSO 见 `DEV-PLAN-019C`。
 
@@ -49,6 +49,13 @@ sequenceDiagram
   - 由于 Kratos 的 identifier 通常要求全局唯一，而本系统允许 `(tenant_id, email)` 唯一，PoC 采用：
     - `password_identifier = "{tenant_id}:{lower(email)}"`
     - traits 里保留 `email` 与 `tenant_id` 用于展示与映射。
+
+### 3.3 系统级前置决策（引用 `DEV-PLAN-019`）
+> 本计划直接采纳 `docs/dev-plans/019-multi-tenant-toolchain.md` 的系统级契约，并将其在身份域 PoC 中具体化。
+
+- **Tenant Domain Contract（必须一致）**：未登录场景的 tenant 解析以 `tenants.domain` 为权威；值必须为 `lowercase(hostname)` 且不含端口。PoC 默认 tenant 域名统一为 `default.localhost`，不得混用 `default.example.com` 等历史值。
+- **Fail-Closed（不得回退跨租户）**：`/login` 与 `/oauth/google/callback` 若无法解析 tenant，必须直接拒绝（`404 Not Found`），不得降级到“跨租户按 email 查 user”。
+- **Cookie Domain（PoC 选定）**：为支持按 host 多租户，PoC 的应用侧 `sid`/`oauthState` cookie 在 **非 production** 环境必须为 host-only（不设置 `Domain` 属性）；production 才允许通过 `DOMAIN` 设置 apex 域名策略。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
 ### 4.1 本地用户扩展（PoC）
@@ -129,7 +136,7 @@ PoC 行为（在不改变表单字段名的前提下）：
 ## 6. 核心逻辑与算法 (Business Logic & Algorithms)
 ### 6.1 租户解析（未登录场景）
 新增中间件（或在 login controller 内部实现 PoC 版本）：
-- 解析 `r.Host`（去除端口），调用 `TenantService.GetByDomain(ctx, host)`。
+- 解析 `r.Host`（去除端口并 `strings.ToLower`），调用 `TenantService.GetByDomain(ctx, host)`。
 - 将 `tenant_id` 注入 ctx：`composables.WithTenantID(ctx, tenant.ID())`。
 
 适用范围（最小集）：
@@ -137,7 +144,7 @@ PoC 行为（在不改变表单字段名的前提下）：
 - `/oauth/google/callback`（建议同样解析 tenant，避免同 email 多租户时串号）
 
 失败策略（PoC）：
-- host 找不到 tenant：渲染错误页或提示“Unknown tenant”；不得降级为跨租户 email 查询。
+- host 找不到 tenant：返回 `404 Not Found`（fail-closed）；不得降级为跨租户 email 查询。
 
 ### 6.2 Kratos 登录 → 本地 Session（算法）
 伪代码（示意）：
@@ -183,7 +190,7 @@ setSidCookie(sess.Token)
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 1. [ ] 在 `compose.dev.yml` 增加 Kratos（PoC 环境可先跑最小配置）。
-2. [ ] 实现 tenant 解析并注入 ctx（至少覆盖 `/login`）。
+2. [X] 实现 tenant 解析并注入 ctx（至少覆盖 `/login` 与 `/oauth/google/callback`），并移除跨租户 email 回退。（2025-12-16 09:05 UTC）
 3. [ ] 实现 Kratos 密码登录链路（API flow）与错误渲染映射。
 4. [ ] 实现 identity → 本地 user 绑定（含 `kratos_identity_id` 列与约束）。
 5. [ ] 本地开发体验（DX）：更新 `devhub.yml`/Makefile 增加可选 Kratos 依赖的一键启动方式；默认保持 `IDENTITY_MODE=legacy`，让不做身份域相关开发的同学无需启动 Kratos。

@@ -63,7 +63,15 @@ func InTx(ctx context.Context, fn func(context.Context) error) error {
 		return err
 	}
 
-	if err := fn(WithTx(ctx, tx)); err != nil {
+	txCtx := WithTx(ctx, tx)
+	if err := ApplyTenantRLS(txCtx, tx); err != nil {
+		if rErr := tx.Rollback(ctx); rErr != nil {
+			return errors.Join(err, rErr)
+		}
+		return err
+	}
+
+	if err := fn(txCtx); err != nil {
 		if rErr := tx.Rollback(ctx); rErr != nil {
 			return errors.Join(err, rErr)
 		}

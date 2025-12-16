@@ -106,6 +106,8 @@ db:
 		else \
 			go run cmd/command/main.go migrate $(word 3,$(MAKECMDGOALS)); \
 		fi; \
+	elif [ "$(word 2,$(MAKECMDGOALS))" = "rls-role" ]; then \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable" -v ON_ERROR_STOP=1 -f scripts/db/ensure_iota_app_role.sql; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "plan" ]; then \
 		TARGET_DB_NAME="$(DB_NAME)"; \
 		DB_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"; \
@@ -127,13 +129,14 @@ db:
 		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$DEV_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$DEV_DB_NAME"; \
 		DB_URL="$$DB_URL" ATLAS_DEV_URL="$$DEV_URL" $(ATLAS) migrate lint --env ci --git-base origin/main; \
 	else \
-		echo "Usage: make db [local|stop|clean|reset|seed|migrate]"; \
+		echo "Usage: make db [local|stop|clean|reset|seed|migrate|rls-role]"; \
 		echo "  local   - Start local PostgreSQL database"; \
 		echo "  stop    - Stop database container"; \
 		echo "  clean   - Remove postgres-data directory"; \
 		echo "  reset   - Stop, clean, and restart local database"; \
 		echo "  seed    - Seed database with test data"; \
 		echo "  migrate - Run database migrations (up/down/redo/status)"; \
+		echo "  rls-role - Create/update non-superuser DB role for RLS PoC"; \
 		echo "  plan    - Dry-run Atlas diff for HRM schema"; \
 		echo "  lint    - Run Atlas lint (ci env)"; \
 	fi
@@ -188,7 +191,7 @@ e2e:
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "clean" ]; then \
 		go run cmd/command/main.go e2e drop; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "dev" ]; then \
-		PORT=3201 ORIGIN='http://localhost:3201' DB_NAME=iota_erp_e2e ENABLE_TEST_ENDPOINTS=true air; \
+		PORT=3201 ORIGIN='http://default.localhost:3201' DB_NAME=iota_erp_e2e ENABLE_TEST_ENDPOINTS=true air; \
 	else \
 		echo "Usage: make e2e [test|reset|seed|migrate|run|ci|dev|clean]"; \
 		echo "  test         - Set up database and run all e2e tests"; \
@@ -316,7 +319,7 @@ setup: deps css
 	make check lint
 
 # Prevents make from treating the argument as an undefined target
-watch coverage verbose docker score report linux docker-base docker-prod up down redo status restart logs local stop reset seed migrate plan lint install help imports doc routing:
+watch coverage verbose docker score report linux docker-base docker-prod up down redo status restart logs local stop reset seed migrate plan lint rls-role install help imports doc routing:
 	@:
 
 .PHONY: deps db test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
