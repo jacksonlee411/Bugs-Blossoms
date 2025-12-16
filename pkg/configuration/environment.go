@@ -71,13 +71,6 @@ type GoogleOptions struct {
 	ClientSecret string `env:"GOOGLE_CLIENT_SECRET"`
 }
 
-type TwilioOptions struct {
-	WebhookURL  string `env:"TWILIO_WEBHOOK_URL"`
-	AccountSID  string `env:"TWILIO_ACCOUNT_SID"`
-	AuthToken   string `env:"TWILIO_AUTH_TOKEN"`
-	PhoneNumber string `env:"TWILIO_PHONE_NUMBER"`
-}
-
 type LokiOptions struct {
 	URL     string `env:"LOKI_URL"`
 	AppName string `env:"LOKI_APP_NAME" envDefault:"sdk"`
@@ -93,33 +86,6 @@ type OpenTelemetryOptions struct {
 type PrometheusOptions struct {
 	Enabled bool   `env:"PROMETHEUS_METRICS_ENABLED" envDefault:"false"`
 	Path    string `env:"PROMETHEUS_METRICS_PATH" envDefault:"/debug/prometheus"`
-}
-
-type ClickOptions struct {
-	URL            string `env:"CLICK_URL" envDefault:"https://my.click.uz"`
-	MerchantID     int64  `env:"CLICK_MERCHANT_ID"`
-	MerchantUserID int64  `env:"CLICK_MERCHANT_USER_ID"`
-	ServiceID      int64  `env:"CLICK_SERVICE_ID"`
-	SecretKey      string `env:"CLICK_SECRET_KEY"`
-}
-
-type PaymeOptions struct {
-	URL        string `env:"PAYME_URL" envDefault:"https://checkout.test.paycom.uz"`
-	MerchantID string `env:"PAYME_MERCHANT_ID"`
-	User       string `env:"PAYME_USER" envDefault:"Paycom"`
-	SecretKey  string `env:"PAYME_SECRET_KEY"`
-}
-
-type OctoOptions struct {
-	OctoShopID     int32  `env:"OCTO_SHOP_ID"`
-	OctoSecret     string `env:"OCTO_SECRET"`
-	OctoSecretHash string `env:"OCTO_SECRET_HASH"`
-	NotifyUrl      string `env:"OCTO_NOTIFY_URL"`
-}
-
-type StripeOptions struct {
-	SecretKey     string `env:"STRIPE_SECRET_KEY"`
-	SigningSecret string `env:"STRIPE_SIGNING_SECRET"`
 }
 
 type RateLimitOptions struct {
@@ -177,14 +143,9 @@ type OutboxOptions struct {
 type Configuration struct {
 	Database         DatabaseOptions
 	Google           GoogleOptions
-	Twilio           TwilioOptions
 	Loki             LokiOptions
 	OpenTelemetry    OpenTelemetryOptions
 	Prometheus       PrometheusOptions
-	Click            ClickOptions
-	Payme            PaymeOptions
-	Octo             OctoOptions
-	Stripe           StripeOptions
 	RateLimit        RateLimitOptions
 	Authz            AuthzOptions
 	Outbox           OutboxOptions

@@ -149,7 +149,7 @@ All pushes to `main`/`dev` and every pull request run `.github/workflows/quality
 | `migrations/**` or `modules/**/infrastructure/persistence/schema/**` | PostgreSQL/Redis services + `make db migrate up/down` + `make db seed` (logs stored in `migrate.log`) | `make db migrate up && make db seed` (optionally `make db migrate down` to smoke test) |
 | `sqlc.yaml`, `modules/hrm/infrastructure/sqlc/**`, `modules/hrm/infrastructure/persistence/**/*.sql`, `scripts/db/export_hrm_schema.sh`, `docs/dev-records/hrm-sql-inventory.md` | `make sqlc-generate` + `git status --short` via `hrm-sqlc` filter | `scripts/db/export_hrm_schema.sh` + `make sqlc-generate` + `git status --short` |
 
-> **说明**：Finance 模块（`modules/finance/**`）的自动化测试暂时停用，如修改该模块请自行运行 `go test ./modules/finance/...` 并在 PR 描述中附上结果。
+> **说明**：历史冻结模块（billing/finance/crm/projects）已在 DEV-PLAN-040 中移除；门禁不再对其保留排除/豁免口径。
 
 Running the matching commands locally ensures your branch passes the `quality-gates` check before you open a PR.
 

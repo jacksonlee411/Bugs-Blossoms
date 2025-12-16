@@ -112,11 +112,10 @@ modules/{module}/
 - 可发现性：新增仓库级文档必须在本文件的“文档地图（Doc Map）”中新增链接。
 - 门禁：`make check doc`（执行阶段由 CI 触发，仅在文档/资源变更时运行）。
 
-## 9. 模块冻结政策（Billing / CRM / Finance）
+## 9. 模块冻结政策（已移除）
 
-- 冻结范围：`modules/billing`、`modules/crm`、`modules/finance`
-- 规则：禁止修改上述目录下任何代码/SQL/模板/资源文件，除非经计划批准并解除冻结声明。
-- 说明：质量门禁与脚本已对冻结模块做了排除；遇到冻结模块故障无需修复，保持快照即可。
+- 历史冻结模块 `modules/billing`、`modules/crm`、`modules/finance` 已在 DEV-PLAN-040 中被 Hard Delete；仓库不再保留针对冻结模块的门禁豁免/排除口径。
+- 如将来需要引入“冻结快照”类模块，必须先通过 `docs/dev-plans/` 明确范围、门禁与回滚策略，避免默认破窗。
 
 ## 10. 文档地图（Doc Map）
 

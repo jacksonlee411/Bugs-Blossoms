@@ -12,16 +12,6 @@ ignore_packages:
   - github.com/iota-uz/iota-sdk/modules/core/infrastructure/query
   - github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence
   - github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence/models
-  # finance exceptions
-  - github.com/iota-uz/iota-sdk/modules/finance/infrastructure/query
-  - github.com/iota-uz/iota-sdk/modules/finance/infrastructure/persistence
-  - github.com/iota-uz/iota-sdk/modules/finance/presentation/viewmodels
-  - github.com/iota-uz/iota-sdk/modules/finance/presentation/mappers
-  - github.com/iota-uz/iota-sdk/modules/finance/presentation/templates/components
-  - github.com/iota-uz/iota-sdk/modules/finance/services
-  # crm adapters
-  - github.com/iota-uz/iota-sdk/modules/crm/infrastructure/persistence
-  - github.com/iota-uz/iota-sdk/modules/crm/infrastructure/cpass-providers
   # other module-specific adapters
   - github.com/iota-uz/iota-sdk/modules/warehouse/infrastructure/persistence
   - github.com/iota-uz/iota-sdk/modules/warehouse/infrastructure/persistence/mappers
@@ -47,7 +37,6 @@ shared_packages:
   - cmd
 shared_modules:
   - core
-  - crm
 layers:
   domain:
     description: >-

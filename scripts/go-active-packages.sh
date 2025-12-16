@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
-DEFAULT_EXCLUDE_PATTERN="^github.com/iota-uz/iota-sdk/modules/(billing|crm|finance)"
+DEFAULT_EXCLUDE_PATTERN=""
 
 if [[ "${GO_PACKAGE_EXCLUDE_PATTERN+x}" == "x" ]]; then
   EXCLUDE_PATTERN="${GO_PACKAGE_EXCLUDE_PATTERN}"
@@ -14,7 +14,7 @@ fi
 
 cd "$REPO_ROOT"
 
-packages="$(GOWORK=off go list ./...)"
+packages="$(GOWORK=off go list -buildvcs=false ./...)"
 if [[ -n "${EXCLUDE_PATTERN}" ]]; then
   packages="$(printf "%s\n" "${packages}" | grep -Ev "${EXCLUDE_PATTERN}" || true)"
 fi
