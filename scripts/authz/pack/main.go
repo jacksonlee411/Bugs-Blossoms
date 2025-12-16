@@ -155,8 +155,16 @@ type revisionMetadata struct {
 
 func writeRevision(path string, entries []policyEntry, policyData []byte) error {
 	sum := sha256.Sum256(policyData)
+	revision := fmt.Sprintf("%x", sum[:])
+	if existing, err := os.ReadFile(path); err == nil {
+		var meta revisionMetadata
+		if err := json.Unmarshal(existing, &meta); err == nil && meta.Revision == revision && meta.Entries == len(entries) {
+			return nil
+		}
+	}
+
 	meta := revisionMetadata{
-		Revision:    fmt.Sprintf("%x", sum[:]),
+		Revision:    revision,
 		GeneratedAt: time.Now().UTC(),
 		Entries:     len(entries),
 	}
