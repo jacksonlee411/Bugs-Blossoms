@@ -307,6 +307,7 @@ graph TD
   - [x] Ops 入口满足访问基线（网关 allowlist / BasicAuth / OpsGuard 至少一种），不得默认公网可达。
 - 门禁：
   - [x] 新增/更新文档通过 `make check doc`。
+  - [x] 路由门禁（DEV-PLAN-018B）：`make check routing`（聚合 route-lint、allowlist 健康检查、API 全局错误契约、暴露基线）。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - 访问日志字段建议包含：`route_class(ui|authn|internal_api|public_api|webhook|ops|test|static|websocket|dev_only)`、`path_template`、`request_id`、`tenant_id`（如可得）、`authz_object/action`（如适用）。

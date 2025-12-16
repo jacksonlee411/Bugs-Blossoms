@@ -254,11 +254,14 @@ check:
 		go run cmd/command/main.go check_tr_keys; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "doc" ]; then \
 		bash ./scripts/docs/check.sh; \
+	elif [ "$(word 2,$(MAKECMDGOALS))" = "routing" ]; then \
+		go test ./pkg/routing ./internal/routelint ./internal/routinggates; \
 	else \
 		echo "Usage: make check [lint|tr|doc]"; \
 		echo "  lint - Run golangci-lint (checks for unused variables/functions)"; \
 		echo "  tr   - Check translations for completeness"; \
 		echo "  doc  - Check new-doc gate (paths/naming/AGENTS links)"; \
+		echo "  routing - Check routing quality gates (DEV-PLAN-018B)"; \
 	fi
 
 # sdk-tools CLI management
@@ -313,12 +316,12 @@ setup: deps css
 	make check lint
 
 # Prevents make from treating the argument as an undefined target
-watch coverage verbose docker score report linux docker-base docker-prod up down redo status restart logs local stop reset seed migrate plan lint install help imports doc:
+watch coverage verbose docker score report linux docker-base docker-prod up down redo status restart logs local stop reset seed migrate plan lint install help imports doc routing:
 	@:
 
 .PHONY: deps db test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
         down restart logs local stop reset watch coverage verbose docker score report \
-        dev fmt lint tr doc dev-env linux docker-base docker-prod run server sdk-tools install help atlas-install goose-install plan
+        dev fmt lint tr doc routing dev-env linux docker-base docker-prod run server sdk-tools install help atlas-install goose-install plan
 # HRM sqlc generation
 sqlc-generate:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0 generate -f sqlc.yaml
