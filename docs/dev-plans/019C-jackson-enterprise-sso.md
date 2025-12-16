@@ -89,7 +89,7 @@ tenants:
 ### 4.2 Kratos 配置要求（摘要）
 PoC 需要在 Kratos 中静态配置 OIDC provider 指向 Jackson（以 Kratos 版本与配置格式为准）：
 - Issuer：Jackson 的 `.well-known/openid-configuration` 对应地址
-- client_id / client_secret：由 Jackson 生成或配置
+- client_id / client_secret：由 Jackson 生成或配置；client_secret 建议以 `client_secret_ref`（`ENV:`/`FILE:`）方式注入，不在 DB/audit 落明文（语义与 `DEV-PLAN-019D §6.3` 对齐）
 - scopes：至少 `openid email profile`
 
 ## 5. 接口契约 (API Contracts)
