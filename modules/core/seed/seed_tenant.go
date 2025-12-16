@@ -2,6 +2,7 @@ package seed
 
 import (
 	"context"
+	"net"
 	"strings"
 
 	"github.com/google/uuid"
@@ -16,7 +17,13 @@ func CreateDefaultTenant(ctx context.Context, app application.Application) error
 	logger := conf.Logger()
 	tenantRepository := persistence.NewTenantRepository()
 	defaultTenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-	desiredDomain := "default.localhost"
+	desiredDomain := strings.ToLower(strings.TrimSpace(conf.Domain))
+	if desiredDomain == "" {
+		desiredDomain = "default.localhost"
+	}
+	if h, _, err := net.SplitHostPort(desiredDomain); err == nil {
+		desiredDomain = strings.ToLower(strings.TrimSpace(h))
+	}
 
 	// Create a new tenant with a fixed UUID for the default tenant
 	defaultTenant := tenant.New(
