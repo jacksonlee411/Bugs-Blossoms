@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/a-h/templ"
@@ -12,6 +13,7 @@ import (
 	icons "github.com/iota-uz/icons/phosphor"
 	"github.com/sirupsen/logrus"
 
+	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/components/sidebar"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/error_pages"
 	showcase "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/showcase"
@@ -100,6 +102,8 @@ func (c *ShowcaseController) Register(r *mux.Router) {
 	router.HandleFunc("/error-preview/404", di.H(c.Error404Preview)).Methods(http.MethodGet)
 	// Toast example endpoint
 	router.HandleFunc("/api/showcase/toast-example", di.H(c.ToastExample)).Methods(http.MethodPost)
+	// Combobox options example endpoint (for searchable select showcase)
+	router.HandleFunc("/api/showcase/combobox-options", di.H(c.ComboboxOptions)).Methods(http.MethodGet)
 
 	log.Printf(
 		"See %s%s for docs\n",
@@ -394,4 +398,32 @@ func (c *ShowcaseController) ToastExample(
 	// Example of triggering a toast notification from a server endpoint
 	htmx.ToastSuccess(w, "Server Response", "This toast was triggered by an HTMX request!")
 	w.WriteHeader(http.StatusOK)
+}
+
+func (c *ShowcaseController) ComboboxOptions(
+	r *http.Request,
+	w http.ResponseWriter,
+	logger *logrus.Entry,
+) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	query = strings.ToLower(query)
+
+	options := []*base.ComboboxOption{
+		{Value: "1", Label: "Option A"},
+		{Value: "2", Label: "Option B"},
+		{Value: "3", Label: "Option C"},
+		{Value: "4", Label: "Another Option"},
+	}
+
+	filtered := options
+	if query != "" {
+		filtered = make([]*base.ComboboxOption, 0, len(options))
+		for _, option := range options {
+			if strings.Contains(strings.ToLower(option.Label), query) {
+				filtered = append(filtered, option)
+			}
+		}
+	}
+
+	templ.Handler(base.ComboboxOptions(filtered), templ.WithStreaming()).ServeHTTP(w, r)
 }

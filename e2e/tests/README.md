@@ -19,7 +19,7 @@ tests/
 Tests are organized by business module, matching the application's module structure:
 - `users/` - User registration, authentication, profile management
 - `employees/` - Employee CRUD operations, assignments
-- Future modules: `finance/`, `warehouse/`, `crm/`, etc.
+- Future modules: `superadmin/`, `logs/`, `website/`, etc.
 
 ## Writing Tests
 
