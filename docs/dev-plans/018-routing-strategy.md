@@ -140,12 +140,12 @@ graph TD
 - 常规 HTMX 请求的 `Accept` 通常为 `text/html`，因此不会触发 JSON 分支；如某个 HTMX 调用需要 HTML partial，应避免显式请求 JSON。
 
 ### 5.2 内部 API（`/{module}/api/*`）契约
-- 成功与失败均返回 JSON；不得返回 HTML（避免 UI 与 API 混淆）。
-- 允许在 HTMX 调用场景下设置 `HX-Trigger/HX-Redirect/Hx-Push-Url` 等响应头，但 body 仍保持 JSON。
+- 成功返回 JSON；错误默认也返回 JSON（404/405/500 等全局错误在内部 API 命名空间下强制 JSON-only，见 5.5）。
+- 允许在 HTMX 调用场景下设置 `HX-Trigger/HX-Redirect/Hx-Push-Url` 等响应头；业务成功响应的 body 保持 JSON。
 - 版本策略：**不做版本化（Always Latest）**，与同仓库 UI 同步发布；不承诺对外部调用者的向后兼容性（需要稳定兼容/对外承诺的接口必须走 `/api/v1/*`）。
 - 认证与鉴权：
   - 默认按 Session + Authz 能力校验；
-  - 403 统一返回 forbidden payload（字段口径与现有 `modules/core/authzutil.BuildForbiddenPayload` 对齐），且**不依赖 `Accept` 协商**（内部 API 必须 JSON-only）。
+  - 403 遵循 5.4 的统一口径：显式 JSON（`Accept: application/json`）返回 forbidden payload；HTMX/HTML 场景允许渲染 Unauthorized（保持 UI 体验一致；JSON 仍优先，见 5.1）。
 
 ### 5.3 对外 API（`/api/v1/*`）契约
 - JSON-only；错误统一 envelope（`code/message/details/request_id` 等）并可演进版本。
@@ -264,9 +264,8 @@ graph TD
 0. [x] **ADR 对齐**：固化 3.3 的裁决，并同步更新 Org 系列计划的 API 前缀（`docs/dev-plans/020-organization-lifecycle.md`、`docs/dev-plans/026-org-api-authz-and-events.md`）。
 1. [x] **路由盘点**：输出当前顶层前缀与路由类别清单（UI/Internal API/Public API/Webhooks/Ops/Test），标注“是否符合 4.1”；将结果落盘到附录 B。
 2. [x] **策略落盘**：补齐例外清单与迁移策略（存量路径必须说明为何不能迁移/迁移目标/兼容策略/安全基线）。
-3. [ ] **统一 responder/协商工具**（推荐）：
-   - [ ] 提供统一的 route_class 判定与 responder：HTML/HTMX/JSON forbidden + JSON error envelope。
-   - [ ] 让内部 API 的 forbidden/error 不受 `Accept` 影响（保持 JSON-only）。
+3. [x] **403 responder/协商工具收敛**：
+   - [x] 统一 forbidden payload + Unauthorized（HTML/HTMX fallback）：复用 `modules/core/presentation/templates/layouts/authz_forbidden_responder.go`，core/hrm/logging 共享同一实现。
 4. [x] **全局错误契约落地**：
    - [x] 让 `NotFoundHandler`/`MethodNotAllowedHandler` 在 `/{module}/api/*` 与 `/api/v1/*` 下返回 JSON（见 5.5）。
 5. [x] **试点迁移（最小改动）**：
