@@ -16,6 +16,7 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/permissions"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/pages/authz"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
@@ -61,7 +62,7 @@ func (c *AuthzRequestController) Register(r *mux.Router) {
 
 func (c *AuthzRequestController) List(w http.ResponseWriter, r *http.Request) {
 	if err := composables.CanUser(r.Context(), permissions.AuthzRequestsRead); err != nil {
-		writeForbiddenResponse(w, r, "core.authz", "read")
+		layouts.WriteAuthzForbiddenResponse(w, r, "core.authz", "read")
 		return
 	}
 
@@ -129,7 +130,7 @@ func (c *AuthzRequestController) List(w http.ResponseWriter, r *http.Request) {
 
 func (c *AuthzRequestController) Get(w http.ResponseWriter, r *http.Request) {
 	if err := composables.CanUser(r.Context(), permissions.AuthzRequestsRead); err != nil {
-		writeForbiddenResponse(w, r, "core.authz", "read")
+		layouts.WriteAuthzForbiddenResponse(w, r, "core.authz", "read")
 		return
 	}
 
@@ -148,7 +149,7 @@ func (c *AuthzRequestController) Get(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, services.ErrPolicyDraftNotFound):
 			http.NotFound(w, r)
 		case errors.Is(err, services.ErrTenantMismatch):
-			writeForbiddenResponse(w, r, "core.authz", "read")
+			layouts.WriteAuthzForbiddenResponse(w, r, "core.authz", "read")
 		default:
 			composables.UseLogger(r.Context()).WithError(err).Error("authz ui: failed to load request")
 			http.Error(w, "failed to load request", http.StatusInternalServerError)

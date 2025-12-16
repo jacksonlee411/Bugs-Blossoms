@@ -2,25 +2,18 @@ package controllers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
-	"github.com/a-h/templ"
 	"github.com/google/uuid"
 
-	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
-	corepermissions "github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
-	"github.com/iota-uz/iota-sdk/pkg/htmx"
 	"github.com/iota-uz/iota-sdk/pkg/serrors"
 )
 
@@ -43,7 +36,7 @@ func ensureAuthz(
 
 	if err != nil || currentUser == nil {
 		recordForbiddenCapability(state, r, object, action, capKey)
-		writeForbiddenResponse(w, r, object, action)
+		layouts.WriteAuthzForbiddenResponse(w, r, object, action)
 		return false
 	}
 
@@ -60,7 +53,7 @@ func ensureAuthz(
 	allowed, authzErr := enforceRequest(r.Context(), svc, req, mode)
 	if authzErr != nil {
 		recordForbiddenCapability(state, r, object, action, capKey)
-		writeForbiddenResponse(w, r, object, action)
+		layouts.WriteAuthzForbiddenResponse(w, r, object, action)
 		return false
 	}
 
@@ -79,7 +72,7 @@ func ensureAuthz(
 	}
 
 	recordForbiddenCapability(state, r, object, action, capKey)
-	writeForbiddenResponse(w, r, object, action)
+	layouts.WriteAuthzForbiddenResponse(w, r, object, action)
 	return false
 }
 
@@ -107,103 +100,6 @@ func enforceRequest(ctx context.Context, svc *authz.Service, req authz.Request, 
 		}
 		return allowed, nil
 	}
-}
-
-func writeForbiddenResponse(w http.ResponseWriter, r *http.Request, object, action string) {
-	state := authz.ViewStateFromContext(r.Context())
-	payload := authzutil.BuildForbiddenPayload(r, state, object, action)
-	if accept := strings.ToLower(r.Header.Get("Accept")); strings.Contains(accept, "application/json") {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusForbidden)
-		if err := json.NewEncoder(w).Encode(payload); err != nil {
-			composables.UseLogger(r.Context()).WithError(err).Warn("failed to encode forbidden response")
-		}
-		return
-	}
-
-	if pageCtx, ok := composables.TryUsePageCtx(r.Context()); ok {
-		if state == nil {
-			state = pageCtx.AuthzState()
-		}
-		canDebug := composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil
-		props := &authzcomponents.UnauthorizedProps{
-			Object:        payload.Object,
-			Action:        payload.Action,
-			Operation:     fmt.Sprintf("%s %s", payload.Object, payload.Action),
-			State:         state,
-			RequestURL:    payload.RequestURL,
-			Subject:       payload.Subject,
-			Domain:        payload.Domain,
-			DebugURL:      payload.DebugURL,
-			BaseRevision:  payload.BaseRevision,
-			RequestID:     payload.RequestID,
-			ShowInspector: canDebug,
-			CanDebug:      canDebug,
-		}
-		w.WriteHeader(http.StatusForbidden)
-		if htmx.IsHxRequest(r) {
-			w.Header().Set("Hx-Retarget", "body")
-			w.Header().Set("Hx-Reswap", "innerHTML")
-			templ.Handler(authzcomponents.Unauthorized(props), templ.WithStreaming()).ServeHTTP(w, r)
-			return
-		}
-		templ.Handler(unauthorizedPage(props), templ.WithStreaming()).ServeHTTP(w, r)
-		return
-	}
-	http.Error(w, payload.Message, http.StatusForbidden)
-}
-
-func unauthorizedPage(props *authzcomponents.UnauthorizedProps) templ.Component {
-	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-		pageCtx := composables.UsePageCtx(ctx)
-		title := strings.TrimSpace(pageCtx.T("Authz.Unauthorized.Title"))
-		if title == "" {
-			title = "Unauthorized"
-		}
-
-		content := templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
-			if _, err := io.WriteString(w, `<main class="mx-auto w-full max-w-5xl p-6">`); err != nil {
-				return err
-			}
-			if _, err := io.WriteString(w, `<h1 class="sr-only">`+templ.EscapeString(title)+`</h1>`); err != nil {
-				return err
-			}
-			if _, err := io.WriteString(w, `<div class="flex justify-center">`); err != nil {
-				return err
-			}
-			if err := authzcomponents.Unauthorized(props).Render(ctx, w); err != nil {
-				return err
-			}
-			if _, err := io.WriteString(w, `</div></main>`); err != nil {
-				return err
-			}
-			return nil
-		})
-
-		currentUser, err := composables.UseUser(ctx)
-		if err == nil && currentUser != nil {
-			if _, headErr := layouts.UseHead(ctx); headErr == nil {
-				if _, sidebarErr := layouts.UseSidebarProps(ctx); sidebarErr == nil {
-					layout := layouts.Authenticated(layouts.AuthenticatedProps{
-						BaseProps: layouts.BaseProps{
-							Title: title,
-						},
-					})
-					return layout.Render(templ.WithChildren(ctx, content), w)
-				}
-			}
-		}
-
-		if _, headErr := layouts.UseHead(ctx); headErr == nil {
-			base := layouts.Base(&layouts.BaseProps{
-				Title:        title,
-				WebsocketURL: "/ws",
-			})
-			return base.Render(templ.WithChildren(ctx, content), w)
-		}
-
-		return content.Render(ctx, w)
-	})
 }
 
 func tenantIDFromContext(r *http.Request) uuid.UUID {

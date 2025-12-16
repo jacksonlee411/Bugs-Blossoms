@@ -18,8 +18,8 @@
     - `/api/lens/events/*` → `/core/api/lens/events/*`：`modules/core/presentation/controllers/lens_events_controller.go`
     - `/api/website/ai-chat/*` → `/api/v1/website/ai-chat/*`：`modules/website/module.go`
 - **待完成（M2+）**：
-  - 403 responder/协商工具进一步收敛（减少模块间重复实现，保持 JSON（显式 Accept）优先于 HTMX）
-  - Webhooks：若后续新增 `/webhooks/*`，必须在 allowlist 登记并满足签名校验/重放保护基线；`/billing`、`/twilio` 等 legacy 前缀已由 DEV-PLAN-040 移除并最终表现为 404。
+  - [X] 403 responder/协商工具进一步收敛：统一实现迁移到 `modules/core/presentation/templates/layouts/authz_forbidden_responder.go`；core/hrm/logging 复用同一套 JSON/HTMX/HTML 403 行为（2025-12-16 13:44 UTC）。
+  - [X] Webhooks 基线：allowlist 增加 `/webhooks -> webhook`，全局 404/405/500 对 webhook 采用 JSON-only；新增 `pkg/webhooks` 签名校验/重放保护中间件与门禁断言（2025-12-16 13:44 UTC）。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
@@ -337,6 +337,7 @@ graph TD
 | `/core/api/authz/*` | internal_api | keep | 既成事实的内部 API SSOT |
 | `/api/lens/events/*` | internal_api | migrate | 迁移到 `/core/api/lens/events/*`，保留 alias 窗口期 |
 | `/api/website/ai-chat/*` | public_api | migrate | 当前实现更像匿名 public integration；默认迁移到 `/api/v1/website/ai-chat/*` 并补齐 anti-abuse/审计；若后续改为同源 Session 内部交互，则必须改为 `/website/api/ai-chat/*` 并更新本表 |
+| `/webhooks/*` | webhook | keep | 新增 webhook 推荐统一前缀；必须满足签名校验与重放保护基线（见 6.4），并在 allowlist 登记 |
 | `/query`、`/query/*` | internal_api | legacy | 若保留则补齐 AuthN/Authz 并确保 JSON-only；否则迁移或下线 |
 | `/playground` | dev_only | gate | 默认生产关闭（配置开关） |
 | `/_dev/*` | dev_only | gate | 默认生产关闭（配置开关） |

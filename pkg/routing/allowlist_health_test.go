@@ -15,6 +15,7 @@ func TestAllowlist_LoadsAndHasCriticalRules(t *testing.T) {
 	require.NotEmpty(t, superadminRules)
 
 	requireAllowlistRule(t, serverRules, "/api/v1", RouteClassPublicAPI)
+	requireAllowlistRule(t, serverRules, "/webhooks", RouteClassWebhook)
 	requireAllowlistRule(t, serverRules, "/health", RouteClassOps)
 	requireAllowlistRule(t, serverRules, "/debug/prometheus", RouteClassOps)
 	requireAllowlistRule(t, serverRules, "/_dev", RouteClassDevOnly)

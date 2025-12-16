@@ -311,7 +311,7 @@ func WithLogger(logger *logrus.Logger, opts LoggerOptions) mux.MiddlewareFunc {
 
 						if !wrappedWriter.statusWritten {
 							class := classifier.ClassifyPath(r.URL.Path)
-							if class == routing.RouteClassInternalAPI || class == routing.RouteClassPublicAPI {
+							if class == routing.RouteClassInternalAPI || class == routing.RouteClassPublicAPI || class == routing.RouteClassWebhook {
 								wrappedWriter.Header().Set("Content-Type", "application/json")
 								wrappedWriter.WriteHeader(http.StatusInternalServerError)
 								_ = json.NewEncoder(wrappedWriter).Encode(map[string]any{
