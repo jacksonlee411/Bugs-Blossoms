@@ -28,7 +28,12 @@ func Default(options *DefaultOptions) (*server.HTTPServer, error) {
 
 	// Core middleware stack with tracing capabilities
 	middlewares := []mux.MiddlewareFunc{
-		middleware.WithLogger(options.Logger, middleware.DefaultLoggerOptions()), // This now creates the root span for each request
+		middleware.WithLogger(options.Logger, middleware.LoggerOptions{
+			LogRequestBody:  true,
+			LogResponseBody: true,
+			MaxBodyLength:   512,
+			Entrypoint:      options.Entrypoint,
+		}), // This now creates the root span for each request
 
 		// Add traced middleware for each of your key middleware functions
 		middleware.TracedMiddleware("database"),
@@ -39,6 +44,10 @@ func Default(options *DefaultOptions) (*server.HTTPServer, error) {
 
 		middleware.TracedMiddleware("cors"),
 		middleware.Cors("http://localhost:3000", "ws://localhost:3000"),
+
+		// Ops endpoints are guarded in production (see DEV-PLAN-018).
+		middleware.TracedMiddleware("opsGuard"),
+		middleware.OpsGuard(options.Configuration, options.Entrypoint),
 	}
 
 	// Add rate limiting middleware if enabled

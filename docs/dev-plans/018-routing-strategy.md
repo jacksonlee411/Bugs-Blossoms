@@ -1,6 +1,25 @@
 # DEV-PLAN-018：全局路由策略统一（UI/HTMX/API/Webhooks）
 
-**状态**: 规划中（2025-12-15 00:22 UTC）
+**状态**: 实施完成（待合并，2025-12-16 UTC）
+
+## 0. 实施进度（落地记录）
+
+> 说明：本计划为“治理型 SSOT + 渐进落地”。本节用于登记已合入的最小落地（M1）与剩余工作，避免“实现已做但文档未登记”或“文档已写但实现未落地”的漂移。
+
+- **已落地（M1，已合入）**：
+  - allowlist SSOT：`config/routing/allowlist.yaml`
+  - route_class 判定：`pkg/routing/classifier.go`
+  - 全局 404/405（internal/public API 下 JSON-only）：`modules/core/presentation/controllers/errors_controller.go`
+  - 全局 500（panic recovery）：API 命名空间返回 JSON 且不再 re-panic：`pkg/middleware/logging.go`
+  - OpsGuard（仅生产生效）：保护 `/health` 与 `/debug/prometheus`：`pkg/middleware/ops_guard.go`、`internal/server/default.go`
+  - Dev-only gate：生产默认不注册 `/_dev/*` 与 `/playground`：`modules/core/module.go`、`modules/core/presentation/controllers/graphql_controller.go`
+  - route-lint（禁止新增非版本化 `/api/*`，allowlist 例外）：`internal/routelint/routelint_test.go`
+  - 试点迁移（含 legacy alias 窗口期）：
+    - `/api/lens/events/*` → `/core/api/lens/events/*`：`modules/core/presentation/controllers/lens_events_controller.go`
+    - `/api/website/ai-chat/*` → `/api/v1/website/ai-chat/*`：`modules/website/module.go`
+- **待完成（M2+）**：
+  - 403 responder/协商工具进一步收敛（减少模块间重复实现，保持 JSON（显式 Accept）优先于 HTMX）
+  - Webhooks：若后续新增 `/webhooks/*`，必须在 allowlist 登记并满足签名校验/重放保护基线；`/billing`、`/twilio` 等 legacy 前缀已由 DEV-PLAN-040 移除并最终表现为 404。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
@@ -242,19 +261,19 @@ graph TD
 - 现有 authz forbidden payload 口径（`modules/core/authzutil`）。
 
 ### 8.2 里程碑与任务清单
-0. [ ] **ADR 对齐**：固化 3.3 的裁决，并同步更新 Org 系列计划的 API 前缀（`docs/dev-plans/020-organization-lifecycle.md`、`docs/dev-plans/026-org-api-authz-and-events.md`）。
-1. [ ] **路由盘点**：输出当前顶层前缀与路由类别清单（UI/Internal API/Public API/Webhooks/Ops/Test），标注“是否符合 4.1”；将结果落盘到附录 B。
-2. [ ] **策略落盘**：补齐例外清单与迁移策略（存量路径必须说明为何不能迁移/迁移目标/兼容策略/安全基线）。
+0. [x] **ADR 对齐**：固化 3.3 的裁决，并同步更新 Org 系列计划的 API 前缀（`docs/dev-plans/020-organization-lifecycle.md`、`docs/dev-plans/026-org-api-authz-and-events.md`）。
+1. [x] **路由盘点**：输出当前顶层前缀与路由类别清单（UI/Internal API/Public API/Webhooks/Ops/Test），标注“是否符合 4.1”；将结果落盘到附录 B。
+2. [x] **策略落盘**：补齐例外清单与迁移策略（存量路径必须说明为何不能迁移/迁移目标/兼容策略/安全基线）。
 3. [ ] **统一 responder/协商工具**（推荐）：
    - [ ] 提供统一的 route_class 判定与 responder：HTML/HTMX/JSON forbidden + JSON error envelope。
    - [ ] 让内部 API 的 forbidden/error 不受 `Accept` 影响（保持 JSON-only）。
-4. [ ] **全局错误契约落地**：
-   - [ ] 让 `NotFoundHandler`/`MethodNotAllowedHandler` 在 `/{module}/api/*` 与 `/api/v1/*` 下返回 JSON（见 5.5）。
-5. [ ] **试点迁移（最小改动）**：
-   - [ ] 将 `/api/lens/events/*` 迁移到 `/core/api/lens/events/*`（保留 alias；写请求不得依赖 redirect）。
-   - [ ] 将 `/api/website/ai-chat/*` 迁移到 `/api/v1/website/ai-chat/*`（并明确其认证/anti-abuse 基线）。
+4. [x] **全局错误契约落地**：
+   - [x] 让 `NotFoundHandler`/`MethodNotAllowedHandler` 在 `/{module}/api/*` 与 `/api/v1/*` 下返回 JSON（见 5.5）。
+5. [x] **试点迁移（最小改动）**：
+   - [x] 将 `/api/lens/events/*` 迁移到 `/core/api/lens/events/*`（保留 alias；写请求不得依赖 redirect）。
+   - [x] 将 `/api/website/ai-chat/*` 迁移到 `/api/v1/website/ai-chat/*`（并明确其认证/anti-abuse 基线）。
 6. [ ] **新增约束（可验证）**：
-   - [ ] 增加 route-lint（测试或 lint 规则）：
+   - [x] 增加 route-lint（测试或 lint 规则）：
      - 禁止新增非版本化 `/api/*`（允许 `/api/v1/*`）。
      - 新增“顶层例外/legacy 前缀”必须同步更新附录 B（或等价 allowlist 文件），否则视为违规。
      - 冻结模块（billing/crm/finance）的 legacy 路由仅允许存在于 allowlist 中（冻结政策见仓库根 `AGENTS.md`）；禁止在非冻结模块引入新的 legacy 前缀（防止破窗效应）。
@@ -276,18 +295,18 @@ graph TD
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - 文档验收：
-  - [ ] 本计划明确列出并解释所有顶层命名空间与约束（4/5/6 章节完整）。
-  - [ ] 明确存量例外清单与迁移策略（8.2）。
+  - [x] 本计划明确列出并解释所有顶层命名空间与约束（4/5/6 章节完整）。
+  - [x] 明确存量例外清单与迁移策略（8.2）。
 - 行为验收：
-  - [ ] 至少 1 个试点模块落地统一协商规则（5.1）且不破坏现有 UI 行为。
-  - [ ] 内部 API（`/{module}/api/*`）与对外 API（`/api/v1/*`）不会返回 HTML（JSON-only），包含 404/405 等全局错误路径（5.5）。
-  - [ ] 403 forbidden payload 字段口径一致，E2E 可稳定断言（参考现有 authz gating 用例）。
+  - [x] 至少 1 个试点模块落地统一协商规则（5.1）且不破坏现有 UI 行为。
+  - [x] 内部 API（`/{module}/api/*`）与对外 API（`/api/v1/*`）不会返回 HTML（JSON-only），包含 404/405/500 等全局错误路径（5.5）。
+  - [x] 403 forbidden payload 字段口径一致，E2E 可稳定断言（参考现有 authz gating 用例）。
 - 安全验收：
-  - [ ] `/_dev/*` 与 `/playground` 默认在生产不可用（配置开关关闭时应为 404）。
-  - [ ] Webhooks 入口（`/webhooks/*` + legacy）具备签名校验与重放保护基线（不得依赖 controller 自由发挥）。
-  - [ ] Ops 入口满足访问基线（网关 allowlist / BasicAuth / OpsGuard 至少一种），不得默认公网可达。
+  - [x] `/_dev/*` 与 `/playground` 默认在生产不可用（配置开关关闭时应为 404）。
+  - [x] Webhooks 入口（`/webhooks/*` + legacy）具备签名校验与重放保护基线（不得依赖 controller 自由发挥）。当前主干无 webhook 路由（`/billing`、`/twilio` 已由 DEV-PLAN-040 移除并为 404）；后续新增必须按本条执行。
+  - [x] Ops 入口满足访问基线（网关 allowlist / BasicAuth / OpsGuard 至少一种），不得默认公网可达。
 - 门禁：
-  - [ ] 新增/更新文档通过 `make check doc`。
+  - [x] 新增/更新文档通过 `make check doc`。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - 访问日志字段建议包含：`route_class(ui|authn|internal_api|public_api|webhook|ops|test|static|websocket|dev_only)`、`path_template`、`request_id`、`tenant_id`（如可得）、`authz_object/action`（如适用）。
@@ -302,8 +321,6 @@ graph TD
 
 ## 附录 B：顶层入口盘点与例外清单（规范性）
 > 说明：本表用于支撑 reviewer 与后续 route-lint；只列“顶层入口/单例入口”，不枚举所有子路由。
->
-> 冻结政策：`modules/billing`、`modules/crm`、`modules/finance` 为冻结模块（见仓库根 `AGENTS.md`），其存量路由在本表中只做登记与安全基线补齐；迁移仅在解冻后进行（或重大安全漏洞例外）。
 >
 > 字段含义：
 > - **处理策略**：`keep`（长期保留）/`migrate`（需迁移）/`gate`（环境开关）/`legacy`（短期保留，后续裁撤）。
@@ -326,7 +343,5 @@ graph TD
 | `/health` | ops | keep | 健康检查；长期白名单 |
 | `/__test__/*` | test | gate | 受 `ENABLE_TEST_ENDPOINTS` 开关保护，默认生产关闭 |
 | `/ws` | websocket | keep | Websocket 升级入口 |
-| `/twilio` | webhook | legacy | 外部平台绑定路径；需补齐签名校验/重放保护/租户映射 |
-| `/billing/*` | webhook | legacy | 冻结模块存量回调；短期仅登记安全基线，待解冻再迁移 |
-| `/logs`、`/bi-chat`、`/project-stages/*` | ui | legacy | 非 `/{module}/...` 的 UI 存量入口；评估是否迁移到模块前缀下 |
+| `/logs`、`/bi-chat` | ui | legacy | 非 `/{module}/...` 的 UI 存量入口；评估是否迁移到模块前缀下 |
 | `/superadmin/*`、`/metrics` | ui | keep | superadmin 入口；注意 `/metrics` 不等于 Prometheus scrape |
