@@ -1,9 +1,9 @@
 # DEV-PLAN-040：彻底移除 finance / billing / crm / projects 模块（Hard Delete）
 
-**状态**: 实施完成（待合并 PR #51，2025-12-16 01:32 UTC）
+**状态**: 已合并（PR #51，merge commit `2cd0218f`，2025-12-16 02:30 UTC；Quality Gates run `20254463551` ✅）。8.1 Readiness 待外部确认
 
 ## 1. 背景与上下文 (Context)
-- 仓库当前存在冻结模块：`modules/finance`、`modules/billing`、`modules/crm`（见仓库根 `AGENTS.md` 的“模块冻结政策”）。
+- 仓库此前存在冻结模块：`modules/finance`、`modules/billing`、`modules/crm`（见仓库根 `AGENTS.md` 的“模块冻结政策”）。
 - 同时，`modules/projects`（以下简称 projects 模块）在当前主干目标中被判定为“应彻底移除”的范围（不受冻结政策约束，但同样会带来路由/测试/维护面成本）。
 - 这些模块会导致以下长期成本与误用风险：
   - `go test ./...` 会包含这些模块，导致本地/CI 的“全量测试”在资源竞争下出现超时与不确定性；
@@ -41,7 +41,7 @@ graph TD
 ### 3.2 决策清单（本计划内固定，开发可直接按此执行）
 - [X] ADR-040-01（删除策略）：Hard Delete（目录删除 + 清理所有引用：Go import/模块注册/allowlist/CI/文档）。
 - [X] ADR-040-02（legacy 顶层前缀处置）：不保留 tombstone handler；移除路由注册与 allowlist，最终行为为全局 NotFound（HTTP 404，UI 默认 HTML）。
-  - 约束：合并前必须确认外部 webhook 已解绑/停用（见 8.1）。
+  - 约束：上线/部署前必须确认外部 webhook 已解绑/停用（见 8.1）。
 - [X] ADR-040-03（Website 与 CRM 解耦）：Website AI Chat 不再复用 CRM 的 chat/client 持久化；Thread 数据完全落在 Website 自身（Redis ThreadRepository v2），以便删除 `modules/crm`。
 - [X] ADR-040-04（支付/短信配置处置）：移除 `pkg/configuration` 中 Twilio/Click/Payme/Octo/Stripe 配置结构及 `.env.example` 对应 env（未知 env var 会被忽略，因此对部署侧是“可删可不删”，但仓库口径必须收敛）。
 - [X] ADR-040-05（DB 与迁移）：不在本计划内删除现有 DB 表；`migrations/` 历史文件暂不清理（另立计划做 schema 收敛/重基线）。
@@ -143,7 +143,8 @@ graph TD
 - Website AI Chat API 位于 `/api/v1/*`（public API），必须保持 JSON-only 错误返回契约（参见 DEV-PLAN-018 5.5）。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
-### 8.1 Readiness（必须完成并在本计划内记录命令与输出摘要）
+### 8.1 Readiness（上线/部署前必须完成，并在本计划内记录证据/输出摘要）
+> 说明：该部分需要业务/运维协作确认，代码层面无法自证；但必须在生产部署前完成。
 - [ ] 外部依赖确认：明确没有系统仍依赖以下入口（或已完成解绑/替换/停用）：
   - [ ] `/billing/*`（支付网关回调）
   - [ ] `/twilio`（短信回调）
@@ -179,6 +180,8 @@ graph TD
 - [X] 实施分支与 PR
   - 分支：`feature/dev-plan-040-impl`
   - PR：`https://github.com/jacksonlee411/Bugs-Blossoms/pull/51`
+  - 合并：2025-12-16 02:30 UTC（merge commit `2cd0218f`）
+  - CI：`Quality Gates`（main push）run `20254463551` ✅
 - [X] 本地/CI 对齐验证（摘要）
   - `make check lint`：通过
   - `make test`：通过
