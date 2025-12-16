@@ -76,6 +76,10 @@ func (s *AuthService) CookieGoogleAuthenticate(ctx context.Context, code string)
 		return nil, err
 	}
 	conf := configuration.Use()
+	domain := ""
+	if conf.GoAppEnvironment == configuration.Production {
+		domain = conf.Domain
+	}
 	cookie := &http.Cookie{
 		Name:     conf.SidCookieKey,
 		Value:    sess.Token,
@@ -83,7 +87,7 @@ func (s *AuthService) CookieGoogleAuthenticate(ctx context.Context, code string)
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   conf.GoAppEnvironment == configuration.Production,
-		Domain:   conf.Domain,
+		Domain:   domain,
 		Path:     "/",
 	}
 	return cookie, nil
@@ -196,6 +200,10 @@ func (s *AuthService) CookieAuthenticateWithUserID(ctx context.Context, id uint,
 		return nil, err
 	}
 	conf := configuration.Use()
+	domain := ""
+	if conf.GoAppEnvironment == configuration.Production {
+		domain = conf.Domain
+	}
 	cookie := &http.Cookie{
 		Name:     conf.SidCookieKey,
 		Value:    sess.Token,
@@ -203,7 +211,7 @@ func (s *AuthService) CookieAuthenticateWithUserID(ctx context.Context, id uint,
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   conf.GoAppEnvironment == configuration.Production,
-		Domain:   conf.Domain,
+		Domain:   domain,
 	}
 	return cookie, nil
 }
@@ -240,6 +248,10 @@ func (s *AuthService) CookieAuthenticate(ctx context.Context, email, password st
 		return nil, err
 	}
 	conf := configuration.Use()
+	domain := ""
+	if conf.GoAppEnvironment == configuration.Production {
+		domain = conf.Domain
+	}
 	cookie := &http.Cookie{
 		Name:     conf.SidCookieKey,
 		Value:    sess.Token,
@@ -247,7 +259,7 @@ func (s *AuthService) CookieAuthenticate(ctx context.Context, email, password st
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   conf.GoAppEnvironment == configuration.Production,
-		Domain:   conf.Domain,
+		Domain:   domain,
 	}
 	return cookie, nil
 }
@@ -260,6 +272,10 @@ func generateStateOauthCookie() (*http.Cookie, error) {
 	}
 	state := base64.URLEncoding.EncodeToString(b)
 	conf := configuration.Use()
+	domain := ""
+	if conf.GoAppEnvironment == configuration.Production {
+		domain = conf.Domain
+	}
 	cookie := &http.Cookie{
 		Name:     conf.OauthStateCookieKey,
 		Value:    state,
@@ -267,7 +283,7 @@ func generateStateOauthCookie() (*http.Cookie, error) {
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   conf.GoAppEnvironment == configuration.Production,
-		Domain:   conf.Domain,
+		Domain:   domain,
 	}
 	return cookie, nil
 }

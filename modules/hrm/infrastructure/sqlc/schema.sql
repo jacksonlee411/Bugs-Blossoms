@@ -100,6 +100,8 @@ CREATE TABLE public.employees (
     updated_at timestamp with time zone DEFAULT now()
 );
 
+ALTER TABLE ONLY public.employees FORCE ROW LEVEL SECURITY;
+
 --
 -- Name: employees_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
@@ -285,6 +287,18 @@ ALTER TABLE ONLY public.employees
 --
 ALTER TABLE ONLY public.positions
     ADD CONSTRAINT positions_tenant_id_fkey FOREIGN KEY (tenant_id) REFERENCES public.tenants (id) ON DELETE CASCADE;
+
+--
+-- Name: employees; Type: ROW SECURITY; Schema: public; Owner: -
+--
+ALTER TABLE public.employees ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: employees tenant_isolation; Type: POLICY; Schema: public; Owner: -
+--
+CREATE POLICY tenant_isolation ON public.employees
+    USING ((tenant_id = (current_setting('app.current_tenant'::text))::uuid))
+    WITH CHECK ((tenant_id = (current_setting('app.current_tenant'::text))::uuid));
 
 --
 -- PostgreSQL database dump complete

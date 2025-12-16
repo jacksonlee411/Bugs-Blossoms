@@ -276,19 +276,13 @@ func (g *PgUserRepository) GetByID(ctx context.Context, id uint) (user.User, err
 
 func (g *PgUserRepository) GetByEmail(ctx context.Context, email string) (user.User, error) {
 	tenantID, err := composables.UseTenantID(ctx)
-	var users []user.User
-	if err == nil {
-		// If we have a tenant, use it to filter
-		users, err = g.queryUsers(ctx, userFindQuery+" WHERE u.email = $1 AND u.tenant_id = $2", email, tenantID)
-		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("failed to query user with email: %s", email))
-		}
-	} else {
-		// If no tenant in context (like during login), get user by email across all tenants
-		users, err = g.queryUsers(ctx, userFindQuery+" WHERE u.email = $1", email)
-		if err != nil {
-			return nil, errors.Wrap(err, fmt.Sprintf("failed to query user with email: %s", email))
-		}
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get tenant from context")
+	}
+
+	users, err := g.queryUsers(ctx, userFindQuery+" WHERE u.email = $1 AND u.tenant_id = $2", email, tenantID)
+	if err != nil {
+		return nil, errors.Wrap(err, fmt.Sprintf("failed to query user with email: %s", email))
 	}
 
 	if len(users) == 0 {
