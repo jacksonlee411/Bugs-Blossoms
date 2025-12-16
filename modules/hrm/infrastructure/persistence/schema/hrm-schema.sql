@@ -67,9 +67,12 @@ CREATE INDEX employees_email_idx ON employees (email);
 CREATE INDEX employees_phone_idx ON employees (phone);
 
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE employees FORCE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS tenant_isolation ON employees;
+
 CREATE POLICY tenant_isolation ON employees
     USING (tenant_id = current_setting('app.current_tenant')::uuid)
     WITH CHECK (tenant_id = current_setting('app.current_tenant')::uuid);
+
