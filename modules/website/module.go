@@ -5,11 +5,12 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/internet"
 	corePersistence "github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
-	crmPersistence "github.com/iota-uz/iota-sdk/modules/crm/infrastructure/persistence"
 	"github.com/iota-uz/iota-sdk/modules/website/infrastructure/persistence"
 	"github.com/iota-uz/iota-sdk/modules/website/presentation/controllers"
 	"github.com/iota-uz/iota-sdk/modules/website/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/configuration"
+	"github.com/redis/go-redis/v9"
 )
 
 //go:embed presentation/locales/*.json
@@ -26,14 +27,11 @@ type Module struct {
 }
 
 func (m *Module) Register(app application.Application) error {
+	conf := configuration.Use()
 	userRepo := corePersistence.NewUserRepository(
 		corePersistence.NewUploadRepository(),
 	)
-	chatRepo := crmPersistence.NewChatRepository()
-	passportRepo := corePersistence.NewPassportRepository()
-	clientRepo := crmPersistence.NewClientRepository(
-		passportRepo,
-	)
+	threadRepo := persistence.NewThreadRepository(redis.NewClient(&redis.Options{Addr: conf.RedisURL}))
 	aiconfigRepo := persistence.NewAIChatConfigRepository()
 	app.RegisterServices(
 		services.NewAIChatConfigService(aiconfigRepo),
@@ -41,8 +39,7 @@ func (m *Module) Register(app application.Application) error {
 			services.WebsiteChatServiceConfig{
 				AIConfigRepo: aiconfigRepo,
 				UserRepo:     userRepo,
-				ClientRepo:   clientRepo,
-				ChatRepo:     chatRepo,
+				ThreadRepo:   threadRepo,
 				AIUserEmail:  internet.MustParseEmail("ai@llm.com"),
 			},
 		),

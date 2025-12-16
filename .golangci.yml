@@ -16,9 +16,6 @@ issues:
     - logs
     - e2e
     - migrations
-    - modules/billing
-    - modules/crm
-    - modules/finance
 
 output:
   format: colored-line-number

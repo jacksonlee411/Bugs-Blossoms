@@ -20,7 +20,6 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/domain/value_objects/phone"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers"
 	"github.com/iota-uz/iota-sdk/modules/core/services"
-	"github.com/iota-uz/iota-sdk/modules/finance"
 	"github.com/iota-uz/iota-sdk/pkg/constants"
 	"github.com/iota-uz/iota-sdk/pkg/itf"
 	"github.com/iota-uz/iota-sdk/pkg/rbac"
@@ -35,7 +34,7 @@ func setupSettingsControllerTest(t *testing.T) (*itf.Suite, *services.TenantServ
 	t.Helper()
 	suite := itf.HTTP(t, core.NewModule(&core.ModuleOptions{
 		PermissionSchema: &rbac.PermissionSchema{Sets: []rbac.PermissionSet{}},
-	}), finance.NewModule()).
+	})).
 		AsUser(user.New("Test", "User", internet.MustParseEmail("test@example.com"), user.UILanguageEN))
 
 	suite.WithMiddleware(func(ctx context.Context, r *http.Request) context.Context {

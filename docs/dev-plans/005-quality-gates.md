@@ -32,10 +32,7 @@
 3. [x] **数据库/缓存日志可观测性** —— 保留现有 PostgreSQL 17 + Redis 服务容器，固定 `DB_HOST=localhost` 等变量，但补充 `tee migrate.log` 或 artifact 上传，便于排查迁移失败；同时在 job 结尾上传 `coverage.out`、`migrate.log` 等核心产物。  
 4. [x] **分支保护策略** —— 在 GitHub `main` 分支启用保护：要求 `quality-gates` workflow 通过才能合并，禁止直接 push/force push，并开启至少一条 review。已使用 `gh api --method PUT repos/jacksonlee411/Bugs-Blossoms/branches/main/protection --input /tmp/branch_protect.json` 完成配置。  
 5. [x] **文档同步** —— 在 `README.MD`、`docs/CONTRIBUTING.MD`、`AGENTS.md`、`CLAUDE.md` 更新“质量门禁 & 本地校验”章节，强调 `make check lint`、`make test`、`make css`、`make check tr`、`make db migrate` 等现有命令即可复现 CI 行为，提醒贡献者在提交前手动运行与自己改动相关的命令。  
-6. [ ] **专项问题追踪** —— 2025-11-30 起的最新 run 暂未通过，尚需完成以下事项：  
-   - `modules/billing/presentation/controllers/octo_controller.go` 的 error string 需改为小写（staticcheck `ST1005`），否则 Lint job 报错。  
-   - Finance 模块测试暂时放弃并在 workflow 中跳过（已更新 README/CONTRIBUTING 提示），但 `go test` 过滤命令仍需调整，确保 `github.com/iota-uz/iota-sdk/modules/finance/...` 不会被执行，否则依旧因外键/连接数报错。完成后再恢复 nightly 或单独 job 监控 Finance。  
-   - Playwright/E2E job 仍标记为关闭（`if: false`），待 Finance 恢复后再打开。
+6. [x] **专项问题追踪** —— DEV-PLAN-040 已 Hard Delete `billing/finance/crm/projects`，历史上针对冻结模块的 lint/test 排除与遗留问题不再适用；门禁口径已收敛为对当前有效代码全量生效。
 
 ## 里程碑
 - M1：质量门禁 workflow 雏形（Lint/Test）上线，并在 main 分支开启必需检查。

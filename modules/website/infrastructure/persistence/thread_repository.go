@@ -3,10 +3,12 @@ package persistence
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/modules/website/domain/entities/chatthread"
 	"github.com/iota-uz/iota-sdk/modules/website/infrastructure/persistence/models"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -16,12 +18,16 @@ type ThreadRepository struct {
 }
 
 func NewThreadRepository(redis *redis.Client) *ThreadRepository {
-	return &ThreadRepository{redis: redis, prefix: "threads"}
+	return &ThreadRepository{redis: redis, prefix: "website:ai_chat:threads:v2"}
 }
 
 func (r *ThreadRepository) GetByID(ctx context.Context, id uuid.UUID) (chatthread.ChatThread, error) {
 	var model models.ChatThread
-	result, err := r.redis.HGet(ctx, r.prefix, id.String()).Result()
+	hashKey, err := r.hashKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result, err := r.redis.HGet(ctx, hashKey, id.String()).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return nil, chatthread.ErrChatThreadNotFound
@@ -36,11 +42,15 @@ func (r *ThreadRepository) GetByID(ctx context.Context, id uuid.UUID) (chatthrea
 }
 
 func (r *ThreadRepository) Save(ctx context.Context, thread chatthread.ChatThread) (chatthread.ChatThread, error) {
+	hashKey, err := r.hashKey(ctx)
+	if err != nil {
+		return nil, err
+	}
 	threadJson, err := json.Marshal(ToDBChatThread(thread))
 	if err != nil {
 		return nil, err
 	}
-	if err := r.redis.HSet(ctx, r.prefix, thread.ID().String(), threadJson).Err(); err != nil {
+	if err := r.redis.HSet(ctx, hashKey, thread.ID().String(), threadJson).Err(); err != nil {
 		return nil, err
 	}
 
@@ -48,11 +58,19 @@ func (r *ThreadRepository) Save(ctx context.Context, thread chatthread.ChatThrea
 }
 
 func (r *ThreadRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.redis.HDel(ctx, r.prefix, id.String()).Err()
+	hashKey, err := r.hashKey(ctx)
+	if err != nil {
+		return err
+	}
+	return r.redis.HDel(ctx, hashKey, id.String()).Err()
 }
 
 func (r *ThreadRepository) List(ctx context.Context) ([]chatthread.ChatThread, error) {
-	resultMap, err := r.redis.HGetAll(ctx, r.prefix).Result()
+	hashKey, err := r.hashKey(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resultMap, err := r.redis.HGetAll(ctx, hashKey).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -70,4 +88,12 @@ func (r *ThreadRepository) List(ctx context.Context) ([]chatthread.ChatThread, e
 	}
 
 	return threads, nil
+}
+
+func (r *ThreadRepository) hashKey(ctx context.Context) (string, error) {
+	tenantID, err := composables.UseTenantID(ctx)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s:{%s}", r.prefix, tenantID.String()), nil
 }

@@ -3,15 +3,10 @@ package modules
 import (
 	"slices"
 
-	"github.com/iota-uz/iota-sdk/modules/billing"
-
 	"github.com/iota-uz/iota-sdk/modules/bichat"
 	"github.com/iota-uz/iota-sdk/modules/core"
-	"github.com/iota-uz/iota-sdk/modules/crm"
-	"github.com/iota-uz/iota-sdk/modules/finance"
 	"github.com/iota-uz/iota-sdk/modules/hrm"
 	"github.com/iota-uz/iota-sdk/modules/logging"
-	"github.com/iota-uz/iota-sdk/modules/projects"
 	"github.com/iota-uz/iota-sdk/modules/testkit"
 	"github.com/iota-uz/iota-sdk/modules/warehouse"
 	"github.com/iota-uz/iota-sdk/modules/website"
@@ -26,13 +21,9 @@ var (
 		}),
 		bichat.NewModule(),
 		hrm.NewModule(),
-		finance.NewModule(),
-		projects.NewModule(),
 		logging.NewModule(),
 		warehouse.NewModule(),
-		crm.NewModule(),
 		website.NewModule(),
-		billing.NewModule(),
 		testkit.NewModule(), // Test endpoints - only active when ENABLE_TEST_ENDPOINTS=true
 	}
 
@@ -40,11 +31,8 @@ var (
 		core.NavItems,
 		bichat.NavItems,
 		hrm.NavItems,
-		finance.NavItems,
-		projects.NavItems,
 		logging.NavItems,
 		warehouse.NavItems,
-		crm.NavItems,
 		website.NavItems,
 	)
 )
