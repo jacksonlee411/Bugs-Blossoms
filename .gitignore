@@ -24,3 +24,6 @@ go.work*
 e2e/playwright-report/
 e2e/test-results/
 /.cache
+
+# Sensitive local recovery codes (must never be committed)
+github-recovery-codes.txt

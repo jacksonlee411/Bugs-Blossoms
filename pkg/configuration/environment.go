@@ -179,6 +179,19 @@ type Configuration struct {
 	// Test endpoints - only enable in test environment
 	EnableTestEndpoints bool `env:"ENABLE_TEST_ENDPOINTS" envDefault:"false"`
 
+	// Dev-only endpoints (e.g. /_dev/*). In production, these are disabled by default unless explicitly enabled.
+	EnableDevEndpoints bool `env:"ENABLE_DEV_ENDPOINTS" envDefault:"false"`
+
+	// GraphQL playground (/playground). In production, this is disabled by default unless explicitly enabled.
+	EnableGraphQLPlayground bool `env:"ENABLE_GRAPHQL_PLAYGROUND" envDefault:"false"`
+
+	// Ops endpoints guard (/health, /debug/prometheus). Enforced only in production.
+	OpsGuardEnabled       bool   `env:"OPS_GUARD_ENABLED" envDefault:"true"`
+	OpsGuardCIDRs         string `env:"OPS_GUARD_CIDRS" envDefault:""`
+	OpsGuardToken         string `env:"OPS_GUARD_TOKEN" envDefault:""`
+	OpsGuardBasicAuthUser string `env:"OPS_GUARD_BASIC_AUTH_USER" envDefault:""`
+	OpsGuardBasicAuthPass string `env:"OPS_GUARD_BASIC_AUTH_PASS" envDefault:""`
+
 	logFile *os.File
 	logger  *logrus.Logger
 }

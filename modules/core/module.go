@@ -119,13 +119,17 @@ func (m *Module) Register(app application.Application) error {
 			PermissionSchema: m.options.PermissionSchema,
 		}),
 		controllers.NewGroupsController(app),
-		controllers.NewShowcaseController(app),
-		controllers.NewCrudShowcaseController(app),
 		controllers.NewWebSocketController(app),
 		controllers.NewSettingsController(app),
 		controllers.NewAuthzAPIController(app),
 		controllers.NewAuthzRequestController(app),
 	)
+	if cfg.GoAppEnvironment != configuration.Production || cfg.EnableDevEndpoints {
+		app.RegisterControllers(
+			controllers.NewShowcaseController(app),
+			controllers.NewCrudShowcaseController(app),
+		)
+	}
 	app.RegisterHashFsAssets(assets.HashFS)
 	app.RegisterGraphSchema(application.GraphSchema{
 		Value: graph.NewExecutableSchema(graph.Config{

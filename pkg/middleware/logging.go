@@ -25,12 +25,17 @@ import (
 
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/constants"
+	"github.com/iota-uz/iota-sdk/pkg/routing"
 )
 
 type LoggerOptions struct {
 	LogRequestBody  bool
 	LogResponseBody bool
 	MaxBodyLength   int
+
+	Entrypoint    string
+	AllowlistPath string
+	Repanic       bool
 }
 
 func NewLoggerOptions(logRequestBody bool, logResponseBody bool, maxBodyLength int) LoggerOptions {
@@ -164,6 +169,12 @@ func shouldLogBody(contentType string) bool {
 
 func WithLogger(logger *logrus.Logger, opts LoggerOptions) mux.MiddlewareFunc {
 	conf := configuration.Use()
+	rules, err := routing.LoadAllowlist(opts.AllowlistPath, opts.Entrypoint)
+	if err != nil {
+		rules = nil
+	}
+	classifier := routing.NewClassifier(rules)
+
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(
 			func(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +280,7 @@ func WithLogger(logger *logrus.Logger, opts LoggerOptions) mux.MiddlewareFunc {
 
 				wrappedWriter := wrapResponseWriter(w)
 
-				// Recover from panics, log them with full context, then re-panic
+				// Recover from panics, log them with full context, and return a stable response.
 				defer func() {
 					if recovered := recover(); recovered != nil {
 						duration := time.Since(start)
@@ -298,13 +309,27 @@ func WithLogger(logger *logrus.Logger, opts LoggerOptions) mux.MiddlewareFunc {
 
 						fieldsLogger.WithFields(panicFields).Error("panic recovered in request handler")
 
-						// Set 500 status code so client receives proper HTTP response
 						if !wrappedWriter.statusWritten {
-							wrappedWriter.WriteHeader(http.StatusInternalServerError)
+							class := classifier.ClassifyPath(r.URL.Path)
+							if class == routing.RouteClassInternalAPI || class == routing.RouteClassPublicAPI {
+								wrappedWriter.Header().Set("Content-Type", "application/json")
+								wrappedWriter.WriteHeader(http.StatusInternalServerError)
+								_ = json.NewEncoder(wrappedWriter).Encode(map[string]any{
+									"code":    "INTERNAL_SERVER_ERROR",
+									"message": "internal server error",
+									"meta": map[string]string{
+										"request_id": requestID,
+										"path":       r.URL.Path,
+									},
+								})
+							} else {
+								http.Error(wrappedWriter, "Internal Server Error", http.StatusInternalServerError)
+							}
 						}
 
-						// Re-panic to propagate upstream to process-level recovery
-						panic(recovered)
+						if opts.Repanic {
+							panic(recovered)
+						}
 					}
 				}()
 
