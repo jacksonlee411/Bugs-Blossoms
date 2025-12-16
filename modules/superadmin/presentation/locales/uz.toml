@@ -26,8 +26,12 @@ TenantSignups = "Ijarachi ro'yxatdan o'tishi"
 Title = "Ijarachilar"
 Name = "Ijarachi nomi"
 Domain = "Domen"
+PrimaryDomain = "Asosiy domen"
 Email = "Email"
 Phone = "Telefon"
+IdentityModeColumn = "Identifikatsiya"
+SSOColumn = "SSO"
+RLSColumn = "RLS"
 UserCount = "Foydalanuvchilar soni"
 StatusColumn = "Holat"
 CreatedAt = "Yaratilgan sana"
@@ -45,6 +49,34 @@ Title = "Ijarachilar - Super Admin"
 [SuperAdmin.Tenants.Status]
 Active = "Faol"
 Inactive = "Nofaol"
+
+[SuperAdmin.Tenants.Tabs]
+Overview = "Ko'rinish"
+Domains = "Domenlar"
+Auth = "Autentifikatsiya"
+SSO = "SSO"
+Users = "Foydalanuvchilar"
+Audit = "Audit"
+
+[SuperAdmin.Tenants.IdentityMode]
+Legacy = "Legacy"
+Kratos = "Kratos"
+
+[SuperAdmin.Tenants.SSO]
+Off = "O'chirilgan"
+
+[SuperAdmin.Tenants.RLS]
+Disabled = "O'chirilgan"
+Enforce = "Enforce"
+
+[SuperAdmin.Tenants.Cards]
+IdentityMode = "Identifikatsiya rejimi"
+SSOConnections = "SSO ulanishlar"
+UserCount = "Foydalanuvchilar"
+RLS = "RLS"
+
+[SuperAdmin.Tenants.Overview.Meta]
+Title = "Ijarachi ko'rinishi - Super Admin"
 
 [SuperAdmin.Tenants.Users]
 Title = "Ijarachi foydalanuvchilari"
@@ -87,3 +119,114 @@ PasswordEmpty = "Parol bo'sh bo'lmasligi kerak"
 InvalidContentType = "So'rov JSON formatida bo'lishi kerak"
 NetworkError = "Tarmoq xatosi yuz berdi. Iltimos, qayta urinib ko'ring"
 ServerError = "Server xatosi yuz berdi. Iltimos, qo'llab-quvvatlash xizmatiga murojaat qiling"
+
+[SuperAdmin.Tenants.Domains.Meta]
+Title = "Domenlar - Super Admin"
+
+[SuperAdmin.Tenants.Domains]
+AddTitle = "Domen qo'shish"
+AddHelp = "Hostname qo'shing va uni asosiy qilishdan oldin DNS TXT orqali tasdiqlang."
+ListTitle = "Domenlar"
+ListHelp = "Yo'naltirish tasdiqlangan domenlar bo'yicha aniqlanadi. TXT yozuvi egalikni isbotlaydi."
+Hostname = "Hostname"
+AddButton = "Qo'shish"
+Empty = "Domenlar yo'q"
+TXT = "TXT"
+Primary = "Asosiy"
+Verified = "Tasdiqlangan"
+Pending = "Kutilmoqda"
+Verify = "Tekshirish"
+MakePrimary = "Asosiy qilish"
+Delete = "O'chirish"
+ConfirmMakePrimary = "Ushbu domenni asosiy qilib belgilaysizmi? Bu kirish va callback'larga ta'sir qilishi mumkin."
+ConfirmDelete = "Ushbu domen o'chirilsinmi?"
+
+[SuperAdmin.Tenants.Domains.Columns]
+Hostname = "Hostname"
+Primary = "Asosiy"
+Verified = "Tasdiqlangan"
+Token = "Token"
+LastAttempt = "Oxirgi urinish"
+Error = "Xato"
+Actions = "Harakatlar"
+
+[SuperAdmin.Tenants.Auth.Meta]
+Title = "Autentifikatsiya sozlamalari - Super Admin"
+
+[SuperAdmin.Tenants.Auth]
+Title = "Autentifikatsiya sozlamalari"
+Help = "Ushbu ijarachi uchun identifikatsiya rejimi va ruxsat etilgan kirish usullarini sozlang."
+IdentityMode = "Identifikatsiya rejimi"
+AllowPassword = "Parol"
+AllowGoogle = "Google"
+AllowSSO = "SSO"
+
+[SuperAdmin.Tenants.SSOConnections.Meta]
+Title = "SSO ulanishlar - Super Admin"
+
+[SuperAdmin.Tenants.SSOConnections]
+CreateTitle = "SSO ulanish yaratish"
+EditTitle = "SSO ulanishni tahrirlash"
+Help = "Ijarachi SSO ulanishlarini yarating, sinab ko'ring, yoqing va o'chiring. Maxfiy ma'lumotlar havola ko'rinishida saqlanadi (ENV:/FILE:)."
+CancelEdit = "Tahrirlashni bekor qilish"
+CreateButton = "Yaratish"
+UpdateButton = "Yangilash"
+ListTitle = "Ulanishlar"
+ListHelp = "Faqat muvaffaqiyatli testdan so'ng yoqing (fail-closed)."
+Empty = "SSO ulanishlar yo'q"
+Enabled = "Yoqilgan"
+Disabled = "O'chirilgan"
+TestButton = "Test"
+EnableButton = "Yoqish"
+DisableButton = "O'chirish"
+EditButton = "Tahrirlash"
+DeleteButton = "O'chirish"
+ConfirmDelete = "Ushbu SSO ulanish o'chirilsinmi?"
+SAMLHint = "SAML: metadata URL yoki metadata XML kiriting."
+OIDCHint = "OIDC: client_secret_ref ENV:NAME yoki FILE:/abs/path ni qo'llab-quvvatlaydi."
+
+[SuperAdmin.Tenants.SSOConnections.Fields]
+ConnectionID = "Connection ID"
+DisplayName = "Nomi"
+Protocol = "Protokol"
+JacksonBaseURL = "Jackson Base URL"
+KratosProviderID = "Kratos Provider ID"
+SAMLMetadataURL = "SAML Metadata URL"
+SAMLMetadataXML = "SAML Metadata XML"
+OIDCIssuer = "OIDC Issuer"
+OIDCClientID = "OIDC Client ID"
+OIDCClientSecretRef = "OIDC Client Secret Ref"
+
+[SuperAdmin.Tenants.SSOConnections.Columns]
+Name = "Nomi"
+Protocol = "Protokol"
+Enabled = "Yoqilgan"
+Secret = "Secret"
+LastTest = "Oxirgi test"
+Actions = "Harakatlar"
+
+[SuperAdmin.Tenants.SSOConnections.Secret]
+Ok = "Sozlangan"
+Missing = "Topilmadi"
+Error = "Xato"
+
+[SuperAdmin.Tenants.SSOConnections.Test]
+Ok = "OK"
+Failed = "Muvaffaqiyatsiz"
+
+[SuperAdmin.Tenants.Audit.Meta]
+Title = "Audit jurnali - Super Admin"
+
+[SuperAdmin.Tenants.Audit]
+Title = "Audit jurnali"
+Help = "Konfiguratsiya o'zgarishlari yozib boriladi; maxfiy maydonlar yashiriladi."
+Empty = "Audit yozuvlari yo'q"
+ViewPayload = "Payload ni ko'rish"
+
+[SuperAdmin.Tenants.Audit.Columns]
+Time = "Vaqt"
+Action = "Harakat"
+Actor = "Ijrochi"
+IP = "IP"
+UserAgent = "User Agent"
+Payload = "Payload"

@@ -240,6 +240,14 @@ Tabs: Overview | Domains | Auth | SSO | Users | Audit
 
 > 决策：采用 **路线 A**。数据库只存 `secret_ref`（引用外部 secret），不在 DB/audit 中落 secret 内容。
 
+路线对比（供决策复盘）：
+
+| 路线 | 做法 | 优势 | 代价/风险 | 适用场景 |
+| --- | --- | --- | --- | --- |
+| A（本计划采用） | DB 只存 `secret_ref`（`ENV:`/`FILE:`），运行环境注入 secret | secret 不入库（DB 泄露面更小）；更易满足合规/审计；回滚与隔离边界清晰 | 新增/变更 secret 往往需要运维配合（或依赖运行环境刷新文件）；UI 动态性受限 | 安全优先（Fail-Closed）、基础设施已有 Secret 管理（K8s Secret/文件挂载） |
+| B（不采纳） | DB 存加密密文（应用层解密） | “完全 UI 动态配置”更顺滑；减少运维注入步骤 | 密钥管理/轮转/备份恢复复杂；审计与日志更易误泄；DB 成为敏感数据载体 | 强需求：必须在 UI 内完成 secret 全流程管理，且能投入完善 KMS/Vault 体系 |
+| 外部 Secret Store（不采纳） | Vault/KMS 等集中管理，DB 存引用 | 安全与轮转体验最佳；最小化应用侧密钥负担 | 引入/运维成本高，依赖基础设施成熟度 | 大规模企业环境、已有 Vault/KMS 与 SRE 体系 |
+
 共同约束（无论选哪条路线）：
 - **不在 DB/audit 中落明文 secret**；审计 `payload` 必须过滤敏感字段（secret、token、cookie 等）。
 - **fail-closed**：secret 缺失/不可解析 ⇒ 该连接不得启用（`enabled=false`），且“测试连接”必须返回可读错误。

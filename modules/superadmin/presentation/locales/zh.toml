@@ -26,8 +26,12 @@ TenantSignups = "租户注册"
 Title = "租户"
 Name = "租户名称"
 Domain = "域名"
+PrimaryDomain = "主域名"
 Email = "电子邮件"
 Phone = "电话"
+IdentityModeColumn = "身份模式"
+SSOColumn = "SSO"
+RLSColumn = "RLS"
 UserCount = "用户数量"
 StatusColumn = "状态"
 CreatedAt = "创建日期"
@@ -45,6 +49,34 @@ Title = "租户 - 超级管理员"
 [SuperAdmin.Tenants.Status]
 Active = "活跃"
 Inactive = "非活跃"
+
+[SuperAdmin.Tenants.Tabs]
+Overview = "概览"
+Domains = "域名"
+Auth = "登录方式"
+SSO = "SSO"
+Users = "用户"
+Audit = "审计"
+
+[SuperAdmin.Tenants.IdentityMode]
+Legacy = "旧版"
+Kratos = "Kratos"
+
+[SuperAdmin.Tenants.SSO]
+Off = "关闭"
+
+[SuperAdmin.Tenants.RLS]
+Disabled = "关闭"
+Enforce = "启用"
+
+[SuperAdmin.Tenants.Cards]
+IdentityMode = "身份模式"
+SSOConnections = "SSO 连接"
+UserCount = "用户"
+RLS = "RLS"
+
+[SuperAdmin.Tenants.Overview.Meta]
+Title = "租户概览 - 超级管理员"
 
 [SuperAdmin.Tenants.Users]
 Title = "租户用户"
@@ -64,3 +96,113 @@ Status = "状态"
 [SuperAdmin.Tenants.Users.Meta]
 Title = "租户用户 - 超级管理员"
 
+[SuperAdmin.Tenants.Domains.Meta]
+Title = "域名 - 超级管理员"
+
+[SuperAdmin.Tenants.Domains]
+AddTitle = "新增域名"
+AddHelp = "添加 hostname 后，需要通过 DNS TXT 验证，验证通过后才能设为主域名。"
+ListTitle = "域名列表"
+ListHelp = "路由解析仅信任已验证的域名。通过 TXT 记录证明域名归属。"
+Hostname = "Hostname"
+AddButton = "添加"
+Empty = "暂无域名"
+TXT = "TXT"
+Primary = "主域名"
+Verified = "已验证"
+Pending = "待验证"
+Verify = "验证"
+MakePrimary = "设为主域名"
+Delete = "删除"
+ConfirmMakePrimary = "确认将该域名设为主域名？这可能影响登录与回调。"
+ConfirmDelete = "确认删除该域名？"
+
+[SuperAdmin.Tenants.Domains.Columns]
+Hostname = "Hostname"
+Primary = "主域名"
+Verified = "验证状态"
+Token = "Token"
+LastAttempt = "最近验证"
+Error = "错误"
+Actions = "操作"
+
+[SuperAdmin.Tenants.Auth.Meta]
+Title = "登录方式 - 超级管理员"
+
+[SuperAdmin.Tenants.Auth]
+Title = "登录方式"
+Help = "配置该租户的身份模式与允许的登录入口。"
+IdentityMode = "身份模式"
+AllowPassword = "密码"
+AllowGoogle = "Google"
+AllowSSO = "SSO"
+
+[SuperAdmin.Tenants.SSOConnections.Meta]
+Title = "SSO 连接 - 超级管理员"
+
+[SuperAdmin.Tenants.SSOConnections]
+CreateTitle = "创建 SSO 连接"
+EditTitle = "编辑 SSO 连接"
+Help = "创建/测试/启用/禁用租户 SSO 连接。Secret 仅存引用（ENV:/FILE:）。"
+CancelEdit = "取消编辑"
+CreateButton = "创建"
+UpdateButton = "更新"
+ListTitle = "连接列表"
+ListHelp = "测试通过后再启用（fail-closed）。"
+Empty = "暂无 SSO 连接"
+Enabled = "已启用"
+Disabled = "未启用"
+TestButton = "测试"
+EnableButton = "启用"
+DisableButton = "禁用"
+EditButton = "编辑"
+DeleteButton = "删除"
+ConfirmDelete = "确认删除该 SSO 连接？"
+SAMLHint = "SAML：填写 metadata URL 或 metadata XML（二选一）。"
+OIDCHint = "OIDC：client_secret_ref 支持 ENV:NAME 或 FILE:/绝对路径。"
+
+[SuperAdmin.Tenants.SSOConnections.Fields]
+ConnectionID = "连接 ID"
+DisplayName = "显示名称"
+Protocol = "协议"
+JacksonBaseURL = "Jackson 地址"
+KratosProviderID = "Kratos Provider ID"
+SAMLMetadataURL = "SAML Metadata URL"
+SAMLMetadataXML = "SAML Metadata XML"
+OIDCIssuer = "OIDC Issuer"
+OIDCClientID = "OIDC Client ID"
+OIDCClientSecretRef = "OIDC Client Secret Ref"
+
+[SuperAdmin.Tenants.SSOConnections.Columns]
+Name = "名称"
+Protocol = "协议"
+Enabled = "启用"
+Secret = "Secret"
+LastTest = "最近测试"
+Actions = "操作"
+
+[SuperAdmin.Tenants.SSOConnections.Secret]
+Ok = "已配置"
+Missing = "缺失"
+Error = "异常"
+
+[SuperAdmin.Tenants.SSOConnections.Test]
+Ok = "通过"
+Failed = "失败"
+
+[SuperAdmin.Tenants.Audit.Meta]
+Title = "审计 - 超级管理员"
+
+[SuperAdmin.Tenants.Audit]
+Title = "审计日志"
+Help = "配置变更会落库审计，并对敏感字段进行脱敏。"
+Empty = "暂无审计日志"
+ViewPayload = "查看 payload"
+
+[SuperAdmin.Tenants.Audit.Columns]
+Time = "时间"
+Action = "动作"
+Actor = "操作者"
+IP = "IP"
+UserAgent = "User Agent"
+Payload = "Payload"

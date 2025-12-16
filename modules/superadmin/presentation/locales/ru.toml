@@ -26,8 +26,12 @@ TenantSignups = "Регистрации арендаторов"
 Title = "Арендаторы"
 Name = "Название арендатора"
 Domain = "Домен"
+PrimaryDomain = "Основной домен"
 Email = "Email"
 Phone = "Телефон"
+IdentityModeColumn = "Идентификация"
+SSOColumn = "SSO"
+RLSColumn = "RLS"
 UserCount = "Количество пользователей"
 StatusColumn = "Статус"
 CreatedAt = "Дата создания"
@@ -45,6 +49,34 @@ Title = "Арендаторы - Super Admin"
 [SuperAdmin.Tenants.Status]
 Active = "Активен"
 Inactive = "Неактивен"
+
+[SuperAdmin.Tenants.Tabs]
+Overview = "Обзор"
+Domains = "Домены"
+Auth = "Аутентификация"
+SSO = "SSO"
+Users = "Пользователи"
+Audit = "Аудит"
+
+[SuperAdmin.Tenants.IdentityMode]
+Legacy = "Legacy"
+Kratos = "Kratos"
+
+[SuperAdmin.Tenants.SSO]
+Off = "Выкл."
+
+[SuperAdmin.Tenants.RLS]
+Disabled = "Отключено"
+Enforce = "Enforce"
+
+[SuperAdmin.Tenants.Cards]
+IdentityMode = "Режим идентификации"
+SSOConnections = "SSO подключения"
+UserCount = "Пользователи"
+RLS = "RLS"
+
+[SuperAdmin.Tenants.Overview.Meta]
+Title = "Обзор арендатора - Super Admin"
 
 [SuperAdmin.Tenants.Users]
 Title = "Пользователи арендатора"
@@ -87,3 +119,114 @@ PasswordEmpty = "Пароль не может быть пустым"
 InvalidContentType = "Запрос должен использовать формат JSON"
 NetworkError = "Произошла ошибка сети. Пожалуйста, попробуйте снова"
 ServerError = "Произошла ошибка сервера. Пожалуйста, обратитесь в поддержку"
+
+[SuperAdmin.Tenants.Domains.Meta]
+Title = "Домены - Super Admin"
+
+[SuperAdmin.Tenants.Domains]
+AddTitle = "Добавить домен"
+AddHelp = "Добавьте hostname и подтвердите его через DNS TXT перед тем, как сделать основным."
+ListTitle = "Домены"
+ListHelp = "Маршрутизация определяется по подтверждённым доменам. TXT запись доказывает владение."
+Hostname = "Hostname"
+AddButton = "Добавить"
+Empty = "Нет доменов"
+TXT = "TXT"
+Primary = "Основной"
+Verified = "Подтверждён"
+Pending = "Ожидает"
+Verify = "Проверить"
+MakePrimary = "Сделать основным"
+Delete = "Удалить"
+ConfirmMakePrimary = "Сделать этот домен основным? Это может повлиять на вход и callback'и."
+ConfirmDelete = "Удалить этот домен?"
+
+[SuperAdmin.Tenants.Domains.Columns]
+Hostname = "Hostname"
+Primary = "Основной"
+Verified = "Подтверждён"
+Token = "Токен"
+LastAttempt = "Последняя попытка"
+Error = "Ошибка"
+Actions = "Действия"
+
+[SuperAdmin.Tenants.Auth.Meta]
+Title = "Настройки входа - Super Admin"
+
+[SuperAdmin.Tenants.Auth]
+Title = "Настройки входа"
+Help = "Настройте режим идентификации и разрешённые способы входа для этого арендатора."
+IdentityMode = "Режим идентификации"
+AllowPassword = "Пароль"
+AllowGoogle = "Google"
+AllowSSO = "SSO"
+
+[SuperAdmin.Tenants.SSOConnections.Meta]
+Title = "SSO подключения - Super Admin"
+
+[SuperAdmin.Tenants.SSOConnections]
+CreateTitle = "Создать SSO подключение"
+EditTitle = "Редактировать SSO подключение"
+Help = "Создавайте, тестируйте, включайте и отключайте SSO подключения арендатора. Секреты хранятся как ссылки (ENV:/FILE:)."
+CancelEdit = "Отменить редактирование"
+CreateButton = "Создать"
+UpdateButton = "Обновить"
+ListTitle = "Подключения"
+ListHelp = "Включайте только после успешного теста (fail-closed)."
+Empty = "Нет SSO подключений"
+Enabled = "Включено"
+Disabled = "Отключено"
+TestButton = "Тест"
+EnableButton = "Включить"
+DisableButton = "Отключить"
+EditButton = "Редактировать"
+DeleteButton = "Удалить"
+ConfirmDelete = "Удалить это SSO подключение?"
+SAMLHint = "SAML: укажите URL метаданных или XML метаданных."
+OIDCHint = "OIDC: client_secret_ref поддерживает ENV:NAME или FILE:/abs/path."
+
+[SuperAdmin.Tenants.SSOConnections.Fields]
+ConnectionID = "Connection ID"
+DisplayName = "Название"
+Protocol = "Протокол"
+JacksonBaseURL = "Jackson Base URL"
+KratosProviderID = "Kratos Provider ID"
+SAMLMetadataURL = "SAML Metadata URL"
+SAMLMetadataXML = "SAML Metadata XML"
+OIDCIssuer = "OIDC Issuer"
+OIDCClientID = "OIDC Client ID"
+OIDCClientSecretRef = "OIDC Client Secret Ref"
+
+[SuperAdmin.Tenants.SSOConnections.Columns]
+Name = "Название"
+Protocol = "Протокол"
+Enabled = "Включено"
+Secret = "Секрет"
+LastTest = "Последний тест"
+Actions = "Действия"
+
+[SuperAdmin.Tenants.SSOConnections.Secret]
+Ok = "Настроено"
+Missing = "Отсутствует"
+Error = "Ошибка"
+
+[SuperAdmin.Tenants.SSOConnections.Test]
+Ok = "OK"
+Failed = "Неудачно"
+
+[SuperAdmin.Tenants.Audit.Meta]
+Title = "Журнал аудита - Super Admin"
+
+[SuperAdmin.Tenants.Audit]
+Title = "Журнал аудита"
+Help = "Изменения конфигурации записываются; чувствительные поля маскируются."
+Empty = "Нет записей аудита"
+ViewPayload = "Показать payload"
+
+[SuperAdmin.Tenants.Audit.Columns]
+Time = "Время"
+Action = "Действие"
+Actor = "Кто"
+IP = "IP"
+UserAgent = "User Agent"
+Payload = "Payload"
