@@ -91,7 +91,7 @@ modules/{module}/
 ## 7. HRM/Org（sqlc / Atlas+Goose）工作流（摘要）
 
 - sqlc：影响 `sqlc.yaml` / `modules/hrm/infrastructure/sqlc/**` / `modules/hrm/infrastructure/persistence/**/*.sql` / `docs/dev-records/hrm-sql-inventory.md` 时：先 `scripts/db/export_hrm_schema.sh`，再 `make sqlc-generate`，最后 `git status --short` 必须为空。
-- Atlas/Goose：HRM schema 以 `modules/hrm/infrastructure/atlas/schema.hcl` 为权威；`make db plan` 做 dry-run，`make db lint` 跑 atlas lint；执行 HRM 迁移用 `HRM_MIGRATIONS=1 make db migrate up`。
+- Atlas/Goose：HRM schema 由 `atlas.hcl` 的 `src`（SQL 文件组合）为权威；`make db plan` 做 dry-run，`make db lint` 跑 atlas lint；执行 HRM 迁移用 `HRM_MIGRATIONS=1 make db migrate up`。
 - Atlas/Goose（Org）：命中 `modules/org/infrastructure/**` 或 `migrations/org/**` 时：按 `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md` 的口径执行 `make org plan && make org lint && make org migrate up`；并确保 Org 使用独立 goose 版本表（例如 `GOOSE_TABLE=goose_db_version_org`）。
 
 ## 8. 文档收敛与门禁（New Doc Gate）
@@ -134,6 +134,7 @@ modules/{module}/
 - HRM Atlas+Goose：`docs/runbooks/hrm-atlas-goose.md`
 - PostgreSQL 17 迁移：`docs/runbooks/postgres17-migration.md`
 - 文档规范：`docs/dev-plans/000-docs-format.md`
+- R200 工具链落地现状与复用指引（DEV-PLAN-009A）：`docs/dev-plans/009A-r200-tooling-playbook.md`
 - Core 用户权限页 IA 优化：`docs/dev-plans/016A-core-users-permissions-ia.md`
 - Core 用户权限页签 UI/交互优化：`docs/dev-plans/016B-core-users-permissions-ui.md`
 - Transactional Outbox 工具链（DEV-PLAN-017）：`docs/dev-plans/017-transactional-outbox.md`
