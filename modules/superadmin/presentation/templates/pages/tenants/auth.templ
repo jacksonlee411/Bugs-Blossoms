@@ -1,0 +1,92 @@
+package tenants
+
+import (
+	"fmt"
+
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/components/base/card"
+	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/modules/superadmin/domain/entities"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type AuthPageProps struct {
+	Tenant   *entities.TenantInfo
+	Settings *entities.TenantAuthSettings
+	Errors   map[string]string
+	Notice   string
+}
+
+templ AuthContent(props *AuthPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div id="auth-content" class="space-y-6">
+		if props.Notice != "" {
+			<div class="p-3 rounded-lg border border-green-500/30 bg-green-500/10 text-sm text-green-500">{ props.Notice }</div>
+		}
+		if props.Errors != nil && props.Errors["general"] != "" {
+			<div class="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-500">{ props.Errors["general"] }</div>
+		}
+		@card.Card(card.Props{WrapperClass: "p-0"}) {
+			<div>
+				<h2 class="text-sm font-semibold text-100">{ pageCtx.T("SuperAdmin.Tenants.Auth.Title") }</h2>
+				<p class="mt-1 text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.Auth.Help") }</p>
+			</div>
+			<form
+				class="mt-4 space-y-6"
+				hx-post={ fmt.Sprintf("/superadmin/tenants/%s/auth", props.Tenant.ID.String()) }
+				hx-target="#auth-content"
+				hx-swap="outerHTML"
+			>
+				<div>
+					<label class="block text-xs text-300 mb-2">{ pageCtx.T("SuperAdmin.Tenants.Auth.IdentityMode") }</label>
+					<select name="identity_mode" class="w-full h-11 px-3 rounded-lg bg-surface-400 border border-secondary text-100">
+						<option value="legacy" selected?={ props.Settings != nil && props.Settings.IdentityMode == "legacy" }>{ pageCtx.T("SuperAdmin.Tenants.IdentityMode.Legacy") }</option>
+						<option value="kratos" selected?={ props.Settings != nil && props.Settings.IdentityMode == "kratos" }>{ pageCtx.T("SuperAdmin.Tenants.IdentityMode.Kratos") }</option>
+					</select>
+				</div>
+				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+					@input.Switch(&input.SwitchProps{
+						Label:   pageCtx.T("SuperAdmin.Tenants.Auth.AllowPassword"),
+						Checked: props.Settings != nil && props.Settings.AllowPassword,
+						Attrs: templ.Attributes{
+							"name":  "allow_password",
+							"value": "1",
+						},
+					})
+					@input.Switch(&input.SwitchProps{
+						Label:   pageCtx.T("SuperAdmin.Tenants.Auth.AllowGoogle"),
+						Checked: props.Settings != nil && props.Settings.AllowGoogle,
+						Attrs: templ.Attributes{
+							"name":  "allow_google",
+							"value": "1",
+						},
+					})
+					@input.Switch(&input.SwitchProps{
+						Label:   pageCtx.T("SuperAdmin.Tenants.Auth.AllowSSO"),
+						Checked: props.Settings != nil && props.Settings.AllowSSO,
+						Attrs: templ.Attributes{
+							"name":  "allow_sso",
+							"value": "1",
+						},
+					})
+				</div>
+				<div class="flex justify-end">
+					@button.Primary(button.Props{Size: button.SizeMD, Attrs: templ.Attributes{"type": "submit"}}) {
+						{ pageCtx.T("Save") }
+					}
+				</div>
+			</form>
+		}
+	</div>
+}
+
+templ Auth(props *AuthPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@TenantDetailShell(&TenantDetailShellProps{
+		Tenant:    props.Tenant,
+		ActiveTab: "auth",
+		Title:     pageCtx.T("SuperAdmin.Tenants.Auth.Meta.Title"),
+	}) {
+		@AuthContent(props)
+	}
+}

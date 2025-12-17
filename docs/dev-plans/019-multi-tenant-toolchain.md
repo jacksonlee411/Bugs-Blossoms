@@ -25,6 +25,7 @@
 - `DEV-PLAN-019A`：PostgreSQL RLS 强租户隔离（PoC）—— `docs/dev-plans/019A-rls-tenant-isolation.md`
 - `DEV-PLAN-019B`：ORY Kratos 接入与本地 Session 桥接（PoC）—— `docs/dev-plans/019B-ory-kratos-session-bridge.md`
 - `DEV-PLAN-019C`：BoxyHQ Jackson 企业 SSO（PoC）—— `docs/dev-plans/019C-jackson-enterprise-sso.md`
+- `DEV-PLAN-019D`：多租户管理页面可视化管理方案（Tenant Console）—— `docs/dev-plans/019D-multi-tenant-management-ui.md`
 
 ## 选型对比（对齐 DEV-PLAN-009 的“对比矩阵”要求）
 
@@ -176,8 +177,12 @@ tenants:
           oidc:
             issuer: "http://jackson:5225/.well-known/openid-configuration"
             client_id: "..."
+            # 只存引用，不落明文；支持 ENV:/FILE:（生产推荐 FILE:，见 019D §6.3）
             client_secret_ref: "ENV:SSO_ACME_OKTA_CLIENT_SECRET"
 ```
+
+说明（仅表达语义，避免实现细节漂移）：
+- `client_secret_ref`：`ENV:<NAME>` 或 `FILE:<ABS_PATH>`；生产推荐 `FILE:`（例如 K8s Secret volume），本地/兜底可用 `ENV:`。详细约束与 fail-closed 行为见 `DEV-PLAN-019D` 的 `§6.3`。
 
 ## 核心逻辑与算法（Business Logic & Algorithms）
 

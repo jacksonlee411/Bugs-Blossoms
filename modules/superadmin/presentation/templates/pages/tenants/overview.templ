@@ -1,0 +1,68 @@
+package tenants
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/iota-uz/iota-sdk/components/base/badge"
+	"github.com/iota-uz/iota-sdk/modules/superadmin/domain/entities"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type OverviewPageProps struct {
+	Tenant *entities.TenantInfo
+}
+
+templ OverviewCards(tenant *entities.TenantInfo) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{
+		identityLabel := pageCtx.T("SuperAdmin.Tenants.IdentityMode.Legacy")
+		if tenant.IdentityMode == "kratos" {
+			identityLabel = pageCtx.T("SuperAdmin.Tenants.IdentityMode.Kratos")
+		}
+
+		ssoLabel := pageCtx.T("SuperAdmin.Tenants.SSO.Off")
+		if tenant.AllowSSO {
+			ssoLabel = fmt.Sprintf("%d", tenant.SSOConnectionsTotal)
+		}
+
+		rlsMode := os.Getenv("RLS_ENFORCE")
+		rlsLabel := pageCtx.T("SuperAdmin.Tenants.RLS.Disabled")
+		rlsVariant := badge.VariantGray
+		if rlsMode == "enforce" {
+			rlsLabel = pageCtx.T("SuperAdmin.Tenants.RLS.Enforce")
+			rlsVariant = badge.VariantGreen
+		}
+	}}
+	<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+		<div class="p-4 bg-surface-500 rounded-xl border border-secondary">
+			<p class="text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.Cards.IdentityMode") }</p>
+			<p class="mt-2 text-sm font-medium text-100">{ identityLabel }</p>
+		</div>
+		<div class="p-4 bg-surface-500 rounded-xl border border-secondary">
+			<p class="text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.Cards.SSOConnections") }</p>
+			<p class="mt-2 text-sm font-medium text-100">{ ssoLabel }</p>
+		</div>
+		<div class="p-4 bg-surface-500 rounded-xl border border-secondary">
+			<p class="text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.Cards.UserCount") }</p>
+			<p class="mt-2 text-sm font-medium text-100">{ fmt.Sprintf("%d", tenant.UserCount) }</p>
+		</div>
+		<div class="p-4 bg-surface-500 rounded-xl border border-secondary">
+			<p class="text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.Cards.RLS") }</p>
+			<div class="mt-2">
+				@StatusBadge(rlsLabel, rlsVariant)
+			</div>
+		</div>
+	</div>
+}
+
+templ Overview(props *OverviewPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@TenantDetailShell(&TenantDetailShellProps{
+		Tenant:    props.Tenant,
+		ActiveTab: "overview",
+		Title:     pageCtx.T("SuperAdmin.Tenants.Overview.Meta.Title"),
+	}) {
+		@OverviewCards(props.Tenant)
+	}
+}

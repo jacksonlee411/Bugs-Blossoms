@@ -1,0 +1,102 @@
+package tenants
+
+import (
+	"github.com/iota-uz/iota-sdk/components/base/card"
+	"github.com/iota-uz/iota-sdk/components/scaffold/table"
+	"github.com/iota-uz/iota-sdk/modules/superadmin/domain/entities"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type AuditLogVM struct {
+	Log           *entities.SuperadminAuditLog
+	PayloadPretty string
+}
+
+type AuditPageProps struct {
+	Tenant *entities.TenantInfo
+	Logs   []*AuditLogVM
+	Total  int
+	Errors map[string]string
+}
+
+templ AuditContent(props *AuditPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div id="audit-content" class="space-y-6">
+		if props.Errors != nil && props.Errors["general"] != "" {
+			<div class="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-500">{ props.Errors["general"] }</div>
+		}
+		@card.Card(card.Props{WrapperClass: "p-0"}) {
+			<div>
+				<h2 class="text-sm font-semibold text-100">{ pageCtx.T("SuperAdmin.Tenants.Audit.Title") }</h2>
+				<p class="mt-1 text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.Audit.Help") }</p>
+			</div>
+			<div class="mt-4 overflow-x-auto">
+				<table class="min-w-full text-sm">
+					<thead class="text-xs text-300 border-b border-secondary">
+						<tr>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.Audit.Columns.Time") }</th>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.Audit.Columns.Action") }</th>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.Audit.Columns.Actor") }</th>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.Audit.Columns.IP") }</th>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.Audit.Columns.UserAgent") }</th>
+							<th class="text-right py-2">{ pageCtx.T("SuperAdmin.Tenants.Audit.Columns.Payload") }</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-secondary">
+						if len(props.Logs) == 0 {
+							<tr>
+								<td colspan="6" class="py-6 text-center text-300">{ pageCtx.T("SuperAdmin.Tenants.Audit.Empty") }</td>
+							</tr>
+						} else {
+							for _, vm := range props.Logs {
+								<tr class="align-top">
+									<td class="py-3 pr-4 text-200">
+										@table.DateTime(vm.Log.CreatedAt)
+									</td>
+									<td class="py-3 pr-4 font-mono text-xs text-200">{ vm.Log.Action }</td>
+									<td class="py-3 pr-4 text-200">
+										<div class="text-sm text-100">{ vm.Log.ActorEmail }</div>
+										if vm.Log.ActorName != nil && *vm.Log.ActorName != "" {
+											<div class="text-xs text-300">{ *vm.Log.ActorName }</div>
+										}
+									</td>
+									<td class="py-3 pr-4 text-200">
+										if vm.Log.IPAddress != nil && *vm.Log.IPAddress != "" {
+											{ *vm.Log.IPAddress }
+										} else {
+											{ "-" }
+										}
+									</td>
+									<td class="py-3 pr-4 text-200 max-w-[240px] truncate">
+										if vm.Log.UserAgent != nil && *vm.Log.UserAgent != "" {
+											<span title={ *vm.Log.UserAgent }>{ *vm.Log.UserAgent }</span>
+										} else {
+											{ "-" }
+										}
+									</td>
+									<td class="py-3 text-right">
+										<details class="inline-block text-left">
+											<summary class="cursor-pointer text-primary-500 text-xs">{ pageCtx.T("SuperAdmin.Tenants.Audit.ViewPayload") }</summary>
+											<pre class="mt-2 p-3 rounded-lg bg-surface-400 border border-secondary text-xs text-100 overflow-x-auto max-w-[480px]">{ vm.PayloadPretty }</pre>
+										</details>
+									</td>
+								</tr>
+							}
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+templ Audit(props *AuditPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@TenantDetailShell(&TenantDetailShellProps{
+		Tenant:    props.Tenant,
+		ActiveTab: "audit",
+		Title:     pageCtx.T("SuperAdmin.Tenants.Audit.Meta.Title"),
+	}) {
+		@AuditContent(props)
+	}
+}

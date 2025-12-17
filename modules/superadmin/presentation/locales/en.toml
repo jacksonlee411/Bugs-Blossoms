@@ -26,8 +26,12 @@ TenantSignups = "Tenant Sign-ups"
 Title = "Tenants"
 Name = "Tenant Name"
 Domain = "Domain"
+PrimaryDomain = "Primary Domain"
 Email = "Email"
 Phone = "Phone"
+IdentityModeColumn = "Identity"
+SSOColumn = "SSO"
+RLSColumn = "RLS"
 UserCount = "User Count"
 StatusColumn = "Status"
 CreatedAt = "Created Date"
@@ -45,6 +49,34 @@ Title = "Tenants - Super Admin"
 [SuperAdmin.Tenants.Status]
 Active = "Active"
 Inactive = "Inactive"
+
+[SuperAdmin.Tenants.Tabs]
+Overview = "Overview"
+Domains = "Domains"
+Auth = "Auth"
+SSO = "SSO"
+Users = "Users"
+Audit = "Audit"
+
+[SuperAdmin.Tenants.IdentityMode]
+Legacy = "Legacy"
+Kratos = "Kratos"
+
+[SuperAdmin.Tenants.SSO]
+Off = "Off"
+
+[SuperAdmin.Tenants.RLS]
+Disabled = "Disabled"
+Enforce = "Enforce"
+
+[SuperAdmin.Tenants.Cards]
+IdentityMode = "Identity Mode"
+SSOConnections = "SSO Connections"
+UserCount = "Users"
+RLS = "RLS"
+
+[SuperAdmin.Tenants.Overview.Meta]
+Title = "Tenant Overview - Super Admin"
 
 [SuperAdmin.Tenants.Users]
 Title = "Tenant Users"
@@ -87,3 +119,114 @@ PasswordEmpty = "Password cannot be empty"
 InvalidContentType = "Request must use JSON format"
 NetworkError = "Network error occurred. Please try again"
 ServerError = "Server error occurred. Please contact support"
+
+[SuperAdmin.Tenants.Domains.Meta]
+Title = "Domains - Super Admin"
+
+[SuperAdmin.Tenants.Domains]
+AddTitle = "Add Domain"
+AddHelp = "Add a hostname and verify it via DNS TXT before making it primary."
+ListTitle = "Domains"
+ListHelp = "Routing resolves by verified domains. Use TXT record to prove ownership."
+Hostname = "Hostname"
+AddButton = "Add"
+Empty = "No domains"
+TXT = "TXT"
+Primary = "Primary"
+Verified = "Verified"
+Pending = "Pending"
+Verify = "Verify"
+MakePrimary = "Make Primary"
+Delete = "Delete"
+ConfirmMakePrimary = "Set this domain as primary? This can affect login and callbacks."
+ConfirmDelete = "Delete this domain?"
+
+[SuperAdmin.Tenants.Domains.Columns]
+Hostname = "Hostname"
+Primary = "Primary"
+Verified = "Verified"
+Token = "Token"
+LastAttempt = "Last Attempt"
+Error = "Error"
+Actions = "Actions"
+
+[SuperAdmin.Tenants.Auth.Meta]
+Title = "Auth Settings - Super Admin"
+
+[SuperAdmin.Tenants.Auth]
+Title = "Auth Settings"
+Help = "Configure identity mode and allowed login methods for this tenant."
+IdentityMode = "Identity Mode"
+AllowPassword = "Password"
+AllowGoogle = "Google"
+AllowSSO = "SSO"
+
+[SuperAdmin.Tenants.SSOConnections.Meta]
+Title = "SSO Connections - Super Admin"
+
+[SuperAdmin.Tenants.SSOConnections]
+CreateTitle = "Create SSO Connection"
+EditTitle = "Edit SSO Connection"
+Help = "Create, test, enable, and disable tenant SSO connections. Secrets are stored as references (ENV:/FILE:)."
+CancelEdit = "Cancel Edit"
+CreateButton = "Create"
+UpdateButton = "Update"
+ListTitle = "Connections"
+ListHelp = "Enable only after a successful test (fail-closed)."
+Empty = "No SSO connections"
+Enabled = "Enabled"
+Disabled = "Disabled"
+TestButton = "Test"
+EnableButton = "Enable"
+DisableButton = "Disable"
+EditButton = "Edit"
+DeleteButton = "Delete"
+ConfirmDelete = "Delete this SSO connection?"
+SAMLHint = "SAML: provide metadata URL or metadata XML."
+OIDCHint = "OIDC: client_secret_ref supports ENV:NAME or FILE:/abs/path."
+
+[SuperAdmin.Tenants.SSOConnections.Fields]
+ConnectionID = "Connection ID"
+DisplayName = "Display Name"
+Protocol = "Protocol"
+JacksonBaseURL = "Jackson Base URL"
+KratosProviderID = "Kratos Provider ID"
+SAMLMetadataURL = "SAML Metadata URL"
+SAMLMetadataXML = "SAML Metadata XML"
+OIDCIssuer = "OIDC Issuer"
+OIDCClientID = "OIDC Client ID"
+OIDCClientSecretRef = "OIDC Client Secret Ref"
+
+[SuperAdmin.Tenants.SSOConnections.Columns]
+Name = "Name"
+Protocol = "Protocol"
+Enabled = "Enabled"
+Secret = "Secret"
+LastTest = "Last Test"
+Actions = "Actions"
+
+[SuperAdmin.Tenants.SSOConnections.Secret]
+Ok = "Configured"
+Missing = "Missing"
+Error = "Error"
+
+[SuperAdmin.Tenants.SSOConnections.Test]
+Ok = "OK"
+Failed = "Failed"
+
+[SuperAdmin.Tenants.Audit.Meta]
+Title = "Audit Logs - Super Admin"
+
+[SuperAdmin.Tenants.Audit]
+Title = "Audit Logs"
+Help = "Configuration changes are recorded with sensitive fields redacted."
+Empty = "No audit logs"
+ViewPayload = "View payload"
+
+[SuperAdmin.Tenants.Audit.Columns]
+Time = "Time"
+Action = "Action"
+Actor = "Actor"
+IP = "IP"
+UserAgent = "User Agent"
+Payload = "Payload"

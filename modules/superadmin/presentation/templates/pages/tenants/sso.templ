@@ -1,0 +1,374 @@
+package tenants
+
+import (
+	"fmt"
+	"net/url"
+	"strings"
+
+	"github.com/iota-uz/iota-sdk/components/base/badge"
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/components/base/card"
+	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/components/scaffold/table"
+	"github.com/iota-uz/iota-sdk/modules/superadmin/domain/entities"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type SSOConnectionVM struct {
+	Connection   *entities.TenantSSOConnection
+	SecretStatus string
+	SecretError  string
+}
+
+type SSOFormProps struct {
+	ID                  string
+	ConnectionID        string
+	DisplayName         string
+	Protocol            string
+	JacksonBaseURL      string
+	KratosProviderID    string
+	SAMLMetadataURL     string
+	SAMLMetadataXML     string
+	OIDCIssuer          string
+	OIDCClientID        string
+	OIDCClientSecretRef string
+}
+
+type SSOPageProps struct {
+	Tenant      *entities.TenantInfo
+	Connections []*SSOConnectionVM
+	Form        *SSOFormProps
+	Errors      map[string]string
+	Notice      string
+}
+
+func ssoBaseURL(tenantID string) string {
+	return fmt.Sprintf("/superadmin/tenants/%s/sso", tenantID)
+}
+
+func (p *SSOPageProps) formAction() string {
+	if p.Form != nil && p.Form.ID != "" {
+		return fmt.Sprintf("/superadmin/tenants/%s/sso/%s", p.Tenant.ID.String(), url.PathEscape(p.Form.ID))
+	}
+	return fmt.Sprintf("/superadmin/tenants/%s/sso", p.Tenant.ID.String())
+}
+
+func (p *SSOPageProps) formTitle() string {
+	if p.Form != nil && p.Form.ID != "" {
+		return "edit"
+	}
+	return "create"
+}
+
+func protocolOrDefault(p *SSOFormProps) string {
+	if p == nil || p.Protocol == "" {
+		return "saml"
+	}
+	return p.Protocol
+}
+
+templ SecretStatusBadge(status string, errMsg string) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	switch status {
+		case "ok":
+			@StatusBadge(pageCtx.T("SuperAdmin.Tenants.SSOConnections.Secret.Ok"), badge.VariantGreen)
+		case "missing":
+			@StatusBadge(pageCtx.T("SuperAdmin.Tenants.SSOConnections.Secret.Missing"), badge.VariantGray)
+		default:
+			@StatusBadge(pageCtx.T("SuperAdmin.Tenants.SSOConnections.Secret.Error"), badge.VariantPink)
+	}
+}
+
+templ TestStatusBadge(status *string) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if status == nil || *status == "" {
+		@StatusBadge("-", badge.VariantGray)
+	} else if *status == "ok" {
+		@StatusBadge(pageCtx.T("SuperAdmin.Tenants.SSOConnections.Test.Ok"), badge.VariantGreen)
+	} else {
+		@StatusBadge(pageCtx.T("SuperAdmin.Tenants.SSOConnections.Test.Failed"), badge.VariantPink)
+	}
+}
+
+templ SSOContent(props *SSOPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div id="sso-content" class="space-y-6" x-data={ fmt.Sprintf("{ protocol: '%s' }", protocolOrDefault(props.Form)) }>
+		if props.Notice != "" {
+			<div class="p-3 rounded-lg border border-green-500/30 bg-green-500/10 text-sm text-green-500">{ props.Notice }</div>
+		}
+		if props.Errors != nil && props.Errors["general"] != "" {
+			<div class="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-500">{ props.Errors["general"] }</div>
+		}
+		@card.Card(card.Props{WrapperClass: "p-0"}) {
+			<div class="flex items-start justify-between gap-4">
+				<div>
+					<h2 class="text-sm font-semibold text-100">
+						if props.Form != nil && props.Form.ID != "" {
+							{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.EditTitle") }
+						} else {
+							{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.CreateTitle") }
+						}
+					</h2>
+					<p class="mt-1 text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Help") }</p>
+				</div>
+				if props.Form != nil && props.Form.ID != "" {
+					@button.Secondary(button.Props{Size: button.SizeSM, Href: ssoBaseURL(props.Tenant.ID.String())}) {
+						{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.CancelEdit") }
+					}
+				}
+			</div>
+			<form
+				class="mt-4 space-y-4"
+				hx-post={ props.formAction() }
+				hx-target="#sso-content"
+				hx-swap="outerHTML"
+			>
+				if props.Form != nil && props.Form.ID != "" {
+					<input type="hidden" name="id" value={ props.Form.ID }/>
+				}
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.ConnectionID"),
+						Placeholder: "acme-okta",
+						Attrs: templ.Attributes{
+							"name":  "connection_id",
+							"value": props.Form.ConnectionID,
+						},
+						Error: props.Errors["connection_id"],
+					})
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.DisplayName"),
+						Placeholder: "Login with Okta",
+						Attrs: templ.Attributes{
+							"name":  "display_name",
+							"value": props.Form.DisplayName,
+						},
+						Error: props.Errors["display_name"],
+					})
+				</div>
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					<div>
+						<label class="block text-xs text-300 mb-2">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.Protocol") }</label>
+						<select name="protocol" class="w-full h-11 px-3 rounded-lg bg-surface-400 border border-secondary text-100" x-model="protocol">
+							<option value="saml">SAML</option>
+							<option value="oidc">OIDC</option>
+						</select>
+					</div>
+					<div>
+						<label class="block text-xs text-300 mb-2">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.JacksonBaseURL") }</label>
+						<input
+							type="text"
+							name="jackson_base_url"
+							value={ props.Form.JacksonBaseURL }
+							class="w-full h-11 px-3 rounded-lg bg-surface-400 border border-secondary text-100"
+						/>
+						if props.Errors["jackson_base_url"] != "" {
+							<p class="mt-1 text-xs text-red-500">{ props.Errors["jackson_base_url"] }</p>
+						}
+					</div>
+				</div>
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.KratosProviderID"),
+						Placeholder: "jackson-acme-okta",
+						Attrs: templ.Attributes{
+							"name":  "kratos_provider_id",
+							"value": props.Form.KratosProviderID,
+						},
+						Error: props.Errors["kratos_provider_id"],
+					})
+				</div>
+				<div x-show="protocol === 'saml'" class="space-y-4">
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.SAMLMetadataURL"),
+						Placeholder: "https://idp.example.com/metadata",
+						Attrs: templ.Attributes{
+							"name":  "saml_metadata_url",
+							"value": props.Form.SAMLMetadataURL,
+						},
+						Error: props.Errors["saml_metadata_url"],
+					})
+					@input.TextArea(&input.TextAreaProps{
+						Label: pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.SAMLMetadataXML"),
+						Attrs: templ.Attributes{
+							"name": "saml_metadata_xml",
+							"rows": "6",
+						},
+						Value: props.Form.SAMLMetadataXML,
+						Error: props.Errors["saml_metadata_xml"],
+					})
+					<p class="text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.SAMLHint") }</p>
+				</div>
+				<div x-show="protocol === 'oidc'" class="space-y-4">
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.OIDCIssuer"),
+						Placeholder: "https://issuer.example.com",
+						Attrs: templ.Attributes{
+							"name":  "oidc_issuer",
+							"value": props.Form.OIDCIssuer,
+						},
+						Error: props.Errors["oidc_issuer"],
+					})
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.OIDCClientID"),
+						Placeholder: "client-id",
+						Attrs: templ.Attributes{
+							"name":  "oidc_client_id",
+							"value": props.Form.OIDCClientID,
+						},
+						Error: props.Errors["oidc_client_id"],
+					})
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("SuperAdmin.Tenants.SSOConnections.Fields.OIDCClientSecretRef"),
+						Placeholder: "FILE:/var/run/secrets/sso/acme-okta-client-secret",
+						Attrs: templ.Attributes{
+							"name":  "oidc_client_secret_ref",
+							"value": props.Form.OIDCClientSecretRef,
+						},
+						Error: props.Errors["oidc_client_secret_ref"],
+					})
+					<p class="text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.OIDCHint") }</p>
+				</div>
+				<div class="flex justify-end gap-3">
+					@button.Primary(button.Props{Size: button.SizeMD, Attrs: templ.Attributes{"type": "submit"}}) {
+						if props.Form != nil && props.Form.ID != "" {
+							{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.UpdateButton") }
+						} else {
+							{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.CreateButton") }
+						}
+					}
+				</div>
+			</form>
+		}
+		@card.Card(card.Props{WrapperClass: "p-0"}) {
+			<div>
+				<h2 class="text-sm font-semibold text-100">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.ListTitle") }</h2>
+				<p class="mt-1 text-xs text-300">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.ListHelp") }</p>
+			</div>
+			<div class="mt-4 overflow-x-auto">
+				<table class="min-w-full text-sm">
+					<thead class="text-xs text-300 border-b border-secondary">
+						<tr>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Columns.Name") }</th>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Columns.Protocol") }</th>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Columns.Enabled") }</th>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Columns.Secret") }</th>
+							<th class="text-left py-2 pr-4">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Columns.LastTest") }</th>
+							<th class="text-right py-2">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Columns.Actions") }</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-secondary">
+						if len(props.Connections) == 0 {
+							<tr>
+								<td colspan="6" class="py-6 text-center text-300">{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.Empty") }</td>
+							</tr>
+						} else {
+							for _, vm := range props.Connections {
+								{{ c := vm.Connection }}
+								<tr class="align-top">
+									<td class="py-3 pr-4">
+										<div class="font-medium text-100">{ c.DisplayName }</div>
+										<div class="mt-1 text-xs text-300 font-mono">{ c.ConnectionID }</div>
+										if c.LastTestError != nil && *c.LastTestError != "" {
+											<div class="mt-1 text-xs text-red-500">{ *c.LastTestError }</div>
+										}
+									</td>
+									<td class="py-3 pr-4 text-200">{ strings.ToUpper(c.Protocol) }</td>
+									<td class="py-3 pr-4">
+										if c.Enabled {
+											@StatusBadge(pageCtx.T("SuperAdmin.Tenants.SSOConnections.Enabled"), badge.VariantGreen)
+										} else {
+											@StatusBadge(pageCtx.T("SuperAdmin.Tenants.SSOConnections.Disabled"), badge.VariantGray)
+										}
+									</td>
+									<td class="py-3 pr-4">
+										if c.Protocol == "oidc" {
+											@SecretStatusBadge(vm.SecretStatus, vm.SecretError)
+										} else {
+											@StatusBadge("-", badge.VariantGray)
+										}
+									</td>
+									<td class="py-3 pr-4">
+										<div class="flex items-center gap-2">
+											@TestStatusBadge(c.LastTestStatus)
+											if c.LastTestAt != nil {
+												<span class="text-xs text-300">
+													@table.DateTime(*c.LastTestAt)
+												</span>
+											}
+										</div>
+									</td>
+									<td class="py-3 text-right">
+										<div class="flex justify-end gap-2">
+											@button.Secondary(button.Props{
+												Size: button.SizeSM,
+												Attrs: templ.Attributes{
+													"hx-post":   fmt.Sprintf("/superadmin/tenants/%s/sso/%s/test", props.Tenant.ID.String(), c.ID.String()),
+													"hx-target": "#sso-content",
+													"hx-swap":   "outerHTML",
+												},
+											}) {
+												{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.TestButton") }
+											}
+											if c.Enabled {
+												@button.Secondary(button.Props{
+													Size: button.SizeSM,
+													Attrs: templ.Attributes{
+														"hx-post":   fmt.Sprintf("/superadmin/tenants/%s/sso/%s/disable", props.Tenant.ID.String(), c.ID.String()),
+														"hx-target": "#sso-content",
+														"hx-swap":   "outerHTML",
+													},
+												}) {
+													{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.DisableButton") }
+												}
+											} else {
+												@button.PrimaryOutline(button.Props{
+													Size: button.SizeSM,
+													Attrs: templ.Attributes{
+														"hx-post":   fmt.Sprintf("/superadmin/tenants/%s/sso/%s/enable", props.Tenant.ID.String(), c.ID.String()),
+														"hx-target": "#sso-content",
+														"hx-swap":   "outerHTML",
+													},
+												}) {
+													{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.EnableButton") }
+												}
+											}
+											@button.Secondary(button.Props{
+												Size: button.SizeSM,
+												Href: fmt.Sprintf("%s?edit=%s", ssoBaseURL(props.Tenant.ID.String()), url.QueryEscape(c.ID.String())),
+											}) {
+												{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.EditButton") }
+											}
+											@button.Danger(button.Props{
+												Size: button.SizeSM,
+												Attrs: templ.Attributes{
+													"hx-post":    fmt.Sprintf("/superadmin/tenants/%s/sso/%s/delete", props.Tenant.ID.String(), c.ID.String()),
+													"hx-target":  "#sso-content",
+													"hx-swap":    "outerHTML",
+													"hx-confirm": pageCtx.T("SuperAdmin.Tenants.SSOConnections.ConfirmDelete"),
+												},
+											}) {
+												{ pageCtx.T("SuperAdmin.Tenants.SSOConnections.DeleteButton") }
+											}
+										</div>
+									</td>
+								</tr>
+							}
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</div>
+}
+
+templ SSO(props *SSOPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@TenantDetailShell(&TenantDetailShellProps{
+		Tenant:    props.Tenant,
+		ActiveTab: "sso",
+		Title:     pageCtx.T("SuperAdmin.Tenants.SSOConnections.Meta.Title"),
+	}) {
+		@SSOContent(props)
+	}
+}

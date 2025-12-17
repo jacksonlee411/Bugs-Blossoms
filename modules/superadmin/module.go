@@ -37,16 +37,27 @@ func (m *Module) Register(app application.Application) error {
 
 	// Register repositories
 	analyticsRepo := persistence.NewPgAnalyticsQueryRepository()
+	tenantDomainsRepo := persistence.NewPgTenantDomainsRepository()
+	tenantAuthRepo := persistence.NewPgTenantAuthSettingsRepository()
+	tenantSSORepo := persistence.NewPgTenantSSOConnectionsRepository()
+	auditLogRepo := persistence.NewPgSuperadminAuditLogRepository()
 
 	// User repository for tenant users service
 	uploadRepo := corepersistence.NewUploadRepository()
 	userRepo := corepersistence.NewUserRepository(uploadRepo)
+
+	auditService := services.NewAuditService()
 
 	// Register services
 	app.RegisterServices(
 		services.NewAnalyticsService(analyticsRepo),
 		services.NewTenantService(analyticsRepo),
 		services.NewTenantUsersService(userRepo),
+		auditService,
+		services.NewTenantDomainService(tenantDomainsRepo, auditService),
+		services.NewTenantAuthSettingsService(tenantAuthRepo, tenantSSORepo, auditService),
+		services.NewTenantSSOService(tenantSSORepo, auditService),
+		services.NewSuperadminAuditLogService(auditLogRepo),
 	)
 
 	// Get UserService from application

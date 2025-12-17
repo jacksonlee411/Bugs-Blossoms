@@ -9,7 +9,6 @@ import (
 	"github.com/iota-uz/iota-sdk/components/base/input"
 	"github.com/iota-uz/iota-sdk/components/scaffold/table"
 	"github.com/iota-uz/iota-sdk/modules/superadmin/domain/entities"
-	"github.com/iota-uz/iota-sdk/modules/superadmin/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/types"
 	"net/http"
@@ -473,14 +472,12 @@ templ Users(props *UsersPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ params, _ := composables.UseParams(ctx) }}
 	{{ config := buildUsersTableConfig(props.Tenant, props.Users, props.Total, pageCtx, params.Request) }}
-	@layouts.SuperAdminAuthenticated(layouts.SuperAdminAuthenticatedProps{
-		BaseProps: layouts.BaseProps{Title: pageCtx.T("SuperAdmin.Tenants.Users.Meta.Title")},
+	@TenantDetailShell(&TenantDetailShellProps{
+		Tenant:    props.Tenant,
+		ActiveTab: "users",
+		Title:     pageCtx.T("SuperAdmin.Tenants.Users.Meta.Title"),
 	}) {
-		<div class="pt-6">
-			@Breadcrumbs(props.Tenant)
-			@TenantInfoCard(props.Tenant)
-			@table.Content(config)
-			@PasswordResetModal(props.Tenant.ID.String())
-		</div>
+		@table.Content(config)
+		@PasswordResetModal(props.Tenant.ID.String())
 	}
 }

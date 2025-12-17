@@ -63,11 +63,31 @@ const (
 			t.name,
 			t.email,
 			t.phone,
-			t.domain,
+			COALESCE(td.hostname, t.domain) as domain,
+			t.is_active,
+			COALESCE(ta.identity_mode, 'legacy') as identity_mode,
+			COALESCE(ta.allow_sso, false) as allow_sso,
+			COALESCE(sso.total, 0) as sso_connections_total,
+			COALESCE(sso.active, 0) as sso_connections_active,
 			COALESCE(u.user_count, 0) as user_count,
 			t.created_at,
 			t.updated_at
 		FROM tenants t
+		LEFT JOIN LATERAL (
+			SELECT hostname
+			FROM tenant_domains
+			WHERE tenant_id = t.id AND is_primary = true
+			LIMIT 1
+		) td ON true
+		LEFT JOIN tenant_auth_settings ta ON ta.tenant_id = t.id
+		LEFT JOIN (
+			SELECT
+				tenant_id,
+				COUNT(*) as total,
+				COUNT(*) FILTER (WHERE enabled) as active
+			FROM tenant_sso_connections
+			GROUP BY tenant_id
+		) sso ON sso.tenant_id = t.id
 		LEFT JOIN (
 			SELECT tenant_id, COUNT(*) as user_count
 			FROM users
@@ -83,23 +103,44 @@ const (
 			t.name,
 			t.email,
 			t.phone,
-			t.domain,
+			COALESCE(td.hostname, t.domain) as domain,
+			t.is_active,
+			COALESCE(ta.identity_mode, 'legacy') as identity_mode,
+			COALESCE(ta.allow_sso, false) as allow_sso,
+			COALESCE(sso.total, 0) as sso_connections_total,
+			COALESCE(sso.active, 0) as sso_connections_active,
 			COALESCE(u.user_count, 0) as user_count,
 			t.created_at,
 			t.updated_at
 		FROM tenants t
+		LEFT JOIN LATERAL (
+			SELECT hostname
+			FROM tenant_domains
+			WHERE tenant_id = t.id AND is_primary = true
+			LIMIT 1
+		) td ON true
+		LEFT JOIN tenant_auth_settings ta ON ta.tenant_id = t.id
+		LEFT JOIN (
+			SELECT
+				tenant_id,
+				COUNT(*) as total,
+				COUNT(*) FILTER (WHERE enabled) as active
+			FROM tenant_sso_connections
+			GROUP BY tenant_id
+		) sso ON sso.tenant_id = t.id
 		LEFT JOIN (
 			SELECT tenant_id, COUNT(*) as user_count
 			FROM users
 			GROUP BY tenant_id
 		) u ON t.id = u.tenant_id
-		WHERE t.name ILIKE $1 OR t.domain ILIKE $1
+		WHERE t.name ILIKE $1 OR t.domain ILIKE $1 OR td.hostname ILIKE $1
 	`
 
 	countTenantsSearchSQL = `
-		SELECT COUNT(*)
-		FROM tenants
-		WHERE name ILIKE $1 OR domain ILIKE $1
+		SELECT COUNT(DISTINCT t.id)
+		FROM tenants t
+		LEFT JOIN tenant_domains td ON td.tenant_id = t.id
+		WHERE t.name ILIKE $1 OR t.domain ILIKE $1 OR td.hostname ILIKE $1
 	`
 
 	filterTenantsByDateRangeQuery = `
@@ -108,11 +149,31 @@ const (
 			t.name,
 			t.email,
 			t.phone,
-			t.domain,
+			COALESCE(td.hostname, t.domain) as domain,
+			t.is_active,
+			COALESCE(ta.identity_mode, 'legacy') as identity_mode,
+			COALESCE(ta.allow_sso, false) as allow_sso,
+			COALESCE(sso.total, 0) as sso_connections_total,
+			COALESCE(sso.active, 0) as sso_connections_active,
 			COALESCE(u.user_count, 0) as user_count,
 			t.created_at,
 			t.updated_at
 		FROM tenants t
+		LEFT JOIN LATERAL (
+			SELECT hostname
+			FROM tenant_domains
+			WHERE tenant_id = t.id AND is_primary = true
+			LIMIT 1
+		) td ON true
+		LEFT JOIN tenant_auth_settings ta ON ta.tenant_id = t.id
+		LEFT JOIN (
+			SELECT
+				tenant_id,
+				COUNT(*) as total,
+				COUNT(*) FILTER (WHERE enabled) as active
+			FROM tenant_sso_connections
+			GROUP BY tenant_id
+		) sso ON sso.tenant_id = t.id
 		LEFT JOIN (
 			SELECT tenant_id, COUNT(*) as user_count
 			FROM users
@@ -133,11 +194,31 @@ const (
 			t.name,
 			t.email,
 			t.phone,
-			t.domain,
+			COALESCE(td.hostname, t.domain) as domain,
+			t.is_active,
+			COALESCE(ta.identity_mode, 'legacy') as identity_mode,
+			COALESCE(ta.allow_sso, false) as allow_sso,
+			COALESCE(sso.total, 0) as sso_connections_total,
+			COALESCE(sso.active, 0) as sso_connections_active,
 			COALESCE(u.user_count, 0) as user_count,
 			t.created_at,
 			t.updated_at
 		FROM tenants t
+		LEFT JOIN LATERAL (
+			SELECT hostname
+			FROM tenant_domains
+			WHERE tenant_id = t.id AND is_primary = true
+			LIMIT 1
+		) td ON true
+		LEFT JOIN tenant_auth_settings ta ON ta.tenant_id = t.id
+		LEFT JOIN (
+			SELECT
+				tenant_id,
+				COUNT(*) as total,
+				COUNT(*) FILTER (WHERE enabled) as active
+			FROM tenant_sso_connections
+			GROUP BY tenant_id
+		) sso ON sso.tenant_id = t.id
 		LEFT JOIN (
 			SELECT tenant_id, COUNT(*) as user_count
 			FROM users
@@ -174,7 +255,7 @@ func (r *pgAnalyticsQueryRepository) fieldMapping() map[Field]string {
 		FieldName:      "t.name",
 		FieldEmail:     "t.email",
 		FieldPhone:     "t.phone",
-		FieldDomain:    "t.domain",
+		FieldDomain:    "COALESCE(td.hostname, t.domain)",
 		FieldUserCount: "COALESCE(u.user_count, 0)",
 		FieldCreatedAt: "t.created_at",
 		FieldUpdatedAt: "t.updated_at",
@@ -435,6 +516,11 @@ func (r *pgAnalyticsQueryRepository) GetTenantDetails(ctx context.Context, tenan
 		&tenant.Email,
 		&tenant.Phone,
 		&tenant.Domain,
+		&tenant.IsActive,
+		&tenant.IdentityMode,
+		&tenant.AllowSSO,
+		&tenant.SSOConnectionsTotal,
+		&tenant.SSOConnectionsActive,
 		&tenant.UserCount,
 		&tenant.CreatedAt,
 		&tenant.UpdatedAt,
@@ -518,6 +604,11 @@ func (r *pgAnalyticsQueryRepository) scanTenants(rows pgx.Rows) ([]*entities.Ten
 			&tenant.Email,
 			&tenant.Phone,
 			&tenant.Domain,
+			&tenant.IsActive,
+			&tenant.IdentityMode,
+			&tenant.AllowSSO,
+			&tenant.SSOConnectionsTotal,
+			&tenant.SSOConnectionsActive,
 			&tenant.UserCount,
 			&tenant.CreatedAt,
 			&tenant.UpdatedAt,

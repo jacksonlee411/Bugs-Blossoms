@@ -1,0 +1,80 @@
+package tenants
+
+import (
+	"fmt"
+
+	"github.com/google/uuid"
+	"github.com/iota-uz/iota-sdk/components/base/badge"
+	"github.com/iota-uz/iota-sdk/modules/superadmin/domain/entities"
+	"github.com/iota-uz/iota-sdk/modules/superadmin/presentation/templates/layouts"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type TenantDetailShellProps struct {
+	Tenant    *entities.TenantInfo
+	ActiveTab string
+	Title     string
+}
+
+templ TenantHeader(tenant *entities.TenantInfo) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div class="px-6 mb-6">
+		<div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+			<div>
+				<h1 class="text-2xl font-semibold text-100">{ tenant.Name }</h1>
+				<p class="mt-1 text-sm text-200">{ tenant.Domain }</p>
+			</div>
+			<div class="mt-1">
+				if tenant.IsActive {
+					@StatusBadge(pageCtx.T("SuperAdmin.Tenants.Status.Active"), badge.VariantGreen)
+				} else {
+					@StatusBadge(pageCtx.T("SuperAdmin.Tenants.Status.Inactive"), badge.VariantGray)
+				}
+			</div>
+		</div>
+	</div>
+}
+
+templ TenantTabLink(href string, label string, active bool) {
+	<a
+		href={ templ.SafeURL(href) }
+		class={ templ.Classes(
+				"inline-flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors",
+				templ.KV("border-primary text-100", active),
+				templ.KV("border-transparent text-300 hover:text-200 hover:border-secondary", !active),
+			) }
+	>
+		{ label }
+	</a>
+}
+
+templ TenantTabs(tenantID uuid.UUID, activeTab string) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div class="px-6">
+		<div class="border-b border-secondary">
+			<nav class="-mb-px flex gap-6 overflow-x-auto" aria-label="Tenant tabs">
+				@TenantTabLink(fmt.Sprintf("/superadmin/tenants/%s", tenantID.String()), pageCtx.T("SuperAdmin.Tenants.Tabs.Overview"), activeTab == "overview")
+				@TenantTabLink(fmt.Sprintf("/superadmin/tenants/%s/domains", tenantID.String()), pageCtx.T("SuperAdmin.Tenants.Tabs.Domains"), activeTab == "domains")
+				@TenantTabLink(fmt.Sprintf("/superadmin/tenants/%s/auth", tenantID.String()), pageCtx.T("SuperAdmin.Tenants.Tabs.Auth"), activeTab == "auth")
+				@TenantTabLink(fmt.Sprintf("/superadmin/tenants/%s/sso", tenantID.String()), pageCtx.T("SuperAdmin.Tenants.Tabs.SSO"), activeTab == "sso")
+				@TenantTabLink(fmt.Sprintf("/superadmin/tenants/%s/users", tenantID.String()), pageCtx.T("SuperAdmin.Tenants.Tabs.Users"), activeTab == "users")
+				@TenantTabLink(fmt.Sprintf("/superadmin/tenants/%s/audit", tenantID.String()), pageCtx.T("SuperAdmin.Tenants.Tabs.Audit"), activeTab == "audit")
+			</nav>
+		</div>
+	</div>
+}
+
+templ TenantDetailShell(props *TenantDetailShellProps) {
+	@layouts.SuperAdminAuthenticated(layouts.SuperAdminAuthenticatedProps{
+		BaseProps: layouts.BaseProps{Title: props.Title},
+	}) {
+		<div class="pt-6">
+			@Breadcrumbs(props.Tenant)
+			@TenantHeader(props.Tenant)
+			@TenantTabs(props.Tenant.ID, props.ActiveTab)
+			<div class="px-6 mt-6">
+				{ children... }
+			</div>
+		</div>
+	}
+}

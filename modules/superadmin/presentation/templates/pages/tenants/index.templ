@@ -13,6 +13,7 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/types"
 	"net/http"
+	"os"
 )
 
 type IndexPageProps struct {
@@ -87,6 +88,21 @@ templ ViewButton(url string) {
 	})
 }
 
+templ UsersButton(url string) {
+	@button.Secondary(button.Props{
+		Size: button.SizeSM,
+		Icon: icons.UsersThree(icons.Props{Size: "16"}),
+		Href: url,
+	})
+}
+
+templ ActionButtons(detailsURL string, usersURL string) {
+	<div class="flex gap-2">
+		@ViewButton(detailsURL)
+		@UsersButton(usersURL)
+	</div>
+}
+
 func safeString(s *string) string {
 	if s == nil || *s == "" {
 		return "-"
@@ -97,8 +113,10 @@ func safeString(s *string) string {
 func buildTableConfig(tenants []*entities.TenantInfo, total int, pageCtx types.PageContextProvider, r *http.Request) *table.TableConfig {
 	columns := []table.TableColumn{
 		table.Column("name", pageCtx.T("SuperAdmin.Tenants.Name"), table.WithSortable()),
-		table.Column("email", pageCtx.T("SuperAdmin.Tenants.Email")),
-		table.Column("phone", pageCtx.T("SuperAdmin.Tenants.Phone")),
+		table.Column("domain", pageCtx.T("SuperAdmin.Tenants.PrimaryDomain"), table.WithSortable()),
+		table.Column("identity_mode", pageCtx.T("SuperAdmin.Tenants.IdentityModeColumn")),
+		table.Column("sso", pageCtx.T("SuperAdmin.Tenants.SSOColumn")),
+		table.Column("rls", pageCtx.T("SuperAdmin.Tenants.RLSColumn")),
 		table.Column("user_count", pageCtx.T("SuperAdmin.Tenants.UserCount")),
 		table.Column("status", pageCtx.T("SuperAdmin.Tenants.StatusColumn")),
 		table.Column("created_at", pageCtx.T("SuperAdmin.Tenants.CreatedAt"), table.WithSortable()),
@@ -108,16 +126,47 @@ func buildTableConfig(tenants []*entities.TenantInfo, total int, pageCtx types.P
 	rows := make([]table.TableRow, len(tenants))
 	for i, tenant := range tenants {
 		status := pageCtx.T("SuperAdmin.Tenants.Status.Active")
+		statusVariant := badge.VariantGreen
+		if !tenant.IsActive {
+			status = pageCtx.T("SuperAdmin.Tenants.Status.Inactive")
+			statusVariant = badge.VariantGray
+		}
+
+		detailsURL := fmt.Sprintf("/superadmin/tenants/%s", tenant.ID.String())
 		usersURL := fmt.Sprintf("/superadmin/tenants/%s/users", tenant.ID.String())
+
+		identityLabel := pageCtx.T("SuperAdmin.Tenants.IdentityMode.Legacy")
+		identityVariant := badge.VariantGray
+		if tenant.IdentityMode == "kratos" {
+			identityLabel = pageCtx.T("SuperAdmin.Tenants.IdentityMode.Kratos")
+			identityVariant = badge.VariantBlue
+		}
+
+		ssoLabel := pageCtx.T("SuperAdmin.Tenants.SSO.Off")
+		ssoVariant := badge.VariantGray
+		if tenant.AllowSSO {
+			ssoLabel = fmt.Sprintf("%d", tenant.SSOConnectionsTotal)
+			ssoVariant = badge.VariantBlue
+		}
+
+		rlsMode := os.Getenv("RLS_ENFORCE")
+		rlsLabel := pageCtx.T("SuperAdmin.Tenants.RLS.Disabled")
+		rlsVariant := badge.VariantGray
+		if rlsMode == "enforce" {
+			rlsLabel = pageCtx.T("SuperAdmin.Tenants.RLS.Enforce")
+			rlsVariant = badge.VariantGreen
+		}
 
 		rows[i] = table.Row(
 			table.Cell(SafeText(tenant.Name), tenant.Name),
-			table.Cell(SafeText(safeString(tenant.Email)), safeString(tenant.Email)),
-			table.Cell(SafeText(safeString(tenant.Phone)), safeString(tenant.Phone)),
+			table.Cell(SafeText(tenant.Domain), tenant.Domain),
+			table.Cell(StatusBadge(identityLabel, identityVariant), tenant.IdentityMode),
+			table.Cell(StatusBadge(ssoLabel, ssoVariant), tenant.SSOConnectionsTotal),
+			table.Cell(StatusBadge(rlsLabel, rlsVariant), rlsLabel),
 			table.Cell(SafeText(fmt.Sprintf("%d", tenant.UserCount)), tenant.UserCount),
-			table.Cell(StatusBadge(status, badge.VariantGreen), status),
+			table.Cell(StatusBadge(status, statusVariant), status),
 			table.Cell(table.DateTime(tenant.CreatedAt), tenant.CreatedAt),
-			table.Cell(ViewButton(usersURL), nil),
+			table.Cell(ActionButtons(detailsURL, usersURL), nil),
 		)
 	}
 
@@ -144,7 +193,7 @@ templ TableRows(tenants []*entities.TenantInfo) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	if len(tenants) == 0 {
 		<tr>
-			<td colspan="7" class="text-center py-12">
+			<td colspan="9" class="text-center py-12">
 				<p class="text-sm text-gray-800 font-medium">{ pageCtx.T("Scaffold.Table.NothingFound") }</p>
 				<p class="text-xs text-300 mt-2">No tenants match the current filters</p>
 			</td>
@@ -153,23 +202,61 @@ templ TableRows(tenants []*entities.TenantInfo) {
 		for _, tenant := range tenants {
 			{{
 				status := pageCtx.T("SuperAdmin.Tenants.Status.Active")
+				statusVariant := badge.VariantGreen
+				if !tenant.IsActive {
+					status = pageCtx.T("SuperAdmin.Tenants.Status.Inactive")
+					statusVariant = badge.VariantGray
+				}
+
+				detailsURL := fmt.Sprintf("/superadmin/tenants/%s", tenant.ID.String())
 				usersURL := fmt.Sprintf("/superadmin/tenants/%s/users", tenant.ID.String())
+
+				identityLabel := pageCtx.T("SuperAdmin.Tenants.IdentityMode.Legacy")
+				identityVariant := badge.VariantGray
+				if tenant.IdentityMode == "kratos" {
+					identityLabel = pageCtx.T("SuperAdmin.Tenants.IdentityMode.Kratos")
+					identityVariant = badge.VariantBlue
+				}
+
+				ssoLabel := pageCtx.T("SuperAdmin.Tenants.SSO.Off")
+				ssoVariant := badge.VariantGray
+				if tenant.AllowSSO {
+					ssoLabel = fmt.Sprintf("%d", tenant.SSOConnectionsTotal)
+					ssoVariant = badge.VariantBlue
+				}
+
+				rlsMode := os.Getenv("RLS_ENFORCE")
+				rlsLabel := pageCtx.T("SuperAdmin.Tenants.RLS.Disabled")
+				rlsVariant := badge.VariantGray
+				if rlsMode == "enforce" {
+					rlsLabel = pageCtx.T("SuperAdmin.Tenants.RLS.Enforce")
+					rlsVariant = badge.VariantGreen
+				}
 			}}
 			<tr class="border-b border-secondary hover:bg-surface-500 transition-all duration-200 ease-in-out">
 				<td class="px-4 py-4 font-medium text-gray-800">{ tenant.Name }</td>
-				<td class="px-4 py-4 text-200">{ safeString(tenant.Email) }</td>
-				<td class="px-4 py-4 text-200">{ safeString(tenant.Phone) }</td>
+				<td class="px-4 py-4 text-200">{ tenant.Domain }</td>
+				<td class="px-4 py-4">
+					@StatusBadge(identityLabel, identityVariant)
+				</td>
+				<td class="px-4 py-4">
+					@StatusBadge(ssoLabel, ssoVariant)
+				</td>
+				<td class="px-4 py-4">
+					@StatusBadge(rlsLabel, rlsVariant)
+				</td>
 				<td class="px-4 py-4 text-200">{ fmt.Sprintf("%d", tenant.UserCount) }</td>
 				<td class="px-4 py-4">
-					@badge.New(badge.Props{Variant: badge.VariantGreen}) {
-						{ status }
-					}
+					@StatusBadge(status, statusVariant)
 				</td>
 				<td class="px-4 py-4 text-200">
 					@table.DateTime(tenant.CreatedAt)
 				</td>
 				<td class="px-4 py-4">
-					@ViewButton(usersURL)
+					<div class="flex gap-2">
+						@ViewButton(detailsURL)
+						@UsersButton(usersURL)
+					</div>
 				</td>
 			</tr>
 		}
