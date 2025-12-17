@@ -98,6 +98,20 @@ func (s *userSeeder) getOrCreateUser(ctx context.Context, r role.Role, tenantID 
 
 	logger := configuration.Use().Logger()
 	if foundUser != nil {
+		if foundUser.Type() != s.user.Type() {
+			tx, err := composables.UseTx(ctx)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to get transaction")
+			}
+			if _, err := tx.Exec(ctx, `
+				UPDATE users
+				SET type = $1, updated_at = now()
+				WHERE id = $2 AND tenant_id = $3
+			`, string(s.user.Type()), foundUser.ID(), tenantID); err != nil {
+				return nil, errors.Wrap(err, "failed to update user type")
+			}
+			logger.Infof("Updated user %s type to %s", s.user.Email().Value(), s.user.Type())
+		}
 		logger.Infof("User %s already exists", s.user.Email().Value())
 		return foundUser, nil
 	}
@@ -107,6 +121,7 @@ func (s *userSeeder) getOrCreateUser(ctx context.Context, r role.Role, tenantID 
 		s.user.LastName(),
 		s.user.Email(),
 		s.user.UILanguage(),
+		user.WithType(s.user.Type()),
 		user.WithTenantID(tenantID),
 		user.WithPassword(s.user.Password()),
 		user.WithMiddleName(s.user.MiddleName()),
