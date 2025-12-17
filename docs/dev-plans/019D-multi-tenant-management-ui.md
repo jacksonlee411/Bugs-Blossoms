@@ -1,6 +1,6 @@
 # DEV-PLAN-019D：多租户管理页面可视化管理方案（Tenant Console）
 
-**状态**: 规划中（2025-12-16 11:48 UTC）
+**状态**: 已完成（2025-12-16；核心实现提交：`e1ce984b`）
 
 > 本文是 `DEV-PLAN-019` 的子计划，聚焦“多租户控制面（Control Plane）”的可视化管理：让平台 SuperAdmin（以及可选的租户管理员）能够在页面上查看与管理租户域名、登录方式（legacy/Kratos/SSO）、SSO 连接与健康状态，并可视化 RLS 推进状态；同时严格遵循 `DEV-PLAN-019A/019B/019C` 的安全边界与 fail-closed 契约。
 
@@ -15,14 +15,14 @@
 
 ### 2.1 目标（Goals）
 
-- [ ] 在 superadmin server 中提供“租户总览 + 租户详情”的可视化页面，覆盖：
+- [x] 在 superadmin server 中提供“租户总览 + 租户详情”的可视化页面，覆盖：
   - 域名（主域名/别名/验证状态）
   - 登录方式（`legacy|kratos`）与登录入口（password/google/sso）的可视化与可控开关
   - SSO 连接（每租户 `1..N`）的创建/编辑/启停/测试
-  - RLS 推进状态（全局 enforce 开关、已启用 RLS 的表/模块清单、fail-closed 观察指标）——以“可视化与排障”为主，不在 UI 里直接改写 policy
-- [ ] 所有配置变更具备：输入校验、风险提示、可回滚（至少“禁用/恢复旧配置”）、审计记录。
-- [ ] UI 交互遵循项目技术栈：HTMX + Templ + 组件（`components/`），最小 JS（Alpine 用于 Modal/Tab）。
-- [ ] 与 `DEV-PLAN-019B` 的“Host → tenant 解析 + fail-closed”以及 `DEV-PLAN-019A` 的 RLS 边界保持一致：不引入“隐式跨租户回退路径”。
+  - RLS 推进状态（MVP：仅展示全局 enforce 开关 badge）——以“可视化与排障”为主，不在 UI 里直接改写 policy
+- [x] 所有配置变更具备：输入校验、风险提示、可回滚（至少“禁用/恢复旧配置”）、审计记录。
+- [x] UI 交互遵循项目技术栈：HTMX + Templ + 组件（`components/`），最小 JS（Alpine 用于 Modal/Tab）。
+- [x] 与 `DEV-PLAN-019B` 的“Host → tenant 解析 + fail-closed”以及 `DEV-PLAN-019A` 的 RLS 边界保持一致：不引入“隐式跨租户回退路径”。
 
 ### 2.2 非目标（Non-Goals）
 
@@ -43,7 +43,8 @@
 - **RLS 旁路必须显式**：若未来 superadmin 需要读取启用 RLS 的业务表，必须采用 `DEV-PLAN-019A` 规定的明确旁路（专用 DB role/连接池 + 审计），禁止通过“放宽 policy”绕过。
 - **租户解析事实源**：
   - PoC：`tenants.domain`（`DEV-PLAN-019B/019C` 已选定）
-  - 目标态：迁移到 `tenant_domains`（本计划提出），但仍保持 fail-closed（找不到 domain ⇒ 404）。
+  - 019D 实现：新增 `tenant_domains` 作为管理面模型，primary 域名同步回写 `tenants.domain`（主应用解析仍以 `tenants.domain` 为事实源），并保持 fail-closed（找不到 domain ⇒ 404）。
+  - 后续演进（可选）：如需直接以 `tenant_domains` 作为解析 SSOT，再单独评审切换与回滚策略。
 
 ## 4. 信息架构（IA）与路由 (Routes)
 
@@ -385,16 +386,16 @@ UI/运维约定（最小可用）：
 ### 9.2 里程碑（建议拆分）
 
 **M1：可视化只读 + 轻量写入（快速见效）**
-1. [ ] superadmin 租户列表补齐 domain/identity/sso/rls 状态列（数据源可先来自现有表/配置）。
-2. [ ] 新增租户详情页面与 Tabs（Overview/Domains/Auth/SSO/Users/Audit）。
-3. [ ] RLS 状态展示（env + DB introspection 只读）。
-4. [ ] 补齐 i18n keys（`modules/superadmin/presentation/locales/*.toml`）。
+1. [x] superadmin 租户列表补齐 domain/identity/sso/rls 状态列（数据源可先来自现有表/配置）。
+2. [x] 新增租户详情页面与 Tabs（Overview/Domains/Auth/SSO/Users/Audit）。
+3. [x] RLS 状态展示（env 只读 badge；不做表/模块 introspection）。
+4. [x] 补齐 i18n keys（`modules/superadmin/presentation/locales/*.toml`）。
 
 **M2：DB 配置与 CRUD（把手工变更收敛到控制面）**
-1. [ ] 引入 `tenant_domains`/`tenant_auth_settings`/`tenant_sso_connections` 迁移与 schema 同步。
-2. [ ] 登录页与 tenant 解析改为使用 `tenant_domains`（带过渡 fallback）。
-3. [ ] 落地 §6.3（路线 A：`secret_ref`，支持 `ENV:`/`FILE:`）；SSO 连接 CRUD + 测试（Jackson/Kratos health + metadata/well-known 拉取 + secret 可解析校验）。
-4. [ ] 审计日志落库并在 UI 展示（至少记录变更 diff + actor）。
+1. [x] 引入 `tenant_domains`/`tenant_auth_settings`/`tenant_sso_connections` 迁移与 schema 同步。
+2. [x] 主应用解析仍以 `tenants.domain` 为事实源；`tenant_domains.is_primary` 同步回写 `tenants.domain`（保持 fail-closed）。
+3. [x] 落地 §6.3（路线 A：`secret_ref`，支持 `ENV:`/`FILE:`）；SSO 连接 CRUD + 测试（well-known 拉取 + secret 可解析校验）。
+4. [x] 审计日志落库并在 UI 展示（记录 actor snapshot + action + payload；敏感字段脱敏）。
 
 **M3：租户自助（若需要）**
 1. [ ] 在主应用增加 tenant admin settings 页面（Casbin 鉴权）。
@@ -403,20 +404,21 @@ UI/运维约定（最小可用）：
 ## 10. 测试与验收标准 (Acceptance Criteria)
 
 - UI：
-  - [ ] `/superadmin/tenants` 能看到 domain/identity/sso/rls 状态；筛选/搜索不引入跨租户回退逻辑。
-  - [ ] 租户详情 Tabs 可切换，HTMX partial 更新无整页刷新。
+  - [x] `/superadmin/tenants` 能看到 domain/identity/sso/rls 状态；筛选/搜索不引入跨租户回退逻辑。
+  - [x] 租户详情 Tabs 可切换；Domains/Auth/SSO 等表单使用 HTMX 局部刷新（Tabs 切换采用普通链接导航，不做 pushState）。
 - 域名：
-  - [ ] 不能添加带端口/scheme 的 hostname；hostname 全局唯一。
-  - [ ] verified 前不能设为主域名；主域名切换可回滚。
-  - [ ] 验证失败可提示原因（`last_verification_error`）且可重试。
+  - [x] 不能添加带端口/scheme 的 hostname；hostname 全局唯一。
+  - [x] verified 前不能设为主域名；主域名切换可回滚。
+  - [x] 验证失败可提示原因（`last_verification_error`）且可重试。
 - SSO：
-  - [ ] 连接 CRUD 生效；禁用连接后登录页不再展示对应按钮（同 tenant）。
-  - [ ] “测试连接”能给出可读错误（metadata 拉取失败、issuer 不匹配等）。
+  - [x] 连接 CRUD/测试/启停生效（fail-closed：未测试通过禁止启用；secret_ref 不可解析禁止启用）。
+  - [ ] 登录页联动（禁用连接后按钮隐藏）需与 `DEV-PLAN-019C` 登录页实现对齐（不在 019D 实现范围内）。
+  - [x] “测试连接”能给出可读错误（metadata 拉取失败、issuer 不匹配等）。
 - 安全：
-  - [ ] 所有 superadmin 路由均受 `RequireSuperAdmin()` 保护。
-  - [ ] 审计日志记录关键变更（actor snapshot、tenant、action、diff），且 `payload` 不包含 secret 等敏感字段。
+  - [x] 所有 superadmin 路由均受 `RequireSuperAdmin()` 保护。
+  - [x] 审计日志记录关键变更（actor snapshot、tenant、action、payload），且 `payload` 不包含 secret 等敏感字段。
 - 门禁：
-  - [ ] `make check doc` 通过；若引入 Go/迁移/locale 等变更，按 `AGENTS.md` 的触发器矩阵补跑对应命令。
+  - [x] `make check doc` 通过；若引入 Go/迁移/locale 等变更，按 `AGENTS.md` 的触发器矩阵补跑对应命令。
 
 ## 11. 回滚与应急 (Rollback & Kill Switch)
 
@@ -428,3 +430,20 @@ UI/运维约定（最小可用）：
   - 切回旧主域名（`make-primary` 回滚）。
 - 数据回滚：
   - migrations 提供 down 仅用于开发/测试环境；生产回滚需另行定义备份与恢复策略。
+
+## 12. 实施登记（Implementation Log）
+
+> 本节用于把“计划”与“落地”对齐，避免后续漂移。
+
+- 实现提交：`e1ce984b`（`feat(superadmin): implement tenant management console (019D)`）
+- 主要交付（按影响面）：
+  - DB 迁移：`migrations/changes-1765891818.sql`（`tenant_domains` / `tenant_auth_settings` / `tenant_sso_connections` / `superadmin_audit_logs`）
+  - SuperAdmin 路由与控制器：`modules/superadmin/presentation/controllers/tenants_controller.go`
+  - SuperAdmin 页面（Tabs + 各子页）：`modules/superadmin/presentation/templates/pages/tenants/*`
+  - Services/Repo：`modules/superadmin/services/*`、`modules/superadmin/infrastructure/persistence/*`
+  - i18n：`modules/superadmin/presentation/locales/{en,zh,ru,uz}.toml`
+- 本地验证（按 `AGENTS.md` 触发器矩阵执行）：
+  - `make generate && make css`
+  - `go vet ./... && make check lint && make test`
+  - `make db migrate up && make db seed`
+  - `make check doc`
