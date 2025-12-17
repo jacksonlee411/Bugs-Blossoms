@@ -5,7 +5,7 @@
 ## 1. 背景与上下文 (Context)
 - **需求来源**：`docs/dev-plans/020-organization-lifecycle.md` 的「步骤 2：建立占位表与事件契约」。
 - **当前痛点**：
-  - 020/024/025/026 明确依赖“继承/角色/change_requests”的结构与“OrgChanged/OrgAssignmentChanged”稳定契约，但若先写代码再补结构，很容易在 M1 之后产生破坏性迁移与契约漂移。
+  - 020/024/025/026 明确依赖“继承/角色/org_change_requests”的结构与 Topics `org.changed.v1`/`org.assignment.changed.v1` 的稳定契约，但若先写代码再补结构，很容易在 M1 之后产生破坏性迁移与契约漂移。
   - 事件字段若在下游（Authz/缓存/报表）消费后再改名/改语义，会导致跨模块回放与纠偏成本急剧上升。
 - **业务价值**：
   - 通过“占位表先行 + 契约冻结（v1 Topic）”，为后续 024/025/026 的实现提供可直接编码的落点，降低返工与漂移风险。

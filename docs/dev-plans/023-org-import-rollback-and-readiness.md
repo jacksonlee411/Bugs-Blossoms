@@ -11,7 +11,7 @@
 - `make check lint` 与 `go test ./cmd/org-data/... ./modules/org/...`（或相关路径）通过，失败有回滚/清理方案。
 
 ## 范围与非目标
-- 范围：为 org 主链提供数据工具；覆盖 021/022 已落地的表（`org_nodes`/`org_node_slices`/`org_edges`/`positions`/`org_assignments`；可选扩展到 `org_roles/org_role_assignments/org_attribute_inheritance_rules/change_requests` 的导出）。
+- 范围：为 org 主链提供数据工具；覆盖 021/022 已落地的表（`org_nodes`/`org_node_slices`/`org_edges`/`org_positions`/`org_assignments`；可选扩展到 `org_roles/org_role_assignments/org_attribute_inheritance_rules/org_change_requests` 的导出）。
 - 非目标：不实现最终 UI、审批/流程、矩阵/继承逻辑执行，只提供数据导入与清理脚本；不交付生产级自动化灰度，仅最小可用路径。
 
 ## 依赖与里程碑
@@ -33,7 +33,7 @@
 - **模板定义**：
   - `nodes.csv`: `code` (必填), `type` (OrgUnit), `name`, `i18n_names` (JSON), `status` (active/retired), `effective_date`, `end_date`, `parent_code` (为空表示 root), `display_order`, `manager_user_id` (可选), `manager_email` (可选，优先级低于 manager_user_id)
   - `positions.csv`: `code` (必填), `org_node_code` (必填), `title`, `effective_date`, `end_date`, `is_auto_created`
-  - `assignments.csv`: `position_code` (必填), `assignment_type` (primary/matrix/dotted), `effective_date`, `end_date`, `pernr` (必填), `subject_id` (可选，若为空则按 pernr 生成稳定 UUID)
+  - `assignments.csv`: `position_code` (必填), `assignment_type` (primary/matrix/dotted), `effective_date`, `end_date`, `pernr` (必填), `subject_id` (可选，若为空则按 035 的确定性映射生成；前端不生成)
 - **映射规则**：
   - `nodes.csv` 每行会落成：`org_nodes`（按 `code` 确保存在稳定 ID）+ `org_node_slices`（属性时间片）+ `org_edges`（父子关系时间片，root 行不写 edge；`parent_hint` 与 edge 在写入前做一致性校验）。
   - 导入时 CLI 需建立内存映射（Code -> UUID），将 CSV 中的 `parent_code/org_node_code` 转换为 DB 中的 `*_node_id`。
@@ -52,11 +52,12 @@
   - 检查时间片重叠（Overlap Check）：查询 DB 中该实体的现有时间片，模拟插入看是否触发 EXCLUDE 约束。
 - **Phase 3: Apply (Transactional)**
   - 开启事务（db backend）或调用 API 批量入口（api backend，优先走 `POST /org/api/batch` 以复用 024/026 的校验、审计与事件发布路径）。
-  - 按依赖顺序写入：`org_nodes` -> `org_node_slices` -> `org_edges` -> `positions` -> `org_assignments`（`org_edges` 的 `path/depth` 由触发器维护）。
+  - 若 `RLS_ENFORCE=enforce`（对齐 019A）：事务开始后第一条 SQL 前必须注入 `app.current_tenant`（`set_config('app.current_tenant', tenant_id, true)`），避免 fail-closed policy 触发读写失败。
+  - 按依赖顺序写入：`org_nodes` -> `org_node_slices` -> `org_edges` -> `org_positions` -> `org_assignments`（`org_edges` 的 `path/depth` 由触发器维护）。
   - 失败则全量回滚。
   - 事件与缓存一致性：
     - **db backend**：不直接触发应用内缓存失效；若在应用运行期间做 merge，需在执行后调用 026 的 `/org/api/snapshot` 或重启应用以完成对账/缓存重建（直到 outbox/relay 落地）。
-    - **api backend**：由服务端在同一事务内写入 outbox 并发布 `OrgChanged/OrgAssignmentChanged`（对齐 022），触发下游（Authz/缓存/索引）更新。
+    - **api backend**：由服务端在同一事务内写入 outbox 并发布 Topics `org.changed.v1`/`org.assignment.changed.v1`（对齐 022），触发下游（Authz/缓存/索引）更新。
 
 ### 4. 回滚策略 (Rollback)
 - **机制**：M1 先采用 **时间窗口 + 租户** 的最小方案；为降低误删风险，导入默认只支持“空租户/空组织数据”的 seed 模式（若检测到 tenant 已存在 org 主链数据则拒绝，需显式开关才允许 merge）。
@@ -64,7 +65,7 @@
 - **逻辑**：
   - `rollback --since "2025-01-15T12:00:00Z"`
   - 查询所有 `created_at >= since AND tenant_id = target` 的记录。
-  - 逆序删除：`org_assignments` -> `positions` -> `org_edges` -> `org_node_slices` -> `org_nodes`。
+  - 逆序删除：`org_assignments` -> `org_positions` -> `org_edges` -> `org_node_slices` -> `org_nodes`。
   - **安全网**：默认 dry-run（不加 `--apply`）列出将要删除的记录数；执行 `--apply` 前需用户二次确认（输入 `YES`）。
 
 ### 5. Readiness 检查集
