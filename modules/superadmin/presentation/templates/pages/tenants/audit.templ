@@ -50,8 +50,9 @@ templ AuditContent(props *AuditPageProps) {
 						} else {
 							for _, vm := range props.Logs {
 								<tr class="align-top">
-									<td class="py-3 pr-4 text-200">@table.DateTime(vm.Log.CreatedAt)
-</td>
+									<td class="py-3 pr-4 text-200">
+										@table.DateTime(vm.Log.CreatedAt)
+									</td>
 									<td class="py-3 pr-4 font-mono text-xs text-200">{ vm.Log.Action }</td>
 									<td class="py-3 pr-4 text-200">
 										<div class="text-sm text-100">{ vm.Log.ActorEmail }</div>

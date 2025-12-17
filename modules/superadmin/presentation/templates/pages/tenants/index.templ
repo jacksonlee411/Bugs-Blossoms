@@ -236,15 +236,19 @@ templ TableRows(tenants []*entities.TenantInfo) {
 			<tr class="border-b border-secondary hover:bg-surface-500 transition-all duration-200 ease-in-out">
 				<td class="px-4 py-4 font-medium text-gray-800">{ tenant.Name }</td>
 				<td class="px-4 py-4 text-200">{ tenant.Domain }</td>
-				<td class="px-4 py-4">@StatusBadge(identityLabel, identityVariant)
-</td>
-				<td class="px-4 py-4">@StatusBadge(ssoLabel, ssoVariant)
-</td>
-				<td class="px-4 py-4">@StatusBadge(rlsLabel, rlsVariant)
-</td>
+				<td class="px-4 py-4">
+					@StatusBadge(identityLabel, identityVariant)
+				</td>
+				<td class="px-4 py-4">
+					@StatusBadge(ssoLabel, ssoVariant)
+				</td>
+				<td class="px-4 py-4">
+					@StatusBadge(rlsLabel, rlsVariant)
+				</td>
 				<td class="px-4 py-4 text-200">{ fmt.Sprintf("%d", tenant.UserCount) }</td>
-				<td class="px-4 py-4">@StatusBadge(status, statusVariant)
-</td>
+				<td class="px-4 py-4">
+					@StatusBadge(status, statusVariant)
+				</td>
 				<td class="px-4 py-4 text-200">
 					@table.DateTime(tenant.CreatedAt)
 				</td>

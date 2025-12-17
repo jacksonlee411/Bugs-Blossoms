@@ -292,8 +292,9 @@ templ SSOContent(props *SSOPageProps) {
 										<div class="flex items-center gap-2">
 											@TestStatusBadge(c.LastTestStatus)
 											if c.LastTestAt != nil {
-												<span class="text-xs text-300">@table.DateTime(*c.LastTestAt)
-</span>
+												<span class="text-xs text-300">
+													@table.DateTime(*c.LastTestAt)
+												</span>
 											}
 										</div>
 									</td>
