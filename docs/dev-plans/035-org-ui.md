@@ -1,10 +1,15 @@
 # DEV-PLAN-035：组织机构模块 M1 前端界面（templ + HTMX）
 
-**状态**: 规划中（2025-12-14 23:54 UTC）
+**状态**: 已评审（2025-12-17 11:44 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+
+## 0. 进度速记
+- 本计划只交付 Org M1 的“可用管理 UI”（树 + 节点表单 + 分配时间线），不引入 SPA。
+- UI 写路径不自造业务逻辑：与 [DEV-PLAN-024](024-org-crud-mainline.md)/[DEV-PLAN-025](025-org-time-and-audit.md) 共用 Org Service；Authz/outbox/缓存以 [DEV-PLAN-026](026-org-api-authz-and-events.md) 为准。
+- 403 Forbidden 统一复用 `modules/core/presentation/templates/layouts.WriteAuthzForbiddenResponse`（JSON/HTMX/Full page 三种输出一致）。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**: [DEV-PLAN-020](020-organization-lifecycle.md) 的步骤 6A。
-- **目标用户**: HR 管理员/组织管理员（具备 `Org.Read/Org.Write/Org.Assign` 权限的租户用户）。
+- **目标用户**: HR 管理员/组织管理员（具备 Org 相关 Casbin 权限的租户用户；object/action 口径见 §7，与 [DEV-PLAN-026](026-org-api-authz-and-events.md) 对齐）。
 - **现状与痛点**:
   - Org 模块的主链能力（Person → Position → Org）与 API/Authz/事件闭环分别由 [DEV-PLAN-024](024-org-crud-mainline.md)、[DEV-PLAN-026](026-org-api-authz-and-events.md) 交付。
   - 目前缺少“可用且可操作”的管理界面，导致组织主数据仍需通过脚本或临时页面维护，无法支撑日常 HR 操作与验证。
@@ -19,11 +24,11 @@
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
 - [ ] **组织树视图**：交付可交互的树形视图，展示 `OrgUnit` 单树，并可随 `effective_date` 切换刷新。
-- [ ] **节点管理**：交付 OrgNode 的“查看 + 创建 + 编辑（Insert 时间片语义）”表单与详情面板。
+- [ ] **节点管理**：交付 OrgNode 的“查看 + 创建 + 编辑（Insert 时间片语义）+ 变更上级（MoveNode）”表单与详情面板。
 - [ ] **职位与分配管理（M1 主链）**：
   - [ ] 在分配时间线/详情中展示 Position 信息（只读；字段以 schema/API 为准）。
   - [ ] 交付 Assignment 的“创建 + 编辑（Insert 时间片语义） + 时间线查看”，并覆盖后端“自动创建空壳 Position”的交互闭环。
-- [ ] **授权驱动 UI**：所有页面与按钮的可见性、可操作性均受 `Org.Read/Org.Write/Org.Assign` 控制；无权访问统一走 403 契约。
+- [ ] **授权驱动 UI**：所有页面与按钮的可见性、可操作性均受 Org 相关 Casbin object/action 控制（见 §7）；无权访问统一走 403 契约。
 - [ ] **HTMX 局部刷新体验**：树、详情、表单提交使用局部刷新；提交成功后自动更新相关区域（树/详情/时间线）。
 - [ ] **门禁对齐**：`.templ`/Tailwind 变更后执行 `make generate && make css` 并保证生成物已提交（`git status --short` 干净）。
 
@@ -63,9 +68,9 @@ graph TD
   - **读（as-of）**：以 URL query 的 `effective_date` 作为查询点。
   - **写（Insert）**：以表单字段 `effective_date` 作为写入时间片起点；若表单未提供则默认使用 URL query 的 `effective_date`。
 - `type`: 固定 `OrgUnit`（M1）；其它类型在后续阶段启用时再扩展。
-- `subject`: `person:{id}`（与 [DEV-PLAN-024](024-org-crud-mainline.md) 对齐），M1 支持两种 `id`：
-  - `person:{pernr}`：`pernr` 为租户内稳定的人员编号（`string`）。**M1 规范用法**。
-  - `person:{uuid}`：当 `id` 可解析为 UUID 时，服务端可直接视为 `subject_id`（便于 API 客户端/后续演进）。
+- `subject`: `person:<id>`（与 [DEV-PLAN-024](024-org-crud-mainline.md) 对齐），M1 支持两种 `id`：
+  - `person:<pernr>`：`pernr` 为租户内稳定的人员编号（`string`）。**M1 规范用法**，例如 `subject=person:000123`。
+  - `person:<uuid>`：当 `id` 可解析为 UUID 时，服务端可直接视为 `subject_id`（用于 API 客户端/后续演进；UI 默认不走该路径）。
 
 ### 4.2 ViewModel（建议最小集）
 > 说明：字段名仅用于消除歧义；最终以实现时的 Go 类型为准。
@@ -87,10 +92,15 @@ graph TD
   - `Code string`
   - `Name string`
   - `I18nNames map[string]string`（可选）
-  - `ParentNodeID *uuid.UUID`
+  - `ParentNodeID *uuid.UUID`（create 时使用；变更上级走 MoveNode 表单）
   - `LegalEntityID *uuid.UUID`（或 `CompanyCode string`，以 schema 为准）
   - `LocationID *uuid.UUID`
   - `DisplayOrder int`
+  - `EffectiveDate string`
+  - `Errors map[string]string`
+- `OrgNodeMoveFormVM`:
+  - `ID uuid.UUID`
+  - `NewParentNodeID uuid.UUID`
   - `EffectiveDate string`
   - `Errors map[string]string`
 - `AssignmentTimelineVM`:
@@ -111,17 +121,13 @@ graph TD
 
 ### 4.3 表单校验与错误展示
 - DTO 校验失败：返回 422，并渲染带 `Errors` 的表单片段（对齐现有 `composables.UseForm(...).Ok(...)` 模式）。
-- 业务规则失败（如时间重叠/冻结窗口）：错误映射为可读提示并在表单顶部展示；错误码与语义以 [DEV-PLAN-025](025-org-time-and-audit.md)/[DEV-PLAN-026](026-org-api-authz-and-events.md) 为准。
+- 业务规则失败（如时间重叠/冻结窗口）：错误映射为可读提示并在表单顶部展示；错误码与语义 SSOT 为 [DEV-PLAN-024](024-org-crud-mainline.md)/[DEV-PLAN-025](025-org-time-and-audit.md)。
 
 ### 4.4 Person 标识与确定性映射（M1 契约）
 - **输入（UI）**：以 `pernr`（string）作为用户可输入/可选择的人员标识；用于 URL `subject=person:{pernr}` 与表单字段 `pernr`。
 - **存储（DB）**：`org_assignments.subject_id` 为 `uuid not null`（见 [DEV-PLAN-021](021-org-schema-and-constraints.md)），服务端必须在写入时生成或校验该值。
-- **映射算法（服务端）**：`subject_id = UUIDv5_SHA1(namespace, tenant_id + ":" + subject_type + ":" + pernr)`。
-  - `subject_type`：M1 固定为 `person`。
-  - `namespace`：使用项目内固定常量（需与导入工具 [DEV-PLAN-023](023-org-import-rollback-and-readiness.md) 保持一致）。
-- **校验规则**：
-  - 若请求中同时包含 `subject_id` 与 `pernr`，服务端必须校验二者一致（不一致返回 422）。
-  - 前端不生成 `subject_id`，仅传 `pernr`（或 `subject`），避免多端算法漂移。
+- **映射（SSOT）**：`subject_id` 的生成/校验以 [DEV-PLAN-026](026-org-api-authz-and-events.md) 的“Subject 标识与确定性映射（SSOT）”为准；前端不生成 `subject_id`，仅传 `pernr`（或 `subject`），避免多端算法漂移。
+- **一致性校验**：若请求中同时包含 `subject_id` 与 `pernr`，服务端必须校验二者一致（不一致返回 422）。
 
 ## 5. 接口契约 (API Contracts)
 > 标准：需要同时定义页面路由、HTMX partial 的 URL/Method/参数与错误行为；Authz 失败需返回统一 403 契约并渲染 Unauthorized 组件。
@@ -151,7 +157,7 @@ graph TD
 - `GET /org/hierarchies?type=OrgUnit&effective_date=YYYY-MM-DD`
   - 200：返回树组件 HTML（可包含 `id="org-tree"` 容器）。
   - 400：参数非法（如 `effective_date/type` 无法解析）。
-  - 403：返回 Unauthorized 片段，并设置 `Hx-Retarget: body`、`Hx-Reswap: innerHTML`（对齐项目现有 403 HTMX 契约）。
+  - 403：返回 Unauthorized 片段（复用 `layouts.WriteAuthzForbiddenResponse`），并设置 `Hx-Retarget: body`、`Hx-Reswap: innerHTML`。
 
 #### 5.2.2 节点详情与表单
 - `GET /org/nodes/{id}?effective_date=YYYY-MM-DD`
@@ -162,25 +168,31 @@ graph TD
 - `POST /org/nodes?effective_date=YYYY-MM-DD`（创建）
   - Form（示意）：`code,name,parent_id,legal_entity_id,location_id,display_order,effective_date`
   - 200：返回详情片段 +（OOB）刷新树；并设置 `Hx-Push-Url: /org/nodes?effective_date=<effective_date>`（以写入的 `effective_date` 为准）。
-  - 403：无 `org.* write` 权限。
+  - 403：无 `org.nodes write` 权限。
   - 422：返回带错误的表单片段。
-  - 409：写入冲突（如 code 重复、时间线重叠、冻结窗口拒绝等；以 [DEV-PLAN-025](025-org-time-and-audit.md)/[DEV-PLAN-026](026-org-api-authz-and-events.md) 的错误码为准）。
+  - 409：写入冲突（如 code 重复、时间线重叠、冻结窗口拒绝等；错误码 SSOT 为 [DEV-PLAN-024](024-org-crud-mainline.md)/[DEV-PLAN-025](025-org-time-and-audit.md)）。
 - `PATCH /org/nodes/{id}?effective_date=YYYY-MM-DD`（更新；Insert 时间片语义）
-  - Form（示意）：与创建类似，附带 slice 相关字段。
+  - Form（示意）：`name,i18n_names,legal_entity_id,location_id,display_order,effective_date`（不包含 `code/parent_id`；变更上级走 MoveNode）。
   - 成功/失败行为同创建。
   - 404：节点不存在。
+- `POST /org/nodes/{id}:move?effective_date=YYYY-MM-DD`（变更上级；MoveNode）
+  - Form（示意）：`new_parent_id,effective_date`
+  - 200：返回更新后的详情片段 +（OOB）刷新树；并设置 `Hx-Push-Url: /org/nodes?effective_date=<effective_date>`。
+  - 403：无 `org.edges write` 权限。
+  - 422：参数非法/不允许移动 root/父节点不存在/需要管理员 correct-move（如 024 的 `ORG_USE_CORRECT_MOVE`）。
+  - 409：写入冲突/冻结窗口/结构约束失败（错误码 SSOT 为 024/025）。
 
 #### 5.2.3 分配时间线与写入
 - `GET /org/assignments?subject=person:{id}&effective_date=YYYY-MM-DD`
   - 200：返回该 subject 的分配时间线片段。
   - 400：参数非法（如 `effective_date/subject` 无法解析）。
-  - 403：无 `org.* read` 权限。
+  - 403：无 `org.assignments read` 权限。
 - `POST /org/assignments?effective_date=YYYY-MM-DD`
   - Form（示意）：`pernr,org_node_id,position_id(optional),assignment_type(optional),effective_date`
-  - 200：返回更新后的时间线片段；并设置 `Hx-Push-Url: /org/assignments?effective_date=<effective_date>&subject=person:<pernr>`（以写入的 `effective_date/pernr` 为准）。
-  - 403：无 `org.* assign` 权限。
+  - 200：返回更新后的时间线片段；并设置 `Hx-Push-Url: /org/assignments?effective_date=<effective_date>&subject=person:{pernr}`（以写入的 `effective_date/pernr` 为准，例如 `subject=person:000123`）。
+  - 403：无 `org.assignments assign` 权限。
   - 422：返回带错误的表单片段。
-  - 409：写入冲突（如时间线重叠/冻结窗口/主分配唯一性冲突等；以 [DEV-PLAN-025](025-org-time-and-audit.md)/[DEV-PLAN-026](026-org-api-authz-and-events.md) 的错误码为准）。
+  - 409：写入冲突（如时间线重叠/冻结窗口/主分配唯一性冲突等；错误码 SSOT 为 [DEV-PLAN-024](024-org-crud-mainline.md)/[DEV-PLAN-025](025-org-time-and-audit.md)）。
 - `PATCH /org/assignments/{id}?effective_date=YYYY-MM-DD`（更新；Insert 时间片语义）
   - 成功/失败行为同创建。
   - 404：分配不存在。
@@ -201,13 +213,23 @@ graph TD
    - 通过 `hx-get="/org/nodes"` + `hx-push-url="true"` 触发局部刷新（替换页面内容容器），并将 `effective_date` 固化到 URL。
 2. 触发树与当前面板刷新（若当前有选中节点，则按新 `effective_date` 重取其 as-of 视图）。
 
+### 6.4 变更上级（MoveNode）
+1. 用户在节点详情面板点击“变更上级”：加载 MoveNode 表单片段（默认 `effective_date` 取页面当前值）。
+2. 提交 `POST /org/nodes/{id}:move`：
+   - 成功：返回更新后的详情片段，并 OOB 刷新树（保持选中态尽量稳定）。
+   - 失败：422/409 返回带错误信息的 MoveNode 表单片段。
+
 ## 7. 安全与鉴权 (Security & Authz)
-- **鉴权入口**: 控制器层统一执行鉴权（对齐 [DEV-PLAN-026](026-org-api-authz-and-events.md) 的 object/action 口径），并调用统一 403 输出（HTML/HTMX）。
+- **鉴权入口**:
+  - 控制器层统一调用 `modules/core/presentation/controllers.ensureAuthz`（或等价封装）执行鉴权；
+  - 403 输出统一复用 `modules/core/presentation/templates/layouts.WriteAuthzForbiddenResponse`（自动覆盖 JSON/HTMX/Full Page）。
 - **UI 可见性**: 模板中使用 `pageCtx.CanAuthz(object, action)` 控制按钮/链接展示，但不可替代服务端强制鉴权。
-- **最小权限集（M1）**:
-  - `org.* read`：允许查看树/节点详情/分配时间线。
-  - `org.* write`：允许创建/更新组织节点（以及必要的结构写入，例如移动节点导致的边更新）。
-  - `org.* assign`：允许创建/更新分配；当 `position_id` 为空时，允许服务端在同一事务内自动创建空壳 Position（不应额外要求 `org.* write`，避免“可分配但不能分配”的权限悖论）。
+- **最小权限集（M1，对齐 026 的 object/action）**:
+  - `org.hierarchies read`：允许查看组织树（`/org/hierarchies`、`/org/nodes` 页内树区域）。
+  - `org.nodes write`：允许创建/编辑节点（Insert 语义）。
+  - `org.edges write`：允许移动节点（MoveNode；对用户表现为“移动/变更上级”）。
+  - `org.assignments read`：允许查看分配时间线。
+  - `org.assignments assign`：允许创建/编辑分配；当 `position_id` 为空触发自动创建空壳 Position 时，**不额外要求** `org.nodes write`（避免“可分配但不能分配”的权限悖论）。
 - **租户隔离**: 所有读写必须基于 Session/tenant 上下文；UI 不允许通过 query/path 访问其它租户数据。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
@@ -227,6 +249,7 @@ graph TD
    - [ ] 点击节点可加载详情面板并保持选中态。
 4. [ ] **节点详情与表单**
    - [ ] 新建/编辑表单：字段覆盖 [DEV-PLAN-020](020-organization-lifecycle.md) 的 M1 必填字段（以 schema 为准）。
+   - [ ] 变更上级（MoveNode）入口与表单（M1：Insert Move；correct-move/admin UI 仅做错误提示，不强制交付）。
    - [ ] 提交成功刷新树与面板；校验失败返回 422 并展示错误。
 5. [ ] **职位与分配**
    - [ ] 分配表单以 `pernr` 为输入（手动输入为默认路径），并能展示 `subject=person:{pernr}` 的分配时间线。
@@ -248,17 +271,18 @@ graph TD
 - `modules/org/presentation/**`：controllers/templates/viewmodels/mappers。
 - `modules/org/module.go`（及必要的 `links.go`）：路由与导航注册。
 - `e2e/tests/org/**`：Playwright 用例。
-- `docs/dev-records/`：关键交互与 readiness 命令记录（如需截图，放入 `docs/assets/` 并在记录中引用）。
+- `docs/dev-records/DEV-PLAN-035-READINESS.md`：关键交互与 readiness 命令记录（如需截图，放入 `docs/assets/` 并在记录中引用）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 ### 9.1 验收标准
 - Org 页面在本地环境可用：树可浏览，节点/分配可按 `effective_date` 查询并完成主链操作。
 - `subject=person:{pernr}` 可用：以 `pernr` 查询时间线与创建分配行为一致；服务端按 4.4 的规则确定性映射到 `subject_id`。
 - 权限正确：
-  - 无 `Org.Read`：访问 `/org/nodes` 返回 403（页面与 HTMX 都符合统一契约）。
-  - 无 `Org.Write`：创建/编辑入口不可见且服务端拒绝写入。
-  - 无 `Org.Assign`：分配入口不可见且服务端拒绝写入。
-  - 仅有 `Org.Assign`（无 `Org.Write`）时：仍可创建分配并触发后端自动创建 Position。
+  - 无 `org.hierarchies read`：访问 `/org/nodes` 返回 403（页面与 HTMX 都符合统一契约）。
+  - 无 `org.nodes write`：节点创建/编辑入口不可见且服务端拒绝写入。
+  - 无 `org.edges write`：MoveNode 入口不可见且服务端拒绝写入。
+  - 无 `org.assignments assign`：分配入口不可见且服务端拒绝写入。
+  - 仅有 `org.assignments assign`（无 `org.nodes write`）时：仍可创建分配并触发后端自动创建 Position。
 - 生成物与门禁一致：
   - `make generate && make css` 后 `git status --short` 干净（无漏提交生成文件）。
 
@@ -266,19 +290,21 @@ graph TD
 - [ ] 管理员登录后可查看组织树。
 - [ ] 创建新 OrgNode，树中可见且详情正确。
 - [ ] 编辑 OrgNode（Insert 语义），在不同 `effective_date` 下可看到正确 as-of 视图。
+- [ ] 变更节点上级（MoveNode），树与详情刷新正确。
 - [ ] 为某 `person:{pernr}` 创建 Assignment（默认走手动输入 `pernr` 路径），并在时间线中可见。
-- [ ] 无 `Org.Write` 账户：UI 不展示创建入口，且直接请求写接口返回 403。
-- [ ] 无 `Org.Assign` 账户：UI 不展示分配入口，且直接请求分配写接口返回 403。
-- [ ] 仅 `Org.Assign`（无 `Org.Write`）账户：创建分配成功（包含自动创建 Position 的路径）。
-- [ ] 无 `Org.Read` 账户：直接访问 `/org/nodes` 返回 403 Unauthorized 页面。
+- [ ] 无 `org.nodes write` 账户：UI 不展示节点写入口，且直接请求写接口返回 403。
+- [ ] 无 `org.assignments assign` 账户：UI 不展示分配入口，且直接请求分配写接口返回 403。
+- [ ] 仅 `org.assignments assign`（无 `org.nodes write`）账户：创建分配成功（包含自动创建 Position 的路径）。
+- [ ] 无 `org.hierarchies read` 账户：直接访问 `/org/nodes` 返回 403 Unauthorized 页面。
 
 ### 9.3 Readiness（执行后在此记录）
-> 执行后将 `[ ]` 改为 `[X]`，并补充时间戳、结果与必要链接。
+> 执行后将 `[ ]` 改为 `[X]`，并补充时间戳、结果与必要链接；同时将命令与输出记录到 `docs/dev-records/DEV-PLAN-035-READINESS.md`。
 
 - [ ] `make generate && make css` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败（附摘要）
 - [ ] `git status --short` —— （YYYY-MM-DD HH:MM UTC）结果：必须为空
 - [ ] `go fmt ./... && go vet ./...` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败
 - [ ] `make check lint && make test` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败
+- [ ] 如涉及路由 allowlist：`make check routing` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败
 - [ ] `cd e2e && pnpm test tests/org` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败
 
 ## 10. 运维与监控 (Ops & Monitoring)

@@ -191,7 +191,7 @@ erDiagram
 | `id` | `uuid` | `pk` | `gen_random_uuid()` | Assignment ID |
 | `position_id` | `uuid` | `not null` |  | FK → `org_positions` |
 | `subject_type` | `text` | `not null` + check | `'person'` | M1 固定 |
-| `subject_id` | `uuid` | `not null` |  | 由服务端确定性映射（见 035/023） |
+| `subject_id` | `uuid` | `not null` |  | 由服务端确定性映射（见 [DEV-PLAN-026](026-org-api-authz-and-events.md)） |
 | `pernr` | `text` | `not null` |  | 可读人员编号（M1：允许用 HRM employees.id 字符串） |
 | `assignment_type` | `text` | `not null` + check | `'primary'` | `primary/matrix/dotted`（M1 仅写 primary） |
 | `is_primary` | `boolean` | `not null` | `true` | M1 与 `assignment_type` 一致 |
