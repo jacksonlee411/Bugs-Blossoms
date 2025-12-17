@@ -44,7 +44,12 @@ func (s *AuditService) Log(ctx context.Context, tenantID *uuid.UUID, action stri
 		}
 	}
 
-	safePayload := redactAuditPayload(payload)
+	normalizedPayload, err := normalizeAuditPayload(payload)
+	if err != nil {
+		return err
+	}
+
+	safePayload := redactAuditPayload(normalizedPayload)
 	payloadBytes, err := json.Marshal(safePayload)
 	if err != nil {
 		return err
@@ -74,6 +79,23 @@ func (s *AuditService) Log(ctx context.Context, tenantID *uuid.UUID, action stri
 		userAgent,
 	)
 	return err
+}
+
+func normalizeAuditPayload(payload any) (any, error) {
+	if payload == nil {
+		return map[string]any{}, nil
+	}
+
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var v any
+	if err := json.Unmarshal(b, &v); err != nil {
+		return nil, err
+	}
+	return v, nil
 }
 
 func redactAuditPayload(payload any) any {
