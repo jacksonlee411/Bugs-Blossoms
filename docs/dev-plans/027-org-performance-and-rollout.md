@@ -60,7 +60,7 @@ graph TD
 ## 4. 数据模型与约束 (Data Model & Constraints)
 > 本计划原则上不引入新表；如因性能达标需要补索引/调整查询，应通过 021/迁移工作流落地并记录原因与回滚方式。
 
-- **基准数据**：复用 021 的 org 核心表（`org_nodes/org_node_slices/org_edges/positions/org_assignments`），由 023 的 `cmd/org-data` 或本计划的 dataset 生成器写入（见 5.1）。
+- **基准数据**：复用 021 的 org 核心表（`org_nodes/org_node_slices/org_edges/org_positions/org_assignments`），由 023 的 `cmd/org-data` 或本计划的 dataset 生成器写入（见 5.1）。
 - **允许的 schema 变更范围（仅限性能达标所需）**：
   - 仅新增/调整索引、统计信息或查询形态；禁止引入闭包表/物化视图（029 负责）。
   - 任一 schema 变更必须：

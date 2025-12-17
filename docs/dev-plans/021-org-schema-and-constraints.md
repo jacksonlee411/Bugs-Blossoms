@@ -1,6 +1,8 @@
 # DEV-PLAN-021：Org 核心表与约束
 
 **状态**: 已批准（2025-12-15 12:47 UTC）
+**对齐更新**：
+- 2025-12-17：对齐 DEV-PLAN-017/019A 工具链约束（`pgcrypto`/`gen_random_uuid()`、RLS fail-closed、系统队列表 RLS 边界），并与 DEV-PLAN-020 最新口径一致。
 
 > 目标：按 `docs/dev-plans/001-technical-design-template.md` 的“可直接编码、无猜测”标准，把 Org M1 的 DB 合同（schema/约束/迁移工具链）写清楚。
 
@@ -68,13 +70,14 @@ erDiagram
 - 依赖扩展：
   - `ltree`：路径存储与 `@>`/`<@` 查询
   - `btree_gist`：支持在 EXCLUDE 中对 `uuid/text` 使用 `=` 运算符
+  - `pgcrypto`：提供 `gen_random_uuid()`（对齐 017 outbox 与本计划 uuid 主键默认值）
 - 软删：业务层使用 `status='rescinded'|'retired'`；Org 模块内部 FK 默认 `on delete restrict`（禁止硬删被引用记录）。
 
 ### 4.1 `org_nodes`（稳定标识）
 | 列 | 类型 | 约束 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | `not null` |  | 租户 |
-| `id` | `uuid` | `pk` |  | 稳定 ID（由服务端生成；是否加默认值由实现决定） |
+| `id` | `uuid` | `pk` | `gen_random_uuid()` | 稳定 ID（默认随机；导入/外部对齐场景允许服务端显式指定） |
 | `type` | `text` | `not null` + check | `'OrgUnit'` | M1 固定 |
 | `code` | `varchar(64)` | `not null` |  | 租户内唯一编码 |
 | `is_root` | `boolean` | `not null` | `false` | 单租户唯一根（M1 不支持根迁移） |
@@ -92,7 +95,7 @@ erDiagram
 | 列 | 类型 | 约束 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | `not null` |  | 租户 |
-| `id` | `uuid` | `pk` |  | slice 主键 |
+| `id` | `uuid` | `pk` | `gen_random_uuid()` | slice 主键 |
 | `org_node_id` | `uuid` | `not null` |  | FK → `org_nodes` |
 | `name` | `varchar(255)` | `not null` |  | 展示名（默认 locale） |
 | `i18n_names` | `jsonb` | `not null` | `'{}'` | 多语言名称 |
@@ -131,7 +134,7 @@ erDiagram
 | 列 | 类型 | 约束 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | `not null` |  | 租户 |
-| `id` | `uuid` | `pk` |  | edge slice 主键 |
+| `id` | `uuid` | `pk` | `gen_random_uuid()` | edge slice 主键 |
 | `hierarchy_type` | `text` | `not null` + check | `'OrgUnit'` | M1 固定 |
 | `parent_node_id` | `uuid` | `null` |  | root slice 允许 `null` |
 | `child_node_id` | `uuid` | `not null` |  | FK → `org_nodes` |
@@ -160,7 +163,7 @@ erDiagram
 | 列 | 类型 | 约束 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | `not null` |  | 租户 |
-| `id` | `uuid` | `pk` |  | Position ID |
+| `id` | `uuid` | `pk` | `gen_random_uuid()` | Position ID |
 | `org_node_id` | `uuid` | `not null` |  | FK → `org_nodes` |
 | `code` | `varchar(64)` | `not null` |  | Position code（可含 `AUTO-` 前缀） |
 | `title` | `text` | `null` |  | 展示名（可空） |
@@ -185,7 +188,7 @@ erDiagram
 | 列 | 类型 | 约束 | 默认 | 说明 |
 | --- | --- | --- | --- | --- |
 | `tenant_id` | `uuid` | `not null` |  | 租户 |
-| `id` | `uuid` | `pk` |  | Assignment ID |
+| `id` | `uuid` | `pk` | `gen_random_uuid()` | Assignment ID |
 | `position_id` | `uuid` | `not null` |  | FK → `org_positions` |
 | `subject_type` | `text` | `not null` + check | `'person'` | M1 固定 |
 | `subject_id` | `uuid` | `not null` |  | 由服务端确定性映射（见 035/023） |
@@ -222,6 +225,7 @@ erDiagram
 - 迁移目录（Goose）：`migrations/org/`
   - baseline：`00001_org_baseline.sql`
   - smoke（可选但推荐）：`00002_org_migration_smoke.sql`
+  - （后续 026）`org_outbox`：在同目录追加序号递增迁移，结构对齐 `docs/dev-plans/017-transactional-outbox.md`，并按 019A 的系统表约束 **不启用 RLS**
   - Atlas state：`migrations/org/atlas.sum`
 
 ### 5.2 Atlas 配置（必须明确）
@@ -273,11 +277,17 @@ erDiagram
 
 ## 7. 安全与鉴权 (Security & Authz)
 - **租户隔离**：所有表均含 `tenant_id`，所有查询必须包含 `WHERE tenant_id = $1`；DB 层通过 `(tenant_id, *_id)` 外键/约束对 Org 内部表提供兜底隔离。
+- **RLS（对齐 DEV-PLAN-019A，兼容性要求）**：
+  - 本计划的 baseline 迁移 **不默认启用 RLS**（避免在 024/026 尚未全面完成“事务内注入 `app.current_tenant`”前引入读写失败/偶发报错）。
+  - 若后续对 Org 业务表启用 RLS：policy 必须使用 `tenant_id = current_setting('app.current_tenant')::uuid`（fail-closed），并要求所有访问路径在事务内注入 `app.current_tenant`；细节以 `docs/dev-plans/019A-rls-tenant-isolation.md` 为准。
+  - 系统队列表（例如 026 将引入的 `org_outbox`）PoC 阶段不得启用 RLS，以保证 relay 可跨租户 claim；如未来确需启用，必须走专用 DB role/连接池与审计，禁止通过放宽 policy 绕过隔离（见 019A 的系统级决策）。
 - **PII 最小化**：本计划 schema 不落 email/phone 等敏感字段；`pernr` 仅作为业务编号，真实 PII 由 HRM/核心用户模块管理。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 - **依赖**：
   - 011A：Atlas/Goose 工具链口径（`DB_URL/ATLAS_DEV_URL`、隔离 dev-db、lint 规则）。
+  - 017：Transactional Outbox SSOT（后续 026 的 `org_outbox` 结构与 `pgcrypto` 依赖来源）。
+  - 019A：RLS 强租户隔离契约（fail-closed 的 `app.current_tenant` 注入与系统表边界）。
   - 020/024/025：有效期写语义与 MoveNode 的服务侧实现（本计划只定义 DB 合同）。
 - **里程碑**：
   1. [ ] 落地 `modules/org/infrastructure/persistence/schema/org-schema.sql`（包含扩展/表/索引/约束）。
@@ -287,6 +297,9 @@ erDiagram
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 ### 9.1 DB 约束验收（必须可重复执行）
+- **扩展与默认值**：
+  - `SELECT gen_random_uuid();` 可执行（`pgcrypto` 已启用）。
+  - 不显式传 `id` 插入 `org_nodes/org_node_slices/org_edges/org_positions/org_assignments` 时，应由默认值生成主键。
 - **有效期**：对同一 `org_node_id` 插入重叠 slice，应被 EXCLUDE 拒绝。
 - **双亲**：对同一 `child_node_id` 插入重叠 edge slice，应被 EXCLUDE 拒绝。
 - **重名**：同父同窗插入 `lower(name)` 相同的 slice，应被 EXCLUDE 拒绝。
@@ -306,5 +319,5 @@ erDiagram
 
 ## 10. 运维、回滚与降级 (Ops / Rollback)
 - 回滚最近一次迁移：`GOOSE_STEPS=1 goose -dir migrations/org postgres "$DSN" down`
-- 扩展回滚：迁移 `down` **不得删除扩展**（`ltree/btree_gist` 保持幂等）；避免影响其它模块。
+- 扩展回滚：迁移 `down` **不得删除扩展**（`pgcrypto/ltree/btree_gist` 保持幂等）；避免影响其它模块。
 - 失败处置：任何迁移失败先 `down` 回滚到上一个可用版本，再修正 schema/迁移，禁止在目标库上手工修补导致 drift。

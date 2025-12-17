@@ -1,7 +1,9 @@
 # DEV-PLAN-020：组织机构模块（对标 Workday）
 
 **状态**: 已完成（2025-12-07 16:20）  
-**对齐更新**：2025-12-16：对齐 DEV-PLAN-017/018/019 的工具链与门禁约束（outbox 闭环、routing gates、租户 fail-closed/RLS 注入口径）。
+**对齐更新**：
+- 2025-12-16：对齐 DEV-PLAN-017/018/019 的工具链与门禁约束（outbox 闭环、routing gates、租户 fail-closed/RLS 注入口径）。
+- 2025-12-17：补齐 017/018/019/Casbin 的落点细节（API 示例前缀、Authz 门禁表述、outbox/relay/RLS 边界、集成图从“eventbus 直连”调整为 outbox 闭环）。
 **评审结论**：M1 收敛为“单一 Organization Unit 树（原 Supervisory）+ 有效期校验 + 去重/无重叠 + 基础审计/查询性能”，暂不落地 workflow/BP 绑定、Authz 策略生成、并行版本、What-if/Impact UI 等高阶能力，统一挪到后续阶段或 backlog；M1 即交付最小权限集（Org.Read/Org.Write/Org.Assign/Org.Admin）及基础策略片段。
 
 ## 背景
@@ -16,7 +18,7 @@
 4. **生命周期驱动（后续）**：组织单元的创建、重命名、合并、撤销等动作理想路径是“请求→审批→生效”，但 M1 仅直接 CRUD；审批/草稿/仿真视图待后续里程碑再启用。
 5. **时间线 API**：所有读写接口必须显式接受 `effective_date`（对齐 Workday 的 `Effective Date` 查询点），未提供时默认 `time.Now().UTC()`，以保障历史查询与未来排程。
 6. **事件一致性（outbox）**：关键变更通过 DEV-PLAN-017 的 outbox 闭环投递（业务写入 + outbox enqueue 同一事务提交；at-least-once；消费者按 `event_id` 幂等）。
-- **安全与最小权限**：M1 定义 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`，接口默认要求 Session+租户校验与对应权限；策略片段走 `make authz-pack`（生成）+ `make authz-test && make authz-lint`（门禁）。
+- **安全与最小权限**：M1 定义 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`（对齐 026：`org.*` + `read/write/assign/admin`），接口默认要求 Session+租户校验与对应权限；策略片段走 `make authz-pack`（生成）+ `make authz-test && make authz-lint`（门禁）。
 - **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；日期字段命名与 Workday 对齐：`effective_date`（开始），`end_date`/`inactive_date`（结束，半开区间）。
 - **人员标识**：采用 `person_id` 作为自然人主键（不可变）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户下同一 person 不变。
 
@@ -30,7 +32,7 @@
 - 每阶段可独立上线，确保 HRM/Authz/Finance 等依赖至少获得稳定的组织主数据引用与事件，不因未完成高级特性而阻塞。
 
 ## 范围
-- **M1 主数据最小集**：单一 Organization Unit 树，必备属性（code、name+i18n_names、parent、legal_entity_id/company_code、location_id、display_order、effective_date、end_date、tenant），强制去重名/无重叠/租户隔离性能；父子校验、基础审计、冻结窗口为硬约束；预留 change_requests/继承规则/角色表结构但可不启用业务。
+- **M1 主数据最小集**：单一 Organization Unit 树，必备属性（code、name+i18n_names、parent、legal_entity_id/company_code、location_id、display_order、effective_date、end_date、tenant），强制去重名/无重叠/租户隔离性能；父子校验、基础审计、冻结窗口为硬约束；预留 `org_change_requests`/继承规则/角色表结构但可不启用业务。
 - **时间维度**：节点/关系/分配的有效期字段与校验；只提供 `effective_date` 查询与基础 CRUD，不做 retro/并行版本。
 - **树一致性**：每租户仅一棵 Organization Unit 树，唯一根节点；禁止环、禁止双亲、禁止孤儿，`OrgEdge` 为父子真相，`OrgNode.parent_hint` 由边反查并在写入时强校验一致。
 - **主数据治理**：编码规则（唯一/长度/前缀）、命名规范、必填属性/字典校验、发布模式（API + 事件 + 批量导入）、冲突处理与审核责任写入文档；Org 为组织层级 SOR，Position 为人员隶属锚点（可自动生成空壳），编制留在 DEV-PLAN-021，Cost Center/Finance 仅消费事件/视图（冻结期不改 schema）。
@@ -65,10 +67,10 @@
 - 冻结窗口：对 Organization Unit 树应用配置化冻结窗口（默认月末+3 天，可按租户覆盖），冻结期仅允许未来日期变更。
 - 历史/未来查询：接口统一接受 `effective_date` 作为查询点。Retro 重播与补偿不在 M1 范围，列为后续增强。
 - SAP 约束对照：约束 1（无空档、无重叠）为本方案默认；A/2/3/B/T 仅作为参考，不在 Org 模块使用。
-- Correction vs Update：API 设计需显式区分“更正历史”（Correct，如 `POST /nodes/{id}:correct`，原地修改当前切片，需更高权限与审计标记）与“新增时间片”（Update，如 `PATCH /nodes/{id}`，截断旧片段再写新段），避免误用。
+- Correction vs Update：API 设计需显式区分“更正历史”（Correct，如 `POST /org/api/nodes/{id}:correct`，原地修改当前切片，需更高权限与审计标记）与“新增时间片”（Update，如 `PATCH /org/api/nodes/{id}`，截断旧片段再写新段），避免误用。
 
 ### 4. 组织层级 & 权限
-- **M1**：仅发布 `OrgChanged`/`OrgAssignmentChanged` 事件供 Authz/HRM 订阅，不做策略生成/继承计算。
+- **M1**：仅发布 DEV-PLAN-022 定义的 integration events（Topics `org.changed.v1`/`org.assignment.changed.v1`）供 Authz/HRM 等订阅，不做策略生成/继承计算。
 - **后续（M3+）**：再评估 OrgSecurityDomain/Group 映射、继承计算与 policy 草稿出口，配合 `make authz-pack/test`。
 
 ## 技术方案
@@ -90,11 +92,11 @@
   - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_date, end_date, depth, path ltree）。
   - `positions`（tenant_id, id, org_node_id, code, title, status, effective_date, end_date, is_auto_created bool, created_at, updated_at），M1 可自动为 Assignment 创建一对一空壳，通过 `is_auto_created` 标记以供后续治理。
   - `org_assignments`（tenant_id, id, position_id, subject_type=person, subject_id=person_id, pernr, assignment_type=primary|matrix|dotted, effective_date, end_date, primary bool）。
-  - 占位/可选表：`org_attribute_inheritance_rules`（属性继承策略配置）、`org_roles`（角色字典）、`org_role_assignments`（角色分配，带有效期）、`change_requests`（草稿/提交/审批/生效占位，M1 可仅存草稿+审计字段）、`org_matrix_links`（矩阵/虚线组织关联）、`org_security_group_mappings`（组织节点与安全组关联）、`org_links`（组织与项目/成本中心/预算科目等多对多关联，带有效期）。
+  - 占位/可选表：`org_attribute_inheritance_rules`（属性继承策略配置）、`org_roles`（角色字典）、`org_role_assignments`（角色分配，带有效期）、`org_change_requests`（变更草稿/提交/审批/生效占位，M1 可仅存草稿+审计字段）、`org_matrix_links`（矩阵/虚线组织关联）、`org_security_group_mappings`（组织节点与安全组关联）、`org_links`（组织与项目/成本中心/预算科目等多对多关联，带有效期）。
   - 其他表（retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
   - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_date, end_date))` 用于时间冲突约束，`(tenant_id, parent_node_id, display_order)` 便于排序。
 - 约束（M1 落地）：`org_nodes` 的 code 需在 tenant 内唯一；name/i18n_names 在同一父节点+时间窗口内唯一（按默认 locale）；`org_edges` 防环/双亲（ltree path + 唯一 child per hierarchy）；`positions` 需归属 OrgNode；`org_assignments` 对同一 subject 在重叠时间内仅允许一个 primary（部分唯一约束），position_id 必填，assignment_type 默认 primary。
-- 多租户隔离：所有主键/唯一约束均以 `(tenant_id, <id/unique fields>)` 复合，外键与 sqlc 查询强制带 tenant 过滤；路径/缓存 key 同样纳入 tenant，避免跨租户穿透。对齐 DEV-PLAN-019/019A：tenant 上下文缺失时 fail-closed；启用 RLS 时必须在事务内注入 `app.current_tenant`。
+- 多租户隔离：所有主键/唯一约束均以 `(tenant_id, <id/unique fields>)` 复合，外键与 sqlc 查询强制带 tenant 过滤；路径/缓存 key 同样纳入 tenant，避免跨租户穿透。对齐 DEV-PLAN-019/019A：tenant 上下文缺失时 fail-closed；启用 RLS 时必须在事务内注入 `app.current_tenant`；对齐 019A：系统队列表（如 `org_outbox`）PoC 阶段不启用 RLS 以保证 relay 可跨租户 claim，未来如需启用必须走专用 DB role/连接池，禁止通过放宽 policy 绕过隔离。
 - Postgres 依赖：迁移启用 `ltree` 与 `btree_gist` 扩展；有效期字段统一 `tstzrange` 且使用 `[start, end)` 半开区间，写入/校验一律 UTC，迁移包含时区/边界说明；`EXCLUDE USING gist (tenant_id WITH =, node_id WITH =, tstzrange(effective_date, end_date) WITH &&)` 防重叠，重名用 `(tenant_id,parent_node_id,name,effective_date,end_date)` 唯一。
 - sqlc 包：`modules/org/infrastructure/sqlc/...` 负责 CRUD + 冲突检测查询，包含 Position、继承解析只读视图、变更请求占位。
 - 性能与冲突验证：itf/bench 覆盖 1k 节点查询 <200ms，重叠/重名写入被拒绝；在 CI 以基准或集成测试执行。
@@ -109,6 +111,7 @@
 ### Presentation Layer & API
 - UI（templ，HTML/HTMX）：前缀 `/org/...`（体验完善由 035 负责；M1 可只交付最小页面骨架）。
 - 内部 API（默认 JSON-only；403 见 018 的 5.4）：前缀 `/org/api/...`（对齐 `docs/dev-plans/018-routing-strategy.md` 的 `/{module}/api/*`；落地需通过 `make check routing`）
+  - 路由登记：同步更新 `config/routing/allowlist.yaml`（`/org`=ui、`/org/api`=internal_api），并确保 404/405/500 在 `/org/api/*` 下遵循 JSON-only 全局错误契约。
   - `GET /org/api/hierarchies?type=OrgUnit&effective_date=`：返回树概览，支持 display_order 排序，属性提供显式值与继承解析值。
   - `POST /org/api/nodes` / `PATCH /org/api/nodes/{id}`：节点 CRUD（含有效期、重名、父子校验）；支持字段 code/name/i18n_names/legal_entity_id/company_code/location_id/display_order；删除改为 `PATCH` 设置 `end_date` 或状态 `Retired`，误创建支持 Rescind；预留 change request 草稿/提交接口（无审批流，仅存档）。
   - `POST /org/api/positions`（可选）/ `POST /org/api/assignments`：Assignment 以 Position 为锚点；若未显式传 position_id，默认创建一对一 Position 再绑定；支持 `assignment_type`（primary/matrix/dotted）；`PATCH /org/api/assignments/{id}` / `GET /org/api/assignments?subject=person:{id}`：人员分配时间线。
@@ -118,18 +121,18 @@
 - UI（templ）：
   - M1：树形视图 + 基础表单（节点、Position、分配），日期选择器切换有效期，支持多语言名称编辑、display_order 调整。
   - 拖拽式 Change Request Builder / Impact / Security Inspector / route preview 留作 M4+ backlog。
-- 权限要求：`/org/*`（UI）与 `/org/api/*`（内部 API）均需 Session+租户校验与 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`；无策略生成前可用特性开关仅对管理员开放。
+- 权限要求：`/org/*`（UI）与 `/org/api/*`（内部 API）均需 Session+租户校验与 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`（对齐 026 的 Casbin object/action：`org.*` + `read/write/assign/admin`）；无策略生成前可用特性开关仅对管理员开放。
 
 ## 集成与依赖
 - **SOR 边界**：Org 模块为组织层级 SOR；Position 为人员隶属锚点（可自动生成空壳），编制/空岗在 DEV-PLAN-021；HRM 为人 SOR；Finance 为 Cost Center/Company 财务口径 SOR（冻结期间不改 schema）。
 - **HRM 员工**：提供 `OrgAssignments` 视图和分配 API，表单默认 `effective_date = hire_date`，按 SOR 边界执行回写/订阅；主体标识使用 `person_id`（不可变）+ `pernr`（工号，租户内唯一且不变），position_id 必填（可由系统自动生成）。
-- **Authz/Casbin**：M1 仅发布事件；事件 payload 预留 `tenant_id/org_id/hierarchy_type/node_type/person_id/pernr/position_id/effective_date/end_date/assignment_type` 和 `version/timestamp`，供后续 `OrgScope`/ABAC 计算。policy pack/test 放入后续里程碑。
+- **Authz/Casbin**：M1 即接入 `pkg/authz` 对 `/org/*` 与 `/org/api/*` 做粗粒度鉴权（读/写/分配/管理），并提交 `config/access/policies/org/*.csv` 策略片段，通过 `make authz-test && make authz-lint`（必要时触发 `make authz-pack`）。组织节点级 OrgScope/继承/策略生成与草稿工作流放入后续阶段；事件与 snapshot（026）作为下游构建投影/纠偏的输入。
 - **Workflow**：M1 不引入审批引擎，事件中预留变更上下文字段（如 `change_type`, `initiator_id`）便于后续 route preview/绑定；change request 占位表可提前写入草稿。
 - **Position/Compensation**：M1 面向人员，Assignment 必须落在 Position 上，若未提供 position_id 则自动生成空壳 Position；编制/岗位/成本中心钩子留待 DEV-PLAN-021/M3+。
 - **Finance/Projects/Procurement**：冻结期仅消费事件与只读视图，不改 finance 相关 schema；解冻后若有需求在 dev-plan 记录。
 - **缓存**：树结构在 Redis/内存缓存，Key 含层级类型 + effective date（按日）。变更事件触发缓存失效。
 - **Reporting/Analytics**：提供 `org_reporting` 视图供 BI 工具使用，支持任意时间点快照，与 Workday Custom Reporting 对齐；后续补组织图导出、路径查询、人员路径查询接口。
-- **事件契约**：OrgChanged/OrgAssignmentChanged 附带 tenant_id/node_id/effective_window/version/assignment_type/幂等键，向后兼容扩展字段；预留继承解析后的属性、变更请求上下文字段。
+- **事件契约**：以 DEV-PLAN-022 为 SSOT：Topics `org.changed.v1`/`org.assignment.changed.v1`（含 `event_id/tenant_id/request_id/transaction_time/effective_window` 等），通过 DEV-PLAN-017 的 outbox/relay 投递；下游若需全量纠偏走 DEV-PLAN-026 的 `/org/api/snapshot`。
 - **跨模块校验**：person/pernr 通过 HRM 只读视图或缓存软校验并周期性对账；position_id 必填且归属 OrgNode，HRM Position SOR 成熟后再启用更强校验。
 
 ### 集成视图（简版）
@@ -137,11 +140,13 @@
 flowchart LR
   Org[modules/org<br/>组织层级 SOR]
   HRM[modules/hrm<br/>Person SOR]
-  Authz[pkg/authz<br/>Casbin/权限判定]
+  Authz[pkg/authz<br/>Casbin/鉴权]
   Workflow[modules/workflow<br/>BP/审批（后续）]
   Finance[modules/finance<br/>冻结：只读消费]
   Other[采购/项目/其他模块<br/>只读消费]
-  Bus[pkg/eventbus<br/>事件总线]
+  Outbox[(org_outbox<br/>Transactional Outbox)]
+  Relay[pkg/outbox relay]
+  Consumers[下游订阅方<br/>Authz/HRM/Workflow/...]
   Cache[Redis/内存缓存<br/>树缓存]
   DB[(PostgreSQL 17)]
   BI[BI/Reporting<br/>org_reporting 视图]
@@ -150,16 +155,12 @@ flowchart LR
   Org -->|API 调用：Org.Read/Write/Assign/Admin| Authz
   Org <--> Cache
   Org --> DB
+  Org -->|Tx enqueue| Outbox
   HRM --> DB
   Finance --> DB
   BI --> DB
 
-  Org -.->|OrgChanged / OrgAssignmentChanged| Bus
-  Bus -.-> HRM
-  Bus -.-> Authz
-  Bus -.-> Workflow
-  Bus -.-> Finance
-  Bus -.-> Other
+  Outbox --> Relay --> Consumers
 ```
 
 ## 上线与迁移
@@ -169,7 +170,7 @@ flowchart LR
 
 ## 里程碑（按现阶段资源和风险重新规划）
 1. **阶段 0：基线与占位**
-   - 建表与约束：OrgNode/Edge/Position/Assignment（含 assignment_type 占位）、继承规则表、角色表、change_requests 草稿占位，事件契约补充 assignment_type/继承属性。
+   - 建表与约束：OrgNode/Edge/Position/Assignment（含 assignment_type 占位）、继承规则表、角色表、`org_change_requests` 草稿占位，事件契约补充 assignment_type/继承属性。
    - Readiness：`make check lint`、相关路径 `go test`，导入/回滚脚本雏形。
 2. **阶段 1（M1 可交付）：最小可用主链**
    - Person→Position→Org 单树 CRUD，有效期/重名/无重叠/防环、事务时间审计、Rescind/Correct/Update 区分，Position 自动创建路径，1k 节点 <200ms 查询基线。
@@ -178,7 +179,7 @@ flowchart LR
    - 落地属性继承解析与缓存（规则表生效），角色分配与查询占位；矩阵/虚线 assignment_type 可读不可写（或特性开关）。
    - 深层读性能：启用时态闭包表、as_of 快照/物化视图雏形，禁用递归 CTE 热点查询。
 4. **阶段 3：变更请求 & 数据质量**
-   - change_requests 流程雏形（草稿/提交，审批占位）、Pre-flight 影响预检接口；数据质量规则与报告（编码正则、必填/叶子需岗位等），批量修复脚本雏形。
+   - `org_change_requests` 流程雏形（草稿/提交，审批占位）、Pre-flight 影响预检接口；数据质量规则与报告（编码正则、必填/叶子需岗位等），批量修复脚本雏形。
    - org_matrix_links 占位表可写（特性开关），角色/继承规则管理接口。
 5. **阶段 4：权限映射与业务关联**
    - org_security_group_mappings 读写占位（仅预览，不生成策略），权限预览接口；org_links 关联项目/成本中心/预算科目可写占位。
@@ -202,8 +203,8 @@ flowchart LR
     *   **产出**: 可通过 Atlas/Goose 执行的数据库迁移脚本，迁移生成后必须跑 `make db lint`（含 `atlas migrate lint`）与一次 `make db migrate up HRM_MIGRATIONS=1`/`make db migrate down HRM_MIGRATIONS=1` 验证可回滚，并记录命令与结果。
 
 *   **步骤 2: 建立占位表与事件契约**
-    *   **任务**: 创建 `org_attribute_inheritance_rules`, `org_roles`, `change_requests` 等占位表，即使 M1 阶段不实现其业务逻辑，也要确保表结构预留到位。
-    *   **任务**: 定义 `OrgChanged` 和 `OrgAssignmentChanged` 事件的详细数据结构（契约），包含 `assignment_type`、继承属性等未来扩展字段。
+    *   **任务**: 创建 `org_attribute_inheritance_rules`, `org_roles`, `org_change_requests` 等占位表，即使 M1 阶段不实现其业务逻辑，也要确保表结构预留到位。
+    *   **任务**: 按 DEV-PLAN-022 冻结事件契约：Topics `org.changed.v1`/`org.assignment.changed.v1`（字段含 `event_id/tenant_id/request_id/transaction_time/effective_window` 等），并预留 `assignment_type`、继承属性与变更请求上下文等扩展字段。
     *   **验证**: 若涉及 sqlc/atlas 生成，执行 `make sqlc-generate`/`make generate` 后确保 `git status --short` 干净。
 
 *   **步骤 3: 准备基础脚本与验证**
@@ -226,7 +227,7 @@ flowchart LR
 *   **步骤 6: 开发 API 与发布事件**
     *   **任务**: 提供节点、职位、分配的 RESTful API（含 `effective_date` 语义与稳定错误码）。
     *   **任务**: 先落地 Transactional Outbox 工具链（DEV-PLAN-017，`pkg/outbox`），并在 Org 模块使用独立表 `org_outbox`；确保“业务写入 + outbox 入库”同一事务提交。
-    *   **任务**: 在事务提交后通过 relay 投递 `OrgChanged` 和 `OrgAssignmentChanged`（允许重放、消费者按 `event_id` 幂等）；所有入口统一使用 `pkg/authz` 判定 `Org.Read/Org.Write/Org.Assign/Org.Admin`，提交 `config/access/policies/org/**` 片段并运行 `make authz-test authz-lint authz-pack` 作为准入。
+    *   **任务**: 在事务提交后通过 relay 投递 DEV-PLAN-022 定义的 Topics `org.changed.v1`/`org.assignment.changed.v1`（允许重放、消费者按 `event_id` 幂等）；所有入口统一使用 `pkg/authz` 判定 `Org.Read/Org.Write/Org.Assign/Org.Admin`，提交 `config/access/policies/org/*.csv` 策略片段并运行 `make authz-test authz-lint authz-pack` 作为准入。
 
 *   **步骤 6A: 实现 M1 前端界面**
     *   **任务**: 根据 `Presentation Layer & API` 章节中的 UI 描述，开发组织模块的前端界面。
@@ -253,7 +254,7 @@ flowchart LR
 此阶段开始引入流程管理的雏形。
 
 *   **步骤 10: 开发变更请求流程**
-    *   **任务**: 实现 `change_requests` 表的草稿和提交功能，审批部分可暂时占位（workflow 模块未启用时仅存草稿+审计，不触发路由）。
+    *   **任务**: 实现 `org_change_requests` 表的草稿和提交功能，审批部分可暂时占位（workflow 模块未启用时仅存草稿+审计，不触发路由）。
     *   **任务**: 提供一个预检（Pre-flight）API，用于在变更前分析可能的影响，并要求权限校验/审计；相关接口需在 `go test ./modules/org/...` 中覆盖无权限/有权限/租户隔离路径。
 
 *   **步骤 11: 强化数据质量**
@@ -286,7 +287,7 @@ flowchart LR
 - DEV-PLAN-027（步骤 7，性能基准与灰度）：依赖 026，完成 1k 节点 <200ms 基准脚本、导入与灰度发布/回滚剧本（作为 M1 上线验收门槛）。
 - DEV-PLAN-028（步骤 8，继承解析与角色读侧）：依赖 026-027，落地属性继承解析与角色查询占位，矩阵/虚线只读。
 - DEV-PLAN-029（步骤 9，闭包表与深层读优化）：依赖 028，加入闭包表/物化视图及迁移回填、幂等刷新、feature flag/回滚方案。
-- DEV-PLAN-030（步骤 10，变更请求与预检）：依赖 026-027，提供 change_requests 草稿/提交（无 workflow 时仅审计）与 Pre-flight API，并补权限/租户隔离测试。
+- DEV-PLAN-030（步骤 10，变更请求与预检）：依赖 026-027，提供 `org_change_requests` 草稿/提交（无 workflow 时仅审计）与 Pre-flight API，并补权限/租户隔离测试。
 - DEV-PLAN-031（步骤 11，数据质量与修复）：依赖 030，交付数据质量规则/报告与 dry-run/回滚的修复脚本，lint/test 兜底。
 - DEV-PLAN-032（步骤 12，权限映射与业务关联）：依赖 031，推进组织节点与安全组映射、业务对象关联；涉及 finance 目录前需先解冻并更新 AGENTS。
 - DEV-PLAN-033（步骤 13，可视化与报告）：依赖 029/032，完成组织图导出、节点/人员路径等高级报表。
@@ -333,7 +334,7 @@ flowchart LR
 - **跨模块耦合**：若 HRM/Finance 期待同步 schema 变更 → 明确 SOR 边界，仅发布事件/视图，避免修改冻结模块。
 
 ## 未来扩展点（M2+ 清单）
-- 变更请求审批流：基于 `change_requests` 启用 Draft/Submit/Approve/Schedule/Activate，全链路审计与回滚。
+- 变更请求审批流：基于 `org_change_requests` 启用 Draft/Submit/Approve/Schedule/Activate，全链路审计与回滚。
 - 变更影响预检：提供 Pre-flight API，输出受影响员工/岗位/权限/事件列表。
 - 组织图与路径：导出组织图（PNG/SVG/JSON）、节点间路径查询、人员所在路径查询。
 - 矩阵/虚线：完善 `assignment_type` + `org_matrix_links`，路由/权限识别矩阵关系。

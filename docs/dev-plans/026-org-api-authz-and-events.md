@@ -7,7 +7,7 @@
 
 ## 目标
 - API 覆盖节点/层级/岗位/分配的读写操作，返回值含租户隔离与有效期语义。
-- 事件 `OrgChanged` / `OrgAssignmentChanged` 在写入成功后发布，并通过 Transactional Outbox 保证“数据与事件”原子一致。
+- 事件 Topics `org.changed.v1` / `org.assignment.changed.v1` 在写入成功后发布，并通过 Transactional Outbox 保证“数据与事件”原子一致。
 - `make authz-test authz-lint authz-pack` 通过，策略片段提交。
 - 所有入口接受 `effective_date` 参数（默认 `time.Now()`），响应/查询遵循时间线语义。
 - 树/分配读写配套缓存键（含层级/tenant/effective_date）与事件驱动失效/重建策略。
@@ -18,7 +18,7 @@
 - 范围：对外 REST API、Authz 强制、策略片段、Outbox 事件闭环、缓存失效、snapshot/batch 两个系统性接口与配套测试/记录。
 - 非目标：
   - 不实现 Org UI 体验完善（035 负责）；本计划仅保证 API 契约与错误返回稳定。
-  - 不实现 change_requests/审批流/预检（030 负责）。
+  - 不实现 `org_change_requests`/审批流/预检（030 负责）。
   - 不重新定义 022 的事件字段（026 只负责落地投递闭环与幂等/重放）。
   - 不改变 021 的核心表/约束定义（如需改动需回到 021/025 评审）。
 
@@ -41,6 +41,7 @@
 ## 设计决策
 ### 1. 路由与时间语义
 - 内部 API 前缀：`/org/api`（对齐 `docs/dev-plans/018-routing-strategy.md` 的 `/{module}/api/*`），所有读/写接口接受 `effective_date`（RFC3339 或 `YYYY-MM-DD`），缺省 `time.Now().UTC()`。
+- 路由登记：同步更新 `config/routing/allowlist.yaml`（`/org`=ui、`/org/api`=internal_api），并确保 `/org/api/*` 下 404/405/500 遵循 internal API 的 JSON-only 全局错误契约（对齐 018B）。
 - 语义统一：查询一律按 as-of（`effective_date <= t < end_date`）读取有效片段；写入（Update）按 025 的 Insert 算法截断并插入新片段。
 
 ### 2. Authz（Casbin）接入与 403 契约
@@ -56,8 +57,9 @@
 
 ### 3. 事件投递闭环（Transactional Outbox）
 - 原子性要求：业务写入与 outbox 插入必须在同一数据库事务内提交（避免“数据已改但事件未发/事件已发但数据未改”）。
-- 事件来源：复用 022 的 `OrgChangedEvent/OrgAssignmentChangedEvent`，Topic 仍按 `org.changed.v1/org.assignment.changed.v1`；`transaction_time` 取事务提交时间，`effective_window` 取变更的 valid time。
+- 事件来源：复用 022 的事件契约（Topics `org.changed.v1/org.assignment.changed.v1`）；`transaction_time` 取事务提交时间，`effective_window` 取变更的 valid time。
 - 工具链：复用 `DEV-PLAN-017` 的 `pkg/outbox`；本模块使用独立表 `org_outbox`（结构与索引对齐 017，便于未来演进为独立服务）。
+- RLS 边界（对齐 019A）：PoC 阶段 `org_outbox` 不启用 RLS 以保证 relay 可跨租户 claim；如未来需要启用，必须走专用 DB role/连接池与审计，禁止通过放宽 policy 绕过隔离。
 - 幂等与重放：outbox 以 `event_id` 为幂等键、`sequence` 为有序游标；消费者与应用内 handler 必须基于 `event_id` 幂等处理并允许重放。
 - 顺序性：M1 relay 采用**单 worker**按 `sequence` 升序投递；多实例部署通过“仅开启一个 relay”或使用 `pg_try_advisory_lock` 保证同一时刻只有一个 relay；如未来并行化，按 `tenant_id` 分区并在分区内保持顺序（否则下游不得假设顺序）。
 - Outbox 表（M1，示意字段）：

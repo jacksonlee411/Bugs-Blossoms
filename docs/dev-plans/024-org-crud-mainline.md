@@ -26,8 +26,8 @@
 
 ## 依赖与里程碑
 - 依赖：
-  - 021：核心表/约束可用（至少 `org_nodes/org_node_slices/org_edges/positions/org_assignments` 迁移完成）。
-  - 022：`OrgChangedEvent/OrgAssignmentChangedEvent` 契约类型可引用（字段对齐以 022 为准）。
+  - 021：核心表/约束可用（至少 `org_nodes/org_node_slices/org_edges/org_positions/org_assignments` 迁移完成）。
+  - 022：事件契约（Topics `org.changed.v1/org.assignment.changed.v1`）可引用（字段对齐以 022 为准）。
   - 023：仅用于本地准备数据与回滚（不影响 024 代码结构）。
 - 里程碑（按提交时间填充）：模块骨架 -> repo/service CRUD -> controller/DTO/mapper -> 自动 Position -> 最小页面 -> 测试与 readiness 记录。
 
@@ -41,16 +41,17 @@
   - `modules/org/presentation/templates`：最小页面（开发验证用途，完整 UI 在 035）。
 
 ### 2. 数据模型映射（对齐 021）
-- `org_nodes`：稳定标识（被 `org_edges/positions` 外键引用），字段含 `code/is_root/type`。
+- `org_nodes`：稳定标识（被 `org_edges/org_positions` 外键引用），字段含 `code/is_root/type`。
 - `org_node_slices`：节点属性时间片（`name/i18n_names/status/manager_user_id/... + effective_date/end_date`），同节点区间不重叠（EXCLUDE）。
 - `org_edges`：父子关系时间片（`parent_node_id/child_node_id/path/depth + effective_date/end_date`），同 child 区间不重叠（EXCLUDE），`path/depth` 由触发器维护。
-- `positions`：绑定 `org_node_id` 的岗位时间片（`code/title/status/is_auto_created + effective_date/end_date`）。
+- `org_positions`：绑定 `org_node_id` 的岗位时间片（`code/title/status/is_auto_created + effective_date/end_date`）。
 - `org_assignments`：人员分配时间片（`position_id/subject_type/subject_id/pernr/assignment_type/is_primary + effective_date/end_date`），primary 唯一与重叠由约束兜底。
 
 ### 3. API 入口（对齐 020；Authz/批量/对账在 026）
+- 路由登记：同步更新 `config/routing/allowlist.yaml`（`/org`=ui、`/org/api`=internal_api），并通过 `make check routing`（对齐 018B 的 routing gates）。
 - 读（Internal API，对齐 018）：
   - `GET /org/api/hierarchies?type=OrgUnit&effective_date=`：树概览（M1 仅 OrgUnit）。
-  - `GET /org/api/assignments?subject=person:{id}&effective_date=`：人员分配时间线。
+  - `GET /org/api/assignments?subject=person:{pernr}&effective_date=`：人员分配时间线（对齐 035：`pernr` 为租户内稳定人员编号）。
 - 写（M1 主链，Internal API）：
   - `POST /org/api/nodes`：创建节点（写入 `org_nodes` + 首个 `org_node_slices` + `org_edges`（非 root））。
   - `PATCH /org/api/nodes/{id}`：按 Insert 语义新增时间片（end_date 自动计算；细节在 025）。
@@ -70,7 +71,7 @@
 
 ### 5. 自动创建空壳 Position（M1 必做）
 - 触发条件：创建 Assignment 且未提供 `position_id`（或提供 `org_node_id` 替代）。
-- 行为：在同事务内创建 `positions(is_auto_created=true)` 并继续创建 assignment；默认一人一岗仅作为写链路便捷，不视为编制体系。
+- 行为：在同事务内创建 `org_positions(is_auto_created=true)` 并继续创建 assignment；默认一人一岗仅作为写链路便捷，不视为编制体系。
 - 命名与元数据：
   - `code`：使用保留前缀 `AUTO-` + 确定性短 hash（建议基于 `tenant_id/org_node_id/subject_type/subject_id`），用于并发去重与审计定位；M1 不要求对外可读。
   - `title`：可为固定模板（如 `Member of {OrgNodeCode}`）或为空；不要求随 OrgNode 改名自动同步，UI 展示优先使用 OrgNode slice 的 `name`。
@@ -78,8 +79,8 @@
 - 数据治理（后续）：频繁调动可能遗留无引用的 `is_auto_created=true` Position，M1 不做自动清理；治理策略（例如清理无 assignment 的空壳、或统一 Retire）在 031（数据质量）或后续运维计划中落地。
 
 ### 6. 事件生成与发布（对齐 022；投递闭环在 026）
-- 024 的交付口径：在写入成功后生成 `OrgChangedEvent/OrgAssignmentChangedEvent` 并通过应用内 `EventBus` 发布（字段对齐 022；`transaction_time=now()`、`initiator_id` 来自 Session；`entity_version/sequence` 先按最小策略生成，完整审计/幂等口径在 025/026 加固）。
-- 事件可靠投递（Transactional Outbox、缓存失效、对账接口）不在 024，统一在 026 落地。
+- 024 的交付口径：在写入成功后生成 022 定义的 integration event payload（Topics `org.changed.v1/org.assignment.changed.v1`；`transaction_time` 取事务提交时间，`initiator_id` 来自 Session；`entity_version/sequence` 先按最小策略生成，完整审计/幂等口径在 025/026 加固）。
+- 024 不负责 Transactional Outbox/重放/缓存失效/对账，也不通过 `pkg/eventbus` 对外发布 integration events；投递闭环在 026 统一落地。
 
 ### 7. 最小 UI（与 035 边界）
 - 024 仅提供最小页面用于验证 CRUD：节点列表/创建/编辑、Assignment 创建与列表。
@@ -87,11 +88,11 @@
 
 ## 任务清单与验收标准
 1. [ ] 模块骨架：创建 `modules/org`（DDD 目录）与 `module.go/links.go/permissions/constants.go`，保证可被 app 注册且不破坏 cleanarch 约束。验收：`go test ./...` 编译通过（仅作为烟囱验证；完整门禁在 readiness）。
-2. [ ] Repository（sqlc + tenant 过滤）：实现 `org_nodes/org_node_slices/org_edges/positions/org_assignments` 的最小查询与写入 repo（Create/InsertUpdate/List/AsOf），所有查询强制 tenant 过滤。验收：repo 层测试覆盖基本 CRUD 与 tenant 隔离。
+2. [ ] Repository（sqlc + tenant 过滤）：实现 `org_nodes/org_node_slices/org_edges/org_positions/org_assignments` 的最小查询与写入 repo（Create/InsertUpdate/List/AsOf），所有查询强制 tenant 过滤。验收：repo 层测试覆盖基本 CRUD 与 tenant 隔离。
 3. [ ] Service（主链写路径）：实现 Node/Assignment 的 Create 与 Update（Insert）主路径；实现 MoveNode（失效旧边+创建新边）；Update 的 `end_date` 计算与截断逻辑按 025 的算法落地（先跑通主路径，冻结窗口/审计在 025）。验收：服务层测试覆盖有效期基础路径、MoveNode 主路径与 DB 约束冲突报错稳定。
 4. [ ] 自动 Position：实现 “Create Assignment -> 自动创建空壳 Position” 主路径与特性开关；明确矩阵/虚线写入默认拒绝；落地自动 Position 的 `code/title` 生成策略与并发去重策略。验收：测试覆盖有/无 position_id、开关关闭、并发冲突/重试、重复请求（幂等键在 025/026 固化）。
 5. [ ] Controller/DTO：实现最小 REST/HTMX 控制器，强制 Session+tenant 校验，解析 `effective_date`（默认 now）并返回稳定错误结构；权限判定的 `pkg/authz` 接入与策略片段在 026。验收：controller 测试覆盖无 Session/无 tenant/参数非法/租户隔离。
-6. [ ] 事件生成（应用内发布）：写入成功后生成并发布 `OrgChanged/OrgAssignmentChanged`（字段对齐 022；`transaction_time/initiator_id` 必填；`entity_version/sequence` 先按最小策略生成，审计与幂等加固在 025/026）。验收：测试验证事件字段齐全且发布时机在事务成功后。
+6. [ ] 事件生成（仅产出 payload）：写入成功后生成 Topics `org.changed.v1/org.assignment.changed.v1` 的事件 payload（字段对齐 022；`transaction_time/initiator_id` 必填；`entity_version/sequence` 先按最小策略生成，审计与幂等加固在 025/026）。验收：测试验证事件字段齐全且仅在事务成功后产出（失败回滚不产出）。
 7. [ ] 最小 templ 页面：提供节点/Assignment 的最小页面用于人工验证；执行 `templ generate && make css`（如有模板变更）。验收：生成后 `git status --short` 干净。
 8. [ ] Readiness：执行 `make check lint` 与 `go test ./modules/org/...`（或影响路径），必要时补 `templ generate && make css`；将命令/耗时/结果记录到 `docs/dev-records/DEV-PLAN-024-READINESS.md`。
 
