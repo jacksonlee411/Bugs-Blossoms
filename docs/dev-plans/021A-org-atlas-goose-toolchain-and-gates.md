@@ -1,6 +1,7 @@
 # DEV-PLAN-021A：Org Atlas+Goose 工具链与 CI 门禁落地
 
-**状态**: 草拟中（2025-12-17 10:00 UTC）
+**状态**: 已落地（2025-12-17）
+**实现 PR**：#66
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
@@ -14,11 +15,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **Org 受控目录落地**：新增 `migrations/org/**`（goose 格式）与 `migrations/org/atlas.sum`。
-- [ ] **Atlas env 落地**：在根 `atlas.hcl` 新增 `org_dev/org_ci`（或等价命名），并明确 `src` 与 `migration.dir`。
-- [ ] **Makefile 入口落地**：提供可复用、无需猜测的命令入口（plan/lint/migrate up/down/status/redo），并与 CI 口径一致。
-- [ ] **CI 门禁落地**：在 `.github/workflows/quality-gates.yml` 新增 `org-atlas` filter；命中时运行 Org 的 Atlas plan/lint 与 goose smoke，并确保生成物已提交。
-- [ ] **Readiness 可追溯**：创建并填写 `docs/dev-records/DEV-PLAN-021A-READINESS.md`（按“时间→命令→预期→实际→结论/回滚”）。
+- [x] **Org 受控目录落地**：新增 `migrations/org/**`（goose 格式）与 `migrations/org/atlas.sum`。
+- [x] **Atlas env 落地**：在根 `atlas.hcl` 新增 `org_dev/org_ci`（或等价命名），并明确 `src` 与 `migration.dir`。
+- [x] **Makefile 入口落地**：提供可复用、无需猜测的命令入口（plan/lint/migrate up/down/status/redo），并与 CI 口径一致。
+- [x] **CI 门禁落地**：在 `.github/workflows/quality-gates.yml` 新增 `org-atlas` filter；命中时运行 Org 的 Atlas plan/lint 与 goose smoke，并确保生成物已提交。
+- [x] **Readiness 可追溯**：创建并填写 `docs/dev-records/DEV-PLAN-021A-READINESS.md`（按“时间→命令→预期→实际→结论/回滚”）。
 
 ### 2.2 非目标 (Out of Scope)
 - 不在本计划内实现 Org 的业务写路径/API/Authz/outbox（见 022/024/025/026）。
@@ -114,30 +115,30 @@ flowchart TD
 - 011B（可选）：多 worktree 本地 DB 隔离，降低本地验证互相污染风险。
 
 ### 8.2 里程碑
-1. [ ] 新增 Org 目录与最小 stub（`modules/org/.../core_deps.sql`、`.../org-schema.sql`）。
-2. [ ] `atlas.hcl` 增加 `org_dev/org_ci`，本地 `atlas` 可对 Org plan/lint。
-3. [ ] 新增 `migrations/org` baseline + `atlas.sum`（可重复生成且提交干净）。
-4. [ ] Makefile 新增 `make org plan/lint/migrate` 入口（与 CI 命令口径一致）。
-5. [ ] CI 新增 `org-atlas` filter，并跑通 plan/lint/goose smoke + `git status --porcelain` 门禁。
-6. [ ] 写入 `docs/dev-records/DEV-PLAN-021A-READINESS.md`（包含命令输出摘要）。
+1. [x] 新增 Org 目录与最小 stub（`modules/org/.../core_deps.sql`、`.../org-schema.sql`）。
+2. [x] `atlas.hcl` 增加 `org_dev/org_ci`，本地 `atlas` 可对 Org plan/lint。
+3. [x] 新增 `migrations/org` baseline + `atlas.sum`（可重复生成且提交干净）。
+4. [x] Makefile 新增 `make org plan/lint/migrate` 入口（与 CI 命令口径一致）。
+5. [x] CI 新增 `org-atlas` filter，并跑通 plan/lint/goose smoke + `git status --porcelain` 门禁。
+6. [x] 写入 `docs/dev-records/DEV-PLAN-021A-READINESS.md`（包含命令输出摘要）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 ### 9.1 CI 门禁（必须）
 - 当变更命中 `org-atlas` filter 时：
-  - [ ] `make org plan` 可连接 CI Postgres 并输出 plan（不落盘）。
-  - [ ] `make org lint` 通过（`atlas migrate lint --env org_ci`）。
-  - [ ] `make org migrate up` 通过（baseline + smoke），且使用独立 goose 版本表（例如 `GOOSE_TABLE=goose_db_version_org`）。
-  - [ ] `git status --porcelain` 为空（确保 `atlas.sum` 等生成物已提交）。
+  - [x] `make org plan` 可连接 CI Postgres 并输出 plan（不落盘）。
+  - [x] `make org lint` 通过（`atlas migrate lint --env org_ci`）。
+  - [x] `make org migrate up` 通过（baseline + smoke），且使用独立 goose 版本表（例如 `GOOSE_TABLE=goose_db_version_org`）。
+  - [x] `git status --porcelain` 为空（确保 `atlas.sum` 等生成物已提交）。
 
 ### 9.2 本地可复现（必须）
 - 在干净 Postgres 17 上可按如下顺序跑通且无 diff：
-  - [ ] `make atlas-install && make goose-install`
-  - [ ] `make org plan && make org lint`
-  - [ ] `GOOSE_TABLE=goose_db_version_org make org migrate up && GOOSE_TABLE=goose_db_version_org GOOSE_STEPS=1 make org migrate down`
-  - [ ] `git status --short` 为空
+  - [x] `make atlas-install && make goose-install`
+  - [x] `make org plan && make org lint`
+  - [x] `GOOSE_TABLE=goose_db_version_org make org migrate up && GOOSE_TABLE=goose_db_version_org GOOSE_STEPS=1 make org migrate down`
+  - [x] `git status --short` 为空
 
 ### 9.3 Readiness 落盘（必须）
-- [ ] `docs/dev-records/DEV-PLAN-021A-READINESS.md` 存在且包含时间戳、命令、预期/实际、结论/回滚。
+- [x] `docs/dev-records/DEV-PLAN-021A-READINESS.md` 存在且包含时间戳、命令、预期/实际、结论/回滚。
 
 ## 10. 运维、回滚与降级 (Ops / Rollback)
 - 回滚最近一次 Org 迁移：`GOOSE_STEPS=1 make org migrate down`
