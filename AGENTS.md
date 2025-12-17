@@ -34,6 +34,7 @@
 | Authz（`config/access/**` / `pkg/authz/**` / `scripts/authz/**` 等） | `make authz-test && make authz-lint` | 另见 `docs/runbooks/AUTHZ-BOT.md` |
 | HRM sqlc（`sqlc.yaml` / `modules/hrm/infrastructure/sqlc/**` 等） | `scripts/db/export_hrm_schema.sh` + `make sqlc-generate` + `git status --short` | |
 | HRM Atlas/Goose（`modules/hrm/infrastructure/atlas/**` / `migrations/hrm/**` 等） | `make db plan && make db lint` | 另见 dev-plan 对应章节 |
+| Org Atlas/Goose（`modules/org/infrastructure/atlas/**` / `modules/org/infrastructure/persistence/schema/**` / `migrations/org/**` 等） | `make org plan && make org lint && make org migrate up` | 另见 `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md` |
 | 新增/调整文档 | `make check doc` | 门禁见“文档收敛与门禁” |
 
 ## 3. 开发与编码规则（仓库级合约）
@@ -87,10 +88,11 @@ modules/{module}/
 - 测试与校验：Authz 相关改动必须跑 `make authz-test && make authz-lint`。
 - Bot：见 `docs/runbooks/AUTHZ-BOT.md`。
 
-## 7. HRM（sqlc / Atlas+Goose）工作流（摘要）
+## 7. HRM/Org（sqlc / Atlas+Goose）工作流（摘要）
 
 - sqlc：影响 `sqlc.yaml` / `modules/hrm/infrastructure/sqlc/**` / `modules/hrm/infrastructure/persistence/**/*.sql` / `docs/dev-records/hrm-sql-inventory.md` 时：先 `scripts/db/export_hrm_schema.sh`，再 `make sqlc-generate`，最后 `git status --short` 必须为空。
 - Atlas/Goose：HRM schema 以 `modules/hrm/infrastructure/atlas/schema.hcl` 为权威；`make db plan` 做 dry-run，`make db lint` 跑 atlas lint；执行 HRM 迁移用 `HRM_MIGRATIONS=1 make db migrate up`。
+- Atlas/Goose（Org）：命中 `modules/org/infrastructure/**` 或 `migrations/org/**` 时：按 `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md` 的口径执行 `make org plan && make org lint && make org migrate up`；并确保 Org 使用独立 goose 版本表（例如 `GOOSE_TABLE=goose_db_version_org`）。
 
 ## 8. 文档收敛与门禁（New Doc Gate）
 
@@ -144,6 +146,7 @@ modules/{module}/
 - ORY Kratos 接入与会话桥接（DEV-PLAN-019B）：`docs/dev-plans/019B-ory-kratos-session-bridge.md`
 - Jackson 企业 SSO（DEV-PLAN-019C）：`docs/dev-plans/019C-jackson-enterprise-sso.md`
 - 多租户管理页面可视化管理（DEV-PLAN-019D）：`docs/dev-plans/019D-multi-tenant-management-ui.md`
+- Org Atlas+Goose 工具链与门禁（DEV-PLAN-021A）：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
 - 移除 finance/billing/crm/projects 模块（DEV-PLAN-040）：`docs/dev-plans/040-remove-finance-billing-crm.md`
 - 移除 warehouse（仓库）模块（DEV-PLAN-041）：`docs/dev-plans/041-remove-warehouse-module.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
