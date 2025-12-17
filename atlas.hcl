@@ -13,6 +13,10 @@ locals {
     "file://modules/hrm/infrastructure/atlas/core_deps.sql",
     "file://modules/hrm/infrastructure/persistence/schema/hrm-schema.sql",
   ]
+  org_src = [
+    "file://modules/org/infrastructure/atlas/core_deps.sql",
+    "file://modules/org/infrastructure/persistence/schema/org-schema.sql",
+  ]
 }
 
 env "dev" {
@@ -44,6 +48,28 @@ env "ci" {
 
   migration {
     dir    = "file://migrations/hrm"
+    format = "goose"
+  }
+}
+
+env "org_dev" {
+  url = var.db_url
+  dev = var.atlas_dev_url
+  src = local.org_src
+
+  migration {
+    dir    = "file://migrations/org"
+    format = "goose"
+  }
+}
+
+env "org_ci" {
+  url = var.db_url
+  dev = var.atlas_dev_url
+  src = local.org_src
+
+  migration {
+    dir    = "file://migrations/org"
     format = "goose"
   }
 }

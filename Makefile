@@ -141,6 +141,37 @@ db:
 		echo "  lint    - Run Atlas lint (ci env)"; \
 	fi
 
+# Org Atlas+Goose management with subcommands (plan, lint, migrate)
+org:
+	@if [ "$(word 2,$(MAKECMDGOALS))" = "plan" ]; then \
+		TARGET_DB_NAME="$(DB_NAME)"; \
+		DB_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"; \
+		DEV_DB_NAME="$${ATLAS_DEV_DB_NAME:-org_dev}"; \
+		DEV_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$$DEV_DB_NAME?sslmode=disable"; \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$TARGET_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$TARGET_DB_NAME TEMPLATE template0"; \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$DEV_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$DEV_DB_NAME TEMPLATE template0"; \
+		TMP_SCHEMA="$$(mktemp -t org_atlas_schema_XXXXXX.sql)"; \
+		trap 'rm -f "$$TMP_SCHEMA"' EXIT; \
+		cat modules/org/infrastructure/atlas/core_deps.sql modules/org/infrastructure/persistence/schema/org-schema.sql > "$$TMP_SCHEMA"; \
+		TO_URL="file:///$${TMP_SCHEMA#/}"; \
+		$(ATLAS) schema diff --from $$DB_URL --to $$TO_URL --dev-url $$DEV_URL --format '{{ sql . }}'; \
+	elif [ "$(word 2,$(MAKECMDGOALS))" = "lint" ]; then \
+		TARGET_DB_NAME="$(DB_NAME)"; \
+		DB_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"; \
+		DEV_DB_NAME="$${ATLAS_DEV_DB_NAME:-org_dev}"; \
+		DEV_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$$DEV_DB_NAME?sslmode=disable"; \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$TARGET_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$TARGET_DB_NAME TEMPLATE template0"; \
+		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$DEV_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$DEV_DB_NAME TEMPLATE template0"; \
+		DB_URL="$$DB_URL" ATLAS_DEV_URL="$$DEV_URL" $(ATLAS) migrate lint --env org_ci --git-base origin/main; \
+	elif [ "$(word 2,$(MAKECMDGOALS))" = "migrate" ]; then \
+		GOOSE_MIGRATIONS_DIR="migrations/org" GOOSE_TABLE="$${GOOSE_TABLE:-goose_db_version_org}" ./scripts/db/run_goose.sh $(word 3,$(MAKECMDGOALS)); \
+	else \
+		echo "Usage: make org [plan|lint|migrate]"; \
+		echo "  plan        - Dry-run Atlas diff for Org schema"; \
+		echo "  lint        - Run Atlas lint (org_ci env)"; \
+		echo "  migrate     - Run goose migrations (up/down/redo/status)"; \
+	fi
+
 # Run tests with optional subcommands (test, watch, coverage, verbose, package, docker)
 test:
 	@if [ "$(word 1,$(MAKECMDGOALS))" != "test" ]; then \
@@ -322,7 +353,7 @@ setup: deps css
 watch coverage verbose docker score report linux docker-base docker-prod up down redo status restart logs local stop reset seed migrate plan lint rls-role install help imports doc routing:
 	@:
 
-.PHONY: deps db test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
+.PHONY: deps db org test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
         down restart logs local stop reset watch coverage verbose docker score report \
         dev fmt lint tr doc routing dev-env linux docker-base docker-prod run server sdk-tools install help atlas-install goose-install plan
 # HRM sqlc generation

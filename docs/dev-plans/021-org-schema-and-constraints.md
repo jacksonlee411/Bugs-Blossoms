@@ -8,7 +8,7 @@
 
 ## 0. 进度速记
 - ✅ 范围/核心约束口径已定稿（单租户单树、ltree 路径、EXCLUDE 防重叠/双亲、唯一根）。
-- 🔄 Org 的迁移工具链尚未落地（Atlas env / `migrations/org` / lint / 上下行验证）。
+- ✅ Org 的迁移工具链已落地（`atlas.hcl` 的 `org_dev/org_ci`、`migrations/org`、`make org plan/lint/migrate up/down`）。
 - 🆕 文档补齐：表命名冲突决策、ltree label 编码规则、Atlas/Goose 命令口径与 Readiness 记录要求。
 
 ## 1. 背景与上下文 (Context)
@@ -20,11 +20,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **Schema 合同**：落地 Org M1 核心表（`org_nodes`、`org_node_slices`、`org_edges`、`org_positions`、`org_assignments`）的字段/类型/约束/索引（精确到 DB 级别）。
-- [ ] **时态强约束**：用 `check + EXCLUDE USING gist` 兜底“同键区间不重叠”（slice、双亲、主属唯一等），有效期语义统一为 UTC 半开区间 `[effective_date, end_date)`。
-- [ ] **层级强约束**：用 `ltree` 存储路径，写入时拒绝成环；禁止直接 `UPDATE parent_node_id/child_node_id`（移动必须走“失效旧边 + 创建新边”）。
-- [ ] **迁移闭环**：Org 专用 migrations 目录可生成、可 lint、可执行 up/down。
-- [ ] **Readiness 可追溯**：将 lint/上下行验证/关键 SQL 校验命令与结果记录到 `docs/dev-records/DEV-PLAN-021-READINESS.md`（本计划只定义格式与要求；文件在落地时创建）。
+- [x] **Schema 合同**：落地 Org M1 核心表（`org_nodes`、`org_node_slices`、`org_edges`、`org_positions`、`org_assignments`）的字段/类型/约束/索引（精确到 DB 级别）。
+- [x] **时态强约束**：用 `check + EXCLUDE USING gist` 兜底“同键区间不重叠”（slice、双亲、主属唯一等），有效期语义统一为 UTC 半开区间 `[effective_date, end_date)`。
+- [x] **层级强约束**：用 `ltree` 存储路径，写入时拒绝成环；禁止直接 `UPDATE parent_node_id/child_node_id`（移动必须走“失效旧边 + 创建新边”）。
+- [x] **迁移闭环**：Org 专用 migrations 目录可生成、可 lint、可执行 up/down。
+- [x] **Readiness 可追溯**：将 lint/上下行验证/关键 SQL 校验命令与结果记录到 `docs/dev-records/DEV-PLAN-021-READINESS.md`（本计划只定义格式与要求；文件在落地时创建）。
 
 ### 2.2 非目标 (Out of Scope)
 - 不实现业务写语义（Insert/Correct/Rescind/ShiftBoundary 的 Service 算法见 `docs/dev-plans/025-org-time-and-audit.md`）。
@@ -290,10 +290,10 @@ erDiagram
   - 019A：RLS 强租户隔离契约（fail-closed 的 `app.current_tenant` 注入与系统表边界）。
   - 020/024/025：有效期写语义与 MoveNode 的服务侧实现（本计划只定义 DB 合同）。
 - **里程碑**：
-  1. [ ] 落地 `modules/org/infrastructure/persistence/schema/org-schema.sql`（包含扩展/表/索引/约束）。
-  2. [ ] 落地 `modules/org/infrastructure/atlas/core_deps.sql`（最小依赖表 stub）。
-  3. [ ] 新增 `migrations/org/00001_org_baseline.sql` 与 `migrations/org/atlas.sum`，并能被 goose 执行。
-  4. [ ] `atlas migrate lint` 对 Org 迁移通过（CI 可重复执行）。
+  1. [x] 落地 `modules/org/infrastructure/persistence/schema/org-schema.sql`（包含扩展/表/索引/约束）。
+  2. [x] 落地 `modules/org/infrastructure/atlas/core_deps.sql`（最小依赖表 stub）。
+  3. [x] 新增 `migrations/org/00001_org_baseline.sql` 与 `migrations/org/atlas.sum`，并能被 goose 执行。
+  4. [x] `atlas migrate lint` 对 Org 迁移通过（CI 可重复执行）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 ### 9.1 DB 约束验收（必须可重复执行）
@@ -313,9 +313,9 @@ erDiagram
 - 更新限制：直接 `UPDATE org_edges SET parent_node_id=...` 被拒绝。
 
 ### 9.3 Readiness 记录（执行后落盘）
-- [ ] `atlas migrate diff ...` / `atlas migrate lint ...` 输出摘要
-- [ ] `goose -dir migrations/org ... up/down` 输出摘要
-- [ ] `git status --short` 干净确认
+- [x] `atlas migrate diff ...` / `atlas migrate lint ...` 输出摘要
+- [x] `goose -dir migrations/org ... up/down` 输出摘要
+- [x] `git status --short` 干净确认
 
 ## 10. 运维、回滚与降级 (Ops / Rollback)
 - 回滚最近一次迁移：`GOOSE_STEPS=1 goose -dir migrations/org postgres "$DSN" down`

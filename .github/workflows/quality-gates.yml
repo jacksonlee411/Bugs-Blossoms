@@ -69,6 +69,14 @@ jobs:
               - 'scripts/db/run_goose.sh'
               - 'scripts/db/export_hrm_schema.sh'
               - 'docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md'
+            org-atlas:
+              - 'atlas.hcl'
+              - 'modules/org/infrastructure/atlas/**'
+              - 'modules/org/infrastructure/persistence/schema/**'
+              - 'migrations/org/**'
+              - 'scripts/db/run_goose.sh'
+              - 'docs/dev-records/DEV-PLAN-021-READINESS.md'
+              - 'docs/dev-records/DEV-PLAN-021A-READINESS.md'
             authz:
               - 'pkg/authz/**'
               - 'cmd/authzbot/**'
@@ -115,11 +123,11 @@ jobs:
         run: go mod download
 
       - name: Install Atlas CLI
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
+        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
         run: make atlas-install
 
       - name: Install goose CLI
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
+        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
         run: make goose-install
 
       - name: Regenerate templ artifacts
@@ -266,8 +274,41 @@ jobs:
           HRM_MIGRATIONS: "1"
         run: make db migrate up
 
+      - name: Run Org Atlas plan
+        if: ${{ steps.changed-files.outputs.org-atlas == 'true' }}
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: iota_erp_org_atlas
+          ATLAS_DEV_DB_NAME: org_dev
+        run: make org plan
+
+      - name: Run Org Atlas lint
+        if: ${{ steps.changed-files.outputs.org-atlas == 'true' }}
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: iota_erp_org_atlas
+          ATLAS_DEV_DB_NAME: org_dev
+        run: make org lint
+
+      - name: Run Org goose migrations (smoke)
+        if: ${{ steps.changed-files.outputs.org-atlas == 'true' }}
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          DB_NAME: iota_erp_org_atlas
+          GOOSE_TABLE: goose_db_version_org
+        run: make org migrate up
+
       - name: Ensure atlas artifacts are committed
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
+        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             echo "Atlas/goose commands produced uncommitted changes"
