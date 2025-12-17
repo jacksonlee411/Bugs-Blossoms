@@ -1,117 +1,239 @@
-# DEV-PLAN-023：Org 导入/回滚脚本与 Readiness
+# DEV-PLAN-023：Org 导入/回滚工具与 Readiness
 
-**状态**: 规划中（2025-12-13 更新）
+**状态**: 已评审（2025-12-17 11:44 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
 
-## 背景
-- 对应 020 步骤 3，承接 021（schema 落地）与 022（占位表/事件契约），需提供导入/导出/回滚脚本雏形并完成 readiness（lint/test），为 024 CRUD 主链上线前做数据与执行面准备。
+## 0. 进度速记
+- ✅ 交付形态：Go CLI `cmd/org-data`（默认 dry-run）。
+- ✅ MVP 目标：`--backend db` 的 **seed** 导入/导出/回滚 + manifest + readiness。
+- ⏳ 后续增强：`--backend api`（复用 `/org/api/batch`）与 **merge** 导入，待 [DEV-PLAN-026](026-org-api-authz-and-events.md) 就绪后再补，不纳入本计划的 readiness 门槛。
 
-## 目标
-- 提供基于 Go 的 CLI 工具 (`cmd/org-data`)，支持 CSV 数据的导入、导出与回滚，具备完整的 dry-run 校验能力。
-- 定义明确的 CSV 数据模板与校验规则（唯一性、层级完整性、时间窗有效性）。
-- `make check lint` 与 `go test ./cmd/org-data/... ./modules/org/...`（或相关路径）通过，失败有回滚/清理方案。
+## 1. 背景与上下文 (Context)
+- 对应 [DEV-PLAN-020](020-organization-lifecycle.md) 步骤 3，承接：
+  - [DEV-PLAN-021](021-org-schema-and-constraints.md)：Org 核心表/约束（导入写入目标）
+  - [DEV-PLAN-022](022-org-placeholders-and-event-contracts.md)：事件契约（DB backend 不触发；API backend 未来复用）
+- 目标是在 024 CRUD 主链上线前，提供“可重复执行、可校验、可回滚”的数据导入工具与 readiness 记录，降低数据污染与演练成本。
 
-## 范围与非目标
-- 范围：为 org 主链提供数据工具；覆盖 021/022 已落地的表（`org_nodes`/`org_node_slices`/`org_edges`/`org_positions`/`org_assignments`；可选扩展到 `org_roles/org_role_assignments/org_attribute_inheritance_rules/org_change_requests` 的导出）。
-- 非目标：不实现最终 UI、审批/流程、矩阵/继承逻辑执行，只提供数据导入与清理脚本；不交付生产级自动化灰度，仅最小可用路径。
+## 2. 目标与非目标 (Goals & Non-Goals)
+### 2.1 核心目标
+- [ ] 提供 Go CLI `org-data`（`cmd/org-data`）：`import/export/rollback` 三个子命令。
+- [ ] `import`：
+  - [ ] 默认 dry-run（不落库），输出“影响摘要 + 校验错误（含行号/字段）”。
+  - [ ] 显式 `--apply` 才允许写入；写入成功后生成 `import_manifest_*.json`（用于精确回滚）。
+  - [ ] MVP 仅支持 `--backend db` + `--mode seed`（空租户种子导入）。
+- [ ] `export`：从 DB 导出 CSV（支持 `--as-of` 导出快照；不带 `--as-of` 导出全量时间片）。
+- [ ] `rollback`：支持 `--manifest` 精确回滚（推荐）；支持 `--since` 作为 seed 的兜底回滚（带强安全网）。
+- [ ] Readiness：至少通过 `go fmt ./... && go vet ./... && make check lint && make test`，并将命令与输出记录到 `docs/dev-records/DEV-PLAN-023-READINESS.md`。
 
-## 依赖与里程碑
-- 依赖：基于 DEV-PLAN-021 schema 与 DEV-PLAN-022 占位/契约，确保导入数据与现有约束一致；在 024 CRUD 主链前完成 readiness。
-- 里程碑（按提交时间填充）：CLI 工具骨架 -> CSV 解析与校验逻辑 -> 数据库交互与回滚 -> Readiness 验证。
+### 2.2 非目标（本计划明确不做）
+- 不实现 Org UI、审批流、矩阵/继承逻辑执行（见 035/030 等）。
+- 不实现生产级自动化灰度/调度；本工具仅提供最小可用的可重复执行路径。
+- 不纳入本计划 M1 交付/Readiness：`--backend api` / `--mode merge`（待 026 的 `/org/api/batch` 就绪后，另行评审并更新本计划或拆分子计划）。
 
-## 设计决策
-### 1. 工具形态：Go CLI (`cmd/org-data`)
-- **原因**：Shell 脚本处理 CSV 和复杂校验（如时间重叠、树环检测）能力不足且难以维护。使用 Go CLI 可复用 `modules/org/domain` 中的逻辑和 `pkg/db` 连接池。
-- **命令结构**：
-  - `org-data import --tenant <uuid> --input <dir> [--apply] [--strict] [--mode seed|merge] [--backend db|api]`
+## 3. 架构与关键决策 (Architecture & Decisions)
+### 3.1 架构图 (Mermaid)
+```mermaid
+flowchart TD
+  U[Dev/Ops] -->|CSV 目录| CLI[org-data CLI]
+  CLI --> P[Parse & Normalize]
+  P --> V[Validate]
+  V -->|dry-run| OUT[Summary(JSON)+ExitCode]
+  V -->|--apply| B{Backend}
+  B -->|db (MVP)| DB[(Postgres)]
+  B -->|api (post-026)| API[HTTP /org/api/batch]
+  DB --> M[import_manifest_*.json]
+  API --> M
+```
+
+### 3.2 关键设计决策
+1. **Go CLI（选定）**：CSV 解析、时间片校验、环路检测等逻辑不适合 Shell；Go 可复用项目现有配置/DB/RLS 工具链。
+2. **默认 dry-run（选定）**：任何写入必须显式 `--apply`；任何删除必须显式 `--apply` 且 `--yes` 二次确认（避免误操作）。
+3. **MVP 限定 seed（选定）**：`--backend db` 只允许“空租户种子导入”，避免绕过 025/026 的审计/outbox/缓存导致线上不一致；需要 merge 时走未来的 API backend。
+4. **RLS 注入复用现有 helper（选定）**：
+   - 在事务内使用 `pkg/composables.WithTenantID` 注入 tenant context；
+   - 在 `BEGIN` 后第一条 SQL 前调用 `pkg/composables.ApplyTenantRLS(ctx, tx)`（对齐 019A）。
+5. **`subject_id` 映射 SSOT（选定）**：`org_assignments.subject_id` 的确定性映射以 [DEV-PLAN-026](026-org-api-authz-and-events.md) 的“Subject 标识与确定性映射（SSOT）”为唯一事实源；CLI 不允许自行实现漂移算法。
+
+## 4. 数据契约 (Data Contracts)
+> 本节定义 CSV/manifest 的合同；DB schema 合同以 [DEV-PLAN-021](021-org-schema-and-constraints.md) 为准。
+
+### 4.1 输入目录结构（`import --input <dir>`）
+- 必选：`nodes.csv`
+- 可选：`positions.csv`、`assignments.csv`
+- 约定：缺失的可选文件视为“空集”；存在但 Header 缺列/多列则报错（避免静默错位）。
+
+### 4.2 CSV 通用约定
+- 编码：UTF-8（允许 BOM；工具需剥离）。
+- 分隔与引用：RFC4180（逗号分隔、双引号转义），Header 必须存在。
+- Trim 规则：对所有 `code/pernr/email` 等标识字段执行 `strings.TrimSpace`；Trim 后为空视为缺失。
+- 时间字段：
+  - 输入：`YYYY-MM-DD` 或 RFC3339。
+  - 规范化：`YYYY-MM-DD` 解释为 `00:00:00Z`；所有时间按 UTC 写入。
+  - 语义：半开区间 `[effective_date, end_date)`；要求 `effective_date < end_date`。
+- `end_date` 自动补齐：
+  - 若行内提供 `end_date`：按输入写入。
+  - 若行内未提供 `end_date`：按“同一实体的下一片段 `effective_date`，否则 `9999-12-31T00:00:00Z`”补齐。
+- JSON 字段：必须为合法 JSON；写入 DB 时不做额外键校验（M1 保守），但必须是 object。
+
+### 4.3 `nodes.csv`（映射到 `org_nodes` + `org_node_slices` + `org_edges`）
+| 列 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `code` | string | 是 |  | 租户内唯一；用于建立 `code -> org_node_id` 映射 |
+| `type` | string | 否 | `OrgUnit` | M1 仅允许 `OrgUnit`（其它值报错） |
+| `name` | string | 是 |  | 默认 locale 名称 |
+| `i18n_names` | json object | 否 | `{}` | 例如 `{"en":"Engineering","zh":"工程"}` |
+| `status` | enum | 否 | `active` | `active/retired/rescinded` |
+| `legal_entity_id` | uuid | 否 | null | 对齐 021（可选） |
+| `company_code` | string | 否 | null | 对齐 021（可选） |
+| `location_id` | uuid | 否 | null | 对齐 021（可选） |
+| `display_order` | int | 否 | `0` | 同父排序 |
+| `parent_code` | string | 否 | null | 为空表示 root（M1 必须且只能有一个 root code） |
+| `manager_user_id` | bigint | 否 | null | 负责人 `users.id`（类型对齐 DB；导入时仅做存在性校验） |
+| `manager_email` | string | 否 | null | 若无 `manager_user_id` 则可用 email 解析；`SELECT id FROM users WHERE tenant_id=$1 AND lower(email)=lower($2)`，找不到则报错 |
+| `effective_date` | date/datetime | 是 |  |  |
+| `end_date` | date/datetime | 否 | 自动补齐 |  |
+
+**Root 规则（M1）**：
+- 以 `parent_code` 为空识别 root。
+- `nodes.csv` 中所有 `parent_code` 为空的行，其 `code` 必须相同（且全文件仅一个 root code）。
+- root 不支持迁移：对 root code 的所有时间片，`parent_code` 必须始终为空（否则报错）。
+
+### 4.4 `positions.csv`（映射到 `org_positions`）
+| 列 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `code` | string | 是 |  | Position code |
+| `org_node_code` | string | 是 |  | 引用 `nodes.csv.code` |
+| `title` | string | 否 | null |  |
+| `status` | enum | 否 | `active` | `active/retired/rescinded` |
+| `is_auto_created` | bool | 否 | `false` |  |
+| `effective_date` | date/datetime | 是 |  |  |
+| `end_date` | date/datetime | 否 | 自动补齐 |  |
+
+### 4.5 `assignments.csv`（映射到 `org_assignments`）
+| 列 | 类型 | 必填 | 默认 | 说明 |
+| --- | --- | --- | --- | --- |
+| `position_code` | string | 是 |  | 引用 `positions.csv.code` |
+| `assignment_type` | enum | 否 | `primary` | `primary/matrix/dotted`（M1 仅允许写入 `primary`；其余返回校验错误） |
+| `pernr` | string | 是 |  | 人员编号（trim 后不可空；允许前导零） |
+| `subject_id` | uuid | 否 |  | 若提供则必须与 pernr 的映射一致；映射算法见 [DEV-PLAN-026](026-org-api-authz-and-events.md) |
+| `effective_date` | date/datetime | 是 |  |  |
+| `end_date` | date/datetime | 否 | 自动补齐 |  |
+
+### 4.6 Import Manifest（`import --apply` 的产物）
+- 文件名：`import_manifest_<timestamp>_<run_id>.json`
+- 目的：记录本次写入产生的主键集合与关键映射，支持 `rollback --manifest` 精确回滚。
+- 最小字段（v1）：
+  - `version`（int，固定 1）
+  - `run_id`（uuid）
+  - `tenant_id`（uuid）
+  - `mode`（`seed`）
+  - `backend`（`db`）
+  - `started_at`/`finished_at`（RFC3339）
+  - `input`：`{dir, files:{nodes,positions,assignments}}`（文件名即可；hash 可后续追加）
+  - `inserted`：按表列出插入的主键数组：`org_nodes/org_node_slices/org_edges/org_positions/org_assignments`
+  - `subject_mappings`：`[{pernr, subject_id}]`（便于排障与对账）
+  - `summary`：行数/插入数/跳过数（MVP 不做跳过）与耗时
+
+## 5. 接口契约 (CLI Contracts)
+### 5.1 二进制与子命令
+- 二进制：`org-data`
+- 子命令：
+  - `org-data import --tenant <uuid> --input <dir> [--output <dir>] [--apply] [--strict] [--backend db] [--mode seed]`
   - `org-data export --tenant <uuid> --output <dir> [--as-of <date|rfc3339>]`
-  - `org-data rollback --tenant <uuid> (--manifest <path> | --since <timestamp>) [--apply]`
-- **Shell 包装**：保留 `scripts/org/*.sh` 作为 CLI 的简单包装器，方便运维调用。
+  - `org-data rollback --tenant <uuid> (--manifest <path> | --since <rfc3339>) [--apply] [--yes]`
 
-### 2. CSV 数据契约
-- **格式**：UTF-8，逗号分隔，带 Header。
-- **时间字段**：`effective_date/end_date` 支持 `YYYY-MM-DD` 或 RFC3339；`YYYY-MM-DD` 解释为 `00:00:00Z`，统一按 UTC 写入；有效期语义为半开区间 `[effective_date, end_date)`，空 `end_date` 由工具自动补齐（同一实体按 `effective_date` 排序，取下一片段的 `effective_date` 或 `9999-12-31`）。
-- **模板定义**：
-  - `nodes.csv`: `code` (必填), `type` (OrgUnit), `name`, `i18n_names` (JSON), `status` (active/retired), `effective_date`, `end_date`, `parent_code` (为空表示 root), `display_order`, `manager_user_id` (可选), `manager_email` (可选，优先级低于 manager_user_id)
-  - `positions.csv`: `code` (必填), `org_node_code` (必填), `title`, `effective_date`, `end_date`, `is_auto_created`
-  - `assignments.csv`: `position_code` (必填), `assignment_type` (primary/matrix/dotted), `effective_date`, `end_date`, `pernr` (必填), `subject_id` (可选，若为空则按 035 的确定性映射生成；前端不生成)
-- **映射规则**：
-  - `nodes.csv` 每行会落成：`org_nodes`（按 `code` 确保存在稳定 ID）+ `org_node_slices`（属性时间片）+ `org_edges`（父子关系时间片，root 行不写 edge；`parent_hint` 与 edge 在写入前做一致性校验）。
-  - 导入时 CLI 需建立内存映射（Code -> UUID），将 CSV 中的 `parent_code/org_node_code` 转换为 DB 中的 `*_node_id`。
-  - `assignments.csv` 不支持 024 的“隐式自动创建 Position”，Position 必须显式存在（批量导入口径更严格，避免隐式生成脏数据）。
+### 5.2 退出码（MVP 约定）
+- `0`：成功（dry-run 校验通过 / apply 成功 / export 成功 / rollback 成功）
+- `2`：输入/校验错误（CSV/JSON/日期/环路/约束预检失败）
+- `3`：使用错误（缺参数/冲突参数/不支持的组合，例如 `--backend db --mode merge`）
+- `4`：DB 连接或事务错误
+- `5`：DB 写入失败（违反 DB 约束/触发器拒绝等）
+- `6`：安全网拒绝回滚（例如 `--since` 检测到历史数据、未提供 `--yes`）
 
-### 3. 校验与执行逻辑
-- **Phase 1: Parse & Static Validate**
-  - 检查必填项、日期格式（`effective_date < end_date`）、JSON 格式。
-  - 内存中构建树并做环路检测：默认按最小 `effective_date` 的快照检查；`--strict` 下对所有边界时间点（各行 `effective_date` 的去重集合）逐点做 as-of 检查，避免把“不同时间片的边”误判为同一时点成环。
-  - 自动补齐 `end_date` 后，按实体维度检查“无重叠”；`--strict` 下额外检查“无空档”（对 `org_node_slices/org_edges/org_assignments` 默认按约束 1 执行）。
-  - 时区一致性：对所有 `YYYY-MM-DD` 输入强制解释为 UTC 的 `00:00:00Z`，并在运行日志中打印规范化后的时间点（避免因运行环境时区差异导致跨天偏移）。
-- **Phase 2: DB Dry-Run (Read-Only)**
-  - seed 模式：若检测到租户已存在 org 主链数据则直接拒绝。
-  - merge 模式：检查 `code` 在租户内是否冲突（若存在则标记为 Update 或 Skip）。
-  - 检查 `parent_code` 是否存在（或在当前批次中创建）。
-  - 检查时间片重叠（Overlap Check）：查询 DB 中该实体的现有时间片，模拟插入看是否触发 EXCLUDE 约束。
-- **Phase 3: Apply (Transactional)**
-  - 开启事务（db backend）或调用 API 批量入口（api backend，优先走 `POST /org/api/batch` 以复用 024/026 的校验、审计与事件发布路径）。
-  - 若 `RLS_ENFORCE=enforce`（对齐 019A）：事务开始后第一条 SQL 前必须注入 `app.current_tenant`（`set_config('app.current_tenant', tenant_id, true)`），避免 fail-closed policy 触发读写失败。
-  - 按依赖顺序写入：`org_nodes` -> `org_node_slices` -> `org_edges` -> `org_positions` -> `org_assignments`（`org_edges` 的 `path/depth` 由触发器维护）。
-  - 失败则全量回滚。
-  - 事件与缓存一致性：
-    - **db backend**：不直接触发应用内缓存失效；若在应用运行期间做 merge，需在执行后调用 026 的 `/org/api/snapshot` 或重启应用以完成对账/缓存重建（直到 outbox/relay 落地）。
-    - **api backend**：由服务端在同一事务内写入 outbox 并发布 Topics `org.changed.v1`/`org.assignment.changed.v1`（对齐 022），触发下游（Authz/缓存/索引）更新。
+### 5.3 输出约定
+- 结构化摘要：打印到 stdout（JSON，一行），便于脚本采集。
+- 日志：走项目 logger（stderr），必须包含 `run_id/tenant_id/mode/backend/apply` 字段。
 
-### 4. 回滚策略 (Rollback)
-- **机制**：M1 先采用 **时间窗口 + 租户** 的最小方案；为降低误删风险，导入默认只支持“空租户/空组织数据”的 seed 模式（若检测到 tenant 已存在 org 主链数据则拒绝，需显式开关才允许 merge）。
-- **Manifest（推荐）**：每次 `import --apply` 生成 `import_manifest_<timestamp>.json`，记录本次导入写入/更新的主键集合、生成的 `subject_id(pernr->uuid)` 映射与执行摘要；`rollback --manifest` 以 manifest 为准做精确回滚，适用于 merge 场景。
-- **逻辑**：
-  - `rollback --since "2025-01-15T12:00:00Z"`
-  - 查询所有 `created_at >= since AND tenant_id = target` 的记录。
-  - 逆序删除：`org_assignments` -> `org_positions` -> `org_edges` -> `org_node_slices` -> `org_nodes`。
-  - **安全网**：默认 dry-run（不加 `--apply`）列出将要删除的记录数；执行 `--apply` 前需用户二次确认（输入 `YES`）。
+## 6. 核心逻辑与算法 (Business Logic & Algorithms)
+### 6.1 Parse & Normalize
+1. 读取 CSV（剥离 BOM、解析 Header、逐行解析为 struct）。
+2. 规范化：
+   - trim 所有标识字段；
+   - 解析 `effective_date/end_date` 并转为 UTC；
+   - `end_date` 缺省按 4.2 规则补齐；
+   - `manager_email` → `manager_user_id`（若提供 email 且缺 id，则查 `users` 表；查不到报错）。
+3. 构建内存映射：
+   - `nodeCode -> nodeID`（seed 模式下 nodeID 由工具生成 uuid 并写入 DB）
+   - `positionCode -> positionID`
+4. `subject_id`：
+   - 若 CSV 未提供 `subject_id`：按 026 的 SSOT 算法生成；
+   - 若提供：必须校验与算法一致，否则报错。
 
-### 5. Readiness 检查集
-- **Lint**: `golangci-lint` 覆盖 `cmd/org-data` 及 `modules/org`。
-- **Test**:
-  - `go test ./cmd/org-data/...`：测试 CSV 解析与 CLI 逻辑。
-  - `go test ./modules/org/...`：测试领域校验逻辑。
-- **DB Lint**: `atlas migrate lint` 确保 Schema 无破坏性变更。
+### 6.2 Static Validate（不访问 DB）
+- 必填字段、枚举值、JSON shape（必须为 object）、`effective_date < end_date`。
+- 同一实体时间片不重叠（node_slices / edges / positions / assignments 按各自键排序验证）。
+- Root 规则（4.3）校验。
+- 环路检测：
+  - 默认：在最小 `effective_date` 的 as-of 快照上构建 parent 关系并做 DFS。
+  - `--strict`：对输入中所有去重后的 `effective_date` 逐点做 as-of 检查（每点构建 parent 关系并 DFS），避免“不同时间片的边”误判或漏判。
 
-## 任务清单与验收标准
-1. [ ] **CLI 骨架与 CSV 解析**
-   - 创建 `cmd/org-data/main.go` 及子命令结构。
-   - 实现 CSV Parser，支持上述 `nodes.csv`, `positions.csv` 等模板，解析为 Go Struct。
-   - 验收：`go run cmd/org-data/main.go import --help` 可用，能正确解析示例 CSV 并打印 JSON 结构。
+### 6.3 DB Dry-Run（只读）
+- `--mode seed --backend db`：
+  - 空租户校验：`SELECT 1 FROM org_nodes WHERE tenant_id=$1 LIMIT 1` 若存在记录则拒绝（exit=2）。
+  - 预检 manager_user_id（如提供）：`SELECT 1 FROM users WHERE tenant_id=$1 AND id=$2` 不存在则报错（避免写入后发现负责人无效）。
 
-2. [ ] **校验逻辑 (Dry-Run)**
-   - 实现内存环路检测与时间片重叠预检。
-   - 实现 `Code -> UUID` 的解析逻辑（Mock DB 或连接 Dev DB）。
-   - 验收：提供含环路/重叠数据的 CSV，运行 `import`（不加 `--apply`）能准确报错并输出错误行号。
+### 6.4 Apply（事务写入，`--apply`）
+1. 开启事务。
+2. 在 ctx 写入 tenant：`ctx = composables.WithTenantID(ctx, tenantID)`。
+3. 注入 RLS：`composables.ApplyTenantRLS(ctx, tx)`（若 `RLS_ENFORCE=enforce` 且缺 tenant 则 fail-fast）。
+4. 写入顺序（同一事务内）：
+   1. `org_nodes`（root 的 `is_root=true`；其余 false）
+   2. `org_node_slices`
+   3. `org_edges`：必须按 parent-before-child 顺序写入（同一 `effective_date` 下按 depth 升序；root edge `parent_node_id=null`），以满足 021 的 path/depth 触发器对 parent_path 的 as-of 查询依赖
+   4. `org_positions`
+   5. `org_assignments`
+5. 成功提交后写出 manifest（4.6）。
 
-3. [ ] **数据库交互与回滚**
-   - 集成 `pkg/db`，实现事务写入。
-   - 实现 `rollback` 命令，按时间窗查询并生成删除计划。
-   - 验收：在本地 DB 执行导入成功；执行回滚后数据被清理；`dry-run` 模式下不产生脏数据。
+## 7. 安全与鉴权 (Security & Authz)
+- DB backend 直接写库：仅允许 seed（空租户）以降低误用风险；merge 写入必须走未来的 API backend（以 025/026 的审计/outbox/缓存口径为准）。
+- RLS 兼容：当 `RLS_ENFORCE=enforce` 时必须使用非 superuser 且无 `BYPASSRLS` 的 DB 账号（对齐 019/019A）；事务内必须注入 `app.current_tenant`（由 `composables.ApplyTenantRLS` 统一处理）。
 
-4. [ ] **Shell 包装与文档**
-   - 编写 `scripts/org/import.sh` 等包装脚本。
-   - 更新 README，提供 CSV 模板下载链接或示例内容。
-   - 验收：`scripts/org/import.sh` 可直接调用，文档清晰。
+## 8. 依赖与里程碑 (Dependencies & Milestones)
+### 8.1 依赖
+- [DEV-PLAN-021](021-org-schema-and-constraints.md)：表/约束/触发器（尤其 `org_edges.path/depth` 与 root edge 规则）。
+- [DEV-PLAN-026](026-org-api-authz-and-events.md)：`subject_id` 映射 SSOT；以及未来 API backend 的 `/org/api/batch`。
+- [DEV-PLAN-019A](019A-rls-tenant-isolation.md)：RLS 注入契约（通过 `pkg/composables` 落地）。
 
-5. [ ] **Readiness 验证**
-   - 执行 `make check lint`。
-   - 执行 `go test ./modules/org/... ./cmd/org-data/...`。
-   - 记录执行结果到 `docs/dev-records/DEV-PLAN-023-READINESS.md`。
+### 8.2 里程碑（按提交时间填充）
+1. [ ] CLI 骨架（cobra）+ 命令/flag/退出码契约固化
+2. [ ] CSV Parse/Normalize + Static Validate（含 strict 环路检测）
+3. [ ] DB Dry-Run + seed Apply + manifest
+4. [ ] export（全量/`--as-of`）
+5. [ ] rollback（manifest / since 安全网）
+6. [ ] Readiness 记录落盘
 
-## 验证记录
-- 在 `docs/dev-records/DEV-PLAN-023-READINESS.md` 中记录：
-  - `org-data import`（不加 `--apply`）的输出日志（包含校验失败的示例）。
-  - `org-data rollback` 的执行日志。
-  - `make check lint` 和 `go test` 的覆盖率报告。
+## 9. 测试与验收标准 (Acceptance Criteria)
+- 单测（`go test ./cmd/org-data/...`）至少覆盖：
+  - CSV 解析错误行号/字段定位
+  - 环路/重叠/非法日期/非法枚举/非法 JSON
+  - `subject_id` 映射一致性校验（对齐 026）
+- 集成验收（本地 DB）至少覆盖：
+  - seed 导入成功后，`org_edges` 的 root edge 与 child edge 均可写入（触发器 path/depth 生效）
+  - `rollback --manifest --apply --yes` 能清理导入数据且无 FK 残留
+- Readiness：将以下命令与输出记录到 `docs/dev-records/DEV-PLAN-023-READINESS.md`：
+  - `go fmt ./...`
+  - `go vet ./...`
+  - `make check lint`
+  - `make test`
 
-## 风险与回滚/降级路径
-- **数据污染风险**：CLI 默认 dry-run（不加 `--apply`），只有显式传入 `--apply` 才执行写入；写入失败必须整事务回滚。
-- **回滚误删风险**：merge 场景必须优先使用 `rollback --manifest`；`--since` 仅作为 seed 的兜底手段，且不保证恢复“被更新记录”的旧值（后续可通过 025 的审计/request_id 或引入 batch/run 追踪表增强可回放性）。
+## 10. 运维与监控 (Ops & Monitoring)
+- 工具默认 dry-run；任何写入/删除必须显式 `--apply`。
+- `rollback --since` 仅用于 seed 兜底，且必须同时满足：
+  - `--apply --yes`
+  - `org_nodes.created_at < since` 不存在（否则拒绝，exit=6）
+- 日志必须包含 `run_id/tenant_id`，并在成功时输出影响摘要（JSON）。
 
 ## 交付物
-- `cmd/org-data` 源码及 `scripts/org/*.sh` 包装脚本。
-- CSV 数据模板示例（`docs/samples/org/*.csv`）。
-- Readiness 验证报告 (`docs/dev-records/DEV-PLAN-023-READINESS.md`)。
+- `cmd/org-data` 源码。
+- `scripts/org/*.sh`（可选包装器，用于运维一键调用）。
+- CSV 模板示例：`docs/samples/org/*.csv`。
+- Readiness 记录：`docs/dev-records/DEV-PLAN-023-READINESS.md`。
