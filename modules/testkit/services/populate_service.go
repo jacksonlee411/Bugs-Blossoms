@@ -163,13 +163,6 @@ func (s *PopulateService) populateData(ctx context.Context, data *schemas.DataSp
 		}
 	}
 
-	// Create warehouse entities
-	if data.Warehouse != nil {
-		if err := s.createWarehouseData(ctx, data.Warehouse); err != nil {
-			return fmt.Errorf("failed to create warehouse data: %w", err)
-		}
-	}
-
 	return nil
 }
 
@@ -484,12 +477,6 @@ func (s *PopulateService) createDebts(ctx context.Context, debts []schemas.DebtS
 func (s *PopulateService) createCRMData(ctx context.Context, crm *schemas.CRMSpec) error {
 	// TODO: Implement client creation when CRM module is integrated
 	_ = crm
-	return nil
-}
-
-func (s *PopulateService) createWarehouseData(ctx context.Context, warehouse *schemas.WarehouseSpec) error {
-	// TODO: Implement warehouse data creation (units, products) when warehouse module is integrated
-	_ = warehouse
 	return nil
 }
 

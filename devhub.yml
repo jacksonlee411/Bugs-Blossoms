@@ -13,7 +13,7 @@ server:
   desc: Hot-reload Go app
   port: 3200
   run: air -c .air.toml
-  needs: [postgres]
+  needs: [postgres, templ, css]
   health:
     http: http://localhost:3200/health
     wait: 10s

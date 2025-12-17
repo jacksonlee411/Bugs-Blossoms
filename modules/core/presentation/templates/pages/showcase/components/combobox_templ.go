@@ -37,7 +37,7 @@ func SearchableSelect() templ.Component {
 			Searchable:   true,
 			NotFoundText: "No positions found",
 			Name:         "PositionID",
-			Endpoint:     "/warehouse/positions/search",
+			Endpoint:     "/_dev/api/showcase/combobox-options",
 		}).Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err

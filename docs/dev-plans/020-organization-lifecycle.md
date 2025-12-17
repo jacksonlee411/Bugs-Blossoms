@@ -1,6 +1,7 @@
 # DEV-PLAN-020：组织机构模块（对标 Workday）
 
 **状态**: 已完成（2025-12-07 16:20）  
+**对齐更新**：2025-12-16：对齐 DEV-PLAN-017/018/019 的工具链与门禁约束（outbox 闭环、routing gates、租户 fail-closed/RLS 注入口径）。
 **评审结论**：M1 收敛为“单一 Organization Unit 树（原 Supervisory）+ 有效期校验 + 去重/无重叠 + 基础审计/查询性能”，暂不落地 workflow/BP 绑定、Authz 策略生成、并行版本、What-if/Impact UI 等高阶能力，统一挪到后续阶段或 backlog；M1 即交付最小权限集（Org.Read/Org.Write/Org.Assign/Org.Admin）及基础策略片段。
 
 ## 背景
@@ -13,9 +14,9 @@
 2. **有效期优先**：所有组织单元、层级关系、分配记录均采用“生效时间 / 失效时间”双字段，默认强制 `effective_date <= end_date` 并避免重叠。
 3. **多层级模型**：同时支持 Workday 的 Supervisory、Company、Cost Center、Custom Reporting 四类层级，通过 `HierarchyType` 与 `NodeType` 组合实现。
 4. **生命周期驱动（后续）**：组织单元的创建、重命名、合并、撤销等动作理想路径是“请求→审批→生效”，但 M1 仅直接 CRUD；审批/草稿/仿真视图待后续里程碑再启用。
-5. **时间线 API**：所有读写接口必须显式接受 `effective_date`（对齐 Workday 的 `Effective Date` 查询点），未提供时默认 `time.Now()`，以保障历史查询与未来排程。
-6. **可扩展事件流**：关键变更（新建部门、层级调整、员工调动、权限继承）通过 `pkg/eventbus` 发布，供 HRM/财务/审批模块订阅。
-- **安全与最小权限**：M1 定义 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`，接口默认要求 Session+租户校验与对应权限，配套策略片段纳入 `make authz-pack/test`。
+5. **时间线 API**：所有读写接口必须显式接受 `effective_date`（对齐 Workday 的 `Effective Date` 查询点），未提供时默认 `time.Now().UTC()`，以保障历史查询与未来排程。
+6. **事件一致性（outbox）**：关键变更通过 DEV-PLAN-017 的 outbox 闭环投递（业务写入 + outbox enqueue 同一事务提交；at-least-once；消费者按 `event_id` 幂等）。
+- **安全与最小权限**：M1 定义 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`，接口默认要求 Session+租户校验与对应权限；策略片段走 `make authz-pack`（生成）+ `make authz-test && make authz-lint`（门禁）。
 - **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；日期字段命名与 Workday 对齐：`effective_date`（开始），`end_date`/`inactive_date`（结束，半开区间）。
 - **人员标识**：采用 `person_id` 作为自然人主键（不可变）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户下同一 person 不变。
 
@@ -93,7 +94,7 @@
   - 其他表（retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
   - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_date, end_date))` 用于时间冲突约束，`(tenant_id, parent_node_id, display_order)` 便于排序。
 - 约束（M1 落地）：`org_nodes` 的 code 需在 tenant 内唯一；name/i18n_names 在同一父节点+时间窗口内唯一（按默认 locale）；`org_edges` 防环/双亲（ltree path + 唯一 child per hierarchy）；`positions` 需归属 OrgNode；`org_assignments` 对同一 subject 在重叠时间内仅允许一个 primary（部分唯一约束），position_id 必填，assignment_type 默认 primary。
-- 多租户隔离：所有主键/唯一约束均以 `(tenant_id, <id/unique fields>)` 复合，外键与 sqlc 查询强制带 tenant 过滤；路径/缓存 key 同样纳入 tenant，避免跨租户穿透。
+- 多租户隔离：所有主键/唯一约束均以 `(tenant_id, <id/unique fields>)` 复合，外键与 sqlc 查询强制带 tenant 过滤；路径/缓存 key 同样纳入 tenant，避免跨租户穿透。对齐 DEV-PLAN-019/019A：tenant 上下文缺失时 fail-closed；启用 RLS 时必须在事务内注入 `app.current_tenant`。
 - Postgres 依赖：迁移启用 `ltree` 与 `btree_gist` 扩展；有效期字段统一 `tstzrange` 且使用 `[start, end)` 半开区间，写入/校验一律 UTC，迁移包含时区/边界说明；`EXCLUDE USING gist (tenant_id WITH =, node_id WITH =, tstzrange(effective_date, end_date) WITH &&)` 防重叠，重名用 `(tenant_id,parent_node_id,name,effective_date,end_date)` 唯一。
 - sqlc 包：`modules/org/infrastructure/sqlc/...` 负责 CRUD + 冲突检测查询，包含 Position、继承解析只读视图、变更请求占位。
 - 性能与冲突验证：itf/bench 覆盖 1k 节点查询 <200ms，重叠/重名写入被拒绝；在 CI 以基准或集成测试执行。
@@ -107,7 +108,7 @@
 
 ### Presentation Layer & API
 - UI（templ，HTML/HTMX）：前缀 `/org/...`（体验完善由 035 负责；M1 可只交付最小页面骨架）。
-- 内部 API（JSON-only）：前缀 `/org/api/...`（对齐 `docs/dev-plans/018-routing-strategy.md` 的 `/{module}/api/*`）
+- 内部 API（默认 JSON-only；403 见 018 的 5.4）：前缀 `/org/api/...`（对齐 `docs/dev-plans/018-routing-strategy.md` 的 `/{module}/api/*`；落地需通过 `make check routing`）
   - `GET /org/api/hierarchies?type=OrgUnit&effective_date=`：返回树概览，支持 display_order 排序，属性提供显式值与继承解析值。
   - `POST /org/api/nodes` / `PATCH /org/api/nodes/{id}`：节点 CRUD（含有效期、重名、父子校验）；支持字段 code/name/i18n_names/legal_entity_id/company_code/location_id/display_order；删除改为 `PATCH` 设置 `end_date` 或状态 `Retired`，误创建支持 Rescind；预留 change request 草稿/提交接口（无审批流，仅存档）。
   - `POST /org/api/positions`（可选）/ `POST /org/api/assignments`：Assignment 以 Position 为锚点；若未显式传 position_id，默认创建一对一 Position 再绑定；支持 `assignment_type`（primary/matrix/dotted）；`PATCH /org/api/assignments/{id}` / `GET /org/api/assignments?subject=person:{id}`：人员分配时间线。
@@ -318,10 +319,11 @@ flowchart LR
 ## 验收标准
 - Phase 0/1：单树 CRUD + 有效期/去重名/无重叠 + 租户隔离查询性能达标（1k 节点 <200ms），审计和冻结窗口生效；主数据治理（编码/命名/必填/发布模式/SOR 边界）落地。
 - Phase 2：多层级/矩阵占位可查询，不影响主链；若上线，需保持无跨租户穿透、无额外策略耦合。
-- Phase 3+：仅在立项后评估，需明确依赖（workflow/authz），并通过 `make authz-pack/test` 等质量门禁再交付。
+- Phase 3+：仅在立项后评估，需明确依赖（workflow/authz），并通过 `make authz-test && make authz-lint` 等质量门禁再交付。
 - HRM/Position/Finance 集成：M1 仅事件/视图消费，不改 finance 冻结模块；后续若回写需在 dev-plan 记录。
 - 文档完整：模块 README、API 参考、口径说明、操作手册、dev-record、Workday parity checklist。
-- 权限/策略：M1 提供权限常量与基础策略片段，`make authz-pack/test` 通过；无策略生成前，接口需经权限校验或特性开关保护。
+- 路由门禁：`/org/api/*` 需满足 internal API 的全局错误契约（404/405/500 JSON-only），并通过 `make check routing`（DEV-PLAN-018B）。
+- 权限/策略：M1 提供权限常量与基础策略片段，`make authz-test && make authz-lint` 通过（`authz-lint` 会触发 `make authz-pack`）；无策略生成前，接口需经权限校验或特性开关保护。
 
 ## 风险与缓解
 - **时间区间复杂度**：有效期重叠校验可能拖慢写入 → 结合 `EXCLUDE` 约束 + 应用侧批量校验，提前压测 1k 节点场景。

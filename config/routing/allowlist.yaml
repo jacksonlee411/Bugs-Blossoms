@@ -49,6 +49,10 @@ entrypoints:
     - prefix: /api/v1
       class: public_api
 
+    # Webhooks (inbound)
+    - prefix: /webhooks
+      class: webhook
+
     # Legacy / migration windows (see DEV-PLAN-018 appendix B)
     - prefix: /api/lens/events
       class: internal_api

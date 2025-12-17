@@ -45,7 +45,7 @@ func NotFound(app application.Application, opts ...ErrorHandlersOptions) http.Ha
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		class := classifier.ClassifyPath(r.URL.Path)
-		if class == routing.RouteClassInternalAPI || class == routing.RouteClassPublicAPI {
+		if class == routing.RouteClassInternalAPI || class == routing.RouteClassPublicAPI || class == routing.RouteClassWebhook {
 			meta := map[string]string{
 				"path": r.URL.Path,
 			}
@@ -76,7 +76,7 @@ func MethodNotAllowed(opts ...ErrorHandlersOptions) http.HandlerFunc {
 
 	return func(w http.ResponseWriter, r *http.Request) {
 		class := classifier.ClassifyPath(r.URL.Path)
-		if class == routing.RouteClassInternalAPI || class == routing.RouteClassPublicAPI {
+		if class == routing.RouteClassInternalAPI || class == routing.RouteClassPublicAPI || class == routing.RouteClassWebhook {
 			meta := map[string]string{
 				"method": r.Method,
 				"path":   r.URL.Path,

@@ -18,15 +18,15 @@
     - `/api/lens/events/*` → `/core/api/lens/events/*`：`modules/core/presentation/controllers/lens_events_controller.go`
     - `/api/website/ai-chat/*` → `/api/v1/website/ai-chat/*`：`modules/website/module.go`
 - **待完成（M2+）**：
-  - 403 responder/协商工具进一步收敛（减少模块间重复实现，保持 JSON（显式 Accept）优先于 HTMX）
-  - Webhooks：若后续新增 `/webhooks/*`，必须在 allowlist 登记并满足签名校验/重放保护基线；`/billing`、`/twilio` 等 legacy 前缀已由 DEV-PLAN-040 移除并最终表现为 404。
+  - [X] 403 responder/协商工具进一步收敛：统一实现迁移到 `modules/core/presentation/templates/layouts/authz_forbidden_responder.go`；core/hrm/logging 复用同一套 JSON/HTMX/HTML 403 行为（2025-12-16 13:44 UTC）。
+  - [X] Webhooks 基线：allowlist 增加 `/webhooks -> webhook`，全局 404/405/500 对 webhook 采用 JSON-only；新增 `pkg/webhooks` 签名校验/重放保护中间件与门禁断言（2025-12-16 13:44 UTC）。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
   - 项目同时包含：服务端渲染 UI（`templ` + HTMX）、内部 JSON API（用于权限申请/调试/局部交互）、第三方回调（支付/短信/聊天）、测试专用端点以及运维端点。
   - 当前路由命名空间与返回形态存在“不完全一致”的现象：同类能力在不同模块下使用不同前缀/协商规则，导致实现、鉴权与测试口径分散。
 - **现状盘点（示例，非穷举）**：
-  - UI（HTML/HTMX）：`/hrm/employees`、`/logs`、`/finance/*`、`/warehouse/*` 等。
+- UI（HTML/HTMX）：`/hrm/employees`、`/logs`、`/website/ai-chat`、`/bi-chat`、`/superadmin/*` 等。
   - 内部 API（JSON）：`/core/api/authz/*`，以及少量 `/_dev`、`/api/*` 风格的内部端点。
   - AuthN（认证边界）：`/login`、`/logout`、`/oauth/*`。
   - Webhooks/第三方回调：`/twilio`、支付网关回调（路径可能由配置决定）。
@@ -140,12 +140,12 @@ graph TD
 - 常规 HTMX 请求的 `Accept` 通常为 `text/html`，因此不会触发 JSON 分支；如某个 HTMX 调用需要 HTML partial，应避免显式请求 JSON。
 
 ### 5.2 内部 API（`/{module}/api/*`）契约
-- 成功与失败均返回 JSON；不得返回 HTML（避免 UI 与 API 混淆）。
-- 允许在 HTMX 调用场景下设置 `HX-Trigger/HX-Redirect/Hx-Push-Url` 等响应头，但 body 仍保持 JSON。
+- 成功返回 JSON；错误默认也返回 JSON（404/405/500 等全局错误在内部 API 命名空间下强制 JSON-only，见 5.5）。
+- 允许在 HTMX 调用场景下设置 `HX-Trigger/HX-Redirect/Hx-Push-Url` 等响应头；业务成功响应的 body 保持 JSON。
 - 版本策略：**不做版本化（Always Latest）**，与同仓库 UI 同步发布；不承诺对外部调用者的向后兼容性（需要稳定兼容/对外承诺的接口必须走 `/api/v1/*`）。
 - 认证与鉴权：
   - 默认按 Session + Authz 能力校验；
-  - 403 统一返回 forbidden payload（字段口径与现有 `modules/core/authzutil.BuildForbiddenPayload` 对齐），且**不依赖 `Accept` 协商**（内部 API 必须 JSON-only）。
+  - 403 遵循 5.4 的统一口径：显式 JSON（`Accept: application/json`）返回 forbidden payload；HTMX/HTML 场景允许渲染 Unauthorized（保持 UI 体验一致；JSON 仍优先，见 5.1）。
 
 ### 5.3 对外 API（`/api/v1/*`）契约
 - JSON-only；错误统一 envelope（`code/message/details/request_id` 等）并可演进版本。
@@ -264,9 +264,8 @@ graph TD
 0. [x] **ADR 对齐**：固化 3.3 的裁决，并同步更新 Org 系列计划的 API 前缀（`docs/dev-plans/020-organization-lifecycle.md`、`docs/dev-plans/026-org-api-authz-and-events.md`）。
 1. [x] **路由盘点**：输出当前顶层前缀与路由类别清单（UI/Internal API/Public API/Webhooks/Ops/Test），标注“是否符合 4.1”；将结果落盘到附录 B。
 2. [x] **策略落盘**：补齐例外清单与迁移策略（存量路径必须说明为何不能迁移/迁移目标/兼容策略/安全基线）。
-3. [ ] **统一 responder/协商工具**（推荐）：
-   - [ ] 提供统一的 route_class 判定与 responder：HTML/HTMX/JSON forbidden + JSON error envelope。
-   - [ ] 让内部 API 的 forbidden/error 不受 `Accept` 影响（保持 JSON-only）。
+3. [x] **403 responder/协商工具收敛**：
+   - [x] 统一 forbidden payload + Unauthorized（HTML/HTMX fallback）：复用 `modules/core/presentation/templates/layouts/authz_forbidden_responder.go`，core/hrm/logging 共享同一实现。
 4. [x] **全局错误契约落地**：
    - [x] 让 `NotFoundHandler`/`MethodNotAllowedHandler` 在 `/{module}/api/*` 与 `/api/v1/*` 下返回 JSON（见 5.5）。
 5. [x] **试点迁移（最小改动）**：
@@ -307,6 +306,7 @@ graph TD
   - [x] Ops 入口满足访问基线（网关 allowlist / BasicAuth / OpsGuard 至少一种），不得默认公网可达。
 - 门禁：
   - [x] 新增/更新文档通过 `make check doc`。
+  - [x] 路由门禁（DEV-PLAN-018B）：`make check routing`（聚合 route-lint、allowlist 健康检查、API 全局错误契约、暴露基线）。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - 访问日志字段建议包含：`route_class(ui|authn|internal_api|public_api|webhook|ops|test|static|websocket|dev_only)`、`path_template`、`request_id`、`tenant_id`（如可得）、`authz_object/action`（如适用）。
@@ -336,6 +336,7 @@ graph TD
 | `/core/api/authz/*` | internal_api | keep | 既成事实的内部 API SSOT |
 | `/api/lens/events/*` | internal_api | migrate | 迁移到 `/core/api/lens/events/*`，保留 alias 窗口期 |
 | `/api/website/ai-chat/*` | public_api | migrate | 当前实现更像匿名 public integration；默认迁移到 `/api/v1/website/ai-chat/*` 并补齐 anti-abuse/审计；若后续改为同源 Session 内部交互，则必须改为 `/website/api/ai-chat/*` 并更新本表 |
+| `/webhooks/*` | webhook | keep | 新增 webhook 推荐统一前缀；必须满足签名校验与重放保护基线（见 6.4），并在 allowlist 登记 |
 | `/query`、`/query/*` | internal_api | legacy | 若保留则补齐 AuthN/Authz 并确保 JSON-only；否则迁移或下线 |
 | `/playground` | dev_only | gate | 默认生产关闭（配置开关） |
 | `/_dev/*` | dev_only | gate | 默认生产关闭（配置开关） |

@@ -7,7 +7,6 @@ import (
 	corePerms "github.com/iota-uz/iota-sdk/modules/core/permissions"
 	hrmPerms "github.com/iota-uz/iota-sdk/modules/hrm/permissions"
 	loggingPerms "github.com/iota-uz/iota-sdk/modules/logging/permissions"
-	warehousePerms "github.com/iota-uz/iota-sdk/modules/warehouse/permissions"
 )
 
 // permissionSetBuilder helps create consistent permission sets
@@ -52,14 +51,12 @@ func AllPermissions() []*permission.Permission {
 	// Pre-calculate total capacity to avoid slice re-allocations
 	totalCapacity := len(corePerms.Permissions) +
 		len(hrmPerms.Permissions) +
-		len(loggingPerms.Permissions) +
-		len(warehousePerms.Permissions)
+		len(loggingPerms.Permissions)
 
 	permissions := make([]*permission.Permission, 0, totalCapacity)
 	permissions = append(permissions, corePerms.Permissions...)
 	permissions = append(permissions, hrmPerms.Permissions...)
 	permissions = append(permissions, loggingPerms.Permissions...)
-	permissions = append(permissions, warehousePerms.Permissions...)
 	return permissions
 }
 
@@ -91,21 +88,6 @@ func buildModulePermissionSets() []rbac.PermissionSet {
 		core.viewSet("AuthzRequests", corePerms.AuthzRequestsRead),
 		core.manageSet("AuthzRequests", corePerms.AuthzRequestsWrite, corePerms.AuthzRequestsRead, corePerms.AuthzRequestsReview, corePerms.AuthzRequestsDelete),
 		core.viewSet("AuthzDebug", corePerms.AuthzDebug),
-	)
-
-	// Warehouse module
-	warehouse := newPermissionSetBuilder("Warehouse")
-	sets = append(sets,
-		warehouse.viewSet("Product", warehousePerms.ProductRead),
-		warehouse.manageSet("Product", warehousePerms.ProductCreate, warehousePerms.ProductRead, warehousePerms.ProductUpdate, warehousePerms.ProductDelete),
-		warehouse.viewSet("Position", warehousePerms.PositionRead),
-		warehouse.manageSet("Position", warehousePerms.PositionCreate, warehousePerms.PositionRead, warehousePerms.PositionUpdate, warehousePerms.PositionDelete),
-		warehouse.viewSet("Order", warehousePerms.OrderRead),
-		warehouse.manageSet("Order", warehousePerms.OrderCreate, warehousePerms.OrderRead, warehousePerms.OrderUpdate, warehousePerms.OrderDelete),
-		warehouse.viewSet("Unit", warehousePerms.UnitRead),
-		warehouse.manageSet("Unit", warehousePerms.UnitCreate, warehousePerms.UnitRead, warehousePerms.UnitUpdate, warehousePerms.UnitDelete),
-		warehouse.viewSet("Inventory", warehousePerms.InventoryRead),
-		warehouse.manageSet("Inventory", warehousePerms.InventoryCreate, warehousePerms.InventoryRead, warehousePerms.InventoryUpdate, warehousePerms.InventoryDelete),
 	)
 
 	// HRM module

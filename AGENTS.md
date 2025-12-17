@@ -138,11 +138,13 @@ modules/{module}/
 - DEV-PLAN-017 Readiness：`docs/dev-records/DEV-PLAN-017-READINESS.md`
 - 全局路由策略统一（DEV-PLAN-018）：`docs/dev-plans/018-routing-strategy.md`
 - DEV-PLAN-018A 路由策略评审输入：`docs/dev-plans/018A-routing-strategy-review.md`
+- DEV-PLAN-018B 路由策略门禁启动方案：`docs/dev-plans/018B-routing-strategy-gates.md`
 - 多租户工具链选型与落地（DEV-PLAN-019）：`docs/dev-plans/019-multi-tenant-toolchain.md`
 - RLS 强租户隔离（DEV-PLAN-019A）：`docs/dev-plans/019A-rls-tenant-isolation.md`
 - ORY Kratos 接入与会话桥接（DEV-PLAN-019B）：`docs/dev-plans/019B-ory-kratos-session-bridge.md`
 - Jackson 企业 SSO（DEV-PLAN-019C）：`docs/dev-plans/019C-jackson-enterprise-sso.md`
 - 多租户管理页面可视化管理（DEV-PLAN-019D）：`docs/dev-plans/019D-multi-tenant-management-ui.md`
 - 移除 finance/billing/crm/projects 模块（DEV-PLAN-040）：`docs/dev-plans/040-remove-finance-billing-crm.md`
+- 移除 warehouse（仓库）模块（DEV-PLAN-041）：`docs/dev-plans/041-remove-warehouse-module.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`

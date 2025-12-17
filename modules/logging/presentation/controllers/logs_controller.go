@@ -12,6 +12,7 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	corepermissions "github.com/iota-uz/iota-sdk/modules/core/permissions"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/actionlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/domain/entities/authenticationlog"
 	"github.com/iota-uz/iota-sdk/modules/logging/presentation/mappers"
@@ -98,7 +99,7 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 	if !canView {
 		accept := strings.ToLower(r.Header.Get("Accept"))
 		if strings.Contains(accept, "application/json") || htmx.IsHxRequest(r) {
-			writeForbiddenResponse(w, r, logsAuthzObject, "view")
+			layouts.WriteAuthzForbiddenResponse(w, r, logsAuthzObject, "view")
 			return
 		}
 	}

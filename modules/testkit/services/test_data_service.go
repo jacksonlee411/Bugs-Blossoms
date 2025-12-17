@@ -69,10 +69,6 @@ func (s *TestDataService) GetAvailableScenarios() []map[string]interface{} {
 			"description": "Finance module focused setup with accounts, categories, and sample transactions",
 		},
 		{
-			"name":        "warehouse",
-			"description": "Warehouse module setup with units, products, and inventory",
-		},
-		{
 			"name":        "comprehensive",
 			"description": "Full setup with data across all modules",
 		},
@@ -199,63 +195,6 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 				StopOnError:        true,
 			},
 		},
-		"warehouse": {
-			Version: "1.0",
-			Tenant: &schemas.TenantSpec{
-				ID:     "00000000-0000-0000-0000-000000000001",
-				Name:   "Default Test Tenant",
-				Domain: "test.localhost",
-			},
-			Data: &schemas.DataSpec{
-				Users: []schemas.UserSpec{
-					{
-						Email:     "test@gmail.com",
-						Password:  "TestPass123!",
-						FirstName: "Test",
-						LastName:  "User",
-						Language:  "en",
-						Ref:       "testUser",
-						CasbinRoles: []string{
-							"core.superadmin",
-						},
-					},
-				},
-				Warehouse: &schemas.WarehouseSpec{
-					Units: []schemas.UnitSpec{
-						{
-							Title:      "Pieces",
-							ShortTitle: "pcs",
-							Ref:        "pieces",
-						},
-						{
-							Title:      "Kilograms",
-							ShortTitle: "kg",
-							Ref:        "kilograms",
-						},
-					},
-					Products: []schemas.ProductSpec{
-						{
-							Name:    "Widget A",
-							UnitRef: "@units.pieces",
-							Price:   25.50,
-							Ref:     "widgetA",
-						},
-						{
-							Name:    "Component B",
-							UnitRef: "@units.kilograms",
-							Price:   15.75,
-							Ref:     "componentB",
-						},
-					},
-				},
-			},
-			Options: &schemas.OptionsSpec{
-				ClearExisting:      false,
-				ReturnIds:          true,
-				ValidateReferences: true,
-				StopOnError:        true,
-			},
-		},
 		"comprehensive": {
 			Version: "1.0",
 			Tenant: &schemas.TenantSpec{
@@ -346,23 +285,6 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 							Email:     "john.doe@example.com",
 							Phone:     "+1234567890",
 							Ref:       "johnDoe",
-						},
-					},
-				},
-				Warehouse: &schemas.WarehouseSpec{
-					Units: []schemas.UnitSpec{
-						{
-							Title:      "Pieces",
-							ShortTitle: "pcs",
-							Ref:        "pieces",
-						},
-					},
-					Products: []schemas.ProductSpec{
-						{
-							Name:    "Test Product",
-							UnitRef: "@units.pieces",
-							Price:   50.00,
-							Ref:     "testProduct",
 						},
 					},
 				},

@@ -40,7 +40,7 @@ The Super Admin server uses a minimal module configuration:
 - superadmin   // Platform management functionality
 
 // NOT Loaded (unlike main app)
-- warehouse, hrm, logging, website, bichat, testkit, etc.
+- hrm, logging, website, bichat, testkit, etc.
 ```
 
 This selective loading reduces memory footprint and improves security by eliminating unnecessary code paths.

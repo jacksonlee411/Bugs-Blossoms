@@ -445,6 +445,56 @@ jobs:
             coverage.html
             migrate.log
 
+  routing-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: Routing Gates
+
+    services:
+      postgres:
+        image: postgres:17
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: iota_erp
+          POSTGRES_INITDB_ARGS: -c max_connections=200
+        options: >-
+          --health-cmd="pg_isready -U postgres -d iota_erp"
+          --health-interval=5s --health-timeout=5s --health-retries=5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.10"
+          cache: true
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          until pg_isready -h localhost -p 5432 -U postgres -d iota_erp; do
+            echo "Waiting for postgres..."
+            sleep 1
+          done
+
+      - name: Run routing quality gates
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: iota_erp
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+        run: make check routing
+
   test-e2e:
     runs-on: ubuntu-latest
     name: E2E Tests
