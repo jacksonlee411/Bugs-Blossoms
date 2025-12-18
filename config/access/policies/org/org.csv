@@ -7,3 +7,5 @@ p, role:core.superadmin, org.snapshot, *, global, allow
 p, role:core.superadmin, org.batch, *, global, allow
 p, role:core.superadmin, org.change_requests, *, global, allow
 p, role:core.superadmin, org.preflight, *, global, allow
+p, role:core.superadmin, org.roles, *, global, allow
+p, role:core.superadmin, org.role_assignments, *, global, allow

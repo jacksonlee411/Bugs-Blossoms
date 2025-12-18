@@ -14,4 +14,6 @@ p, role:core.superadmin, org.hierarchies, *, global, allow
 p, role:core.superadmin, org.nodes, *, global, allow
 p, role:core.superadmin, org.positions, *, global, allow
 p, role:core.superadmin, org.preflight, *, global, allow
+p, role:core.superadmin, org.role_assignments, *, global, allow
+p, role:core.superadmin, org.roles, *, global, allow
 p, role:core.superadmin, org.snapshot, *, global, allow

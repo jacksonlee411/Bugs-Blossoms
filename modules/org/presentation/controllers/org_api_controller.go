@@ -60,6 +60,7 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 
 	api.HandleFunc("/nodes", c.CreateNode).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}", c.UpdateNode).Methods(http.MethodPatch)
+	api.HandleFunc("/nodes/{id}:resolved-attributes", c.GetNodeResolvedAttributes).Methods(http.MethodGet)
 	api.HandleFunc("/nodes/{id}:move", c.MoveNode).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}:correct", c.CorrectNode).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}:rescind", c.RescindNode).Methods(http.MethodPost)
@@ -71,6 +72,9 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/assignments/{id}", c.UpdateAssignment).Methods(http.MethodPatch)
 	api.HandleFunc("/assignments/{id}:correct", c.CorrectAssignment).Methods(http.MethodPost)
 	api.HandleFunc("/assignments/{id}:rescind", c.RescindAssignment).Methods(http.MethodPost)
+
+	api.HandleFunc("/roles", c.GetRoles).Methods(http.MethodGet)
+	api.HandleFunc("/role-assignments", c.GetRoleAssignments).Methods(http.MethodGet)
 
 	api.HandleFunc("/snapshot", c.GetSnapshot).Methods(http.MethodGet)
 	api.HandleFunc("/batch", c.Batch).Methods(http.MethodPost)
@@ -111,6 +115,51 @@ func (c *OrgAPIController) GetHierarchies(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	include := strings.TrimSpace(r.URL.Query().Get("include"))
+	includeResolved := false
+	if include != "" {
+		parts := strings.Split(include, ",")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			if p == "" {
+				continue
+			}
+			if p == "resolved_attributes" {
+				includeResolved = true
+				continue
+			}
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "include is invalid")
+			return
+		}
+	}
+
+	if includeResolved {
+		if hType != "OrgUnit" {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "type is invalid")
+			return
+		}
+
+		nodes, effectiveDate, _, _, err := c.org.GetHierarchyResolvedAttributes(r.Context(), tenantID, hType, asOf)
+		if err != nil {
+			writeServiceError(w, requestID, err)
+			return
+		}
+
+		type hierarchiesResolvedResponse struct {
+			TenantID      string                                         `json:"tenant_id"`
+			HierarchyType string                                         `json:"hierarchy_type"`
+			EffectiveDate string                                         `json:"effective_date"`
+			Nodes         []services.HierarchyNodeWithResolvedAttributes `json:"nodes"`
+		}
+		writeJSON(w, http.StatusOK, hierarchiesResolvedResponse{
+			TenantID:      tenantID.String(),
+			HierarchyType: hType,
+			EffectiveDate: effectiveDate.UTC().Format(time.RFC3339),
+			Nodes:         nodes,
+		})
+		return
+	}
+
 	nodes, effectiveDate, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, hType, asOf)
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -128,6 +177,242 @@ func (c *OrgAPIController) GetHierarchies(w http.ResponseWriter, r *http.Request
 		HierarchyType: hType,
 		EffectiveDate: effectiveDate.UTC().Format(time.RFC3339),
 		Nodes:         nodes,
+	})
+}
+
+func (c *OrgAPIController) GetNodeResolvedAttributes(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgHierarchiesAuthzObject, "read") {
+		return
+	}
+
+	nodeID, err := uuid.Parse(strings.TrimSpace(mux.Vars(r)["id"]))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "id is invalid")
+		return
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+
+	var requested []string
+	attrRaw := strings.TrimSpace(r.URL.Query().Get("attributes"))
+	if attrRaw != "" {
+		seen := map[string]struct{}{}
+		for _, part := range strings.Split(attrRaw, ",") {
+			name := strings.TrimSpace(strings.ToLower(part))
+			if name == "" {
+				continue
+			}
+			if !isOrgInheritanceAttributeWhitelisted(name) {
+				writeAPIError(w, http.StatusBadRequest, requestID, "ORG_UNKNOWN_ATTRIBUTE", "unknown attribute")
+				return
+			}
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
+			requested = append(requested, name)
+		}
+	}
+
+	const hierarchyType = "OrgUnit"
+	nodes, effectiveDate, sourcesByNode, ruleAttrs, err := c.org.GetHierarchyResolvedAttributes(r.Context(), tenantID, hierarchyType, asOf)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	var node services.HierarchyNodeWithResolvedAttributes
+	found := false
+	for _, n := range nodes {
+		if n.ID == nodeID {
+			node = n
+			found = true
+			break
+		}
+	}
+	if !found {
+		writeAPIError(w, http.StatusNotFound, requestID, "ORG_NODE_NOT_FOUND_AT_DATE", "org_node_id not found at effective_date")
+		return
+	}
+
+	selected := requested
+	if len(selected) == 0 {
+		selected = ruleAttrs
+	}
+
+	attrs := map[string]any{}
+	resolved := map[string]any{}
+	resolvedSources := map[string]*uuid.UUID{}
+
+	sources := sourcesByNode[nodeID]
+	for _, name := range selected {
+		switch name {
+		case "legal_entity_id":
+			attrs[name] = node.Attributes.LegalEntityID
+			resolved[name] = node.ResolvedAttributes.LegalEntityID
+			resolvedSources[name] = sources.LegalEntityID
+		case "company_code":
+			attrs[name] = node.Attributes.CompanyCode
+			resolved[name] = node.ResolvedAttributes.CompanyCode
+			resolvedSources[name] = sources.CompanyCode
+		case "location_id":
+			attrs[name] = node.Attributes.LocationID
+			resolved[name] = node.ResolvedAttributes.LocationID
+			resolvedSources[name] = sources.LocationID
+		case "manager_user_id":
+			attrs[name] = node.Attributes.ManagerUserID
+			resolved[name] = node.ResolvedAttributes.ManagerUserID
+			resolvedSources[name] = sources.ManagerUserID
+		default:
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_UNKNOWN_ATTRIBUTE", "unknown attribute")
+			return
+		}
+	}
+
+	type response struct {
+		TenantID           string                `json:"tenant_id"`
+		HierarchyType      string                `json:"hierarchy_type"`
+		OrgNodeID          string                `json:"org_node_id"`
+		EffectiveDate      string                `json:"effective_date"`
+		Attributes         map[string]any        `json:"attributes"`
+		ResolvedAttributes map[string]any        `json:"resolved_attributes"`
+		ResolvedSources    map[string]*uuid.UUID `json:"resolved_sources"`
+	}
+	writeJSON(w, http.StatusOK, response{
+		TenantID:           tenantID.String(),
+		HierarchyType:      hierarchyType,
+		OrgNodeID:          nodeID.String(),
+		EffectiveDate:      effectiveDate.UTC().Format(time.RFC3339),
+		Attributes:         attrs,
+		ResolvedAttributes: resolved,
+		ResolvedSources:    resolvedSources,
+	})
+}
+
+func isOrgInheritanceAttributeWhitelisted(name string) bool {
+	switch name {
+	case "legal_entity_id", "company_code", "location_id", "manager_user_id":
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *OrgAPIController) GetRoles(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgRolesAuthzObject, "admin") {
+		return
+	}
+
+	roles, err := c.org.ListRoles(r.Context(), tenantID)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type response struct {
+		TenantID string             `json:"tenant_id"`
+		Roles    []services.OrgRole `json:"roles"`
+	}
+	writeJSON(w, http.StatusOK, response{
+		TenantID: tenantID.String(),
+		Roles:    roles,
+	})
+}
+
+func (c *OrgAPIController) GetRoleAssignments(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgRoleAssignmentsAuthzObject, "admin") {
+		return
+	}
+
+	orgNodeRaw := strings.TrimSpace(r.URL.Query().Get("org_node_id"))
+	if orgNodeRaw == "" {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "org_node_id is required")
+		return
+	}
+	orgNodeID, err := uuid.Parse(orgNodeRaw)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "org_node_id is invalid")
+		return
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+
+	includeInherited := false
+	if raw := strings.TrimSpace(r.URL.Query().Get("include_inherited")); raw != "" {
+		v, err := strconv.ParseBool(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "include_inherited is invalid")
+			return
+		}
+		includeInherited = v
+	}
+
+	var roleCode *string
+	if raw := strings.TrimSpace(r.URL.Query().Get("role")); raw != "" {
+		roleCode = &raw
+	}
+
+	var subjectType *string
+	var subjectID *uuid.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("subject")); raw != "" {
+		parts := strings.Split(raw, ":")
+		if len(parts) != 2 {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "subject is invalid")
+			return
+		}
+		st := strings.TrimSpace(strings.ToLower(parts[0]))
+		sid, err := uuid.Parse(strings.TrimSpace(parts[1]))
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "subject is invalid")
+			return
+		}
+		if st != "user" && st != "group" {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "subject is invalid")
+			return
+		}
+		subjectType = &st
+		subjectID = &sid
+	}
+
+	items, effectiveDate, err := c.org.ListRoleAssignments(r.Context(), tenantID, orgNodeID, asOf, includeInherited, roleCode, subjectType, subjectID)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type response struct {
+		TenantID         string                        `json:"tenant_id"`
+		OrgNodeID        string                        `json:"org_node_id"`
+		EffectiveDate    string                        `json:"effective_date"`
+		IncludeInherited bool                          `json:"include_inherited"`
+		Items            []services.RoleAssignmentItem `json:"items"`
+	}
+	writeJSON(w, http.StatusOK, response{
+		TenantID:         tenantID.String(),
+		OrgNodeID:        orgNodeID.String(),
+		EffectiveDate:    effectiveDate.UTC().Format(time.RFC3339),
+		IncludeInherited: includeInherited,
+		Items:            items,
 	})
 }
 
