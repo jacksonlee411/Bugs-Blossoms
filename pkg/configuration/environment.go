@@ -183,6 +183,12 @@ type Configuration struct {
 	// Test endpoints - only enable in test environment
 	EnableTestEndpoints bool `env:"ENABLE_TEST_ENDPOINTS" envDefault:"false"`
 
+	// DEV-PLAN-024: Org auto-generated empty positions.
+	EnableOrgAutoPositions bool `env:"ENABLE_ORG_AUTO_POSITIONS" envDefault:"true"`
+
+	// DEV-PLAN-024: Enable extended assignment types (matrix/dotted).
+	EnableOrgExtendedAssignmentTypes bool `env:"ENABLE_ORG_EXTENDED_ASSIGNMENT_TYPES" envDefault:"false"`
+
 	// Dev-only endpoints (e.g. /_dev/*). In production, these are disabled by default unless explicitly enabled.
 	EnableDevEndpoints bool `env:"ENABLE_DEV_ENDPOINTS" envDefault:"false"`
 

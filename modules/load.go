@@ -7,6 +7,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core"
 	"github.com/iota-uz/iota-sdk/modules/hrm"
 	"github.com/iota-uz/iota-sdk/modules/logging"
+	"github.com/iota-uz/iota-sdk/modules/org"
 	"github.com/iota-uz/iota-sdk/modules/testkit"
 	"github.com/iota-uz/iota-sdk/modules/website"
 	"github.com/iota-uz/iota-sdk/pkg/application"
@@ -21,6 +22,7 @@ var (
 		bichat.NewModule(),
 		hrm.NewModule(),
 		logging.NewModule(),
+		org.NewModule(),
 		website.NewModule(),
 		testkit.NewModule(), // Test endpoints - only active when ENABLE_TEST_ENDPOINTS=true
 	}
@@ -30,6 +32,7 @@ var (
 		bichat.NavItems,
 		hrm.NavItems,
 		logging.NavItems,
+		org.NavItems,
 		website.NavItems,
 	)
 )

@@ -84,6 +84,10 @@ entrypoints:
       class: ui
     - prefix: /bi-chat
       class: ui
+    - prefix: /org
+      class: ui
+    - prefix: /org/api
+      class: internal_api
 
     # Superadmin paths are reachable on the main server via module registration.
     - prefix: /superadmin
