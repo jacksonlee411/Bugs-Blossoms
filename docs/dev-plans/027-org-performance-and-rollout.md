@@ -100,7 +100,7 @@ graph TD
   - `org-perf dataset apply --tenant <uuid> --scale 1k --seed 42 --profile balanced [--backend db|api] [--apply]`
   - `org-perf bench tree --tenant <uuid> --effective-date <rfc3339|yyyy-mm-dd> --profile balanced --iterations 200 --warmup 50 --concurrency 1 --backend db|api [--base-url http://localhost:3200] --output <path>`
 
-- **实现形态 B：Go test（CI Query Budget 守卫，可选但建议）**
+- **实现形态 B：Go test（CI Query Budget 守卫，必须交付）**
   - `go test ./modules/org/... -run '^TestOrgTreeQueryBudget$' -count=1`
   - 测试必须支持从 env/flag 读取：`DB_*`、`TENANT_ID`、`EFFECTIVE_DATE`、`SEED`、`SCALE`、`PROFILE`。
 
