@@ -174,7 +174,7 @@ org:
 
 .PHONY: org-perf-dataset
 org-perf-dataset:
-	@set -euo pipefail; \
+	@set -eu; \
 	TENANT_ID="$${TENANT_ID:-00000000-0000-0000-0000-000000000001}"; \
 	SCALE="$${SCALE:-1k}"; \
 	SEED="$${SEED:-42}"; \
@@ -192,7 +192,7 @@ org-perf-dataset:
 
 .PHONY: org-perf-bench
 org-perf-bench:
-	@set -euo pipefail; \
+	@set -eu; \
 	mkdir -p ./tmp/org-perf; \
 	TENANT_ID="$${TENANT_ID:-00000000-0000-0000-0000-000000000001}"; \
 	SCALE="$${SCALE:-1k}"; \
