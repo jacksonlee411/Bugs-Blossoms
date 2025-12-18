@@ -16,7 +16,7 @@ import (
 )
 
 func runOrgMigrations(projectRoot string, conf *configuration.Configuration) error {
-	cmd := exec.Command("./scripts/db/run_goose.sh", "up")
+	cmd := exec.CommandContext(context.Background(), "./scripts/db/run_goose.sh", "up")
 	cmd.Dir = projectRoot
 	cmd.Env = append(
 		os.Environ(),
