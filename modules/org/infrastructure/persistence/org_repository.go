@@ -70,3 +70,88 @@ ORDER BY e.depth ASC, s.display_order ASC, s.name ASC
 	}
 	return out, nil
 }
+
+func (r *OrgRepository) ListHierarchyAsOfRecursive(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]services.HierarchyNode, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := tx.Query(ctx, `
+	WITH RECURSIVE tree AS (
+		SELECT
+			n.id,
+			n.code,
+			s.name,
+			e.parent_node_id,
+			0 AS depth,
+			s.display_order,
+			s.status
+		FROM org_nodes n
+		JOIN org_node_slices s
+			ON s.tenant_id = n.tenant_id
+			AND s.org_node_id = n.id
+			AND s.effective_date <= $2
+			AND s.end_date > $2
+		JOIN org_edges e
+			ON e.tenant_id = n.tenant_id
+			AND e.child_node_id = n.id
+			AND e.hierarchy_type = $3
+			AND e.effective_date <= $2
+			AND e.end_date > $2
+		WHERE n.tenant_id = $1
+			AND e.parent_node_id IS NULL
+
+		UNION ALL
+
+		SELECT
+			n.id,
+			n.code,
+			s.name,
+			e.parent_node_id,
+			tree.depth + 1 AS depth,
+			s.display_order,
+			s.status
+		FROM tree
+		JOIN org_edges e
+			ON e.tenant_id = $1
+			AND e.parent_node_id = tree.id
+			AND e.hierarchy_type = $3
+			AND e.effective_date <= $2
+			AND e.end_date > $2
+		JOIN org_nodes n
+			ON n.tenant_id = $1
+			AND n.id = e.child_node_id
+		JOIN org_node_slices s
+			ON s.tenant_id = n.tenant_id
+			AND s.org_node_id = n.id
+			AND s.effective_date <= $2
+			AND s.end_date > $2
+	)
+	SELECT id, code, name, parent_node_id, depth, display_order, status
+	FROM tree
+	ORDER BY depth ASC, display_order ASC, name ASC
+	`, pgUUID(tenantID), asOf, hierarchyType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]services.HierarchyNode, 0, 64)
+	for rows.Next() {
+		var node services.HierarchyNode
+		var parent pgtype.UUID
+		if err := rows.Scan(&node.ID, &node.Code, &node.Name, &parent, &node.Depth, &node.DisplayOrder, &node.Status); err != nil {
+			return nil, err
+		}
+		if parent.Valid {
+			pid := uuid.UUID(parent.Bytes)
+			node.ParentID = &pid
+		}
+		out = append(out, node)
+	}
+	if rows.Err() != nil {
+		return nil, rows.Err()
+	}
+	return out, nil
+}

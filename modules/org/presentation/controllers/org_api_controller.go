@@ -1573,12 +1573,23 @@ func requireSessionTenantUser(w http.ResponseWriter, r *http.Request) (uuid.UUID
 	if !ok {
 		return uuid.Nil, nil, requestID, false
 	}
+	if !requireOrgRolloutEnabled(w, requestID, tenantID) {
+		return uuid.Nil, nil, requestID, false
+	}
 	u, err := composables.UseUser(r.Context())
 	if err != nil || u == nil {
 		writeAPIError(w, http.StatusUnauthorized, requestID, "ORG_NO_SESSION", "no user")
 		return uuid.Nil, nil, requestID, false
 	}
 	return tenantID, u, requestID, true
+}
+
+func requireOrgRolloutEnabled(w http.ResponseWriter, requestID string, tenantID uuid.UUID) bool {
+	if services.OrgRolloutEnabledForTenant(tenantID) {
+		return true
+	}
+	writeAPIError(w, http.StatusNotFound, requestID, "ORG_ROLLOUT_DISABLED", "org is not enabled for this tenant")
+	return false
 }
 
 func ensureRequestID(r *http.Request) string {

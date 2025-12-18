@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/iota-uz/iota-sdk/pkg/logging"
 
 	"github.com/caarlos0/env/v11"
@@ -189,6 +191,12 @@ type Configuration struct {
 	// DEV-PLAN-024: Enable extended assignment types (matrix/dotted).
 	EnableOrgExtendedAssignmentTypes bool `env:"ENABLE_ORG_EXTENDED_ASSIGNMENT_TYPES" envDefault:"false"`
 
+	// DEV-PLAN-027: Org rollout flags (tenant allowlist + rollback switches).
+	OrgRolloutMode    string `env:"ORG_ROLLOUT_MODE" envDefault:"disabled"`
+	OrgRolloutTenants string `env:"ORG_ROLLOUT_TENANTS" envDefault:""`
+	OrgReadStrategy   string `env:"ORG_READ_STRATEGY" envDefault:"path"`
+	OrgCacheEnabled   bool   `env:"ORG_CACHE_ENABLED" envDefault:"false"`
+
 	// Dev-only endpoints (e.g. /_dev/*). In production, these are disabled by default unless explicitly enabled.
 	EnableDevEndpoints bool `env:"ENABLE_DEV_ENDPOINTS" envDefault:"false"`
 
@@ -262,6 +270,9 @@ func (c *Configuration) load(envFiles []string) error {
 	if err := c.validateRLS(); err != nil {
 		return err
 	}
+	if err := c.validateOrgRollout(); err != nil {
+		return err
+	}
 	f, logger, err := logging.FileLogger(c.LogrusLogLevel(), c.Loki.LogPath)
 	if err != nil {
 		return err
@@ -310,6 +321,46 @@ func (c *Configuration) validateRLS() error {
 	}
 
 	c.RLSEnforce = mode
+	return nil
+}
+
+func (c *Configuration) validateOrgRollout() error {
+	mode := strings.ToLower(strings.TrimSpace(c.OrgRolloutMode))
+	if mode == "" {
+		mode = "disabled"
+	}
+	switch mode {
+	case "disabled", "enabled":
+	default:
+		return fmt.Errorf("invalid ORG_ROLLOUT_MODE=%q (expected disabled|enabled)", c.OrgRolloutMode)
+	}
+	c.OrgRolloutMode = mode
+
+	strategy := strings.ToLower(strings.TrimSpace(c.OrgReadStrategy))
+	if strategy == "" {
+		strategy = "path"
+	}
+	switch strategy {
+	case "path", "recursive":
+	default:
+		return fmt.Errorf("invalid ORG_READ_STRATEGY=%q (expected path|recursive)", c.OrgReadStrategy)
+	}
+	c.OrgReadStrategy = strategy
+
+	rawTenants := strings.TrimSpace(c.OrgRolloutTenants)
+	if rawTenants != "" {
+		for _, part := range strings.FieldsFunc(rawTenants, func(r rune) bool {
+			return r == ',' || r == ' ' || r == '\n' || r == '\t'
+		}) {
+			if strings.TrimSpace(part) == "" {
+				continue
+			}
+			if _, err := uuid.Parse(part); err != nil {
+				return fmt.Errorf("invalid ORG_ROLLOUT_TENANTS entry=%q: %w", part, err)
+			}
+		}
+	}
+
 	return nil
 }
 

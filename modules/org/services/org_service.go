@@ -25,6 +25,7 @@ var orgOutboxTable = pgx.Identifier{"public", "org_outbox"}
 
 type OrgRepository interface {
 	ListHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, error)
+	ListHierarchyAsOfRecursive(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, error)
 	ListSnapshotNodes(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotEdges(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotPositions(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
@@ -190,10 +191,14 @@ type OrgService struct {
 }
 
 func NewOrgService(repo OrgRepository) *OrgService {
+	var cache *orgCache
+	if configuration.Use().OrgCacheEnabled {
+		cache = newOrgCache()
+	}
 	return &OrgService{
 		repo:      repo,
 		publisher: outbox.NewPublisher(),
-		cache:     newOrgCache(),
+		cache:     cache,
 	}
 }
 
@@ -245,6 +250,9 @@ func (s *OrgService) GetHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, h
 	}
 
 	nodes, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]HierarchyNode, error) {
+		if OrgReadStrategy() == "recursive" {
+			return s.repo.ListHierarchyAsOfRecursive(txCtx, tenantID, hierarchyType, asOf)
+		}
 		return s.repo.ListHierarchyAsOf(txCtx, tenantID, hierarchyType, asOf)
 	})
 	if err != nil {
