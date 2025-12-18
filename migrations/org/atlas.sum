@@ -1,4 +1,5 @@
-h1:zBfjNvtVC/AoPGFA7LA21PP55jNoytq/JTqLCXGKeTs=
+h1:icL5Nx4Xhpgg4o//Pa+ix0YFX1yLpAn32lW+c3kisHI=
 00001_org_baseline.sql h1:HKEUK9io9zwPWO60nEqXEqYxCigSLmO1D/mRcH82dhQ=
 00002_org_migration_smoke.sql h1:D9VgnC2eBDeHyMVqBzEP1/rtMwdtRkcpCGqPwg1L7Gw=
 20251218005114_org_placeholders_and_event_contracts.sql h1:TSQBkvi1nm7SCw+q2BX6ltB/V2naYuznwC923I2PH88=
+20251218130000_org_settings_and_audit.sql h1:3YzoI/vlUhf2IMbig2i2mduGdAEPPSEdAzFNC3DfE/I=
