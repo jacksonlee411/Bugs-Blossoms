@@ -1,0 +1,115 @@
+package org
+
+import (
+	"fmt"
+
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
+	"github.com/iota-uz/iota-sdk/modules/org/presentation/templates/components/orgui"
+	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type NodesPageProps struct {
+	EffectiveDate string
+	SelectedNode  *viewmodels.OrgNodeDetails
+	Tree          *viewmodels.OrgTree
+	Errors        []string
+}
+
+templ NodesPage(props NodesPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{
+			Title: pageCtx.T("Org.UI.Nodes.MetaTitle"),
+		},
+	}) {
+		<div id="org-nodes-page" class="p-6 space-y-4">
+			<div class="flex items-center justify-between gap-4 flex-wrap">
+				<div class="flex items-center gap-3">
+					<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.Nodes.Title") }</h1>
+					<span class="text-xs text-300">{ pageCtx.T("Org.UI.Shared.AsOf") }: { props.EffectiveDate }</span>
+				</div>
+				<div class="flex items-center gap-2">
+					<label class="text-xs font-medium text-200" for="effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
+					<input
+						id="effective-date"
+						type="date"
+						name="effective_date"
+						value={ props.EffectiveDate }
+						class="rounded-md border border-surface-400 bg-surface-200 px-3 py-2 text-sm text-100"
+						hx-get="/org/nodes"
+						hx-trigger="change"
+						hx-target="#org-nodes-page"
+						hx-swap="outerHTML"
+						hx-push-url="true"
+						hx-include="[name='effective_date']"
+					/>
+				</div>
+			</div>
+			@orgui.Subnav(orgui.SubnavProps{
+				EffectiveDate:  props.EffectiveDate,
+				Active:         "nodes",
+				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
+			})
+			if len(props.Errors) > 0 {
+				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+					<ul class="list-disc pl-5 space-y-1">
+						for _, msg := range props.Errors {
+							<li>{ msg }</li>
+						}
+					</ul>
+				</div>
+			}
+			<div class="grid grid-cols-12 gap-4">
+				<div class="col-span-12 lg:col-span-4">
+					<div class="rounded-lg border border-surface-400 bg-surface-300">
+						<div class="flex items-center justify-between border-b border-surface-400 p-3">
+							<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Tree.Title") }</div>
+							if pageCtx.CanAuthz("org.nodes", "write") {
+								@button.Primary(button.Props{
+									Size:  button.SizeSM,
+									Class: "px-2 py-1",
+									Attrs: templ.Attributes{
+										"data-testid": "org-new-node",
+										"hx-get":      fmt.Sprintf("/org/nodes/new?effective_date=%s", props.EffectiveDate),
+										"hx-target":   "#org-node-panel",
+										"hx-swap":     "innerHTML",
+									},
+								}) {
+									{ pageCtx.T("Org.UI.Tree.NewNode") }
+								}
+							}
+						</div>
+						<div class="p-2">
+							@orgui.Tree(orgui.TreeProps{
+								Tree:          props.Tree,
+								EffectiveDate: props.EffectiveDate,
+								SwapOOB:       false,
+							})
+						</div>
+					</div>
+				</div>
+				<div class="col-span-12 lg:col-span-8">
+					<div class="rounded-lg border border-surface-400 bg-surface-300 min-h-[280px]">
+						<div class="border-b border-surface-400 p-3">
+							<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.NodePanel.Title") }</div>
+						</div>
+						<div id="org-node-panel" class="p-4">
+							if props.SelectedNode == nil {
+								<div class="text-sm text-300">
+									{ pageCtx.T("Org.UI.NodePanel.Empty") }
+								</div>
+							} else {
+								@orgui.NodeDetails(orgui.NodeDetailsProps{
+									EffectiveDate: props.EffectiveDate,
+									Node:          props.SelectedNode,
+								})
+							}
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

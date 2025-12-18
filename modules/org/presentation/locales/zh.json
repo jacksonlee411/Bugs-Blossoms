@@ -1,6 +1,87 @@
 {
 	"NavigationLinks": {
 		"Org": "组织架构"
+	},
+	"Org": {
+		"UI": {
+			"Tabs": {
+				"Structure": "组织结构",
+				"Assignments": "人员分配"
+			},
+			"Shared": {
+				"AsOf": "生效视图",
+				"EffectiveDate": "生效日期",
+				"NotFound": "未找到"
+			},
+			"Nodes": {
+				"MetaTitle": "组织结构",
+				"Title": "组织结构"
+			},
+			"Assignments": {
+				"MetaTitle": "人员分配",
+				"Title": "人员分配",
+				"CreateTitle": "创建分配",
+				"TimelineTitle": "时间线",
+				"Empty": "请输入 pernr 后刷新查看时间线。",
+				"Actions": {
+					"Create": "创建",
+					"Refresh": "刷新时间线"
+				},
+				"Fields": {
+					"Pernr": "Pernr",
+					"OrgNode": "组织节点",
+					"PositionID": "职位 ID（可选）"
+				},
+				"Table": {
+					"Pernr": "Pernr",
+					"Effective": "生效区间",
+					"OrgNodeID": "组织节点",
+					"Position": "职位"
+				}
+			},
+			"Tree": {
+				"Title": "组织树",
+				"Empty": "暂无节点",
+				"NewNode": "新建节点"
+			},
+			"NodePanel": {
+				"Title": "详情",
+				"Empty": "请先从组织树选择一个节点，或新建节点。"
+			},
+			"Actions": {
+				"Create": "创建",
+				"Save": "保存",
+				"Move": "移动"
+			},
+			"Node": {
+				"CreateTitle": "新建节点",
+				"EditTitle": "编辑节点",
+				"MoveTitle": "变更上级",
+				"Parent": {
+					"Placeholder": "搜索节点…",
+					"Help": "可按名称或编码搜索"
+				},
+				"Status": {
+					"Active": "启用",
+					"Inactive": "停用"
+				},
+				"Actions": {
+					"NewChild": "新建子节点",
+					"Edit": "编辑",
+					"Move": "变更上级"
+				},
+				"Fields": {
+					"Code": "编码",
+					"Name": "名称",
+					"Status": "状态",
+					"DisplayOrder": "排序",
+					"EffectiveWindow": "生效区间",
+					"ParentHint": "上级提示",
+					"Parent": "上级",
+					"NewParent": "新上级",
+					"I18nNames": "多语言名称（JSON）"
+				}
+			}
+		}
 	}
 }
-

@@ -1,0 +1,93 @@
+package orgui
+
+import (
+	"fmt"
+
+	icons "github.com/iota-uz/icons/phosphor"
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type NodeDetailsProps struct {
+	EffectiveDate string
+	Node          *viewmodels.OrgNodeDetails
+}
+
+templ NodeDetails(props NodeDetailsProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if props.Node == nil {
+		<div class="text-sm text-300">{ pageCtx.T("Org.UI.NodePanel.Empty") }</div>
+	} else {
+		<div class="space-y-4">
+			<div class="flex items-start justify-between gap-3">
+				<div class="min-w-0">
+					<div class="text-base font-semibold text-100 truncate">{ props.Node.Name }</div>
+					<div class="mt-1 text-xs text-300 flex flex-wrap items-center gap-x-4 gap-y-1">
+						<span>{ pageCtx.T("Org.UI.Node.Fields.Code") }: <span class="text-200">{ props.Node.Code }</span></span>
+						<span>{ pageCtx.T("Org.UI.Node.Fields.Status") }: <span class="text-200">{ props.Node.Status }</span></span>
+						<span>{ pageCtx.T("Org.UI.Node.Fields.DisplayOrder") }: <span class="text-200">{ fmt.Sprintf("%d", props.Node.DisplayOrder) }</span></span>
+					</div>
+				</div>
+				<div class="flex items-center gap-2 shrink-0">
+					if pageCtx.CanAuthz("org.nodes", "write") {
+						@button.Secondary(button.Props{
+							Size: button.SizeSM,
+							Icon: icons.Plus(icons.Props{Size: "18"}),
+							Attrs: templ.Attributes{
+								"data-testid": "org-new-child",
+								"hx-get":      fmt.Sprintf("/org/nodes/new?effective_date=%s&parent_id=%s", props.EffectiveDate, props.Node.ID.String()),
+								"hx-target":   "#org-node-panel",
+								"hx-swap":     "innerHTML",
+							},
+						}) {
+							{ pageCtx.T("Org.UI.Node.Actions.NewChild") }
+						}
+						@button.Secondary(button.Props{
+							Size: button.SizeSM,
+							Icon: icons.PencilSimpleLine(icons.Props{Size: "18"}),
+							Attrs: templ.Attributes{
+								"hx-get":    fmt.Sprintf("/org/nodes/%s?effective_date=%s&view=edit", props.Node.ID.String(), props.EffectiveDate),
+								"hx-target": "#org-node-panel",
+								"hx-swap":   "innerHTML",
+							},
+						}) {
+							{ pageCtx.T("Org.UI.Node.Actions.Edit") }
+						}
+					}
+					if pageCtx.CanAuthz("org.edges", "write") && !props.Node.IsRoot {
+						@button.Secondary(button.Props{
+							Size: button.SizeSM,
+							Icon: icons.ArrowsLeftRight(icons.Props{Size: "18"}),
+							Attrs: templ.Attributes{
+								"hx-get":    fmt.Sprintf("/org/nodes/%s?effective_date=%s&view=move", props.Node.ID.String(), props.EffectiveDate),
+								"hx-target": "#org-node-panel",
+								"hx-swap":   "innerHTML",
+							},
+						}) {
+							{ pageCtx.T("Org.UI.Node.Actions.Move") }
+						}
+					}
+				</div>
+			</div>
+			<div class="grid grid-cols-12 gap-3 text-sm">
+				<div class="col-span-12 md:col-span-6">
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Node.Fields.EffectiveWindow") }</div>
+					<div class="mt-1 text-200">
+						{ props.Node.EffectiveDate.UTC().Format("2006-01-02") } → { props.Node.EndDate.UTC().Format("2006-01-02") }
+					</div>
+				</div>
+				<div class="col-span-12 md:col-span-6">
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Node.Fields.ParentHint") }</div>
+					<div class="mt-1 text-200">
+						if props.Node.ParentHint == nil {
+							<span class="text-400">—</span>
+						} else {
+							{ props.Node.ParentHint.String() }
+						}
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

@@ -7,10 +7,12 @@ import (
 )
 
 var OrgLink = types.NavigationItem{
-	Name:     "NavigationLinks.Org",
-	Icon:     icons.TreeStructure(icons.Props{Size: "20"}),
-	Href:     "/org",
-	Children: nil,
+	Name:        "NavigationLinks.Org",
+	Icon:        icons.TreeStructure(icons.Props{Size: "20"}),
+	Href:        "/org/nodes",
+	Children:    nil,
+	AuthzObject: "org.hierarchies",
+	AuthzAction: "read",
 }
 
 var NavItems = []types.NavigationItem{

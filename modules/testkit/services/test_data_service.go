@@ -65,6 +65,10 @@ func (s *TestDataService) GetAvailableScenarios() []map[string]interface{} {
 			"description": "Basic setup with default tenant and test user",
 		},
 		{
+			"name":        "org",
+			"description": "Org module focused setup with admin + readonly users",
+		},
+		{
 			"name":        "finance",
 			"description": "Finance module focused setup with accounts, categories, and sample transactions",
 		},
@@ -96,6 +100,53 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 						CasbinRoles: []string{
 							"core.superadmin",
 						},
+					},
+				},
+			},
+			Options: &schemas.OptionsSpec{
+				ClearExisting:      false,
+				ReturnIds:          true,
+				ValidateReferences: true,
+				StopOnError:        true,
+			},
+		},
+		"org": {
+			Version: "1.0",
+			Tenant: &schemas.TenantSpec{
+				ID:     "00000000-0000-0000-0000-000000000001",
+				Name:   "Default Test Tenant",
+				Domain: "test.localhost",
+			},
+			Data: &schemas.DataSpec{
+				Users: []schemas.UserSpec{
+					{
+						Email:            "org.seed.dummy@example.com",
+						Password:         "TestPass123!",
+						FirstName:        "Org",
+						LastName:         "Seed",
+						Language:         "en",
+						Ref:              "orgSeedDummy",
+						SkipDefaultAdmin: true,
+					},
+					{
+						Email:     "test@gmail.com",
+						Password:  "TestPass123!",
+						FirstName: "Test",
+						LastName:  "User",
+						Language:  "en",
+						Ref:       "orgAdmin",
+						CasbinRoles: []string{
+							"core.superadmin",
+						},
+					},
+					{
+						Email:            "org.readonly@example.com",
+						Password:         "TestPass123!",
+						FirstName:        "Org",
+						LastName:         "Readonly",
+						Language:         "en",
+						Ref:              "orgReadonly",
+						SkipDefaultAdmin: true,
 					},
 				},
 			},

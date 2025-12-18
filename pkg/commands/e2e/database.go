@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -13,6 +14,32 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func runOrgMigrations(projectRoot string, conf *configuration.Configuration) error {
+	cmd := exec.CommandContext(context.Background(), "./scripts/db/run_goose.sh", "up")
+	cmd.Dir = projectRoot
+	cmd.Env = append(
+		os.Environ(),
+		"GOOSE_MIGRATIONS_DIR=migrations/org",
+		"GOOSE_TABLE=goose_db_version_org",
+		"DB_NAME="+E2E_DB_NAME,
+		"DB_HOST="+conf.Database.Host,
+		"DB_PORT="+conf.Database.Port,
+		"DB_USER="+conf.Database.User,
+		"DB_PASSWORD="+conf.Database.Password,
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// goose up exits non-zero when the database is already up to date.
+		if strings.Contains(string(out), "goose run: no next version found") {
+			return nil
+		}
+		_, _ = os.Stdout.Write(out)
+		return err
+	}
+	_, _ = os.Stdout.Write(out)
+	return nil
+}
 
 // Create drops and creates an empty e2e database
 func Create() error {
@@ -125,6 +152,10 @@ func Migrate() error {
 		return fmt.Errorf("failed to ensure HRM schema: %w", err)
 	}
 
+	if err := runOrgMigrations(projectRoot, conf); err != nil {
+		return fmt.Errorf("failed to run org migrations: %w", err)
+	}
+
 	conf.Logger().Info("Applied migrations to e2e database")
 	return nil
 }
@@ -152,10 +183,11 @@ func Setup() error {
 		if err := Create(); err != nil {
 			return err
 		}
-		// Apply migrations for new database
-		if err := Migrate(); err != nil {
-			return err
-		}
+	}
+
+	// Always run migrations to keep schema up to date.
+	if err := Migrate(); err != nil {
+		return err
 	}
 
 	// Always seed with fresh test data
@@ -234,6 +266,8 @@ func TruncateAllTables() error {
 		FROM pg_tables
 		WHERE schemaname = 'public'
 		AND tablename NOT LIKE 'schema_migrations%'
+		AND tablename NOT LIKE 'gorp_migrations%'
+		AND tablename NOT LIKE 'goose_db_version%'
 		ORDER BY tablename
 	`
 

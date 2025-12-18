@@ -139,6 +139,7 @@ modules/{module}/
 - Core 用户权限页签 UI/交互优化：`docs/dev-plans/016B-core-users-permissions-ui.md`
 - Transactional Outbox 工具链（DEV-PLAN-017）：`docs/dev-plans/017-transactional-outbox.md`
 - DEV-PLAN-017 Readiness：`docs/dev-records/DEV-PLAN-017-READINESS.md`
+- DEV-PLAN-035 Readiness：`docs/dev-records/DEV-PLAN-035-READINESS.md`
 - 全局路由策略统一（DEV-PLAN-018）：`docs/dev-plans/018-routing-strategy.md`
 - DEV-PLAN-018A 路由策略评审输入：`docs/dev-plans/018A-routing-strategy-review.md`
 - DEV-PLAN-018B 路由策略门禁启动方案：`docs/dev-plans/018B-routing-strategy-gates.md`
@@ -149,6 +150,8 @@ modules/{module}/
 - 多租户管理页面可视化管理（DEV-PLAN-019D）：`docs/dev-plans/019D-multi-tenant-management-ui.md`
 - 制造示例组织树数据集（DEV-PLAN-036）：`docs/dev-plans/036-org-sample-tree-data.md`
 - Org Atlas+Goose 工具链与门禁（DEV-PLAN-021A）：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
+- Org UI（DEV-PLAN-035）：`docs/dev-plans/035-org-ui.md`
+- Org UI IA 与侧栏集成（DEV-PLAN-035A）：`docs/dev-plans/035A-org-ui-ia-and-sidebar-integration.md`
 - 移除 finance/billing/crm/projects 模块（DEV-PLAN-040）：`docs/dev-plans/040-remove-finance-billing-crm.md`
 - 移除 warehouse（仓库）模块（DEV-PLAN-041）：`docs/dev-plans/041-remove-warehouse-module.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`

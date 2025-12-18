@@ -130,6 +130,23 @@ SELECT EXISTS(
 	return exists, nil
 }
 
+func (r *OrgRepository) GetNode(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID) (services.NodeRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return services.NodeRow{}, err
+	}
+
+	var out services.NodeRow
+	if err := tx.QueryRow(ctx, `
+	SELECT id, code, is_root, type
+	FROM org_nodes
+	WHERE tenant_id=$1 AND id=$2
+	`, pgUUID(tenantID), pgUUID(nodeID)).Scan(&out.ID, &out.Code, &out.IsRoot, &out.Type); err != nil {
+		return services.NodeRow{}, err
+	}
+	return out, nil
+}
+
 func (r *OrgRepository) GetNodeIsRoot(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID) (bool, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
@@ -140,6 +157,69 @@ func (r *OrgRepository) GetNodeIsRoot(ctx context.Context, tenantID uuid.UUID, n
 		return false, err
 	}
 	return isRoot, nil
+}
+
+func (r *OrgRepository) GetNodeSliceAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (services.NodeSliceRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return services.NodeSliceRow{}, err
+	}
+
+	row := tx.QueryRow(ctx, `
+	SELECT
+		id,
+		name,
+		i18n_names,
+		status,
+		legal_entity_id,
+		company_code,
+		location_id,
+		display_order,
+		parent_hint,
+		manager_user_id,
+		effective_date,
+		end_date
+	FROM org_node_slices
+	WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date <= $3 AND end_date > $3
+	ORDER BY effective_date DESC
+	LIMIT 1
+	`, pgUUID(tenantID), pgUUID(nodeID), asOf)
+
+	var out services.NodeSliceRow
+	var i18nRaw []byte
+	var legal pgtype.UUID
+	var location pgtype.UUID
+	var parentHint pgtype.UUID
+	var company pgtype.Text
+	var manager pgtype.Int8
+	if err := row.Scan(
+		&out.ID,
+		&out.Name,
+		&i18nRaw,
+		&out.Status,
+		&legal,
+		&company,
+		&location,
+		&out.DisplayOrder,
+		&parentHint,
+		&manager,
+		&out.EffectiveDate,
+		&out.EndDate,
+	); err != nil {
+		return services.NodeSliceRow{}, err
+	}
+
+	if len(i18nRaw) > 0 {
+		_ = json.Unmarshal(i18nRaw, &out.I18nNames)
+	}
+
+	out.LegalEntityID = nullableUUID(legal)
+	out.LocationID = nullableUUID(location)
+	out.ParentHint = nullableUUID(parentHint)
+	out.CompanyCode = nullableText(company)
+	out.ManagerUserID = nullableInt8(manager)
+
+	return out, nil
 }
 
 func (r *OrgRepository) LockNodeSliceAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (services.NodeSliceRow, error) {

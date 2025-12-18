@@ -1,6 +1,87 @@
 {
   "NavigationLinks": {
     "Org": "Org"
+  },
+  "Org": {
+    "UI": {
+      "Tabs": {
+        "Structure": "Structure",
+        "Assignments": "Assignments"
+      },
+      "Shared": {
+        "AsOf": "As of",
+        "EffectiveDate": "Effective date",
+        "NotFound": "Not found"
+      },
+      "Nodes": {
+        "MetaTitle": "Org structure",
+        "Title": "Org structure"
+      },
+      "Assignments": {
+        "MetaTitle": "Assignments",
+        "Title": "Assignments",
+        "CreateTitle": "Create assignment",
+        "TimelineTitle": "Timeline",
+        "Empty": "Enter a pernr and refresh to see the timeline.",
+        "Actions": {
+          "Create": "Create",
+          "Refresh": "Refresh timeline"
+        },
+        "Fields": {
+          "Pernr": "Pernr",
+          "OrgNode": "Org node",
+          "PositionID": "Position ID (optional)"
+        },
+        "Table": {
+          "Pernr": "Pernr",
+          "Effective": "Effective",
+          "OrgNodeID": "Org node",
+          "Position": "Position"
+        }
+      },
+      "Tree": {
+        "Title": "Tree",
+        "Empty": "No nodes yet",
+        "NewNode": "New node"
+      },
+      "NodePanel": {
+        "Title": "Details",
+        "Empty": "Select a node from the tree, or create a new one."
+      },
+      "Actions": {
+        "Create": "Create",
+        "Save": "Save",
+        "Move": "Move"
+      },
+      "Node": {
+        "CreateTitle": "Create node",
+        "EditTitle": "Edit node",
+        "MoveTitle": "Move node",
+        "Parent": {
+          "Placeholder": "Search nodes…",
+          "Help": "Search by name or code"
+        },
+        "Status": {
+          "Active": "Active",
+          "Inactive": "Inactive"
+        },
+        "Actions": {
+          "NewChild": "New child",
+          "Edit": "Edit",
+          "Move": "Change parent"
+        },
+        "Fields": {
+          "Code": "Code",
+          "Name": "Name",
+          "Status": "Status",
+          "DisplayOrder": "Display order",
+          "EffectiveWindow": "Effective window",
+          "ParentHint": "Parent hint",
+          "Parent": "Parent",
+          "NewParent": "New parent",
+          "I18nNames": "i18n names (JSON)"
+        }
+      }
+    }
   }
 }
-
