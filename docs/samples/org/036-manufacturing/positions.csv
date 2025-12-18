@@ -1,0 +1,6 @@
+code,org_node_code,title,status,is_auto_created,effective_date,end_date
+POS-RE-CEO,BU-RE,房地产总经理,active,false,2025-01-01,
+POS-PM-CEO,BU-PM,物业管理总经理,active,false,2025-01-01,
+POS-IT-CTO,BU-IT,互联网CTO,active,false,2025-01-01,
+POS-IT-DEEP,IT-DEEP-16,平台技术架构负责人,active,false,2025-01-01,
+POS-RE-N-01,RE-N-C01-P01,华北项目01负责人,active,false,2025-01-01,
