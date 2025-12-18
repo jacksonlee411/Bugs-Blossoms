@@ -17,12 +17,8 @@ CREATE TABLE "public"."org_role_assignments" ("tenant_id" uuid NOT NULL, "id" uu
 CREATE INDEX "org_role_assignments_tenant_node_effective_idx" ON "public"."org_role_assignments" ("tenant_id", "org_node_id", "effective_date");
 -- create index "org_role_assignments_tenant_subject_effective_idx" to table: "org_role_assignments"
 CREATE INDEX "org_role_assignments_tenant_subject_effective_idx" ON "public"."org_role_assignments" ("tenant_id", "subject_type", "subject_id", "effective_date");
--- drop "__org_migration_smoke" table
-DROP TABLE "public"."__org_migration_smoke";
 
 -- +goose Down
--- reverse: drop "__org_migration_smoke" table
-CREATE TABLE "public"."__org_migration_smoke" ("id" integer NOT NULL, PRIMARY KEY ("id"));
 -- reverse: create index "org_role_assignments_tenant_subject_effective_idx" to table: "org_role_assignments"
 DROP INDEX "public"."org_role_assignments_tenant_subject_effective_idx";
 -- reverse: create index "org_role_assignments_tenant_node_effective_idx" to table: "org_role_assignments"
