@@ -1,6 +1,6 @@
 # DEV-PLAN-022：Org 占位表与事件契约
 
-**状态**: 已评审（2025-12-17 11:44 UTC）
+**状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-022-READINESS.md`）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：`docs/dev-plans/020-organization-lifecycle.md` 的「步骤 2：建立占位表与事件契约」。
@@ -13,12 +13,12 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] 追加 Org 领域占位表：继承规则、角色、角色分配、变更草稿（change requests），并满足租户隔离与最小约束（不重叠/合法时间窗/必要索引）。
-- [ ] 冻结 `org.changed.v1` 与 `org.assignment.changed.v1` 事件契约（字段名/类型/语义），覆盖：
+- [x] 追加 Org 领域占位表：继承规则、角色、角色分配、变更草稿（change requests），并满足租户隔离与最小约束（不重叠/合法时间窗/必要索引）。
+- [x] 冻结 `org.changed.v1` 与 `org.assignment.changed.v1` 事件契约（字段名/类型/语义），覆盖：
   - `assignment_type`、继承相关预留字段；
   - `change_type/initiator_id/request_id/transaction_time/effective_window`；
   - 幂等（`event_id`）与可演进（Topic 版本）。
-- [ ] 生成与校验路径可重复：涉及 atlas/sqlc 的生成命令执行后 `git status --short` 干净。
+- [x] 生成与校验路径可重复：涉及 atlas/sqlc 的生成命令执行后 `git status --short` 干净。
 
 ### 2.2 非目标（Out of Scope）
 - 不实现继承解析/角色生效算法/草稿审批流（030 承接；workflow 不在 M1）。
@@ -298,10 +298,10 @@ flowchart LR
   - 017：outbox 工具链（语义与字段口径）。
   - 026：outbox 落地与对外事件发布闭环、snapshot/batch 纠偏链路。
 - 里程碑（建议）：
-  1. [ ] 占位表 schema/迁移可生成并 lint 通过
-  2. [ ] 事件契约 v1 文档冻结（含示例）
-  3. [ ] sqlc 查询生成与占位 service/repo 对齐
-  4. [ ] Readiness 记录完成
+  1. [x] 占位表 schema/迁移可生成并 lint 通过
+  2. [x] 事件契约 v1 文档冻结（含示例）
+  3. [x] sqlc 查询生成与占位 service/repo 对齐
+  4. [x] Readiness 记录完成
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - Schema：
@@ -319,7 +319,7 @@ flowchart LR
 - 契约演进：若事件字段需调整，只允许通过发布新 Topic 版本（`v2`）演进；旧版保留一段兼容期并提供 `/org/api/snapshot` 纠偏。
 
 ## 11. 任务清单（落地追踪）
-1. [ ] **Schema 与迁移**：在 `modules/org/infrastructure/persistence/schema/org-schema.sql` 补充 4.1~4.4 的表/索引/约束；执行 `atlas migrate diff --env org_dev <name>` 生成 `migrations/org` 迁移，并运行 `atlas migrate hash --dir file://migrations/org` 更新 `migrations/org/atlas.sum`；最后 `make org lint` 与 `make org migrate up` 可通过。
-2. [ ] **事件契约定义**：在 `modules/org/domain/events`（或等价目录）定义 v1 事件结构体（字段对齐第 5 节），并记录 Topic/版本演进规则。
-3. [ ] **sqlc 查询与服务占位**：新增 SQL 并运行 `make sqlc-generate`；服务层添加草稿保存占位（可空实现），保持 `git status --short` 干净。
-4. [ ] **Readiness 记录**：记录命令与结果到 `docs/dev-records/DEV-PLAN-022-READINESS.md`（迁移生成/上下行/生成物校验）。
+1. [x] **Schema 与迁移**：在 `modules/org/infrastructure/persistence/schema/org-schema.sql` 补充 4.1~4.4 的表/索引/约束；执行 `atlas migrate diff --env org_dev <name>` 生成 `migrations/org` 迁移，并运行 `atlas migrate hash --dir file://migrations/org` 更新 `migrations/org/atlas.sum`；最后 `make org lint` 与 `make org migrate up` 可通过。
+2. [x] **事件契约定义**：在 `modules/org/domain/events`（或等价目录）定义 v1 事件结构体（字段对齐第 5 节），并记录 Topic/版本演进规则。
+3. [x] **sqlc 查询与服务占位**：新增 SQL 并运行 `make sqlc-generate`；服务层添加草稿保存占位（可空实现），保持 `git status --short` 干净。
+4. [x] **Readiness 记录**：记录命令与结果到 `docs/dev-records/DEV-PLAN-022-READINESS.md`（迁移生成/上下行/生成物校验）。
