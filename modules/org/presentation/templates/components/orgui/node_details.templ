@@ -36,9 +36,9 @@ templ NodeDetails(props NodeDetailsProps) {
 							Icon: icons.Plus(icons.Props{Size: "18"}),
 							Attrs: templ.Attributes{
 								"data-testid": "org-new-child",
-								"hx-get":    fmt.Sprintf("/org/nodes/new?effective_date=%s&parent_id=%s", props.EffectiveDate, props.Node.ID.String()),
-								"hx-target": "#org-node-panel",
-								"hx-swap":   "innerHTML",
+								"hx-get":      fmt.Sprintf("/org/nodes/new?effective_date=%s&parent_id=%s", props.EffectiveDate, props.Node.ID.String()),
+								"hx-target":   "#org-node-panel",
+								"hx-swap":     "innerHTML",
 							},
 						}) {
 							{ pageCtx.T("Org.UI.Node.Actions.NewChild") }

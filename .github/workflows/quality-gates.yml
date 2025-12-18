@@ -617,6 +617,9 @@ jobs:
       - name: Download Go dependencies
         run: go mod download
 
+      - name: Install goose
+        run: make goose-install
+
       - name: Setup E2E database
         env:
           DB_HOST: localhost
