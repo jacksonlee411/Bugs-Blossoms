@@ -311,7 +311,6 @@ CREATE TABLE org_change_requests (
 CREATE INDEX org_change_requests_tenant_requester_status_updated_idx ON org_change_requests (tenant_id, requester_id, status, updated_at DESC);
 
 -- DEV-PLAN-025: org_settings + org_audit_logs (schema SSOT; migrations/org applies the same DDL).
-
 CREATE TABLE org_settings (
     tenant_id uuid PRIMARY KEY REFERENCES tenants (id) ON DELETE CASCADE,
     freeze_mode text NOT NULL DEFAULT 'enforce',
@@ -346,3 +345,5 @@ CREATE INDEX org_audit_logs_tenant_transaction_time_desc_idx ON org_audit_logs (
 CREATE INDEX org_audit_logs_tenant_entity_transaction_time_desc_idx ON org_audit_logs (tenant_id, entity_type, entity_id, transaction_time DESC);
 
 CREATE INDEX org_audit_logs_tenant_request_id_idx ON org_audit_logs (tenant_id, request_id);
+
+-- EOF
