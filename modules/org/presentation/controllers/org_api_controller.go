@@ -55,10 +55,16 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/nodes", c.CreateNode).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}", c.UpdateNode).Methods(http.MethodPatch)
 	api.HandleFunc("/nodes/{id}:move", c.MoveNode).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:correct", c.CorrectNode).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:rescind", c.RescindNode).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:shift-boundary", c.ShiftBoundaryNode).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:correct-move", c.CorrectMoveNode).Methods(http.MethodPost)
 
 	api.HandleFunc("/assignments", c.GetAssignments).Methods(http.MethodGet)
 	api.HandleFunc("/assignments", c.CreateAssignment).Methods(http.MethodPost)
 	api.HandleFunc("/assignments/{id}", c.UpdateAssignment).Methods(http.MethodPatch)
+	api.HandleFunc("/assignments/{id}:correct", c.CorrectAssignment).Methods(http.MethodPost)
+	api.HandleFunc("/assignments/{id}:rescind", c.RescindAssignment).Methods(http.MethodPost)
 }
 
 type effectiveWindowResponse struct {
@@ -390,6 +396,252 @@ func (c *OrgAPIController) MoveNode(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type correctNodeRequest struct {
+	EffectiveDate string            `json:"effective_date"`
+	EndDate       *string           `json:"end_date"`
+	Name          *string           `json:"name"`
+	I18nNames     map[string]string `json:"i18n_names"`
+	Status        *string           `json:"status"`
+	DisplayOrder  *int              `json:"display_order"`
+	LegalEntityID optionalUUID      `json:"legal_entity_id"`
+	CompanyCode   optionalString    `json:"company_code"`
+	LocationID    optionalUUID      `json:"location_id"`
+	ManagerUserID optionalInt64     `json:"manager_user_id"`
+}
+
+func (c *OrgAPIController) CorrectNode(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req correctNodeRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	if req.EndDate != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "end_date is not allowed")
+		return
+	}
+
+	asOf, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	var legalEntityID **uuid.UUID
+	if req.LegalEntityID.Set {
+		legalEntityID = &req.LegalEntityID.Value
+	}
+	var companyCode **string
+	if req.CompanyCode.Set {
+		companyCode = &req.CompanyCode.Value
+	}
+	var locationID **uuid.UUID
+	if req.LocationID.Set {
+		locationID = &req.LocationID.Value
+	}
+	var managerUserID **int64
+	if req.ManagerUserID.Set {
+		managerUserID = &req.ManagerUserID.Value
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.CorrectNode(r.Context(), tenantID, requestID, initiatorID, services.CorrectNodeInput{
+		NodeID:        nodeID,
+		AsOf:          asOf,
+		Name:          req.Name,
+		I18nNames:     req.I18nNames,
+		Status:        req.Status,
+		DisplayOrder:  req.DisplayOrder,
+		LegalEntityID: legalEntityID,
+		CompanyCode:   companyCode,
+		LocationID:    locationID,
+		ManagerUserID: managerUserID,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type correctNodeResponse struct {
+		ID              string                  `json:"id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, correctNodeResponse{
+		ID: res.NodeID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type rescindNodeRequest struct {
+	EffectiveDate string `json:"effective_date"`
+	Reason        string `json:"reason"`
+}
+
+func (c *OrgAPIController) RescindNode(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req rescindNodeRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.RescindNode(r.Context(), tenantID, requestID, initiatorID, services.RescindNodeInput{
+		NodeID:        nodeID,
+		EffectiveDate: effectiveDate,
+		Reason:        req.Reason,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type rescindNodeResponse struct {
+		ID              string                  `json:"id"`
+		Status          string                  `json:"status"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, rescindNodeResponse{
+		ID:     res.NodeID.String(),
+		Status: res.Status,
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type shiftBoundaryNodeRequest struct {
+	TargetEffectiveDate string `json:"target_effective_date"`
+	NewEffectiveDate    string `json:"new_effective_date"`
+}
+
+func (c *OrgAPIController) ShiftBoundaryNode(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+	var req shiftBoundaryNodeRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	target, err := parseRequiredEffectiveDate(req.TargetEffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "target_effective_date is required")
+		return
+	}
+	newStart, err := parseRequiredEffectiveDate(req.NewEffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "new_effective_date is required")
+		return
+	}
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.ShiftBoundaryNode(r.Context(), tenantID, requestID, initiatorID, services.ShiftBoundaryNodeInput{
+		NodeID:              nodeID,
+		TargetEffectiveDate: target,
+		NewEffectiveDate:    newStart,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+	type shiftBoundaryResponse struct {
+		ID      string `json:"id"`
+		Shifted struct {
+			TargetEffectiveDate string `json:"target_effective_date"`
+			NewEffectiveDate    string `json:"new_effective_date"`
+		} `json:"shifted"`
+	}
+	var resp shiftBoundaryResponse
+	resp.ID = res.NodeID.String()
+	resp.Shifted.TargetEffectiveDate = res.TargetStart.UTC().Format(time.RFC3339)
+	resp.Shifted.NewEffectiveDate = res.NewStart.UTC().Format(time.RFC3339)
+	writeJSON(w, http.StatusOK, resp)
+}
+
+type correctMoveNodeRequest struct {
+	EffectiveDate string    `json:"effective_date"`
+	NewParentID   uuid.UUID `json:"new_parent_id"`
+}
+
+func (c *OrgAPIController) CorrectMoveNode(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+	var req correctMoveNodeRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+	if req.NewParentID == uuid.Nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "new_parent_id is required")
+		return
+	}
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.CorrectMoveNode(r.Context(), tenantID, requestID, initiatorID, services.CorrectMoveNodeInput{
+		NodeID:        nodeID,
+		EffectiveDate: effectiveDate,
+		NewParentID:   req.NewParentID,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+	type correctMoveResponse struct {
+		ID            string `json:"id"`
+		EffectiveDate string `json:"effective_date"`
+	}
+	writeJSON(w, http.StatusOK, correctMoveResponse{
+		ID:            res.NodeID.String(),
+		EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+	})
+}
+
 func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request) {
 	tenantID, requestID, ok := requireSessionAndTenant(w, r)
 	if !ok {
@@ -561,6 +813,101 @@ func (c *OrgAPIController) UpdateAssignment(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, updateAssignmentResponse{
 		AssignmentID: res.AssignmentID.String(),
 		PositionID:   res.PositionID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type correctAssignmentRequest struct {
+	Pernr      *string    `json:"pernr"`
+	PositionID *uuid.UUID `json:"position_id"`
+	SubjectID  *uuid.UUID `json:"subject_id"`
+}
+
+func (c *OrgAPIController) CorrectAssignment(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	assignmentID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+	var req correctAssignmentRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.CorrectAssignment(r.Context(), tenantID, requestID, initiatorID, services.CorrectAssignmentInput{
+		AssignmentID: assignmentID,
+		Pernr:        req.Pernr,
+		PositionID:   req.PositionID,
+		SubjectID:    req.SubjectID,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type correctAssignmentResponse struct {
+		AssignmentID    string                  `json:"assignment_id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, correctAssignmentResponse{
+		AssignmentID: res.AssignmentID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type rescindAssignmentRequest struct {
+	EffectiveDate string `json:"effective_date"`
+	Reason        string `json:"reason"`
+}
+
+func (c *OrgAPIController) RescindAssignment(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	assignmentID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+	var req rescindAssignmentRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.RescindAssignment(r.Context(), tenantID, requestID, initiatorID, services.RescindAssignmentInput{
+		AssignmentID:  assignmentID,
+		EffectiveDate: effectiveDate,
+		Reason:        req.Reason,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+	type rescindAssignmentResponse struct {
+		AssignmentID    string                  `json:"assignment_id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, rescindAssignmentResponse{
+		AssignmentID: res.AssignmentID.String(),
 		EffectiveWindow: effectiveWindowResponse{
 			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
 			EndDate:       res.EndDate.UTC().Format(time.RFC3339),

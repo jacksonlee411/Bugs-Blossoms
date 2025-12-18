@@ -20,6 +20,9 @@ var endOfTime = time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 type OrgRepository interface {
 	ListHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, error)
 
+	GetOrgSettings(ctx context.Context, tenantID uuid.UUID) (OrgSettings, error)
+	InsertAuditLog(ctx context.Context, tenantID uuid.UUID, log AuditLogInsert) (uuid.UUID, error)
+
 	HasRoot(ctx context.Context, tenantID uuid.UUID) (bool, error)
 	InsertNode(ctx context.Context, tenantID uuid.UUID, nodeType, code string, isRoot bool) (uuid.UUID, error)
 	InsertNodeSlice(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, slice NodeSliceInsert) (uuid.UUID, error)
@@ -46,6 +49,24 @@ type OrgRepository interface {
 	InsertAssignment(ctx context.Context, tenantID uuid.UUID, assignment AssignmentInsert) (uuid.UUID, error)
 	ListAssignmentsTimeline(ctx context.Context, tenantID uuid.UUID, subjectID uuid.UUID) ([]AssignmentViewRow, error)
 	ListAssignmentsAsOf(ctx context.Context, tenantID uuid.UUID, subjectID uuid.UUID, asOf time.Time) ([]AssignmentViewRow, error)
+
+	HasChildrenAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (bool, error)
+	HasPositionsAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (bool, error)
+
+	LockNodeSliceStartingAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, effectiveDate time.Time) (NodeSliceRow, error)
+	LockNodeSliceEndingAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, endDate time.Time) (NodeSliceRow, error)
+	UpdateNodeSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch NodeSliceInPlacePatch) error
+	UpdateNodeSliceEffectiveDate(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, effectiveDate time.Time) error
+	UpdateNodeSliceEndDate(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
+	DeleteNodeSlicesFrom(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, from time.Time) error
+
+	LockEdgeStartingAt(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, effectiveDate time.Time) (EdgeRow, error)
+	DeleteEdgeByID(ctx context.Context, tenantID uuid.UUID, edgeID uuid.UUID) error
+	DeleteEdgesFrom(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, from time.Time) error
+
+	LockAssignmentByID(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID) (AssignmentRow, error)
+	UpdateAssignmentInPlace(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, patch AssignmentInPlacePatch) error
+	UpdateAssignmentEndDate(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, endDate time.Time) error
 }
 
 type HierarchyNode struct {
@@ -87,6 +108,18 @@ type NodeSliceRow struct {
 	EndDate       time.Time
 }
 
+type NodeSliceInPlacePatch struct {
+	Name          *string
+	I18nNames     map[string]string
+	Status        *string
+	LegalEntityID **uuid.UUID
+	CompanyCode   **string
+	LocationID    **uuid.UUID
+	DisplayOrder  *int
+	ParentHint    **uuid.UUID
+	ManagerUserID **int64
+}
+
 type EdgeRow struct {
 	ID            uuid.UUID
 	ParentNodeID  *uuid.UUID
@@ -119,6 +152,12 @@ type AssignmentRow struct {
 	IsPrimary      bool
 	EffectiveDate  time.Time
 	EndDate        time.Time
+}
+
+type AssignmentInPlacePatch struct {
+	PositionID *uuid.UUID
+	Pernr      *string
+	SubjectID  *uuid.UUID
 }
 
 type AssignmentViewRow struct {
@@ -208,6 +247,10 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(400, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
+	if requestID == "" {
+		requestID = uuid.NewString()
+	}
+	txTime := time.Now().UTC()
 	in.Code = strings.TrimSpace(in.Code)
 	in.Name = strings.TrimSpace(in.Name)
 	if in.Code == "" || in.Name == "" || in.EffectiveDate.IsZero() {
@@ -223,6 +266,15 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return out{}, err
+		}
+		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
+		if err != nil {
+			return out{}, err
+		}
+
 		hierarchyType := "OrgUnit"
 		if in.ParentID == nil {
 			hasRoot, err := s.repo.HasRoot(txCtx, tenantID)
@@ -269,15 +321,76 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 			return out{}, mapPgError(err)
 		}
 
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:       requestID,
+			TransactionTime: txTime,
+			InitiatorID:     initiatorID,
+			ChangeType:      "node.created",
+			EntityType:      "org_node",
+			EntityID:        nodeID,
+			EffectiveDate:   in.EffectiveDate,
+			EndDate:         endOfTime,
+			OldValues:       nil,
+			NewValues: map[string]any{
+				"org_node_id":     nodeID.String(),
+				"type":            hierarchyType,
+				"code":            in.Code,
+				"is_root":         in.ParentID == nil,
+				"name":            in.Name,
+				"i18n_names":      in.I18nNames,
+				"status":          in.Status,
+				"display_order":   in.DisplayOrder,
+				"parent_hint":     in.ParentID,
+				"manager_user_id": in.ManagerUserID,
+				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":        endOfTime.UTC().Format(time.RFC3339),
+			},
+			Operation:       "Create",
+			FreezeMode:      freeze.Mode,
+			FreezeViolation: freeze.Violation,
+			FreezeCutoffUTC: freeze.CutoffUTC,
+			AffectedAtUTC:   in.EffectiveDate,
+		})
+		if err != nil {
+			return out{}, err
+		}
+
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:       requestID,
+			TransactionTime: txTime,
+			InitiatorID:     initiatorID,
+			ChangeType:      "edge.created",
+			EntityType:      "org_edge",
+			EntityID:        edgeID,
+			EffectiveDate:   in.EffectiveDate,
+			EndDate:         endOfTime,
+			OldValues:       nil,
+			NewValues: map[string]any{
+				"edge_id":        edgeID.String(),
+				"hierarchy_type": hierarchyType,
+				"parent_node_id": in.ParentID,
+				"child_node_id":  nodeID.String(),
+				"effective_date": in.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":       endOfTime.UTC().Format(time.RFC3339),
+			},
+			Operation:       "Create",
+			FreezeMode:      freeze.Mode,
+			FreezeViolation: freeze.Violation,
+			FreezeCutoffUTC: freeze.CutoffUTC,
+			AffectedAtUTC:   in.EffectiveDate,
+		})
+		if err != nil {
+			return out{}, err
+		}
+
 		return out{nodeID: nodeID, edgeID: edgeID}, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	evNode := buildEventV1(requestID, tenantID, initiatorID, now, "node.created", "org_node", written.nodeID, in.EffectiveDate, endOfTime)
-	evEdge := buildEventV1(requestID, tenantID, initiatorID, now, "edge.created", "org_edge", written.edgeID, in.EffectiveDate, endOfTime)
+	evNode := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.created", "org_node", written.nodeID, in.EffectiveDate, endOfTime)
+	evEdge := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.created", "org_edge", written.edgeID, in.EffectiveDate, endOfTime)
 
 	return &CreateNodeResult{
 		NodeID:        written.nodeID,
@@ -315,11 +428,24 @@ func (s *OrgService) UpdateNode(ctx context.Context, tenantID uuid.UUID, request
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(400, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
+	if requestID == "" {
+		requestID = uuid.NewString()
+	}
+	txTime := time.Now().UTC()
 	if in.NodeID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "id/effective_date are required", nil)
 	}
 
 	windowEnd, err := inTx(ctx, tenantID, func(txCtx context.Context) (time.Time, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return time.Time{}, err
+		}
+		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+
 		current, err := s.repo.LockNodeSliceAt(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
 			return time.Time{}, mapPgError(err)
@@ -387,14 +513,55 @@ func (s *OrgService) UpdateNode(ctx context.Context, tenantID uuid.UUID, request
 			return time.Time{}, mapPgError(err)
 		}
 
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:       requestID,
+			TransactionTime: txTime,
+			InitiatorID:     initiatorID,
+			ChangeType:      "node.updated",
+			EntityType:      "org_node",
+			EntityID:        in.NodeID,
+			EffectiveDate:   in.EffectiveDate,
+			EndDate:         newEnd,
+			OldValues: map[string]any{
+				"slice_id":        current.ID.String(),
+				"org_node_id":     in.NodeID.String(),
+				"name":            current.Name,
+				"i18n_names":      current.I18nNames,
+				"status":          current.Status,
+				"display_order":   current.DisplayOrder,
+				"parent_hint":     current.ParentHint,
+				"manager_user_id": current.ManagerUserID,
+				"effective_date":  current.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":        current.EndDate.UTC().Format(time.RFC3339),
+			},
+			NewValues: map[string]any{
+				"org_node_id":     in.NodeID.String(),
+				"name":            nextSlice.Name,
+				"i18n_names":      nextSlice.I18nNames,
+				"status":          nextSlice.Status,
+				"display_order":   nextSlice.DisplayOrder,
+				"parent_hint":     nextSlice.ParentHint,
+				"manager_user_id": nextSlice.ManagerUserID,
+				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":        newEnd.UTC().Format(time.RFC3339),
+			},
+			Operation:       "Update",
+			FreezeMode:      freeze.Mode,
+			FreezeViolation: freeze.Violation,
+			FreezeCutoffUTC: freeze.CutoffUTC,
+			AffectedAtUTC:   in.EffectiveDate,
+		})
+		if err != nil {
+			return time.Time{}, err
+		}
+
 		return newEnd, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	ev := buildEventV1(requestID, tenantID, initiatorID, now, "node.updated", "org_node", in.NodeID, in.EffectiveDate, windowEnd)
+	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.updated", "org_node", in.NodeID, in.EffectiveDate, windowEnd)
 	return &UpdateNodeResult{
 		NodeID:        in.NodeID,
 		EffectiveDate: in.EffectiveDate,
@@ -422,71 +589,90 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(400, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
+	if requestID == "" {
+		requestID = uuid.NewString()
+	}
+	txTime := time.Now().UTC()
 	if in.NodeID == uuid.Nil || in.NewParentID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "id/new_parent_id/effective_date are required", nil)
 	}
 
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (EdgeRow, error) {
+	type out struct {
+		newEdge   EdgeRow
+		oldEdgeID uuid.UUID
+		oldParent *uuid.UUID
+	}
+
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return out{}, err
+		}
+		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
+		if err != nil {
+			return out{}, err
+		}
+
 		isRoot, err := s.repo.GetNodeIsRoot(txCtx, tenantID, in.NodeID)
 		if err != nil {
-			return EdgeRow{}, err
+			return out{}, err
 		}
 		if isRoot {
-			return EdgeRow{}, newServiceError(422, "ORG_CANNOT_MOVE_ROOT", "cannot move root", nil)
+			return out{}, newServiceError(422, "ORG_CANNOT_MOVE_ROOT", "cannot move root", nil)
 		}
 
 		hierarchyType := "OrgUnit"
 		parentExists, err := s.repo.NodeExistsAt(txCtx, tenantID, in.NewParentID, hierarchyType, in.EffectiveDate)
 		if err != nil {
-			return EdgeRow{}, err
+			return out{}, err
 		}
 		if !parentExists {
-			return EdgeRow{}, newServiceError(422, "ORG_PARENT_NOT_FOUND", "new_parent_id not found at effective_date", nil)
+			return out{}, newServiceError(422, "ORG_PARENT_NOT_FOUND", "new_parent_id not found at effective_date", nil)
 		}
 
 		movedEdge, err := s.repo.LockEdgeAt(txCtx, tenantID, hierarchyType, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return EdgeRow{}, mapPgError(err)
+			return out{}, mapPgError(err)
 		}
 		if movedEdge.EffectiveDate.Equal(in.EffectiveDate) {
-			return EdgeRow{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "use correct-move for in-place updates", nil)
+			return out{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "use correct-move for in-place updates", nil)
 		}
 
 		subtree, err := s.repo.LockEdgesInSubtree(txCtx, tenantID, hierarchyType, in.EffectiveDate, movedEdge.Path)
 		if err != nil {
-			return EdgeRow{}, err
+			return out{}, err
 		}
 		for _, e := range subtree {
 			if e.EffectiveDate.Equal(in.EffectiveDate) {
-				return EdgeRow{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "subtree contains edges requiring correct-move at effective_date", nil)
+				return out{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "subtree contains edges requiring correct-move at effective_date", nil)
 			}
 		}
 
 		if err := s.repo.TruncateEdge(txCtx, tenantID, movedEdge.ID, in.EffectiveDate); err != nil {
-			return EdgeRow{}, mapPgError(err)
+			return out{}, mapPgError(err)
 		}
 		newEdgeID, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, &in.NewParentID, in.NodeID, in.EffectiveDate, movedEdge.EndDate)
 		if err != nil {
-			return EdgeRow{}, mapPgError(err)
+			return out{}, mapPgError(err)
 		}
 
 		currentSlice, err := s.repo.LockNodeSliceAt(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return EdgeRow{}, mapPgError(err)
+			return out{}, mapPgError(err)
 		}
 		if currentSlice.EffectiveDate.Equal(in.EffectiveDate) {
-			return EdgeRow{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "use correct for in-place parent_hint updates", nil)
+			return out{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "use correct for in-place parent_hint updates", nil)
 		}
 		next, hasNext, err := s.repo.NextNodeSliceEffectiveDate(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return EdgeRow{}, err
+			return out{}, err
 		}
 		newEnd := currentSlice.EndDate
 		if hasNext && next.Before(newEnd) {
 			newEnd = next
 		}
 		if err := s.repo.TruncateNodeSlice(txCtx, tenantID, currentSlice.ID, in.EffectiveDate); err != nil {
-			return EdgeRow{}, mapPgError(err)
+			return out{}, mapPgError(err)
 		}
 		_, err = s.repo.InsertNodeSlice(txCtx, tenantID, in.NodeID, NodeSliceInsert{
 			Name:          currentSlice.Name,
@@ -502,7 +688,7 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 			EndDate:       newEnd,
 		})
 		if err != nil {
-			return EdgeRow{}, mapPgError(err)
+			return out{}, mapPgError(err)
 		}
 
 		for _, e := range subtree {
@@ -510,31 +696,67 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 				continue
 			}
 			if err := s.repo.TruncateEdge(txCtx, tenantID, e.ID, in.EffectiveDate); err != nil {
-				return EdgeRow{}, mapPgError(err)
+				return out{}, mapPgError(err)
 			}
 			if _, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, e.ParentNodeID, e.ChildNodeID, in.EffectiveDate, e.EndDate); err != nil {
-				return EdgeRow{}, mapPgError(err)
+				return out{}, mapPgError(err)
 			}
 		}
 
-		return EdgeRow{
+		newEdge := EdgeRow{
 			ID:            newEdgeID,
 			ParentNodeID:  &in.NewParentID,
 			ChildNodeID:   in.NodeID,
 			EffectiveDate: in.EffectiveDate,
 			EndDate:       movedEdge.EndDate,
-		}, nil
+		}
+
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:       requestID,
+			TransactionTime: txTime,
+			InitiatorID:     initiatorID,
+			ChangeType:      "edge.updated",
+			EntityType:      "org_edge",
+			EntityID:        newEdgeID,
+			EffectiveDate:   in.EffectiveDate,
+			EndDate:         movedEdge.EndDate,
+			OldValues: map[string]any{
+				"edge_id":        movedEdge.ID.String(),
+				"parent_node_id": movedEdge.ParentNodeID,
+				"child_node_id":  movedEdge.ChildNodeID.String(),
+				"effective_date": movedEdge.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":       movedEdge.EndDate.UTC().Format(time.RFC3339),
+				"path":           movedEdge.Path,
+				"depth":          movedEdge.Depth,
+			},
+			NewValues: map[string]any{
+				"edge_id":        newEdgeID.String(),
+				"parent_node_id": in.NewParentID.String(),
+				"child_node_id":  in.NodeID.String(),
+				"effective_date": in.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":       movedEdge.EndDate.UTC().Format(time.RFC3339),
+			},
+			Operation:       "Move",
+			FreezeMode:      freeze.Mode,
+			FreezeViolation: freeze.Violation,
+			FreezeCutoffUTC: freeze.CutoffUTC,
+			AffectedAtUTC:   in.EffectiveDate,
+		})
+		if err != nil {
+			return out{}, err
+		}
+
+		return out{newEdge: newEdge, oldEdgeID: movedEdge.ID, oldParent: movedEdge.ParentNodeID}, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	ev := buildEventV1(requestID, tenantID, initiatorID, now, "edge.updated", "org_edge", written.ID, written.EffectiveDate, written.EndDate)
+	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.updated", "org_edge", written.newEdge.ID, written.newEdge.EffectiveDate, written.newEdge.EndDate)
 	return &MoveNodeResult{
-		EdgeID:        written.ID,
-		EffectiveDate: written.EffectiveDate,
-		EndDate:       written.EndDate,
+		EdgeID:        written.newEdge.ID,
+		EffectiveDate: written.newEdge.EffectiveDate,
+		EndDate:       written.newEdge.EndDate,
 		GeneratedEvents: []events.OrgEventV1{
 			ev,
 		},
@@ -563,6 +785,10 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(400, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
+	if requestID == "" {
+		requestID = uuid.NewString()
+	}
+	txTime := time.Now().UTC()
 	in.Pernr = strings.TrimSpace(in.Pernr)
 	if in.Pernr == "" || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "pernr/effective_date are required", nil)
@@ -593,6 +819,15 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return out{}, err
+		}
+		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
+		if err != nil {
+			return out{}, err
+		}
+
 		var positionID uuid.UUID
 		if in.PositionID != nil {
 			positionID = *in.PositionID
@@ -641,14 +876,45 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		if err != nil {
 			return out{}, mapPgError(err)
 		}
+
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:       requestID,
+			TransactionTime: txTime,
+			InitiatorID:     initiatorID,
+			ChangeType:      "assignment.created",
+			EntityType:      "org_assignment",
+			EntityID:        assignmentID,
+			EffectiveDate:   in.EffectiveDate,
+			EndDate:         endOfTime,
+			OldValues:       nil,
+			NewValues: map[string]any{
+				"assignment_id":   assignmentID.String(),
+				"position_id":     positionID.String(),
+				"subject_type":    "person",
+				"subject_id":      derivedSubjectID.String(),
+				"pernr":           in.Pernr,
+				"assignment_type": assignmentType,
+				"is_primary":      true,
+				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":        endOfTime.UTC().Format(time.RFC3339),
+			},
+			Operation:       "Create",
+			FreezeMode:      freeze.Mode,
+			FreezeViolation: freeze.Violation,
+			FreezeCutoffUTC: freeze.CutoffUTC,
+			AffectedAtUTC:   in.EffectiveDate,
+		})
+		if err != nil {
+			return out{}, err
+		}
+
 		return out{assignmentID: assignmentID, positionID: positionID}, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	ev := buildEventV1(requestID, tenantID, initiatorID, now, "assignment.created", "org_assignment", written.assignmentID, in.EffectiveDate, endOfTime)
+	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.created", "org_assignment", written.assignmentID, in.EffectiveDate, endOfTime)
 	return &CreateAssignmentResult{
 		AssignmentID:  written.assignmentID,
 		PositionID:    written.positionID,
@@ -680,6 +946,10 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(400, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
+	if requestID == "" {
+		requestID = uuid.NewString()
+	}
+	txTime := time.Now().UTC()
 	if in.AssignmentID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "id/effective_date are required", nil)
 	}
@@ -691,6 +961,15 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return out{}, err
+		}
+		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
+		if err != nil {
+			return out{}, err
+		}
+
 		current, err := s.repo.LockAssignmentAt(txCtx, tenantID, in.AssignmentID, in.EffectiveDate)
 		if err != nil {
 			return out{}, mapPgError(err)
@@ -761,14 +1040,54 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			return out{}, mapPgError(err)
 		}
 
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:       requestID,
+			TransactionTime: txTime,
+			InitiatorID:     initiatorID,
+			ChangeType:      "assignment.updated",
+			EntityType:      "org_assignment",
+			EntityID:        newID,
+			EffectiveDate:   in.EffectiveDate,
+			EndDate:         newEnd,
+			OldValues: map[string]any{
+				"assignment_id":   current.ID.String(),
+				"position_id":     current.PositionID.String(),
+				"subject_type":    current.SubjectType,
+				"subject_id":      current.SubjectID.String(),
+				"pernr":           current.Pernr,
+				"assignment_type": current.AssignmentType,
+				"is_primary":      current.IsPrimary,
+				"effective_date":  current.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":        current.EndDate.UTC().Format(time.RFC3339),
+			},
+			NewValues: map[string]any{
+				"assignment_id":   newID.String(),
+				"position_id":     positionID.String(),
+				"subject_type":    current.SubjectType,
+				"subject_id":      current.SubjectID.String(),
+				"pernr":           current.Pernr,
+				"assignment_type": current.AssignmentType,
+				"is_primary":      current.IsPrimary,
+				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
+				"end_date":        newEnd.UTC().Format(time.RFC3339),
+			},
+			Operation:       "Update",
+			FreezeMode:      freeze.Mode,
+			FreezeViolation: freeze.Violation,
+			FreezeCutoffUTC: freeze.CutoffUTC,
+			AffectedAtUTC:   in.EffectiveDate,
+		})
+		if err != nil {
+			return out{}, err
+		}
+
 		return out{assignmentID: newID, positionID: positionID, endDate: newEnd}, nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now().UTC()
-	ev := buildEventV1(requestID, tenantID, initiatorID, now, "assignment.updated", "org_assignment", written.assignmentID, in.EffectiveDate, written.endDate)
+	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.updated", "org_assignment", written.assignmentID, in.EffectiveDate, written.endDate)
 	return &UpdateAssignmentResult{
 		AssignmentID:  written.assignmentID,
 		PositionID:    written.positionID,
