@@ -139,6 +139,7 @@ modules/{module}/
 - Core 用户权限页签 UI/交互优化：`docs/dev-plans/016B-core-users-permissions-ui.md`
 - Transactional Outbox 工具链（DEV-PLAN-017）：`docs/dev-plans/017-transactional-outbox.md`
 - DEV-PLAN-017 Readiness：`docs/dev-records/DEV-PLAN-017-READINESS.md`
+- DEV-PLAN-030 Readiness：`docs/dev-records/DEV-PLAN-030-READINESS.md`
 - DEV-PLAN-035 Readiness：`docs/dev-records/DEV-PLAN-035-READINESS.md`
 - 全局路由策略统一（DEV-PLAN-018）：`docs/dev-plans/018-routing-strategy.md`
 - DEV-PLAN-018A 路由策略评审输入：`docs/dev-plans/018A-routing-strategy-review.md`
