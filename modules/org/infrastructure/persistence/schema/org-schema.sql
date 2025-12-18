@@ -346,4 +346,34 @@ CREATE INDEX org_audit_logs_tenant_entity_transaction_time_desc_idx ON org_audit
 
 CREATE INDEX org_audit_logs_tenant_request_id_idx ON org_audit_logs (tenant_id, request_id);
 
+-- DEV-PLAN-026: org_outbox (schema SSOT; migrations/org applies the same DDL).
+CREATE TABLE org_outbox (
+    id uuid NOT NULL DEFAULT gen_random_uuid (),
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    topic text NOT NULL,
+    payload jsonb NOT NULL,
+    event_id uuid NOT NULL,
+    sequence bigserial
+        NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        published_at timestamptz NULL,
+        attempts int NOT NULL DEFAULT 0,
+        available_at timestamptz NOT NULL DEFAULT now(),
+        locked_at timestamptz NULL,
+        last_error text NULL,
+        CONSTRAINT org_outbox_pkey PRIMARY KEY (id),
+        CONSTRAINT org_outbox_event_id_key UNIQUE (event_id),
+        CONSTRAINT org_outbox_attempts_nonnegative CHECK (attempts >= 0)
+);
+
+CREATE INDEX org_outbox_pending_by_available ON org_outbox (available_at, SEQUENCE)
+WHERE
+    published_at IS NULL;
+
+CREATE INDEX org_outbox_published_by_time ON org_outbox (published_at, SEQUENCE)
+WHERE
+    published_at IS NOT NULL;
+
+CREATE INDEX org_outbox_tenant_published ON org_outbox (tenant_id, published_at, SEQUENCE);
+
 -- EOF

@@ -44,20 +44,20 @@ func (s *OrgService) CorrectNode(ctx context.Context, tenantID uuid.UUID, reques
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "id/effective_date are required", nil)
 	}
 
-	window, err := inTx(ctx, tenantID, func(txCtx context.Context) (NodeSliceRow, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CorrectNodeResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return NodeSliceRow{}, err
+			return nil, err
 		}
 
 		target, err := s.repo.LockNodeSliceAt(txCtx, tenantID, in.NodeID, in.AsOf)
 		if err != nil {
-			return NodeSliceRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		freeze, err := s.freezeCheck(settings, txTime, target.EffectiveDate)
 		if err != nil {
-			return NodeSliceRow{}, err
+			return nil, err
 		}
 
 		oldValues := map[string]any{
@@ -84,12 +84,12 @@ func (s *OrgService) CorrectNode(ctx context.Context, tenantID uuid.UUID, reques
 			ManagerUserID: in.ManagerUserID,
 		}
 		if err := s.repo.UpdateNodeSliceInPlace(txCtx, tenantID, target.ID, patch); err != nil {
-			return NodeSliceRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		updated, err := s.repo.LockNodeSliceAt(txCtx, tenantID, in.NodeID, in.AsOf)
 		if err != nil {
-			return NodeSliceRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		newValues := map[string]any{
@@ -123,24 +123,30 @@ func (s *OrgService) CorrectNode(ctx context.Context, tenantID uuid.UUID, reques
 			AffectedAtUTC:   target.EffectiveDate,
 		})
 		if err != nil {
-			return NodeSliceRow{}, err
+			return nil, err
 		}
 
-		return updated, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.corrected", "org_node", in.NodeID, updated.EffectiveDate, updated.EndDate)
+		res := &CorrectNodeResult{
+			NodeID:        in.NodeID,
+			EffectiveDate: updated.EffectiveDate,
+			EndDate:       updated.EndDate,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.corrected", "org_node", in.NodeID, window.EffectiveDate, window.EndDate)
-	return &CorrectNodeResult{
-		NodeID:        in.NodeID,
-		EffectiveDate: window.EffectiveDate,
-		EndDate:       window.EndDate,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 type RescindNodeInput struct {
@@ -170,47 +176,43 @@ func (s *OrgService) RescindNode(ctx context.Context, tenantID uuid.UUID, reques
 	}
 	in.Reason = strings.TrimSpace(in.Reason)
 
-	type out struct {
-		window NodeSliceRow
-	}
-
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*RescindNodeResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		isRoot, err := s.repo.GetNodeIsRoot(txCtx, tenantID, in.NodeID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		if isRoot {
-			return out{}, newServiceError(http.StatusUnprocessableEntity, "ORG_CANNOT_RESCIND_ROOT", "cannot rescind root", nil)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_CANNOT_RESCIND_ROOT", "cannot rescind root", nil)
 		}
 
 		hasChildren, err := s.repo.HasChildrenAt(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		if hasChildren {
-			return out{}, newServiceError(http.StatusConflict, "ORG_NODE_NOT_EMPTY", "node has children at effective_date", nil)
+			return nil, newServiceError(http.StatusConflict, "ORG_NODE_NOT_EMPTY", "node has children at effective_date", nil)
 		}
 
 		hasPositions, err := s.repo.HasPositionsAt(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		if hasPositions {
-			return out{}, newServiceError(http.StatusConflict, "ORG_NODE_NOT_EMPTY", "node has positions at effective_date", nil)
+			return nil, newServiceError(http.StatusConflict, "ORG_NODE_NOT_EMPTY", "node has positions at effective_date", nil)
 		}
 
 		target, err := s.repo.LockNodeSliceAt(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		oldValues := map[string]any{
@@ -222,29 +224,29 @@ func (s *OrgService) RescindNode(ctx context.Context, tenantID uuid.UUID, reques
 		}
 
 		if err := s.repo.DeleteNodeSlicesFrom(txCtx, tenantID, in.NodeID, in.EffectiveDate); err != nil {
-			return out{}, err
+			return nil, err
 		}
 		hierarchyType := "OrgUnit"
 		if err := s.repo.DeleteEdgesFrom(txCtx, tenantID, hierarchyType, in.NodeID, in.EffectiveDate); err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		edgeAt, err := s.repo.LockEdgeAt(txCtx, tenantID, hierarchyType, in.NodeID, in.EffectiveDate)
 		if err == nil {
 			if edgeAt.EffectiveDate.Equal(in.EffectiveDate) {
 				if err := s.repo.DeleteEdgeByID(txCtx, tenantID, edgeAt.ID); err != nil {
-					return out{}, err
+					return nil, err
 				}
 			} else {
 				if err := s.repo.TruncateEdge(txCtx, tenantID, edgeAt.ID, in.EffectiveDate); err != nil {
-					return out{}, mapPgError(err)
+					return nil, mapPgError(err)
 				}
 			}
 		}
 
 		if target.EffectiveDate.Before(in.EffectiveDate) {
 			if err := s.repo.TruncateNodeSlice(txCtx, tenantID, target.ID, in.EffectiveDate); err != nil {
-				return out{}, mapPgError(err)
+				return nil, mapPgError(err)
 			}
 		}
 
@@ -262,7 +264,7 @@ func (s *OrgService) RescindNode(ctx context.Context, tenantID uuid.UUID, reques
 			EndDate:       endOfTime,
 		})
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		newValues := map[string]any{
@@ -294,25 +296,31 @@ func (s *OrgService) RescindNode(ctx context.Context, tenantID uuid.UUID, reques
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
-		return out{window: NodeSliceRow{EffectiveDate: in.EffectiveDate, EndDate: endOfTime}}, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.rescinded", "org_node", in.NodeID, in.EffectiveDate, endOfTime)
+		res := &RescindNodeResult{
+			NodeID:        in.NodeID,
+			EffectiveDate: in.EffectiveDate,
+			EndDate:       endOfTime,
+			Status:        "rescinded",
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.rescinded", "org_node", in.NodeID, written.window.EffectiveDate, written.window.EndDate)
-	return &RescindNodeResult{
-		NodeID:        in.NodeID,
-		EffectiveDate: written.window.EffectiveDate,
-		EndDate:       written.window.EndDate,
-		Status:        "rescinded",
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 type ShiftBoundaryNodeInput struct {
@@ -344,26 +352,26 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 		return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date is invalid", nil)
 	}
 
-	_, err := inTx(ctx, tenantID, func(txCtx context.Context) (struct{}, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*ShiftBoundaryNodeResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return struct{}{}, err
+			return nil, err
 		}
 
 		target, err := s.repo.LockNodeSliceStartingAt(txCtx, tenantID, in.NodeID, in.TargetEffectiveDate)
 		if err != nil {
-			return struct{}{}, newServiceError(http.StatusUnprocessableEntity, "ORG_NOT_FOUND_AT_DATE", "target slice not found", err)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_NOT_FOUND_AT_DATE", "target slice not found", err)
 		}
 		if !in.NewEffectiveDate.Before(target.EndDate) {
-			return struct{}{}, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date must be before target end_date", nil)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date must be before target end_date", nil)
 		}
 
 		prev, err := s.repo.LockNodeSliceEndingAt(txCtx, tenantID, in.NodeID, in.TargetEffectiveDate)
 		if err != nil {
-			return struct{}{}, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_SWALLOW", "previous slice not found", err)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_SWALLOW", "previous slice not found", err)
 		}
 		if !in.NewEffectiveDate.After(prev.EffectiveDate) {
-			return struct{}{}, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_SWALLOW", "new_effective_date would swallow previous slice", nil)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_SWALLOW", "new_effective_date would swallow previous slice", nil)
 		}
 
 		affectedAt := in.TargetEffectiveDate
@@ -372,7 +380,7 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 		}
 		freeze, err := s.freezeCheck(settings, txTime, affectedAt)
 		if err != nil {
-			return struct{}{}, err
+			return nil, err
 		}
 
 		prevOld := map[string]any{
@@ -389,10 +397,10 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 		}
 
 		if err := s.repo.UpdateNodeSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
-			return struct{}{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 		if err := s.repo.UpdateNodeSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
-			return struct{}{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		prevNew := map[string]any{
@@ -432,7 +440,7 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 			AffectedAtUTC:    affectedAt,
 		})
 		if err != nil {
-			return struct{}{}, err
+			return nil, err
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -454,24 +462,30 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 			AffectedAtUTC:    affectedAt,
 		})
 		if err != nil {
-			return struct{}{}, err
+			return nil, err
 		}
 
-		return struct{}{}, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.corrected", "org_node", in.NodeID, in.NewEffectiveDate, endOfTime)
+		res := &ShiftBoundaryNodeResult{
+			NodeID:      in.NodeID,
+			TargetStart: in.TargetEffectiveDate,
+			NewStart:    in.NewEffectiveDate,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.corrected", "org_node", in.NodeID, in.NewEffectiveDate, endOfTime)
-	return &ShiftBoundaryNodeResult{
-		NodeID:      in.NodeID,
-		TargetStart: in.TargetEffectiveDate,
-		NewStart:    in.NewEffectiveDate,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 type CorrectMoveNodeInput struct {
@@ -498,54 +512,49 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "id/new_parent_id/effective_date are required", nil)
 	}
 
-	type out struct {
-		newEdgeID uuid.UUID
-		endDate   time.Time
-	}
-
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CorrectMoveNodeResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		isRoot, err := s.repo.GetNodeIsRoot(txCtx, tenantID, in.NodeID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		if isRoot {
-			return out{}, newServiceError(http.StatusUnprocessableEntity, "ORG_CANNOT_MOVE_ROOT", "cannot move root", nil)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_CANNOT_MOVE_ROOT", "cannot move root", nil)
 		}
 
 		hierarchyType := "OrgUnit"
 		parentExists, err := s.repo.NodeExistsAt(txCtx, tenantID, in.NewParentID, hierarchyType, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		if !parentExists {
-			return out{}, newServiceError(http.StatusUnprocessableEntity, "ORG_PARENT_NOT_FOUND", "new_parent_id not found at effective_date", nil)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_PARENT_NOT_FOUND", "new_parent_id not found at effective_date", nil)
 		}
 
 		movedEdge, err := s.repo.LockEdgeStartingAt(txCtx, tenantID, hierarchyType, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return out{}, newServiceError(http.StatusUnprocessableEntity, "ORG_USE_MOVE", "use move (insert) when effective_date is not edge slice start", err)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_USE_MOVE", "use move (insert) when effective_date is not edge slice start", err)
 		}
 
 		subtree, err := s.repo.LockEdgesInSubtree(txCtx, tenantID, hierarchyType, in.EffectiveDate, movedEdge.Path)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		if err := s.repo.DeleteEdgeByID(txCtx, tenantID, movedEdge.ID); err != nil {
-			return out{}, err
+			return nil, err
 		}
 		newEdgeID, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, &in.NewParentID, in.NodeID, in.EffectiveDate, movedEdge.EndDate)
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		for _, e := range subtree {
@@ -554,18 +563,18 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 			}
 			if e.EffectiveDate.Equal(in.EffectiveDate) {
 				if err := s.repo.DeleteEdgeByID(txCtx, tenantID, e.ID); err != nil {
-					return out{}, err
+					return nil, err
 				}
 				if _, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, e.ParentNodeID, e.ChildNodeID, in.EffectiveDate, e.EndDate); err != nil {
-					return out{}, mapPgError(err)
+					return nil, mapPgError(err)
 				}
 				continue
 			}
 			if err := s.repo.TruncateEdge(txCtx, tenantID, e.ID, in.EffectiveDate); err != nil {
-				return out{}, mapPgError(err)
+				return nil, mapPgError(err)
 			}
 			if _, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, e.ParentNodeID, e.ChildNodeID, in.EffectiveDate, e.EndDate); err != nil {
-				return out{}, mapPgError(err)
+				return nil, mapPgError(err)
 			}
 		}
 
@@ -576,11 +585,11 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 				parentPtr := &parent
 				patch := NodeSliceInPlacePatch{ParentHint: &parentPtr}
 				if err := s.repo.UpdateNodeSliceInPlace(txCtx, tenantID, nodeSlice.ID, patch); err != nil {
-					return out{}, err
+					return nil, err
 				}
 			} else {
 				if err := s.repo.TruncateNodeSlice(txCtx, tenantID, nodeSlice.ID, in.EffectiveDate); err != nil {
-					return out{}, err
+					return nil, err
 				}
 				_, err := s.repo.InsertNodeSlice(txCtx, tenantID, in.NodeID, NodeSliceInsert{
 					Name:          nodeSlice.Name,
@@ -596,7 +605,7 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 					EndDate:       nodeSlice.EndDate,
 				})
 				if err != nil {
-					return out{}, mapPgError(err)
+					return nil, mapPgError(err)
 				}
 			}
 		}
@@ -633,23 +642,29 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
-		return out{newEdgeID: newEdgeID, endDate: movedEdge.EndDate}, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.corrected", "org_edge", newEdgeID, in.EffectiveDate, movedEdge.EndDate)
+		res := &CorrectMoveNodeResult{
+			NodeID:        in.NodeID,
+			EffectiveDate: in.EffectiveDate,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.corrected", "org_edge", written.newEdgeID, in.EffectiveDate, written.endDate)
-	return &CorrectMoveNodeResult{
-		NodeID:        in.NodeID,
-		EffectiveDate: in.EffectiveDate,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 type CorrectAssignmentInput struct {
@@ -678,20 +693,20 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "id is required", nil)
 	}
 
-	out, err := inTx(ctx, tenantID, func(txCtx context.Context) (AssignmentRow, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CorrectAssignmentResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return AssignmentRow{}, err
+			return nil, err
 		}
 
 		current, err := s.repo.LockAssignmentByID(txCtx, tenantID, in.AssignmentID)
 		if err != nil {
-			return AssignmentRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		freeze, err := s.freezeCheck(settings, txTime, current.EffectiveDate)
 		if err != nil {
-			return AssignmentRow{}, err
+			return nil, err
 		}
 
 		oldValues := map[string]any{
@@ -711,24 +726,24 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 			pernr = strings.TrimSpace(*in.Pernr)
 		}
 		if pernr == "" {
-			return AssignmentRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr cannot be empty", nil)
+			return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr cannot be empty", nil)
 		}
 
 		derivedSubjectID, err := subjectid.NormalizedSubjectID(tenantID, "person", pernr)
 		if err != nil {
-			return AssignmentRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", err.Error(), err)
+			return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", err.Error(), err)
 		}
 		if in.SubjectID != nil && *in.SubjectID != derivedSubjectID {
-			return AssignmentRow{}, newServiceError(http.StatusUnprocessableEntity, "ORG_SUBJECT_MISMATCH", "subject_id does not match SSOT mapping", nil)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SUBJECT_MISMATCH", "subject_id does not match SSOT mapping", nil)
 		}
 
 		if in.PositionID != nil {
 			exists, err := s.repo.PositionExistsAt(txCtx, tenantID, *in.PositionID, current.EffectiveDate)
 			if err != nil {
-				return AssignmentRow{}, err
+				return nil, err
 			}
 			if !exists {
-				return AssignmentRow{}, newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_NOT_FOUND_AT_DATE", "position_id not found at effective_date", nil)
+				return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_NOT_FOUND_AT_DATE", "position_id not found at effective_date", nil)
 			}
 		}
 
@@ -738,12 +753,12 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 			SubjectID:  &derivedSubjectID,
 		}
 		if err := s.repo.UpdateAssignmentInPlace(txCtx, tenantID, current.ID, patch); err != nil {
-			return AssignmentRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		updated, err := s.repo.LockAssignmentByID(txCtx, tenantID, current.ID)
 		if err != nil {
-			return AssignmentRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		newValues := map[string]any{
@@ -776,24 +791,30 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 			AffectedAtUTC:   current.EffectiveDate,
 		})
 		if err != nil {
-			return AssignmentRow{}, err
+			return nil, err
 		}
 
-		return updated, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.corrected", "org_assignment", updated.ID, updated.EffectiveDate, updated.EndDate)
+		res := &CorrectAssignmentResult{
+			AssignmentID:  updated.ID,
+			EffectiveDate: updated.EffectiveDate,
+			EndDate:       updated.EndDate,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.corrected", "org_assignment", out.ID, out.EffectiveDate, out.EndDate)
-	return &CorrectAssignmentResult{
-		AssignmentID:  out.ID,
-		EffectiveDate: out.EffectiveDate,
-		EndDate:       out.EndDate,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 type RescindAssignmentInput struct {
@@ -821,22 +842,22 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "id/effective_date are required", nil)
 	}
 
-	out, err := inTx(ctx, tenantID, func(txCtx context.Context) (AssignmentRow, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*RescindAssignmentResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return AssignmentRow{}, err
+			return nil, err
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			return AssignmentRow{}, err
+			return nil, err
 		}
 
 		current, err := s.repo.LockAssignmentByID(txCtx, tenantID, in.AssignmentID)
 		if err != nil {
-			return AssignmentRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 		if !in.EffectiveDate.After(current.EffectiveDate) || !in.EffectiveDate.Before(current.EndDate) {
-			return AssignmentRow{}, newServiceError(http.StatusUnprocessableEntity, "ORG_INVALID_RESCIND_DATE", "effective_date must be within current window", nil)
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_INVALID_RESCIND_DATE", "effective_date must be within current window", nil)
 		}
 
 		oldValues := map[string]any{
@@ -846,12 +867,12 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 		}
 
 		if err := s.repo.UpdateAssignmentEndDate(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
-			return AssignmentRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		updated, err := s.repo.LockAssignmentByID(txCtx, tenantID, current.ID)
 		if err != nil {
-			return AssignmentRow{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		newValues := map[string]any{
@@ -882,22 +903,28 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return AssignmentRow{}, err
+			return nil, err
 		}
 
-		return updated, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.rescinded", "org_assignment", updated.ID, updated.EffectiveDate, updated.EndDate)
+		res := &RescindAssignmentResult{
+			AssignmentID:  updated.ID,
+			EffectiveDate: updated.EffectiveDate,
+			EndDate:       updated.EndDate,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.rescinded", "org_assignment", out.ID, out.EffectiveDate, out.EndDate)
-	return &RescindAssignmentResult{
-		AssignmentID:  out.ID,
-		EffectiveDate: out.EffectiveDate,
-		EndDate:       out.EndDate,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
