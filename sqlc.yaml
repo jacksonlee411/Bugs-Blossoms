@@ -28,3 +28,18 @@ sql:
         emit_json_tags: true
         emit_pointers_for_null_types: true
         emit_empty_slices: true
+  - engine: postgresql
+    schema:
+      - modules/org/infrastructure/atlas/core_deps.sql
+      - modules/org/infrastructure/persistence/schema/org-schema.sql
+    queries:
+      - modules/org/infrastructure/sqlc/changerequests
+    gen:
+      go:
+        out: modules/org/infrastructure/sqlc/changerequests
+        package: changerequests_sqlc
+        sql_package: pgx/v5
+        emit_prepared_queries: true
+        emit_json_tags: true
+        emit_pointers_for_null_types: true
+        emit_empty_slices: true
