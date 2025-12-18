@@ -90,7 +90,11 @@ func canDialPostgres(tb testing.TB) bool {
 	}
 	addr := net.JoinHostPort(host, port)
 
-	conn, err := net.DialTimeout("tcp", addr, 250*time.Millisecond)
+	dialer := &net.Dialer{Timeout: 250 * time.Millisecond}
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+
+	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
 		return false
 	}

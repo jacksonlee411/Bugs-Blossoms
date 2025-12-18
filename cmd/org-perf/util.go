@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -84,7 +85,10 @@ func detectGitRevision() string {
 			}
 		}
 	}
-	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "git", "rev-parse", "HEAD").Output()
 	if err != nil {
 		return ""
 	}
