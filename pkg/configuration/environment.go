@@ -197,6 +197,10 @@ type Configuration struct {
 	OrgReadStrategy   string `env:"ORG_READ_STRATEGY" envDefault:"path"`
 	OrgCacheEnabled   bool   `env:"ORG_CACHE_ENABLED" envDefault:"false"`
 
+	// DEV-PLAN-028: Org inheritance + role read side (default off).
+	OrgInheritanceEnabled bool `env:"ORG_INHERITANCE_ENABLED" envDefault:"false"`
+	OrgRoleReadEnabled    bool `env:"ORG_ROLE_READ_ENABLED" envDefault:"false"`
+
 	// DEV-PLAN-030: Org change requests & preflight APIs.
 	OrgChangeRequestsEnabled bool `env:"ORG_CHANGE_REQUESTS_ENABLED" envDefault:"false"`
 	OrgPreflightEnabled      bool `env:"ORG_PREFLIGHT_ENABLED" envDefault:"false"`

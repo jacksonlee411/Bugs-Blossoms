@@ -26,6 +26,15 @@ var orgOutboxTable = pgx.Identifier{"public", "org_outbox"}
 type OrgRepository interface {
 	ListHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, error)
 	ListHierarchyAsOfRecursive(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, error)
+
+	// DEV-PLAN-028: inheritance read side helpers.
+	ListNodeAttributesAsOf(ctx context.Context, tenantID uuid.UUID, nodeIDs []uuid.UUID, asOf time.Time) (map[uuid.UUID]OrgNodeAttributes, error)
+	ListAttributeInheritanceRulesAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]AttributeInheritanceRule, error)
+
+	// DEV-PLAN-028: role read side helpers.
+	ListRoles(ctx context.Context, tenantID uuid.UUID) ([]OrgRole, error)
+	ListRoleAssignmentsAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, orgNodeID uuid.UUID, asOf time.Time, includeInherited bool, roleCode *string, subjectType *string, subjectID *uuid.UUID) ([]RoleAssignmentRow, error)
+
 	ListSnapshotNodes(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotEdges(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotPositions(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
@@ -47,6 +56,7 @@ type OrgRepository interface {
 	TruncateNodeSlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
 	NextNodeSliceEffectiveDate(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, after time.Time) (time.Time, bool, error)
 
+	GetEdgeAt(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, asOf time.Time) (EdgeRow, error)
 	LockEdgeAt(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, asOf time.Time) (EdgeRow, error)
 	LockEdgesInSubtree(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time, movedPath string) ([]EdgeRow, error)
 	TruncateEdge(ctx context.Context, tenantID uuid.UUID, edgeID uuid.UUID, endDate time.Time) error

@@ -13,14 +13,16 @@ import (
 )
 
 var (
-	orgHierarchiesAuthzObject = authz.ObjectName("org", "hierarchies")
-	orgNodesAuthzObject       = authz.ObjectName("org", "nodes")
-	orgEdgesAuthzObject       = authz.ObjectName("org", "edges")
-	orgAssignmentsAuthzObject = authz.ObjectName("org", "assignments")
-	orgSnapshotAuthzObject    = authz.ObjectName("org", "snapshot")
-	orgBatchAuthzObject       = authz.ObjectName("org", "batch")
-	orgChangeRequestsAuthzObj = authz.ObjectName("org", "change_requests")
-	orgPreflightAuthzObject   = authz.ObjectName("org", "preflight")
+	orgHierarchiesAuthzObject     = authz.ObjectName("org", "hierarchies")
+	orgNodesAuthzObject           = authz.ObjectName("org", "nodes")
+	orgEdgesAuthzObject           = authz.ObjectName("org", "edges")
+	orgAssignmentsAuthzObject     = authz.ObjectName("org", "assignments")
+	orgSnapshotAuthzObject        = authz.ObjectName("org", "snapshot")
+	orgBatchAuthzObject           = authz.ObjectName("org", "batch")
+	orgChangeRequestsAuthzObj     = authz.ObjectName("org", "change_requests")
+	orgPreflightAuthzObject       = authz.ObjectName("org", "preflight")
+	orgRolesAuthzObject           = authz.ObjectName("org", "roles")
+	orgRoleAssignmentsAuthzObject = authz.ObjectName("org", "role_assignments")
 )
 
 func ensureOrgAuthz(

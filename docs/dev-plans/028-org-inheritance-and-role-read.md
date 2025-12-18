@@ -1,6 +1,6 @@
 # DEV-PLAN-028：Org 属性继承解析与角色读侧占位（Step 8）
 
-**状态**: 已评审（2025-12-18 01:21 UTC）
+**状态**: 已评审（2025-12-18 01:21 UTC）；已完成实现（2025-12-18）；Readiness 已补齐（2025-12-18，见 `docs/dev-records/DEV-PLAN-028-READINESS.md`）
 
 ## 0. 进度速记
 - 本计划对应 `docs/dev-plans/020-organization-lifecycle.md` 阶段 2 / 步骤 8：在 026（API/Authz/Outbox）与 027（性能/灰度）稳定后，补齐“读侧增强能力”。
@@ -19,11 +19,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] 落地 `OrgInheritanceResolver`：在给定 `tenant_id + hierarchy_type + effective_date` 下，为 OrgNode 计算 `resolved_attributes`（与显式 `attributes` 同时可得）。
-  - [ ] 为 `GET /org/api/hierarchies` 增加可选 `include=resolved_attributes`（向后兼容；未指定时响应保持 024 既有形态）。
-  - [ ] 提供角色读侧占位 API：`GET /org/api/roles` 与 `GET /org/api/role-assignments`（只读），并支持 `include_inherited=true`（按祖先继承，返回 `source_org_node_id`）。
-  - [ ] 矩阵/虚线只读：读接口应可返回 `assignment_type in (primary,matrix,dotted)`；写接口继续拒绝 `assignment_type != primary`（对齐 024 的 422 `ORG_ASSIGNMENT_TYPE_DISABLED`）。
-  - [ ] Readiness：新增/更新 `docs/dev-records/DEV-PLAN-028-READINESS.md`，记录门禁命令与结果。
+  - [x] 落地 `OrgInheritanceResolver`：在给定 `tenant_id + hierarchy_type + effective_date` 下，为 OrgNode 计算 `resolved_attributes`（与显式 `attributes` 同时可得）。
+  - [x] 为 `GET /org/api/hierarchies` 增加可选 `include=resolved_attributes`（向后兼容；未指定时响应保持 024 既有形态）。
+  - [x] 提供角色读侧占位 API：`GET /org/api/roles` 与 `GET /org/api/role-assignments`（只读），并支持 `include_inherited=true`（按祖先继承，返回 `source_org_node_id`）。
+  - [x] 矩阵/虚线只读：读接口应可返回 `assignment_type in (primary,matrix,dotted)`；写接口继续拒绝 `assignment_type != primary`（对齐 024 的 422 `ORG_ASSIGNMENT_TYPE_DISABLED`）。
+  - [x] Readiness：新增/更新 `docs/dev-records/DEV-PLAN-028-READINESS.md`，记录门禁命令与结果。
 - **非目标（本计划明确不做）**：
   - 不提供继承规则/角色/角色分配的写 API（仅通过迁移/seed 或后续 dev-plan 承接）。
   - 不实现安全域/策略生成与继承（020 的 M3+）。
@@ -278,11 +278,11 @@ flowchart TD
   - `docs/dev-plans/026-org-api-authz-and-events.md`：Authz/403 payload/路由规范可复用。
   - `docs/dev-plans/027-org-performance-and-rollout.md`：query budget 思路与灰度口径可复用。
 - **里程碑**：
-  1. [ ] Resolver 与树读扩展（include=resolved_attributes）落地
-  2. [ ] node resolved-attributes 调试端点落地
-  3. [ ] roles/role-assignments 只读端点落地
-  4. [ ] cache + tenant 失效策略落地
-  5. [ ] 测试与门禁通过 + readiness 记录落盘
+  1. [x] Resolver 与树读扩展（include=resolved_attributes）落地
+  2. [x] node resolved-attributes 调试端点落地
+  3. [x] roles/role-assignments 只读端点落地
+  4. [x] cache + tenant 失效策略落地
+  5. [x] 测试与门禁通过 + readiness 记录落盘
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **继承解析正确性**：
