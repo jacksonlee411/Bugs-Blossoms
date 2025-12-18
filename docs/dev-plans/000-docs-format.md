@@ -28,6 +28,7 @@
 - 前置 readiness 或校验类任务（如 `make authz-test authz-lint`、schema drift 检查、基线启动验证）必须以勾选项呈现，并写明执行命令、结果与时间戳。  
 - 涉及共用审计表的命令需同步登记到对应 `docs/dev-records/DEV-PLAN-XXX-...md` 表格，保持时间、命令、结果一致。  
 - 当所有前置项勾选后，再将状态置为 `准备就绪/已批准`，并在状态行写入同一时间戳。
+- **SSOT 引用规则（避免漂移）**：当计划涉及工具链/门禁/生成物（如 sqlc、Atlas/Goose、Authz、Routing、Outbox、多语言等）时，文档中应以“链接/引用”的方式指向单一事实源：`AGENTS.md`（触发器矩阵与本地必跑）、`Makefile`、`.github/workflows/quality-gates.yml`，以及对应的复用手册/计划（例如 `docs/dev-plans/009A-r200-tooling-playbook.md` 和相关 dev-plan/runbook）。除非是**本次实际执行记录**（带时间戳与结果），否则不要在 dev-plan 中复制整段命令清单或矩阵。
 
 ## 状态更新规则
 - 当所有 `[ ]` 条目均更新为 `[X]`，须将文档顶部状态改为 `**状态**: 已完成（YYYY-MM-DD HH:MM）`，时间戳填入完成时刻。  

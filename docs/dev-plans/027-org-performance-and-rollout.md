@@ -16,13 +16,33 @@
   - [ ] 达成并记录性能预算：**OrgUnit 1k 节点树读取 P99 < 200ms**（以本地基准环境为准，见 6.1）。
   - [ ] 输出“灰度发布/回滚剧本”（可在无猜测前提下执行），并明确 feature flag/降级路径与触发条件。
   - [ ] 将基准与剧本纳入 repo 的可复用入口（`make`/`cmd`/`scripts`），便于后续 CI/Readiness 复用。
+  - [ ] 通过本计划命中的 CI 门禁，并在 Readiness 中记录命令与结果（见 2.1 SSOT 引用）。
 - **非目标 (Out of Scope)**:
   - 不引入闭包表/物化视图/深层读取重构（归属 `docs/dev-plans/029-org-closure-and-deep-read-optimization.md`）。
   - 不建设长期压测体系、告警与值班流程（归属 `docs/dev-plans/034-org-ops-monitoring-and-load.md`）。
   - 不实现数据导入工具本体（归属 `docs/dev-plans/023-org-import-rollback-and-readiness.md`），本计划只负责把工具编排为上线剧本并补齐灰度开关。
   - 不重新定义 API/Authz/事件契约（归属 `docs/dev-plans/026-org-api-authz-and-events.md` 与 `docs/dev-plans/022-org-placeholders-and-event-contracts.md`）。
 
-### 2.1 与其他子计划的边界（必须保持清晰）
+### 2.1 工具链与门禁（SSOT 引用）
+> **目的**：本计划会引入/调整基准工具、可能补充索引，并编排灰度/回滚执行面；为避免在 dev-plan 内复制“门禁矩阵/命令清单”导致 drift，这里只勾选“命中的触发器”并给出 SSOT 链接。
+
+- **命中触发器（`[X]` 表示本计划涉及该类变更）**：
+  - [X] Go 代码（bench/CLI/test/脚本封装）
+  - [X] 迁移 / Schema（可能新增索引或调整查询形态；必须走 021A 的 Org Atlas+Goose 工具链）
+  - [X] 文档 / Readiness（新增 `DEV-PLAN-027-READINESS` 记录）
+  - [X] Authz（灰度可见性策略；若涉及 `config/access/**` 则触发 Authz 门禁）
+  - [ ] `.templ` / Tailwind（本计划不涉及 UI 资源；如后续引入则需勾选并跑相关门禁）
+  - [ ] 多语言 JSON（不涉及）
+  - [ ] 路由治理（仅当新增/调整 `/org/api/*` 路由或 `config/routing/allowlist.yaml` 时）
+
+- **SSOT（命令与门禁以这些为准）**：
+  - `AGENTS.md`（触发器矩阵与本地必跑命令）
+  - `Makefile`（命令入口，尤其 `make org ...` / `make check ...`）
+  - `.github/workflows/quality-gates.yml`（CI 门禁定义）
+  - `docs/dev-plans/009A-r200-tooling-playbook.md`（工具链复用索引）
+  - `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`（Org Atlas+Goose 工具链与门禁）
+
+### 2.2 与其他子计划的边界（必须保持清晰）
 - 021：负责 schema/约束/迁移；027 仅提出“为达标所需的索引/查询调整建议”，落地仍需走 021 的迁移工作流与评审口径。
 - 023：负责导入/回滚工具实现；027 负责把 023 的能力编排为“灰度发布/回滚剧本”，并给出触发条件与演练步骤。
 - 024：负责主链 CRUD 与树读入口；027 负责对 024 的读路径做基准与预算约束，不改业务语义。
@@ -36,7 +56,7 @@
 ### 3.1 架构图 (Mermaid)
 ```mermaid
 graph TD
-    A[org-perf / go test -bench] -->|db backend| B[Org Repo/Service]
+    A[org-perf / go test (query budget)] -->|db backend| B[Org Repo/Service]
     A -->|api backend| C[HTTP: GET /org/api/hierarchies...]
     C --> D[Org Controllers]
     D --> B
@@ -70,20 +90,23 @@ graph TD
 
 ## 5. 接口契约 (API Contracts)
 ### 5.1 性能基准入口（CLI / Make）
-> 目标是给出“无需猜测即可执行”的命令与参数口径；具体实现可选 `cmd/org-perf` 或 `go test -bench`，但对外入口必须稳定。
+> 目标是给出“无需猜测即可执行”的命令与参数口径；**对外入口以 `Makefile` 为准（SSOT）**，CLI/测试只是实现形态，可替换但不得破坏“参数口径与输出报告”契约。
 
-- **推荐入口 A：Go CLI `cmd/org-perf`（端到端可复用）**
-  - `org-perf dataset apply --tenant <uuid> --scale 1k --seed 42 --profile balanced [--backend db|api] [--apply]`
-  - `org-perf bench tree --tenant <uuid> --effective-date <rfc3339|yyyy-mm-dd> --profile balanced --iterations 200 --warmup 50 --concurrency 1 --backend db|api [--base-url http://localhost:3200] --output <path>`
-  - 输出（JSON）最小字段口径：
-    - `scenario`（如 `org_tree`）、`scale`（如 `1k`）、`profile`（如 `balanced`）、`backend`（`db|api`）
-    - `p50_ms/p95_ms/p99_ms`、`count`、`started_at/finished_at`、`git_rev`、`db_version`
-- **推荐入口 B：`go test -bench`（稳定预算门槛）**
-  - `go test ./modules/org/... -run '^$' -bench '^BenchmarkOrgTree1K$' -benchmem`
-  - 基准必须支持从 env/flag 读取：`DB_*`、`TENANT_ID`、`EFFECTIVE_DATE`、`SEED`、`SCALE`、`PROFILE`。
-- **Makefile 入口（对齐 AGENTS “入口优先”）**
+- **稳定入口（必须交付）**
   - `make org-perf-dataset`：生成/导入固定 1k 数据集（默认 dry-run，`APPLY=1` 才落库）。
   - `make org-perf-bench`：运行基准并输出 `./tmp/org-perf/report.json`（路径可配置）。
+
+- **实现形态 A：Go CLI `cmd/org-perf`（端到端可复用，推荐）**
+  - `org-perf dataset apply --tenant <uuid> --scale 1k --seed 42 --profile balanced [--backend db|api] [--apply]`
+  - `org-perf bench tree --tenant <uuid> --effective-date <rfc3339|yyyy-mm-dd> --profile balanced --iterations 200 --warmup 50 --concurrency 1 --backend db|api [--base-url http://localhost:3200] --output <path>`
+
+- **实现形态 B：Go test（CI Query Budget 守卫，必须交付）**
+  - `go test ./modules/org/... -run '^TestOrgTreeQueryBudget$' -count=1`
+  - 测试必须支持从 env/flag 读取：`DB_*`、`TENANT_ID`、`EFFECTIVE_DATE`、`SEED`、`SCALE`、`PROFILE`。
+
+- **输出（JSON）最小字段口径（`org-perf-bench` 必须满足）**：
+  - `scenario`（如 `org_tree`）、`scale`（如 `1k`）、`profile`（如 `balanced`）、`backend`（`db|api`）
+  - `p50_ms/p95_ms/p99_ms`、`count`、`started_at/finished_at`、`git_rev`、`db_version`
 
 ### 5.2 API 基准目标（对齐 024/026）
 - `GET /org/api/hierarchies?type=OrgUnit&effective_date=`（024 定义，M1 树概览）
@@ -116,7 +139,7 @@ graph TD
 3. **应用侧可逆优化**：
    - 引入缓存（026 已有基线：tenant+hierarchy_type+effective_date 作为 key），先粗粒度失效；缓存策略细化留给 027 的实现任务。
 4. **降级查询路径（feature flag）**：
-   - 提供 `ORG_READ_STRATEGY=path|recursive`（示例命名，最终以实现为准），默认使用性能更优者；当发现 path 策略在某些数据分布退化时可回切 recursive（正确性优先）。
+   - 提供 `ORG_READ_STRATEGY=path|recursive`（开关定义见 10.1），默认使用性能更优者；当发现 path 策略在某些数据分布退化时可回切 recursive（正确性优先）。
 5. **架构兜底：转入 DEV-PLAN-029**：
    - 当索引/查询形态/缓存/读策略切换仍无法达成 `P99 < 200ms`，必须显式转入 `docs/dev-plans/029-org-closure-and-deep-read-optimization.md` 的闭包表/物化视图方案作为唯一架构级救生圈，并据此重新评估里程碑与上线窗口。
 6. **停止上线并回滚（当达不到 200ms 门槛）**：
@@ -153,6 +176,7 @@ graph TD
 - **CI 硬指标（Query Count，防 N+1）**：
   - 对“树读取基准场景（repo/service 层）”设置 query budget，要求常数级且不随节点数线性增长（例如 10 节点与 1k 节点的查询次数差异 ≤ 1）。
   - 预算值先以 baseline 固化（写入测试常量与 Readiness 记录）；若确需上调，必须附带原因与 `EXPLAIN`/基准数据支持。
+  - **计数口径建议**：在测试环境注入 query counter（例如通过 `pgx`/`pgxpool` 的 tracer 或包装 `pgx.Tx` 的 `Exec/Query/QueryRow/SendBatch`），仅统计 DB roundtrip 次数（不计内存计算），确保对 N+1 回退敏感。
 - **工程门禁**：
   - 文档/脚本落地后，相关门禁（至少 `make check doc`；如新增 Go 代码则按 AGENTS 跑 `go fmt ./... && go vet ./... && make check lint && make test`）必须通过。
 - **交付记录**：
@@ -161,21 +185,21 @@ graph TD
     - 数据集生成命令与 scale/seed
     - 基准执行命令、输出报告摘要（P50/P95/P99）
     - 灰度/回滚剧本演练日志与结论
-  - 更新 020 约定的 Workday parity checklist（性能/灰度结果至少要有一条可追溯记录）。
+  - 对齐 020 的“Workday parity checklist”要求：在 `docs/dev-records/DEV-PLAN-027-READINESS.md` 中记录本计划对应条目（性能/灰度/回滚演练），并回链到 `docs/dev-plans/020-organization-lifecycle.md`。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 ### 10.1 Feature Flag（灰度开关口径）
 - **目标**：允许按租户逐步启用 Org 读路径/缓存/（未来）闭包表读路径，且能一键回滚。
-- **建议开关（示意，最终以实现为准）**：
-  - `ORG_ROLLOUT_MODE=disabled|enabled`（默认 `disabled`）
-  - `ORG_ROLLOUT_TENANTS=<uuid,uuid,...>`（enabled 时生效；空表示不启用任何租户）
-  - `ORG_READ_STRATEGY=path|recursive`（仅影响读实现选择）
-  - `ORG_CACHE_ENABLED=true|false`（缓存总开关）
+- **开关定义（契约）**：
+  - `ORG_ROLLOUT_MODE=disabled|enabled`（默认 `disabled`）：`disabled` 表示所有租户均不启用 Org（用于一键下线）；`enabled` 表示进入“按租户 allowlist 灰度”。
+  - `ORG_ROLLOUT_TENANTS=<uuid,uuid,...>`（默认空）：当 `ORG_ROLLOUT_MODE=enabled` 时，只有在 allowlist 内的租户才启用 Org；空表示不启用任何租户。
+  - `ORG_READ_STRATEGY=path|recursive`（默认 `path`）：选择树读取实现；回滚/降级时切到 `recursive`（正确性优先）。
+  - `ORG_CACHE_ENABLED=true|false`（默认 `false`）：缓存总开关；回滚时可先置 `false` 以排除缓存一致性因素。
 
 ### 10.2 灰度发布剧本（M1）
 1. **前置检查**：确认 021/024/025/026 已部署且健康，outbox relay 正常，Authz 策略已合并并生效。
 2. **灰度导入（dry-run）**：使用 023 工具对目标租户执行 `import` dry-run，修正数据后再 `--apply`。
-3. **启用灰度租户**：将目标租户加入 `ORG_ROLLOUT_TENANTS`，并保持仅内部角色可见（Authz）。
+3. **启用灰度租户**：确保 `ORG_ROLLOUT_MODE=enabled`，将目标租户加入 `ORG_ROLLOUT_TENANTS`，并保持仅内部角色可见（Authz）。
 4. **验收**：运行 5.1 的基准（至少 DB 基准），并对关键页面/API 做冒烟验证；若失败按 6.2 决策树处理。
 5. **扩大范围**：按租户逐步扩容；每次扩容都必须留存基准与验证记录。
 

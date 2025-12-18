@@ -21,10 +21,30 @@
   - [ ] 实现 X 功能，响应时间 < 200ms (P99)。
   - [ ] 确保数据一致性，特别是 [特定场景]。
   - [ ] 通过 `make check lint` 与所有 CI 门禁。
+  - [ ] 明确本计划命中的工具链/门禁触发器，并按 SSOT 执行与引用（见“工具链与门禁（SSOT 引用）”）。
   - [ ] (可选) 定义 Feature Flag 策略（如 `ENABLE_X_FEATURE`），明确灰度路径。
 - **非目标 (Out of Scope)**:
   - 不包含 UI 动画效果。
   - 不处理跨租户的数据迁移（留待后续计划）。
+
+## 2.1 工具链与门禁（SSOT 引用）
+> **目的**：避免在 dev-plan 里复制工具链细节导致 drift；本文只声明“本计划命中哪些触发器/工具链”，并给出可复现的入口链接。
+
+- **触发器清单（勾选本计划命中的项）**：
+  - [ ] Go 代码（`go fmt ./... && go vet ./... && make check lint && make test`）
+  - [ ] `.templ` / Tailwind（`make generate && make css`，并确保生成物提交）
+  - [ ] 多语言 JSON（`make check tr`）
+  - [ ] Authz（`make authz-test && make authz-lint`；策略聚合用 `make authz-pack`）
+  - [ ] 路由治理（`make check routing`；必要时更新 `config/routing/allowlist.yaml`）
+  - [ ] DB 迁移 / Schema（按模块/域对应的 dev-plan + `Makefile` 入口执行，如 `make db plan/lint/migrate ...`）
+  - [ ] sqlc（按对应 dev-plan + `Makefile` 入口执行，如 `make sqlc-generate`）
+  - [ ] Outbox（按 `DEV-PLAN-017` 与 runbook 约定执行与验收）
+
+- **SSOT 链接（按需保留/补充）**：
+  - 触发器矩阵与本地必跑：`AGENTS.md`
+  - 命令入口与脚本实现：`Makefile`
+  - CI 门禁定义：`.github/workflows/quality-gates.yml`
+  - 工具链复用索引：`docs/dev-plans/009A-r200-tooling-playbook.md`
 
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.1 架构图 (Mermaid)
