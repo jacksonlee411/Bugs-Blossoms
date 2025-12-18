@@ -20,6 +20,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/org/infrastructure/persistence"
 	orgsvc "github.com/iota-uz/iota-sdk/modules/org/services"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
+	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/itf"
 )
 
@@ -78,8 +79,15 @@ func TestOrgTreeQueryBudget(t *testing.T) {
 func canDialPostgres(tb testing.TB) bool {
 	tb.Helper()
 
-	host := strings.TrimSpace(getenvDefault("DB_HOST", "localhost"))
-	port := strings.TrimSpace(getenvDefault("DB_PORT", "5432"))
+	cfg := configuration.Use()
+	host := strings.TrimSpace(cfg.Database.Host)
+	if host == "" {
+		host = "localhost"
+	}
+	port := strings.TrimSpace(cfg.Database.Port)
+	if port == "" {
+		port = "5432"
+	}
 	addr := net.JoinHostPort(host, port)
 
 	conn, err := net.DialTimeout("tcp", addr, 250*time.Millisecond)
