@@ -1,6 +1,7 @@
 # DEV-PLAN-030：Org 变更请求与预检（Step 10）
 
 **状态**: 已评审（2025-12-18 02:01 UTC）
+**实施状态**: 已落地（2025-12-18），门禁记录见 `docs/dev-records/DEV-PLAN-030-READINESS.md`。
 
 ## 0. 进度速记
 - 本计划对应 `docs/dev-plans/020-organization-lifecycle.md` 的步骤 10：在 M1 CRUD/API/审计/outbox 基线稳定后，引入“变更请求（draft/submit）+ 影响预检（preflight）”能力。
@@ -18,11 +19,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] 提供 `org_change_requests` 的最小 API：创建草稿、更新草稿、读取、提交、取消（不执行变更）。
-  - [ ] 提供 Pre-flight API：对草稿（或 payload）执行结构校验 + 业务校验 + 影响分析，输出稳定 JSON 合同。
-  - [ ] workflow 未启用时：提交仅改变 `status` 并落盘审计信息，不触发任何外部路由/执行主数据写入/不写 outbox。
-  - [ ] 测试：覆盖无权限/有权限/租户隔离（含“跨租户读取/提交必须失败”）。
-  - [ ] Readiness：新增/更新 `docs/dev-records/DEV-PLAN-030-READINESS.md`，记录门禁命令与结果。
+  - [X] 提供 `org_change_requests` 的最小 API：创建草稿、更新草稿、读取、提交、取消（不执行变更）。
+  - [X] 提供 Pre-flight API：对草稿（或 payload）执行结构校验 + 业务校验 + 影响分析，输出稳定 JSON 合同。
+  - [X] workflow 未启用时：提交仅改变 `status` 并落盘审计信息，不触发任何外部路由/执行主数据写入/不写 outbox。
+  - [X] 测试：覆盖无权限/有权限/租户隔离（含“跨租户读取/提交必须失败”）。
+  - [X] Readiness：新增/更新 `docs/dev-records/DEV-PLAN-030-READINESS.md`，记录门禁命令与结果。
 - **非目标（本计划明确不做）**：
   - 不实现审批/排程/生效（Approve/Schedule/Activate）完整流程（后续阶段另立 dev-plan；workflow 模块启用前不做）。
   - 不实现“执行草稿变更”（apply）入口；实际写入仍通过 026 的 `/org/api/batch` 等已冻结契约完成。
@@ -279,11 +280,11 @@ flowchart TD
   - `docs/dev-plans/025-org-time-and-audit.md`：冻结窗口与 Correct/Rescind/ShiftBoundary 的校验口径（预检必须复用）。
   - `docs/dev-plans/026-org-api-authz-and-events.md`：Authz/403 payload/batch 合同（payload 复用）。
 - **里程碑**：
-  1. [ ] `org_change_requests` 迁移落地（若 022 尚未落地）
-  2. [ ] change-requests API（create/update/get/list/submit/cancel）
-  3. [ ] preflight API（校验 + 影响摘要）
-  4. [ ] Authz 策略片段与门禁通过
-  5. [ ] 测试与 readiness 记录落盘
+  1. [X] `org_change_requests` 迁移落地（由 022 落地：`migrations/org/20251218005114_org_placeholders_and_event_contracts.sql`）
+  2. [X] change-requests API（create/update/get/list/submit/cancel）
+  3. [X] preflight API（校验 + 影响摘要）
+  4. [X] Authz 策略片段与门禁通过
+  5. [X] 测试与 readiness 记录落盘
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **权限**：
@@ -308,3 +309,11 @@ flowchart TD
 - `POST /org/api/preflight`（影响摘要）与测试。
 - Authz 策略片段与门禁通过（如涉及 `config/access/**`）。
 - `docs/dev-records/DEV-PLAN-030-READINESS.md`（在落地时填写）。  
+
+## 11. 完成情况登记（证据点）
+- API 路由：`modules/org/presentation/controllers/org_api_controller.go`（`/org/api/change-requests*`、`POST /org/api/preflight`）。
+- Feature flags：`pkg/configuration/environment.go`（`ORG_CHANGE_REQUESTS_ENABLED`、`ORG_PREFLIGHT_ENABLED`；默认关闭）。
+- Authz：`modules/org/presentation/controllers/authz_helpers.go`（objects） + `config/access/policies/org/org.csv`（策略片段）。
+- Schema：`migrations/org/20251218005114_org_placeholders_and_event_contracts.sql`（`org_change_requests`）。
+- 租户隔离（Repo 级集成测试）：`modules/org/services/change_request_repository_integration_test.go`。
+- Readiness/门禁结果：`docs/dev-records/DEV-PLAN-030-READINESS.md`。
