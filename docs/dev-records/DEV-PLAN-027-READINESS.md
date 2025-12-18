@@ -53,12 +53,35 @@
   - `ORG_READ_STRATEGY=recursive`（正确性优先的回退路径）
   - `ORG_CACHE_ENABLED=false`（排除缓存一致性因素）
 
-## 6. 实际跑通记录（待填写）
+## 6. 实际跑通记录（2025-12-19）
 
-- 时间：
-- 环境（CPU/内存/DB 版本、关键 env）：
-- 数据集（tenant/scale/seed/profile）：
-- 基准结果（P50/P95/P99，重复 3 次波动）：
-- Query Budget（小/大规模查询次数）：
-- 灰度/回滚演练结论（dry-run + apply）：
-
+- 时间：2025-12-19
+- 环境：
+  - OS：WSL2 Linux（`uname -a`：`Linux DESKTOP-S9U9E9K 5.15.167.4-microsoft-standard-WSL2 ...`）
+  - CPU：AMD Ryzen AI 9 365（20 vCPU，10 cores，`lscpu`）
+  - 内存：15Gi（`free -h`）
+  - Postgres：17.7（docker `postgres:17`，`db_version=17.7 (Debian 17.7-3.pgdg13+1)`）
+  - DB：`DB_HOST=localhost` `DB_PORT=5438` `DB_NAME=iota_erp`
+  - 关键 env：`ORG_READ_STRATEGY=path`（默认）、`ORG_CACHE_ENABLED=false`（默认）、`RLS_ENFORCE=disabled`（默认）
+- 依赖准备：
+  - 启动 DB：`make db local`
+  - 跑迁移：`make db migrate up`
+- 数据集（固定 1k profile）：
+  - tenant：`20a8c36b-3348-434c-abe0-22408e9ba5df`
+  - effective_date：`2025-01-01T00:00:00Z`
+  - scale/profile/seed：`1k` / `balanced` / `42`
+  - dry-run：`TENANT_ID=20a8c36b-3348-434c-abe0-22408e9ba5df SCALE=1k SEED=42 PROFILE=balanced make org-perf-dataset`
+  - apply：`TENANT_ID=20a8c36b-3348-434c-abe0-22408e9ba5df SCALE=1k SEED=42 PROFILE=balanced APPLY=1 make org-perf-dataset`
+- 基准结果（DB backend；`ITERATIONS=200` / `WARMUP=50` / `CONCURRENCY=1`；git_rev=`eec640b5a6f792a767751400dcbb4ea8fa4e50f4`）：
+  - run1：P50=6.731ms P95=7.729ms P99=8.795ms（`tmp/org-perf/report-run1.json`）
+  - run2：P50=6.881ms P95=8.017ms P99=8.803ms（`tmp/org-perf/report-run2.json`）
+  - run3：P50=6.641ms P95=7.643ms P99=9.086ms（`tmp/org-perf/report-run3.json`）
+  - 结论：
+    - 性能预算：3 次 P99 均远低于 200ms（通过）。
+    - 可重复性：以 3 次 P99 中位数（8.803ms）为基准，偏差 -0.09% / 0% / +3.21%（通过）。
+- Query Budget（防 N+1）：
+  - 命令：`go test ./modules/org/services -run '^TestOrgTreeQueryBudget$' -count=1`
+  - 结果：small(10 nodes)=1 query；large(1k nodes)=1 query；budget=1（通过）。
+- 灰度/回滚演练（dry-run + apply）：
+  - 数据层：已演练 dataset `dry-run` 与 `apply`（基准租户独立、可重复导入）。
+  - 开关层：回滚可通过 `ORG_ROLLOUT_MODE=disabled` 或将租户从 `ORG_ROLLOUT_TENANTS` 移除；降级可通过 `ORG_READ_STRATEGY=recursive`，排除缓存因素可 `ORG_CACHE_ENABLED=false`。
