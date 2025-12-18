@@ -1,6 +1,6 @@
 # DEV-PLAN-023：Org 导入/回滚工具与 Readiness
 
-**状态**: 已评审（2025-12-17 11:44 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-023-READINESS.md`）
 
 ## 0. 进度速记
 - ✅ 交付形态：Go CLI `cmd/org-data`（默认 dry-run）。
@@ -15,14 +15,14 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] 提供 Go CLI `org-data`（`cmd/org-data`）：`import/export/rollback` 三个子命令。
-- [ ] `import`：
-  - [ ] 默认 dry-run（不落库），输出“影响摘要 + 校验错误（含行号/字段）”。
-  - [ ] 显式 `--apply` 才允许写入；写入成功后生成 `import_manifest_*.json`（用于精确回滚）。
-  - [ ] MVP 仅支持 `--backend db` + `--mode seed`（空租户种子导入）。
-- [ ] `export`：从 DB 导出 CSV（支持 `--as-of` 导出快照；不带 `--as-of` 导出全量时间片）。
-- [ ] `rollback`：支持 `--manifest` 精确回滚（推荐）；支持 `--since` 作为 seed 的兜底回滚（带强安全网）。
-- [ ] Readiness：至少通过 `go fmt ./... && go vet ./... && make check lint && make test`，并将命令与输出记录到 `docs/dev-records/DEV-PLAN-023-READINESS.md`。
+- [x] 提供 Go CLI `org-data`（`cmd/org-data`）：`import/export/rollback` 三个子命令。
+- [x] `import`：
+  - [x] 默认 dry-run（不落库），输出“影响摘要 + 校验错误（含行号/字段）”。
+  - [x] 显式 `--apply` 才允许写入；写入成功后生成 `import_manifest_*.json`（用于精确回滚）。
+  - [x] MVP 仅支持 `--backend db` + `--mode seed`（空租户种子导入）。
+- [x] `export`：从 DB 导出 CSV（支持 `--as-of` 导出快照；不带 `--as-of` 导出全量时间片）。
+- [x] `rollback`：支持 `--manifest` 精确回滚（推荐）；支持 `--since` 作为 seed 的兜底回滚（带强安全网）。
+- [x] Readiness：至少通过 `go fmt ./... && go vet ./... && make check lint && make test`，并将命令与输出记录到 `docs/dev-records/DEV-PLAN-023-READINESS.md`。
 
 ### 2.2 非目标（本计划明确不做）
 - 不实现 Org UI、审批流、矩阵/继承逻辑执行（见 035/030 等）。
@@ -210,13 +210,13 @@ flowchart TD
 - [DEV-PLAN-019A](019A-rls-tenant-isolation.md)：RLS 注入契约（通过 `pkg/composables` 落地）。
 
 ### 8.2 里程碑（按提交时间填充）
-0. [ ] 先行落地 `NormalizedSubjectID(...)`（对齐 026 §7.3）+ 单测冻结（供 CLI/API 复用）
-1. [ ] CLI 骨架（cobra）+ 命令/flag/退出码契约固化
-2. [ ] CSV Parse/Normalize + Static Validate（含 strict 环路检测）
-3. [ ] DB Dry-Run + seed Apply + manifest
-4. [ ] export（全量/`--as-of`）
-5. [ ] rollback（manifest / since 安全网）
-6. [ ] Readiness 记录落盘
+0. [x] 先行落地 `NormalizedSubjectID(...)`（对齐 026 §7.3）+ 单测冻结（供 CLI/API 复用）
+1. [x] CLI 骨架（cobra）+ 命令/flag/退出码契约固化
+2. [x] CSV Parse/Normalize + Static Validate（含 strict 环路检测）
+3. [x] DB Dry-Run + seed Apply + manifest
+4. [x] export（全量/`--as-of`）
+5. [x] rollback（manifest / since 安全网）
+6. [x] Readiness 记录落盘
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - 单测（`go test ./cmd/org-data/...`）至少覆盖：

@@ -1,6 +1,6 @@
 # DEV-PLAN-024：Org 主链 CRUD（Person → Position → Org）
 
-**状态**: 已评审（2025-12-17 11:44 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-024-READINESS.md`）
 
 ## 0. 进度速记
 - 本计划只交付 **主链 CRUD + 自动创建空壳 Position** 的最小可用路径（可写可查），用于支撑后续 025/026/035 的落地与联调。
@@ -17,14 +17,14 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] 新增 `modules/org`（DDD 分层）并完成模块注册（`module.go/links.go`），通过 cleanarchguard。
-- [ ] 主链写入能力（M1）：
-  - [ ] Node：Create + Update(Insert)（仅属性时间片）+ MoveNode（边时间片 + 子树级联重切片）。
-  - [ ] Assignment：Create + Update(Insert)，并支持“未提供 `position_id` 时自动创建空壳 Position”。
-- [ ] 主链读取能力（M1）：树概览（as-of）与按人员的 assignment 时间线查询。
-- [ ] 写入成功后生成 022 的 integration event payload（**不投递**；outbox/relay 在 026 统一落地）。
-- [ ] 全链路 Session + tenant 强校验；兼容 `RLS_ENFORCE=enforce`（事务内注入 `app.current_tenant`，对齐 019A）。
-- [ ] Readiness：至少通过 `go fmt ./... && go vet ./... && make check lint && make test`，并记录到 `docs/dev-records/DEV-PLAN-024-READINESS.md`。
+- [x] 新增 `modules/org`（DDD 分层）并完成模块注册（`module.go/links.go`），通过 cleanarchguard。
+- [x] 主链写入能力（M1）：
+  - [x] Node：Create + Update(Insert)（仅属性时间片）+ MoveNode（边时间片 + 子树级联重切片）。
+  - [x] Assignment：Create + Update(Insert)，并支持“未提供 `position_id` 时自动创建空壳 Position”。
+- [x] 主链读取能力（M1）：树概览（as-of）与按人员的 assignment 时间线查询。
+- [x] 写入成功后生成 022 的 integration event payload（**不投递**；outbox/relay 在 026 统一落地）。
+- [x] 全链路 Session + tenant 强校验；兼容 `RLS_ENFORCE=enforce`（事务内注入 `app.current_tenant`，对齐 019A）。
+- [x] Readiness：至少通过 `go fmt ./... && go vet ./... && make check lint && make test`，并记录到 `docs/dev-records/DEV-PLAN-024-READINESS.md`。
 
 ### 2.2 非目标（本计划明确不做）
 - 不交付 Correct/Rescind/ShiftBoundary/冻结窗口与审计（025 负责；024 仅保留入口与错误码占位）。
@@ -377,11 +377,11 @@ flowchart TD
 - [DEV-PLAN-026](026-org-api-authz-and-events.md)：`subject_id` 映射 SSOT、Authz/outbox/snapshot/batch。
 
 ### 8.2 里程碑（按提交时间填充）
-1. [ ] 模块骨架 + 注册（module/links/router allowlist）
-2. [ ] Repo 层（as-of 读 + 最小写入）
-3. [ ] Service 层：Create/Insert/MoveNode/Assignment+AutoPosition
-4. [ ] Controller：`/org/api/*` 最小子集 + 最小验证页
-5. [ ] 测试与 readiness 记录
+1. [x] 模块骨架 + 注册（module/links/router allowlist）
+2. [x] Repo 层（as-of 读 + 最小写入）
+3. [x] Service 层：Create/Insert/MoveNode/Assignment+AutoPosition
+4. [x] Controller：`/org/api/*` 最小子集 + 最小验证页
+5. [x] 测试与 readiness 记录
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **功能验收（必须）**：
@@ -393,12 +393,12 @@ flowchart TD
   - `go test ./modules/org/...`：覆盖 Insert 写语义、MoveNode 子树重切片、AutoPosition 并发去重、事件 payload 构造。
   - controller 测试覆盖：无 Session/无 tenant/参数非法/租户隔离。
 - **Readiness（按仓库门禁）**：在 `docs/dev-records/DEV-PLAN-024-READINESS.md` 记录：
-  - [ ] `go fmt ./...`
-  - [ ] `go vet ./...`
-  - [ ] `make check lint`
-  - [ ] `make test`
-  - [ ] 如涉及 `.templ`/Tailwind：`make generate && make css` 且 `git status --short` 干净
-  - [ ] 如涉及路由 allowlist：`make check routing`
+  - [x] `go fmt ./...`
+  - [x] `go vet ./...`
+  - [x] `make check lint`
+  - [x] `make test`
+  - [x] 如涉及 `.templ`/Tailwind：`make generate && make css` 且 `git status --short` 干净
+  - [x] 如涉及路由 allowlist：`make check routing`
 
 ## 10. 运维、回滚与降级 (Ops / Rollback)
 - **降级开关**：

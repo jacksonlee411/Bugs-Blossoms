@@ -1,6 +1,6 @@
 # DEV-PLAN-025：Org 时间约束、冻结窗口与审计（Update / Correct / Rescind / ShiftBoundary）
 
-**状态**: 已评审（2025-12-17 11:44 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-025-READINESS.md`）
 
 ## 0. 进度速记
 - 本计划在 024 主链 CRUD 已可跑通的前提下，补齐 **有效期强校验 + 冻结窗口 + 审计落盘 + Correct/Rescind/ShiftBoundary**。
@@ -16,18 +16,18 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **有效期语义强校验**：
-  - [ ] 统一解析/规范化 `effective_date`（UTC，半开区间 `[start,end)`）。
-  - [ ] 写入前校验：无重叠（DB 兜底）、关键时间线无空档（Service 保证）、跨表 valid-time 引用合法（Assignment 在 Position 有效窗内等）。
-  - [ ] 对 OrgEdge/OrgNode 的结构写入保持“无环/无双亲/有 root edge”（DB + Service 组合）。
-- [ ] **冻结窗口（可租户覆盖）**：默认“上月 + 3 天宽限期”，到期后拒绝修改更早月份的历史数据（可 per-tenant override）。
-- [ ] **操作类型分流**（并写审计/事件）：
-  - [ ] `Update`：Insert 语义（只提交 `effective_date`，系统计算 `end_date`）。
-  - [ ] `Correct`：原位更正（不改时间字段；用于修正历史片段内容或结构）。
-  - [ ] `Rescind`：撤销误创建（软撤销：节点/岗位通过 `status=rescinded`；结构/时间线相应收口；Assignment/Edge 的撤销以“截断/删除+审计”为准，详见 §6）。
-  - [ ] `ShiftBoundary`：原子移动相邻片段交界线（不允许吞没/倒错）。
-- [ ] **审计落盘**：引入 `org_audit_logs`，记录 `request_id/transaction_time/initiator_id/change_type/effective_window/old_values/new_values`，可按 request_id 串联。
-- [ ] **事件字段齐全**：所有写操作产出的 payload 满足 022 v1 字段；投递闭环与重放由 026 负责。
+- [x] **有效期语义强校验**：
+  - [x] 统一解析/规范化 `effective_date`（UTC，半开区间 `[start,end)`）。
+  - [x] 写入前校验：无重叠（DB 兜底）、关键时间线无空档（Service 保证）、跨表 valid-time 引用合法（Assignment 在 Position 有效窗内等）。
+  - [x] 对 OrgEdge/OrgNode 的结构写入保持“无环/无双亲/有 root edge”（DB + Service 组合）。
+- [x] **冻结窗口（可租户覆盖）**：默认“上月 + 3 天宽限期”，到期后拒绝修改更早月份的历史数据（可 per-tenant override）。
+- [x] **操作类型分流**（并写审计/事件）：
+  - [x] `Update`：Insert 语义（只提交 `effective_date`，系统计算 `end_date`）。
+  - [x] `Correct`：原位更正（不改时间字段；用于修正历史片段内容或结构）。
+  - [x] `Rescind`：撤销误创建（软撤销：节点/岗位通过 `status=rescinded`；结构/时间线相应收口；Assignment/Edge 的撤销以“截断/删除+审计”为准，详见 §6）。
+  - [x] `ShiftBoundary`：原子移动相邻片段交界线（不允许吞没/倒错）。
+- [x] **审计落盘**：引入 `org_audit_logs`，记录 `request_id/transaction_time/initiator_id/change_type/effective_window/old_values/new_values`，可按 request_id 串联。
+- [x] **事件字段齐全**：所有写操作产出的 payload 满足 022 v1 字段；投递闭环与重放由 026 负责。
 
 ### 2.2 非目标
 - 不实现 workflow/草稿审批/并行版本/retro 回放。
@@ -414,11 +414,11 @@ flowchart TD
 - 026：Authz/outbox（本计划只产出 payload，不投递）
 
 ### 9.2 里程碑（按提交时间填充）
-1. [ ] 落地 `org_settings` 与 `org_audit_logs` 迁移
-2. [ ] 冻结窗口实现（enforce/shadow/disabled）+ 测试
-3. [ ] Update/Correct/Rescind/ShiftBoundary 服务实现 + 测试
-4. [ ] 审计写入与事件 payload 生成 + 测试
-5. [ ] Readiness 记录
+1. [x] 落地 `org_settings` 与 `org_audit_logs` 迁移
+2. [x] 冻结窗口实现（enforce/shadow/disabled）+ 测试
+3. [x] Update/Correct/Rescind/ShiftBoundary 服务实现 + 测试
+4. [x] 审计写入与事件 payload 生成 + 测试
+5. [x] Readiness 记录
 
 ## 10. 测试与验收标准 (Acceptance Criteria)
 - **冻结窗口**：

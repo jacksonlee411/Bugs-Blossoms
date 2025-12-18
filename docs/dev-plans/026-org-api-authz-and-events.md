@@ -1,6 +1,6 @@
 # DEV-PLAN-026：Org API、Authz 与事件发布（Outbox / Snapshot / Batch）
 
-**状态**: 已评审（2025-12-17 11:44 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-026-READINESS.md`）
 
 ## 0. 进度速记
 - 024/025 定义主链 CRUD 与时间/审计写语义；026 在其契约上补齐“对外 API + Authz + outbox/relay + 缓存 + snapshot/batch”闭环。
@@ -20,19 +20,19 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **API 交付与冻结**：实现 `/org/api/**`，其中 CRUD/Correct 等接口的请求/响应/错误码以 024/025 为 SSOT；本计划补齐 Authz/403/outbox/caching/snapshot/batch。
-- [ ] **Authz**：
-  - [ ] 端点 → object/action 映射固化（见 §7.1），并用 `ensureAuthz` 统一校验。
-  - [ ] 403 返回 `modules/core/authzutil.ForbiddenPayload`（见 §5.2）。
-  - [ ] 提交策略片段 `config/access/policies/org/*.csv`，并通过 `make authz-test authz-lint authz-pack`。
-- [ ] **Outbox 原子一致**：
-  - [ ] 落地 `public.org_outbox`（结构/索引对齐 017）。
-  - [ ] 所有写事务在同一 DB tx 内 enqueue 022 事件 payload（topic=`org.changed.v1`/`org.assignment.changed.v1`）。
-  - [ ] relay/cleaner 通过 `OUTBOX_RELAY_TABLES/OUTBOX_CLEANER_TABLES` 启用，并支持单活与重试（对齐 017）。
-- [ ] **Snapshot（纠偏）**：实现 `GET /org/api/snapshot`，支持 as-of、include 子集与 cursor 分页（见 §5.4）。
-- [ ] **Batch（原子重组）**：实现 `POST /org/api/batch`，支持 dry-run、规模限制、失败定位（见 §5.5）。
-- [ ] **缓存（M1 基线）**：树查询与分配查询提供进程内缓存；写后即时失效 + outbox 事件驱动失效（tenant 粒度）。
-- [ ] **Readiness（按仓库门禁）**：在 `docs/dev-records/DEV-PLAN-026-READINESS.md` 记录：
+- [x] **API 交付与冻结**：实现 `/org/api/**`，其中 CRUD/Correct 等接口的请求/响应/错误码以 024/025 为 SSOT；本计划补齐 Authz/403/outbox/caching/snapshot/batch。
+- [x] **Authz**：
+  - [x] 端点 → object/action 映射固化（见 §7.1），并用 `ensureAuthz` 统一校验。
+  - [x] 403 返回 `modules/core/authzutil.ForbiddenPayload`（见 §5.2）。
+  - [x] 提交策略片段 `config/access/policies/org/*.csv`，并通过 `make authz-test authz-lint authz-pack`。
+- [x] **Outbox 原子一致**：
+  - [x] 落地 `public.org_outbox`（结构/索引对齐 017）。
+  - [x] 所有写事务在同一 DB tx 内 enqueue 022 事件 payload（topic=`org.changed.v1`/`org.assignment.changed.v1`）。
+  - [x] relay/cleaner 通过 `OUTBOX_RELAY_TABLES/OUTBOX_CLEANER_TABLES` 启用，并支持单活与重试（对齐 017）。
+- [x] **Snapshot（纠偏）**：实现 `GET /org/api/snapshot`，支持 as-of、include 子集与 cursor 分页（见 §5.4）。
+- [x] **Batch（原子重组）**：实现 `POST /org/api/batch`，支持 dry-run、规模限制、失败定位（见 §5.5）。
+- [x] **缓存（M1 基线）**：树查询与分配查询提供进程内缓存；写后即时失效 + outbox 事件驱动失效（tenant 粒度）。
+- [x] **Readiness（按仓库门禁）**：在 `docs/dev-records/DEV-PLAN-026-READINESS.md` 记录：
   - `go fmt ./... && go vet ./... && make check lint && make test`
   - `make authz-test authz-lint authz-pack` 且 `git status --short` 干净
   - 如修改 `config/routing/allowlist.yaml`：`make check routing`
@@ -367,12 +367,12 @@ CREATE INDEX org_outbox_tenant_published
 - [DEV-PLAN-019A](019A-rls-tenant-isolation.md)：RLS 注入与隔离约定。
 
 ### 8.2 里程碑（按提交时间填充）
-1. [ ] Authz：object/action 映射落地 + 策略片段 + 门禁
-2. [ ] `org_outbox` 迁移 + 写事务内 enqueue（覆盖所有写路径）
-3. [ ] relay/dispatcher 接入 + 缓存失效 handler
-4. [ ] `/org/api/snapshot`（include + cursor）
-5. [ ] `/org/api/batch`（dry_run + 规模限制 + 失败定位）
-6. [ ] 测试与 readiness 记录
+1. [x] Authz：object/action 映射落地 + 策略片段 + 门禁
+2. [x] `org_outbox` 迁移 + 写事务内 enqueue（覆盖所有写路径）
+3. [x] relay/dispatcher 接入 + 缓存失效 handler
+4. [x] `/org/api/snapshot`（include + cursor）
+5. [x] `/org/api/batch`（dry_run + 规模限制 + 失败定位）
+6. [x] 测试与 readiness 记录
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **Authz**：
