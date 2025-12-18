@@ -1,0 +1,4 @@
+code,type,name,i18n_names,status,legal_entity_id,company_code,location_id,display_order,parent_code,manager_user_id,manager_email,effective_date,end_date
+ROOT,OrgUnit,Company Root,"{}",active,,,,0,,,,2025-01-01,
+ENG,OrgUnit,Engineering,"{\"en\":\"Engineering\"}",active,,,,10,ROOT,,,2025-01-01,
+
