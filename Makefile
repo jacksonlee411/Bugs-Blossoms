@@ -172,6 +172,54 @@ org:
 		echo "  migrate     - Run goose migrations (up/down/redo/status)"; \
 	fi
 
+.PHONY: org-perf-dataset
+org-perf-dataset:
+	@set -euo pipefail; \
+	TENANT_ID="$${TENANT_ID:-00000000-0000-0000-0000-000000000001}"; \
+	SCALE="$${SCALE:-1k}"; \
+	SEED="$${SEED:-42}"; \
+	PROFILE="$${PROFILE:-balanced}"; \
+	BACKEND="$${BACKEND:-db}"; \
+	APPLY_FLAG=""; \
+	if [ "$${APPLY:-0}" = "1" ]; then APPLY_FLAG="--apply"; fi; \
+	go run ./cmd/org-perf dataset apply \
+	  --tenant "$$TENANT_ID" \
+	  --scale "$$SCALE" \
+	  --seed "$$SEED" \
+	  --profile "$$PROFILE" \
+	  --backend "$$BACKEND" \
+	  $$APPLY_FLAG
+
+.PHONY: org-perf-bench
+org-perf-bench:
+	@set -euo pipefail; \
+	mkdir -p ./tmp/org-perf; \
+	TENANT_ID="$${TENANT_ID:-00000000-0000-0000-0000-000000000001}"; \
+	SCALE="$${SCALE:-1k}"; \
+	SEED="$${SEED:-42}"; \
+	PROFILE="$${PROFILE:-balanced}"; \
+	BACKEND="$${BACKEND:-db}"; \
+	ITERATIONS="$${ITERATIONS:-200}"; \
+	WARMUP="$${WARMUP:-50}"; \
+	CONCURRENCY="$${CONCURRENCY:-1}"; \
+	EFFECTIVE_DATE="$${EFFECTIVE_DATE:-}"; \
+	BASE_URL="$${BASE_URL:-http://localhost:3200}"; \
+	OUTPUT="$${OUTPUT:-./tmp/org-perf/report.json}"; \
+	ED_FLAG=""; \
+	if [ -n "$$EFFECTIVE_DATE" ]; then ED_FLAG="--effective-date $$EFFECTIVE_DATE"; fi; \
+	go run ./cmd/org-perf bench tree \
+	  --tenant "$$TENANT_ID" \
+	  --scale "$$SCALE" \
+	  --seed "$$SEED" \
+	  --profile "$$PROFILE" \
+	  --backend "$$BACKEND" \
+	  --iterations "$$ITERATIONS" \
+	  --warmup "$$WARMUP" \
+	  --concurrency "$$CONCURRENCY" \
+	  --base-url "$$BASE_URL" \
+	  --output "$$OUTPUT" \
+	  $$ED_FLAG
+
 # Run tests with optional subcommands (test, watch, coverage, verbose, package, docker)
 test:
 	@if [ "$(word 1,$(MAKECMDGOALS))" != "test" ]; then \

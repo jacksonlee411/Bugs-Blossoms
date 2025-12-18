@@ -1,6 +1,6 @@
 # DEV-PLAN-027：Org 性能基准与灰度发布（Step 7）
 
-**状态**: 已评审（2025-12-14 08:22 UTC）
+**状态**: 已评审（2025-12-14 08:22 UTC）；已完成 M1 工具/开关落地（2025-12-18）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**: `docs/dev-plans/020-organization-lifecycle.md` 的 **步骤 7：性能与上线准备**（M1 上线验收门槛）。
@@ -12,10 +12,10 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**:
-  - [ ] 提供可重复执行的性能基准（PG17、固定数据集、固定参数），覆盖 M1 关键读路径。
+  - [x] 提供可重复执行的性能基准（PG17、固定数据集、固定参数），覆盖 M1 关键读路径。
   - [ ] 达成并记录性能预算：**OrgUnit 1k 节点树读取 P99 < 200ms**（以本地基准环境为准，见 6.1）。
-  - [ ] 输出“灰度发布/回滚剧本”（可在无猜测前提下执行），并明确 feature flag/降级路径与触发条件。
-  - [ ] 将基准与剧本纳入 repo 的可复用入口（`make`/`cmd`/`scripts`），便于后续 CI/Readiness 复用。
+  - [x] 输出“灰度发布/回滚剧本”（可在无猜测前提下执行），并明确 feature flag/降级路径与触发条件。
+  - [x] 将基准与剧本纳入 repo 的可复用入口（`make`/`cmd`/`scripts`），便于后续 CI/Readiness 复用。
   - [ ] 通过本计划命中的 CI 门禁，并在 Readiness 中记录命令与结果（见 2.1 SSOT 引用）。
 - **非目标 (Out of Scope)**:
   - 不引入闭包表/物化视图/深层读取重构（归属 `docs/dev-plans/029-org-closure-and-deep-read-optimization.md`）。
@@ -159,12 +159,12 @@ graph TD
   - `docs/dev-plans/024-org-crud-mainline.md`：树读入口与最小主链可运行（`GET /org/api/hierarchies...`）。
   - `docs/dev-plans/026-org-api-authz-and-events.md`：Authz/缓存基线/outbox 闭环（灰度期间便于纠偏与缓存失效）。
 - **里程碑**：
-  1. [ ] 基准数据集生成/导入入口落地（固定 1k profile）。
-  2. [ ] DB 基准（repo/service）可运行并产出 JSON 报告。
-  3. [ ] API 基准（`/org/api/hierarchies`）可运行并产出报告（参考指标）。
-  4. [ ] 性能预算达标或形成明确降级方案（含 feature flag 与回滚命令）。
+  1. [x] 基准数据集生成/导入入口落地（固定 1k profile）。
+  2. [x] DB 基准（repo/service）可运行并产出 JSON 报告。
+  3. [x] API 基准（`/org/api/hierarchies`）可运行并产出报告（参考指标）。
+  4. [x] 形成明确降级方案（含 feature flag 与回滚命令）。
   5. [ ] 灰度发布/回滚剧本定稿并演练（dry-run + apply）。
-  6. [ ] Readiness 记录补齐（命令/耗时/结果/环境）。
+  6. [ ] Readiness 记录补齐（命令/耗时/结果/环境；已创建 `docs/dev-records/DEV-PLAN-027-READINESS.md`）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **性能预算（硬门槛）**：

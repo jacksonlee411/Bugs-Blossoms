@@ -5,7 +5,9 @@ import (
 
 	"github.com/gorilla/mux"
 
+	"github.com/iota-uz/iota-sdk/modules/org/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
 )
 
@@ -43,6 +45,12 @@ func (c *OrgUIController) Register(r *mux.Router) {
 }
 
 func (c *OrgUIController) Index(w http.ResponseWriter, r *http.Request) {
+	tenantID, err := composables.UseTenantID(r.Context())
+	if err != nil || !services.OrgRolloutEnabledForTenant(tenantID) {
+		http.NotFound(w, r)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(`<html><body><h1>Org</h1><ul><li><a href="/org/api/hierarchies?type=OrgUnit">GET /org/api/hierarchies</a></li></ul></body></html>`))
 }
