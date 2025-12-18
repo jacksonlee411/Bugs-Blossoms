@@ -72,9 +72,9 @@ templ NodesPage(props NodesPageProps) {
 									Class: "px-2 py-1",
 									Attrs: templ.Attributes{
 										"data-testid": "org-new-node",
-										"hx-get":    fmt.Sprintf("/org/nodes/new?effective_date=%s", props.EffectiveDate),
-										"hx-target": "#org-node-panel",
-										"hx-swap":   "innerHTML",
+										"hx-get":      fmt.Sprintf("/org/nodes/new?effective_date=%s", props.EffectiveDate),
+										"hx-target":   "#org-node-panel",
+										"hx-swap":     "innerHTML",
 									},
 								}) {
 									{ pageCtx.T("Org.UI.Tree.NewNode") }
