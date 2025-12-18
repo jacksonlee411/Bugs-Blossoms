@@ -1,6 +1,6 @@
 # DEV-PLAN-032：Org 权限映射与业务关联（Step 12）
 
-**状态**: 规划中（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
 
 ## 0. 进度速记
 - 本计划交付“可有效期化的映射表 + 只读权限预览接口”，用于支撑后续 workflow/报表/下游集成的 scope 计算与对账。

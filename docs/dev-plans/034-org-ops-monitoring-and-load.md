@@ -1,6 +1,6 @@
 # DEV-PLAN-034：Org 运维治理与压测（Step 14）
 
-**状态**: 规划中（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
 
 ## 0. 进度速记
 - 本计划交付“可观测性（metrics/health）+ 可重复压测 + 运维脚本入口”，用于支撑 Org 长期运行与灰度/回滚演练。

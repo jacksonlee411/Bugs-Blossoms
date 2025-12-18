@@ -1,6 +1,6 @@
 # DEV-PLAN-028：Org 属性继承解析与角色读侧占位（Step 8）
 
-**状态**: 规划中（2025-12-18 01:21 UTC）
+**状态**: 已评审（2025-12-18 01:21 UTC）
 
 ## 0. 进度速记
 - 本计划对应 `docs/dev-plans/020-organization-lifecycle.md` 阶段 2 / 步骤 8：在 026（API/Authz/Outbox）与 027（性能/灰度）稳定后，补齐“读侧增强能力”。

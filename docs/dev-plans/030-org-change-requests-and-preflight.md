@@ -1,6 +1,6 @@
 # DEV-PLAN-030：Org 变更请求与预检（Step 10）
 
-**状态**: 规划中（2025-12-18 02:01 UTC）
+**状态**: 已评审（2025-12-18 02:01 UTC）
 
 ## 0. 进度速记
 - 本计划对应 `docs/dev-plans/020-organization-lifecycle.md` 的步骤 10：在 M1 CRUD/API/审计/outbox 基线稳定后，引入“变更请求（draft/submit）+ 影响预检（preflight）”能力。

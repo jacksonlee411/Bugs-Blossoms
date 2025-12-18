@@ -1,6 +1,6 @@
 # DEV-PLAN-033：Org 可视化与高级报告（Step 13）
 
-**状态**: 规划中（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
 
 ## 0. 进度速记
 - 本计划交付三类能力：**组织图导出（JSON）**、**节点/人员路径查询**、以及面向 BI 的 **`org_reporting`（as-of 快照）**。

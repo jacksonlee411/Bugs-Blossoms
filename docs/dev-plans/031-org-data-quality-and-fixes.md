@@ -1,6 +1,6 @@
 # DEV-PLAN-031：Org 数据质量与修复（Step 11）
 
-**状态**: 规划中（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
 
 ## 0. 进度速记
 - 本计划聚焦“数据质量规则/报告 + 可回滚的批量修复工具”，为 Org 进入长期运行提供最小治理闭环。
