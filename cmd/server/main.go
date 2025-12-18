@@ -13,6 +13,7 @@ import (
 	"github.com/iota-uz/iota-sdk/modules"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers"
+	orgoutboxdispatcher "github.com/iota-uz/iota-sdk/modules/org/infrastructure/outbox"
 	"github.com/iota-uz/iota-sdk/pkg/application"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/eventbus"
@@ -144,7 +145,11 @@ func startOutboxBackground(
 			} else {
 				dispatcher := eventbusdispatcher.New(eb)
 				for _, table := range relayTables {
-					relay, err := outbox.NewRelay(pool, table, dispatcher, outbox.RelayOptions{
+					var relayDispatcher outbox.Dispatcher = dispatcher
+					if outbox.TableLabel(table) == "public.org_outbox" {
+						relayDispatcher = orgoutboxdispatcher.NewDispatcher(eb)
+					}
+					relay, err := outbox.NewRelay(pool, table, relayDispatcher, outbox.RelayOptions{
 						PollInterval:    conf.Outbox.RelayPollInterval,
 						BatchSize:       conf.Outbox.RelayBatchSize,
 						LockTTL:         conf.Outbox.RelayLockTTL,

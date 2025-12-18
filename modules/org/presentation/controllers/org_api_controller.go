@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,6 +66,9 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/assignments/{id}", c.UpdateAssignment).Methods(http.MethodPatch)
 	api.HandleFunc("/assignments/{id}:correct", c.CorrectAssignment).Methods(http.MethodPost)
 	api.HandleFunc("/assignments/{id}:rescind", c.RescindAssignment).Methods(http.MethodPost)
+
+	api.HandleFunc("/snapshot", c.GetSnapshot).Methods(http.MethodGet)
+	api.HandleFunc("/batch", c.Batch).Methods(http.MethodPost)
 }
 
 type effectiveWindowResponse struct {
@@ -73,8 +77,11 @@ type effectiveWindowResponse struct {
 }
 
 func (c *OrgAPIController) GetHierarchies(w http.ResponseWriter, r *http.Request) {
-	tenantID, requestID, ok := requireSessionAndTenant(w, r)
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
 	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgHierarchiesAuthzObject, "read") {
 		return
 	}
 
@@ -128,6 +135,9 @@ type createNodeRequest struct {
 func (c *OrgAPIController) CreateNode(w http.ResponseWriter, r *http.Request) {
 	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
 	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgNodesAuthzObject, "write") {
 		return
 	}
 
@@ -269,6 +279,9 @@ func (c *OrgAPIController) UpdateNode(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgNodesAuthzObject, "write") {
+		return
+	}
 
 	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
@@ -352,6 +365,9 @@ func (c *OrgAPIController) MoveNode(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgEdgesAuthzObject, "write") {
+		return
+	}
 
 	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
@@ -412,6 +428,9 @@ type correctNodeRequest struct {
 func (c *OrgAPIController) CorrectNode(w http.ResponseWriter, r *http.Request) {
 	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
 	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgNodesAuthzObject, "admin") {
 		return
 	}
 
@@ -495,6 +514,9 @@ func (c *OrgAPIController) RescindNode(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgNodesAuthzObject, "admin") {
+		return
+	}
 
 	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
@@ -547,6 +569,9 @@ type shiftBoundaryNodeRequest struct {
 func (c *OrgAPIController) ShiftBoundaryNode(w http.ResponseWriter, r *http.Request) {
 	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
 	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgNodesAuthzObject, "admin") {
 		return
 	}
 	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
@@ -603,6 +628,9 @@ func (c *OrgAPIController) CorrectMoveNode(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgEdgesAuthzObject, "admin") {
+		return
+	}
 	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
@@ -643,8 +671,11 @@ func (c *OrgAPIController) CorrectMoveNode(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request) {
-	tenantID, requestID, ok := requireSessionAndTenant(w, r)
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
 	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "read") {
 		return
 	}
 
@@ -706,6 +737,9 @@ func (c *OrgAPIController) CreateAssignment(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "assign") {
+		return
+	}
 
 	var req createAssignmentRequest
 	if err := decodeJSON(r.Body, &req); err != nil {
@@ -759,6 +793,9 @@ type updateAssignmentRequest struct {
 func (c *OrgAPIController) UpdateAssignment(w http.ResponseWriter, r *http.Request) {
 	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
 	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "assign") {
 		return
 	}
 
@@ -831,6 +868,9 @@ func (c *OrgAPIController) CorrectAssignment(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "admin") {
+		return
+	}
 	assignmentID, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
@@ -877,6 +917,9 @@ func (c *OrgAPIController) RescindAssignment(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "admin") {
+		return
+	}
 	assignmentID, err := uuid.Parse(mux.Vars(r)["id"])
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
@@ -915,6 +958,600 @@ func (c *OrgAPIController) RescindAssignment(w http.ResponseWriter, r *http.Requ
 	})
 }
 
+func (c *OrgAPIController) GetSnapshot(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgSnapshotAuthzObject, "admin") {
+		return
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+
+	var includes []string
+	if raw := strings.TrimSpace(r.URL.Query().Get("include")); raw != "" {
+		includes = strings.Split(raw, ",")
+	}
+
+	limit := 0
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "limit is invalid")
+			return
+		}
+		limit = n
+	}
+
+	cursor := strings.TrimSpace(r.URL.Query().Get("cursor"))
+
+	res, err := c.org.GetSnapshot(r.Context(), tenantID, asOf, includes, limit, cursor)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, res)
+}
+
+type batchRequest struct {
+	DryRun        bool           `json:"dry_run"`
+	EffectiveDate string         `json:"effective_date"`
+	Commands      []batchCommand `json:"commands"`
+}
+
+type batchCommand struct {
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+type batchCommandResult struct {
+	Index  int            `json:"index"`
+	Type   string         `json:"type"`
+	Ok     bool           `json:"ok"`
+	Result map[string]any `json:"result,omitempty"`
+}
+
+func (c *OrgAPIController) Batch(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgBatchAuthzObject, "admin") {
+		return
+	}
+
+	var req batchRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_BATCH_INVALID_BODY", "invalid json body")
+		return
+	}
+
+	if len(req.Commands) < 1 || len(req.Commands) > 100 {
+		writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_BATCH_TOO_LARGE", "commands size is invalid")
+		return
+	}
+
+	moves := 0
+	for _, cmd := range req.Commands {
+		switch strings.TrimSpace(cmd.Type) {
+		case "node.move", "node.correct_move":
+			moves++
+		}
+	}
+	if moves > 10 {
+		writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_BATCH_TOO_MANY_MOVES", "too many move commands")
+		return
+	}
+
+	globalEffective := strings.TrimSpace(req.EffectiveDate)
+	if globalEffective == "" {
+		globalEffective = time.Now().UTC().Format(time.RFC3339)
+	} else {
+		if _, err := parseEffectiveDate(globalEffective); err != nil {
+			writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_BATCH_INVALID_BODY", "effective_date is invalid")
+			return
+		}
+	}
+
+	pool, err := composables.UsePool(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, requestID, "ORG_INTERNAL", err.Error())
+		return
+	}
+	tx, err := pool.Begin(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, requestID, "ORG_INTERNAL", err.Error())
+		return
+	}
+	defer func() { _ = tx.Rollback(r.Context()) }()
+
+	txCtx := composables.WithTx(r.Context(), tx)
+	txCtx = composables.WithTenantID(txCtx, tenantID)
+	if err := composables.ApplyTenantRLS(txCtx, tx); err != nil {
+		writeAPIError(w, http.StatusInternalServerError, requestID, "ORG_INTERNAL", err.Error())
+		return
+	}
+
+	txCtx = services.WithSkipCacheInvalidation(txCtx)
+	if req.DryRun {
+		txCtx = services.WithSkipOutboxEnqueue(txCtx)
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	results := make([]batchCommandResult, 0, len(req.Commands))
+	eventsEnqueued := 0
+
+	for i, cmd := range req.Commands {
+		cmdType := strings.TrimSpace(cmd.Type)
+		if cmdType == "" {
+			writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "type is required")
+			return
+		}
+		payload := cmd.Payload
+		if len(payload) == 0 {
+			writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is required")
+			return
+		}
+		payload, err = injectEffectiveDate(payload, globalEffective)
+		if err != nil {
+			writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+			return
+		}
+
+		switch cmdType {
+		case "node.create":
+			var body createNodeRequest
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.CreateNode(txCtx, tenantID, requestID, initiatorID, services.CreateNodeInput{
+				Code:          body.Code,
+				Name:          body.Name,
+				ParentID:      body.ParentID,
+				EffectiveDate: effectiveDate,
+				I18nNames:     body.I18nNames,
+				Status:        body.Status,
+				DisplayOrder:  body.DisplayOrder,
+				LegalEntityID: body.LegalEntityID,
+				CompanyCode:   body.CompanyCode,
+				LocationID:    body.LocationID,
+				ManagerUserID: body.ManagerUserID,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.NodeID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "node.update":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				updateNodeRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.UpdateNode(txCtx, tenantID, requestID, initiatorID, services.UpdateNodeInput{
+				NodeID:        body.ID,
+				EffectiveDate: effectiveDate,
+				Name:          body.Name,
+				I18nNames:     body.I18nNames,
+				Status:        body.Status,
+				DisplayOrder:  body.DisplayOrder,
+				LegalEntityID: fieldIfSetUUID(body.LegalEntityID),
+				CompanyCode:   fieldIfSetString(body.CompanyCode),
+				LocationID:    fieldIfSetUUID(body.LocationID),
+				ManagerUserID: fieldIfSetInt64(body.ManagerUserID),
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.NodeID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "node.move":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				moveNodeRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.MoveNode(txCtx, tenantID, requestID, initiatorID, services.MoveNodeInput{
+				NodeID:        body.ID,
+				NewParentID:   body.NewParentID,
+				EffectiveDate: effectiveDate,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.EdgeID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "node.correct":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				correctNodeRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			asOf, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.CorrectNode(txCtx, tenantID, requestID, initiatorID, services.CorrectNodeInput{
+				NodeID:        body.ID,
+				AsOf:          asOf,
+				Name:          body.Name,
+				I18nNames:     body.I18nNames,
+				Status:        body.Status,
+				DisplayOrder:  body.DisplayOrder,
+				LegalEntityID: fieldIfSetUUID(body.LegalEntityID),
+				CompanyCode:   fieldIfSetString(body.CompanyCode),
+				LocationID:    fieldIfSetUUID(body.LocationID),
+				ManagerUserID: fieldIfSetInt64(body.ManagerUserID),
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.NodeID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "node.rescind":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				rescindNodeRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.RescindNode(txCtx, tenantID, requestID, initiatorID, services.RescindNodeInput{
+				NodeID:        body.ID,
+				EffectiveDate: effectiveDate,
+				Reason:        body.Reason,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.NodeID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "node.shift_boundary":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				shiftBoundaryNodeRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			target, err := parseRequiredEffectiveDate(body.TargetEffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "target_effective_date is required")
+				return
+			}
+			newStart, err := parseRequiredEffectiveDate(body.NewEffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "new_effective_date is required")
+				return
+			}
+			res, err := c.org.ShiftBoundaryNode(txCtx, tenantID, requestID, initiatorID, services.ShiftBoundaryNodeInput{
+				NodeID:              body.ID,
+				TargetEffectiveDate: target,
+				NewEffectiveDate:    newStart,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.NodeID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "node.correct_move":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				correctMoveNodeRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.CorrectMoveNode(txCtx, tenantID, requestID, initiatorID, services.CorrectMoveNodeInput{
+				NodeID:        body.ID,
+				EffectiveDate: effectiveDate,
+				NewParentID:   body.NewParentID,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.NodeID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "assignment.create":
+			var body createAssignmentRequest
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.CreateAssignment(txCtx, tenantID, requestID, initiatorID, services.CreateAssignmentInput{
+				Pernr:          body.Pernr,
+				EffectiveDate:  effectiveDate,
+				AssignmentType: body.AssignmentType,
+				PositionID:     body.PositionID,
+				OrgNodeID:      body.OrgNodeID,
+				SubjectID:      body.SubjectID,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.AssignmentID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "assignment.update":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				updateAssignmentRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			var positionID *uuid.UUID
+			if body.PositionID.Set && body.PositionID.Value != nil {
+				positionID = body.PositionID.Value
+			}
+			var orgNodeID *uuid.UUID
+			if body.OrgNodeID.Set && body.OrgNodeID.Value != nil {
+				orgNodeID = body.OrgNodeID.Value
+			}
+			res, err := c.org.UpdateAssignment(txCtx, tenantID, requestID, initiatorID, services.UpdateAssignmentInput{
+				AssignmentID:  body.ID,
+				EffectiveDate: effectiveDate,
+				PositionID:    positionID,
+				OrgNodeID:     orgNodeID,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.AssignmentID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "assignment.correct":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				correctAssignmentRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			res, err := c.org.CorrectAssignment(txCtx, tenantID, requestID, initiatorID, services.CorrectAssignmentInput{
+				AssignmentID: body.ID,
+				Pernr:        body.Pernr,
+				PositionID:   body.PositionID,
+				SubjectID:    body.SubjectID,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.AssignmentID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		case "assignment.rescind":
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				rescindAssignmentRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.RescindAssignment(txCtx, tenantID, requestID, initiatorID, services.RescindAssignmentInput{
+				AssignmentID:  body.ID,
+				EffectiveDate: effectiveDate,
+				Reason:        body.Reason,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.AssignmentID.String()}})
+			if !req.DryRun {
+				eventsEnqueued += len(res.GeneratedEvents)
+			}
+
+		default:
+			writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "unknown type")
+			return
+		}
+	}
+
+	if req.DryRun {
+		_ = tx.Rollback(r.Context())
+		type batchResponse struct {
+			DryRun         bool                 `json:"dry_run"`
+			Results        []batchCommandResult `json:"results"`
+			EventsEnqueued int                  `json:"events_enqueued"`
+		}
+		writeJSON(w, http.StatusOK, batchResponse{
+			DryRun:         true,
+			Results:        results,
+			EventsEnqueued: 0,
+		})
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		writeAPIError(w, http.StatusInternalServerError, requestID, "ORG_INTERNAL", err.Error())
+		return
+	}
+	c.org.InvalidateTenantCache(tenantID)
+
+	type batchResponse struct {
+		DryRun         bool                 `json:"dry_run"`
+		Results        []batchCommandResult `json:"results"`
+		EventsEnqueued int                  `json:"events_enqueued"`
+	}
+	writeJSON(w, http.StatusOK, batchResponse{
+		DryRun:         false,
+		Results:        results,
+		EventsEnqueued: eventsEnqueued,
+	})
+}
+
+func injectEffectiveDate(payload json.RawMessage, effectiveDate string) (json.RawMessage, error) {
+	if strings.TrimSpace(effectiveDate) == "" {
+		return payload, nil
+	}
+	var obj map[string]any
+	dec := json.NewDecoder(bytes.NewReader(payload))
+	dec.UseNumber()
+	if err := dec.Decode(&obj); err != nil {
+		return nil, err
+	}
+	if _, ok := obj["effective_date"]; !ok {
+		obj["effective_date"] = effectiveDate
+	}
+	b, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+func writeBatchCommandError(w http.ResponseWriter, requestID string, commandIndex int, commandType string, status int, code, message string) {
+	meta := map[string]string{
+		"request_id":    requestID,
+		"command_index": strconv.Itoa(commandIndex),
+		"command_type":  commandType,
+	}
+	writeJSON(w, status, coredtos.APIError{
+		Code:    code,
+		Message: message,
+		Meta:    meta,
+	})
+}
+
+func writeBatchServiceError(w http.ResponseWriter, requestID string, commandIndex int, commandType string, err error) {
+	var svcErr *services.ServiceError
+	if errors.As(err, &svcErr) {
+		meta := map[string]string{
+			"request_id":    requestID,
+			"command_index": strconv.Itoa(commandIndex),
+			"command_type":  commandType,
+		}
+		writeJSON(w, svcErr.Status, coredtos.APIError{
+			Code:    svcErr.Code,
+			Message: svcErr.Message,
+			Meta:    meta,
+		})
+		return
+	}
+	writeBatchCommandError(w, requestID, commandIndex, commandType, http.StatusInternalServerError, "ORG_INTERNAL", err.Error())
+}
+
+func fieldIfSetUUID(v optionalUUID) **uuid.UUID {
+	if !v.Set {
+		return nil
+	}
+	return &v.Value
+}
+
+func fieldIfSetString(v optionalString) **string {
+	if !v.Set {
+		return nil
+	}
+	return &v.Value
+}
+
+func fieldIfSetInt64(v optionalInt64) **int64 {
+	if !v.Set {
+		return nil
+	}
+	return &v.Value
+}
+
 func requireSessionAndTenant(w http.ResponseWriter, r *http.Request) (uuid.UUID, string, bool) {
 	requestID := ensureRequestID(r)
 
@@ -950,7 +1587,9 @@ func ensureRequestID(r *http.Request) string {
 	if v != "" {
 		return v
 	}
-	return uuid.NewString()
+	v = uuid.NewString()
+	r.Header.Set(conf.RequestIDHeader, v)
+	return v
 }
 
 func parseEffectiveDate(v string) (time.Time, error) {

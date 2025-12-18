@@ -2,23 +2,33 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/iota-uz/iota-sdk/modules/org/domain/events"
 	"github.com/iota-uz/iota-sdk/modules/org/domain/subjectid"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
+	"github.com/iota-uz/iota-sdk/pkg/constants"
+	"github.com/iota-uz/iota-sdk/pkg/outbox"
+	"github.com/iota-uz/iota-sdk/pkg/repo"
 )
 
 var endOfTime = time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
+var orgOutboxTable = pgx.Identifier{"public", "org_outbox"}
 
 type OrgRepository interface {
 	ListHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, error)
+	ListSnapshotNodes(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
+	ListSnapshotEdges(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
+	ListSnapshotPositions(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
+	ListSnapshotAssignments(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 
 	GetOrgSettings(ctx context.Context, tenantID uuid.UUID) (OrgSettings, error)
 	InsertAuditLog(ctx context.Context, tenantID uuid.UUID, log AuditLogInsert) (uuid.UUID, error)
@@ -174,11 +184,17 @@ type AssignmentViewRow struct {
 }
 
 type OrgService struct {
-	repo OrgRepository
+	repo      OrgRepository
+	publisher outbox.Publisher
+	cache     *orgCache
 }
 
 func NewOrgService(repo OrgRepository) *OrgService {
-	return &OrgService{repo: repo}
+	return &OrgService{
+		repo:      repo,
+		publisher: outbox.NewPublisher(),
+		cache:     newOrgCache(),
+	}
 }
 
 type ServiceError struct {
@@ -201,6 +217,13 @@ func newServiceError(status int, code, message string, cause error) *ServiceErro
 	return &ServiceError{Status: status, Code: code, Message: message, Cause: cause}
 }
 
+func (s *OrgService) InvalidateTenantCache(tenantID uuid.UUID) {
+	if s == nil || s.cache == nil {
+		return
+	}
+	s.cache.InvalidateTenant(tenantID)
+}
+
 func (s *OrgService) GetHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, time.Time, error) {
 	if tenantID == uuid.Nil {
 		return nil, time.Time{}, fmt.Errorf("tenant_id is required")
@@ -212,11 +235,23 @@ func (s *OrgService) GetHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, h
 		asOf = time.Now().UTC()
 	}
 
+	cacheKey := repo.CacheKey("org", "hierarchy", tenantID, hierarchyType, asOf.UTC().Format(time.RFC3339Nano))
+	if s != nil && s.cache != nil {
+		if cachedAny, ok := s.cache.Get(cacheKey); ok {
+			if cached, ok := cachedAny.(cachedHierarchy); ok {
+				return cached.Nodes, cached.AsOf, nil
+			}
+		}
+	}
+
 	nodes, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]HierarchyNode, error) {
 		return s.repo.ListHierarchyAsOf(txCtx, tenantID, hierarchyType, asOf)
 	})
 	if err != nil {
 		return nil, time.Time{}, err
+	}
+	if s != nil && s.cache != nil {
+		s.cache.Set(tenantID, cacheKey, cachedHierarchy{Nodes: nodes, AsOf: asOf})
 	}
 	return nodes, asOf, nil
 }
@@ -260,43 +295,38 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 		in.Status = "active"
 	}
 
-	type out struct {
-		nodeID uuid.UUID
-		edgeID uuid.UUID
-	}
-
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CreateNodeResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		hierarchyType := "OrgUnit"
 		if in.ParentID == nil {
 			hasRoot, err := s.repo.HasRoot(txCtx, tenantID)
 			if err != nil {
-				return out{}, err
+				return nil, err
 			}
 			if hasRoot {
-				return out{}, newServiceError(409, "ORG_OVERLAP", "root already exists", nil)
+				return nil, newServiceError(409, "ORG_OVERLAP", "root already exists", nil)
 			}
 		} else {
 			exists, err := s.repo.NodeExistsAt(txCtx, tenantID, *in.ParentID, hierarchyType, in.EffectiveDate)
 			if err != nil {
-				return out{}, err
+				return nil, err
 			}
 			if !exists {
-				return out{}, newServiceError(422, "ORG_PARENT_NOT_FOUND", "parent not found at effective_date", nil)
+				return nil, newServiceError(422, "ORG_PARENT_NOT_FOUND", "parent not found at effective_date", nil)
 			}
 		}
 
 		nodeID, err := s.repo.InsertNode(txCtx, tenantID, hierarchyType, in.Code, in.ParentID == nil)
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		_, err = s.repo.InsertNodeSlice(txCtx, tenantID, nodeID, NodeSliceInsert{
@@ -313,12 +343,12 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 			EndDate:       endOfTime,
 		})
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		edgeID, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, in.ParentID, nodeID, in.EffectiveDate, endOfTime)
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -352,7 +382,7 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -380,28 +410,69 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
-		return out{nodeID: nodeID, edgeID: edgeID}, nil
+		evNode := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.created", "org_node", nodeID, in.EffectiveDate, endOfTime)
+		evEdge := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.created", "org_edge", edgeID, in.EffectiveDate, endOfTime)
+		res := &CreateNodeResult{
+			NodeID:        nodeID,
+			EdgeID:        edgeID,
+			EffectiveDate: in.EffectiveDate,
+			EndDate:       endOfTime,
+			GeneratedEvents: []events.OrgEventV1{
+				evNode,
+				evEdge,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
+}
 
-	evNode := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.created", "org_node", written.nodeID, in.EffectiveDate, endOfTime)
-	evEdge := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.created", "org_edge", written.edgeID, in.EffectiveDate, endOfTime)
+func outboxTopicForEntityType(entityType string) string {
+	if entityType == "org_assignment" {
+		return events.TopicOrgAssignmentChangedV1
+	}
+	return events.TopicOrgChangedV1
+}
 
-	return &CreateNodeResult{
-		NodeID:        written.nodeID,
-		EdgeID:        written.edgeID,
-		EffectiveDate: in.EffectiveDate,
-		EndDate:       endOfTime,
-		GeneratedEvents: []events.OrgEventV1{
-			evNode,
-			evEdge,
-		},
-	}, nil
+func (s *OrgService) enqueueOutboxEvents(txCtx context.Context, tenantID uuid.UUID, evs []events.OrgEventV1) error {
+	if shouldSkipOutboxEnqueue(txCtx) {
+		return nil
+	}
+	if s == nil || s.publisher == nil || len(evs) == 0 {
+		return nil
+	}
+	tx, err := composables.UseTx(txCtx)
+	if err != nil {
+		return err
+	}
+	for _, ev := range evs {
+		payload, err := json.Marshal(ev)
+		if err != nil {
+			return newServiceError(500, "ORG_OUTBOX_ENCODE_FAILED", "failed to encode outbox payload", err)
+		}
+		_, err = s.publisher.Enqueue(txCtx, tx, orgOutboxTable, outbox.Message{
+			TenantID: tenantID,
+			Topic:    outboxTopicForEntityType(ev.EntityType),
+			EventID:  ev.EventID,
+			Payload:  payload,
+		})
+		if err != nil {
+			return newServiceError(500, "ORG_OUTBOX_ENQUEUE_FAILED", "failed to enqueue outbox message", err)
+		}
+	}
+	return nil
 }
 
 type UpdateNodeInput struct {
@@ -436,27 +507,27 @@ func (s *OrgService) UpdateNode(ctx context.Context, tenantID uuid.UUID, request
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "id/effective_date are required", nil)
 	}
 
-	windowEnd, err := inTx(ctx, tenantID, func(txCtx context.Context) (time.Time, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdateNodeResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return time.Time{}, err
+			return nil, err
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			return time.Time{}, err
+			return nil, err
 		}
 
 		current, err := s.repo.LockNodeSliceAt(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return time.Time{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 		if current.EffectiveDate.Equal(in.EffectiveDate) {
-			return time.Time{}, newServiceError(422, "ORG_USE_CORRECT", "use correct for in-place updates", nil)
+			return nil, newServiceError(422, "ORG_USE_CORRECT", "use correct for in-place updates", nil)
 		}
 
 		next, hasNext, err := s.repo.NextNodeSliceEffectiveDate(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return time.Time{}, err
+			return nil, err
 		}
 
 		newEnd := current.EndDate
@@ -465,7 +536,7 @@ func (s *OrgService) UpdateNode(ctx context.Context, tenantID uuid.UUID, request
 		}
 
 		if err := s.repo.TruncateNodeSlice(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
-			return time.Time{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		nextSlice := current
@@ -510,7 +581,7 @@ func (s *OrgService) UpdateNode(ctx context.Context, tenantID uuid.UUID, request
 			EndDate:       newEnd,
 		})
 		if err != nil {
-			return time.Time{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -552,24 +623,30 @@ func (s *OrgService) UpdateNode(ctx context.Context, tenantID uuid.UUID, request
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return time.Time{}, err
+			return nil, err
 		}
 
-		return newEnd, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.updated", "org_node", in.NodeID, in.EffectiveDate, newEnd)
+		res := &UpdateNodeResult{
+			NodeID:        in.NodeID,
+			EffectiveDate: in.EffectiveDate,
+			EndDate:       newEnd,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "node.updated", "org_node", in.NodeID, in.EffectiveDate, windowEnd)
-	return &UpdateNodeResult{
-		NodeID:        in.NodeID,
-		EffectiveDate: in.EffectiveDate,
-		EndDate:       windowEnd,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 type MoveNodeInput struct {
@@ -597,82 +674,76 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "id/new_parent_id/effective_date are required", nil)
 	}
 
-	type out struct {
-		newEdge   EdgeRow
-		oldEdgeID uuid.UUID
-		oldParent *uuid.UUID
-	}
-
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*MoveNodeResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		isRoot, err := s.repo.GetNodeIsRoot(txCtx, tenantID, in.NodeID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		if isRoot {
-			return out{}, newServiceError(422, "ORG_CANNOT_MOVE_ROOT", "cannot move root", nil)
+			return nil, newServiceError(422, "ORG_CANNOT_MOVE_ROOT", "cannot move root", nil)
 		}
 
 		hierarchyType := "OrgUnit"
 		parentExists, err := s.repo.NodeExistsAt(txCtx, tenantID, in.NewParentID, hierarchyType, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		if !parentExists {
-			return out{}, newServiceError(422, "ORG_PARENT_NOT_FOUND", "new_parent_id not found at effective_date", nil)
+			return nil, newServiceError(422, "ORG_PARENT_NOT_FOUND", "new_parent_id not found at effective_date", nil)
 		}
 
 		movedEdge, err := s.repo.LockEdgeAt(txCtx, tenantID, hierarchyType, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 		if movedEdge.EffectiveDate.Equal(in.EffectiveDate) {
-			return out{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "use correct-move for in-place updates", nil)
+			return nil, newServiceError(422, "ORG_USE_CORRECT_MOVE", "use correct-move for in-place updates", nil)
 		}
 
 		subtree, err := s.repo.LockEdgesInSubtree(txCtx, tenantID, hierarchyType, in.EffectiveDate, movedEdge.Path)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		for _, e := range subtree {
 			if e.EffectiveDate.Equal(in.EffectiveDate) {
-				return out{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "subtree contains edges requiring correct-move at effective_date", nil)
+				return nil, newServiceError(422, "ORG_USE_CORRECT_MOVE", "subtree contains edges requiring correct-move at effective_date", nil)
 			}
 		}
 
 		if err := s.repo.TruncateEdge(txCtx, tenantID, movedEdge.ID, in.EffectiveDate); err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 		newEdgeID, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, &in.NewParentID, in.NodeID, in.EffectiveDate, movedEdge.EndDate)
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		currentSlice, err := s.repo.LockNodeSliceAt(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 		if currentSlice.EffectiveDate.Equal(in.EffectiveDate) {
-			return out{}, newServiceError(422, "ORG_USE_CORRECT_MOVE", "use correct for in-place parent_hint updates", nil)
+			return nil, newServiceError(422, "ORG_USE_CORRECT_MOVE", "use correct for in-place parent_hint updates", nil)
 		}
 		next, hasNext, err := s.repo.NextNodeSliceEffectiveDate(txCtx, tenantID, in.NodeID, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		newEnd := currentSlice.EndDate
 		if hasNext && next.Before(newEnd) {
 			newEnd = next
 		}
 		if err := s.repo.TruncateNodeSlice(txCtx, tenantID, currentSlice.ID, in.EffectiveDate); err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 		_, err = s.repo.InsertNodeSlice(txCtx, tenantID, in.NodeID, NodeSliceInsert{
 			Name:          currentSlice.Name,
@@ -688,7 +759,7 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 			EndDate:       newEnd,
 		})
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		for _, e := range subtree {
@@ -696,10 +767,10 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 				continue
 			}
 			if err := s.repo.TruncateEdge(txCtx, tenantID, e.ID, in.EffectiveDate); err != nil {
-				return out{}, mapPgError(err)
+				return nil, mapPgError(err)
 			}
 			if _, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, e.ParentNodeID, e.ChildNodeID, in.EffectiveDate, e.EndDate); err != nil {
-				return out{}, mapPgError(err)
+				return nil, mapPgError(err)
 			}
 		}
 
@@ -743,24 +814,30 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
-		return out{newEdge: newEdge, oldEdgeID: movedEdge.ID, oldParent: movedEdge.ParentNodeID}, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.updated", "org_edge", newEdge.ID, newEdge.EffectiveDate, newEdge.EndDate)
+		res := &MoveNodeResult{
+			EdgeID:        newEdge.ID,
+			EffectiveDate: newEdge.EffectiveDate,
+			EndDate:       newEdge.EndDate,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.updated", "org_edge", written.newEdge.ID, written.newEdge.EffectiveDate, written.newEdge.EndDate)
-	return &MoveNodeResult{
-		EdgeID:        written.newEdge.ID,
-		EffectiveDate: written.newEdge.EffectiveDate,
-		EndDate:       written.newEdge.EndDate,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 type CreateAssignmentInput struct {
@@ -813,19 +890,14 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		return nil, newServiceError(422, "ORG_SUBJECT_MISMATCH", "subject_id does not match SSOT mapping", nil)
 	}
 
-	type out struct {
-		assignmentID uuid.UUID
-		positionID   uuid.UUID
-	}
-
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CreateAssignmentResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		var positionID uuid.UUID
@@ -833,33 +905,33 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			positionID = *in.PositionID
 			exists, err := s.repo.PositionExistsAt(txCtx, tenantID, positionID, in.EffectiveDate)
 			if err != nil {
-				return out{}, err
+				return nil, err
 			}
 			if !exists {
-				return out{}, newServiceError(422, "ORG_POSITION_NOT_FOUND_AT_DATE", "position_id not found at effective_date", nil)
+				return nil, newServiceError(422, "ORG_POSITION_NOT_FOUND_AT_DATE", "position_id not found at effective_date", nil)
 			}
 		} else {
 			if in.OrgNodeID == nil || *in.OrgNodeID == uuid.Nil {
-				return out{}, newServiceError(400, "ORG_INVALID_BODY", "position_id or org_node_id is required", nil)
+				return nil, newServiceError(400, "ORG_INVALID_BODY", "position_id or org_node_id is required", nil)
 			}
 			if !configuration.Use().EnableOrgAutoPositions {
-				return out{}, newServiceError(422, "ORG_AUTO_POSITION_DISABLED", "auto position creation is disabled", nil)
+				return nil, newServiceError(422, "ORG_AUTO_POSITION_DISABLED", "auto position creation is disabled", nil)
 			}
 			hierarchyType := "OrgUnit"
 			exists, err := s.repo.NodeExistsAt(txCtx, tenantID, *in.OrgNodeID, hierarchyType, in.EffectiveDate)
 			if err != nil {
-				return out{}, err
+				return nil, err
 			}
 			if !exists {
-				return out{}, newServiceError(422, "ORG_NODE_NOT_FOUND_AT_DATE", "org_node_id not found at effective_date", nil)
+				return nil, newServiceError(422, "ORG_NODE_NOT_FOUND_AT_DATE", "org_node_id not found at effective_date", nil)
 			}
 			positionID, err = autoPositionID(tenantID, *in.OrgNodeID, derivedSubjectID)
 			if err != nil {
-				return out{}, err
+				return nil, err
 			}
 			code := autoPositionCode(positionID)
 			if err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, in.EffectiveDate); err != nil {
-				return out{}, mapPgError(err)
+				return nil, mapPgError(err)
 			}
 		}
 
@@ -874,7 +946,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			EndDate:        endOfTime,
 		})
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -905,26 +977,32 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
-		return out{assignmentID: assignmentID, positionID: positionID}, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.created", "org_assignment", assignmentID, in.EffectiveDate, endOfTime)
+		res := &CreateAssignmentResult{
+			AssignmentID:  assignmentID,
+			PositionID:    positionID,
+			SubjectID:     derivedSubjectID,
+			EffectiveDate: in.EffectiveDate,
+			EndDate:       endOfTime,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.created", "org_assignment", written.assignmentID, in.EffectiveDate, endOfTime)
-	return &CreateAssignmentResult{
-		AssignmentID:  written.assignmentID,
-		PositionID:    written.positionID,
-		SubjectID:     derivedSubjectID,
-		EffectiveDate: in.EffectiveDate,
-		EndDate:       endOfTime,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 type UpdateAssignmentInput struct {
@@ -954,33 +1032,27 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "id/effective_date are required", nil)
 	}
 
-	type out struct {
-		assignmentID uuid.UUID
-		positionID   uuid.UUID
-		endDate      time.Time
-	}
-
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (out, error) {
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdateAssignmentResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
 		current, err := s.repo.LockAssignmentAt(txCtx, tenantID, in.AssignmentID, in.EffectiveDate)
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 		if current.EffectiveDate.Equal(in.EffectiveDate) {
-			return out{}, newServiceError(422, "ORG_USE_CORRECT", "use correct for in-place updates", nil)
+			return nil, newServiceError(422, "ORG_USE_CORRECT", "use correct for in-place updates", nil)
 		}
 
 		next, hasNext, err := s.repo.NextAssignmentEffectiveDate(txCtx, tenantID, current.ID, in.EffectiveDate)
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 		newEnd := current.EndDate
 		if hasNext && next.Before(newEnd) {
@@ -992,38 +1064,38 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			positionID = *in.PositionID
 			exists, err := s.repo.PositionExistsAt(txCtx, tenantID, positionID, in.EffectiveDate)
 			if err != nil {
-				return out{}, err
+				return nil, err
 			}
 			if !exists {
-				return out{}, newServiceError(422, "ORG_POSITION_NOT_FOUND_AT_DATE", "position_id not found at effective_date", nil)
+				return nil, newServiceError(422, "ORG_POSITION_NOT_FOUND_AT_DATE", "position_id not found at effective_date", nil)
 			}
 		} else {
 			if in.OrgNodeID == nil || *in.OrgNodeID == uuid.Nil {
-				return out{}, newServiceError(400, "ORG_INVALID_BODY", "position_id or org_node_id is required", nil)
+				return nil, newServiceError(400, "ORG_INVALID_BODY", "position_id or org_node_id is required", nil)
 			}
 			if !configuration.Use().EnableOrgAutoPositions {
-				return out{}, newServiceError(422, "ORG_AUTO_POSITION_DISABLED", "auto position creation is disabled", nil)
+				return nil, newServiceError(422, "ORG_AUTO_POSITION_DISABLED", "auto position creation is disabled", nil)
 			}
 			hierarchyType := "OrgUnit"
 			exists, err := s.repo.NodeExistsAt(txCtx, tenantID, *in.OrgNodeID, hierarchyType, in.EffectiveDate)
 			if err != nil {
-				return out{}, err
+				return nil, err
 			}
 			if !exists {
-				return out{}, newServiceError(422, "ORG_NODE_NOT_FOUND_AT_DATE", "org_node_id not found at effective_date", nil)
+				return nil, newServiceError(422, "ORG_NODE_NOT_FOUND_AT_DATE", "org_node_id not found at effective_date", nil)
 			}
 			positionID, err = autoPositionID(tenantID, *in.OrgNodeID, current.SubjectID)
 			if err != nil {
-				return out{}, err
+				return nil, err
 			}
 			code := autoPositionCode(positionID)
 			if err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, in.EffectiveDate); err != nil {
-				return out{}, mapPgError(err)
+				return nil, mapPgError(err)
 			}
 		}
 
 		if err := s.repo.TruncateAssignment(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		newID, err := s.repo.InsertAssignment(txCtx, tenantID, AssignmentInsert{
@@ -1037,7 +1109,7 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			EndDate:        newEnd,
 		})
 		if err != nil {
-			return out{}, mapPgError(err)
+			return nil, mapPgError(err)
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -1078,25 +1150,31 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			AffectedAtUTC:   in.EffectiveDate,
 		})
 		if err != nil {
-			return out{}, err
+			return nil, err
 		}
 
-		return out{assignmentID: newID, positionID: positionID, endDate: newEnd}, nil
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.updated", "org_assignment", newID, in.EffectiveDate, newEnd)
+		res := &UpdateAssignmentResult{
+			AssignmentID:  newID,
+			PositionID:    positionID,
+			EffectiveDate: in.EffectiveDate,
+			EndDate:       newEnd,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
-	ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.updated", "org_assignment", written.assignmentID, in.EffectiveDate, written.endDate)
-	return &UpdateAssignmentResult{
-		AssignmentID:  written.assignmentID,
-		PositionID:    written.positionID,
-		EffectiveDate: in.EffectiveDate,
-		EndDate:       written.endDate,
-		GeneratedEvents: []events.OrgEventV1{
-			ev,
-		},
-	}, nil
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCache(tenantID)
+	}
+	return written, nil
 }
 
 func (s *OrgService) GetAssignments(ctx context.Context, tenantID uuid.UUID, subject string, asOf *time.Time) (uuid.UUID, []AssignmentViewRow, time.Time, error) {
@@ -1124,7 +1202,27 @@ func (s *OrgService) GetAssignments(ctx context.Context, tenantID uuid.UUID, sub
 	}
 
 	rows, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]AssignmentViewRow, error) {
-		return s.repo.ListAssignmentsAsOf(txCtx, tenantID, subjectUUID, *asOf)
+		cacheKey := repo.CacheKey("org", "assignments_asof", tenantID, subjectUUID, (*asOf).UTC().Format(time.RFC3339Nano))
+		if s != nil && s.cache != nil {
+			if cachedAny, ok := s.cache.Get(cacheKey); ok {
+				if cached, ok := cachedAny.(cachedAssignments); ok {
+					return cached.Rows, nil
+				}
+			}
+		}
+
+		rows, err := s.repo.ListAssignmentsAsOf(txCtx, tenantID, subjectUUID, *asOf)
+		if err != nil {
+			return nil, err
+		}
+		if s != nil && s.cache != nil {
+			s.cache.Set(tenantID, cacheKey, cachedAssignments{
+				SubjectID: subjectUUID,
+				Rows:      rows,
+				AsOf:      *asOf,
+			})
+		}
+		return rows, nil
 	})
 	if err != nil {
 		return uuid.Nil, nil, time.Time{}, err
@@ -1183,18 +1281,19 @@ func mapPgError(err error) error {
 func inTx[T any](ctx context.Context, tenantID uuid.UUID, fn func(txCtx context.Context) (T, error)) (T, error) {
 	var zero T
 
-	pool, err := composables.UsePool(ctx)
+	hasExistingTx := ctx.Value(constants.TxKey) != nil
+	tx, err := composables.BeginTx(ctx)
 	if err != nil {
 		return zero, err
 	}
-
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		return zero, err
+	if !hasExistingTx {
+		defer func() { _ = tx.Rollback(ctx) }()
 	}
-	defer func() { _ = tx.Rollback(ctx) }()
 
-	txCtx := composables.WithTx(ctx, tx)
+	txCtx := ctx
+	if !hasExistingTx {
+		txCtx = composables.WithTx(ctx, tx)
+	}
 	txCtx = composables.WithTenantID(txCtx, tenantID)
 	if err := composables.ApplyTenantRLS(txCtx, tx); err != nil {
 		return zero, err
@@ -1204,8 +1303,10 @@ func inTx[T any](ctx context.Context, tenantID uuid.UUID, fn func(txCtx context.
 	if err != nil {
 		return zero, err
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return zero, err
+	if !hasExistingTx {
+		if err := tx.Commit(ctx); err != nil {
+			return zero, err
+		}
 	}
 	return out, nil
 }

@@ -3,6 +3,7 @@ package org
 import (
 	"embed"
 
+	"github.com/iota-uz/iota-sdk/modules/org/handlers"
 	"github.com/iota-uz/iota-sdk/modules/org/infrastructure/persistence"
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/controllers"
 	"github.com/iota-uz/iota-sdk/modules/org/services"
@@ -36,6 +37,8 @@ func (m *Module) Register(app application.Application) error {
 		controllers.NewOrgAPIController(app),
 		controllers.NewOrgUIController(app),
 	)
+
+	handlers.RegisterOutboxEventHandlers(app)
 
 	return nil
 }
