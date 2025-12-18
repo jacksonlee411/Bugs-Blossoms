@@ -106,3 +106,154 @@ func (r *ChangeRequestRepository) GetByRequestID(ctx context.Context, requestID 
 		UpdatedAt:            asTime(row.UpdatedAt),
 	}, nil
 }
+
+func (r *ChangeRequestRepository) GetByID(ctx context.Context, id uuid.UUID) (*changerequest.ChangeRequest, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tenantID, err := composables.UseTenantID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	q := changerequests_sqlc.New(tx)
+	row, err := q.GetOrgChangeRequestByID(ctx, changerequests_sqlc.GetOrgChangeRequestByIDParams{
+		TenantID: pgUUID(tenantID),
+		ID:       pgUUID(id),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &changerequest.ChangeRequest{
+		TenantID:             asUUID(row.TenantID),
+		ID:                   asUUID(row.ID),
+		RequestID:            row.RequestID,
+		RequesterID:          asUUID(row.RequesterID),
+		Status:               row.Status,
+		PayloadSchemaVersion: row.PayloadSchemaVersion,
+		Payload:              json.RawMessage(row.Payload),
+		Notes:                row.Notes,
+		CreatedAt:            asTime(row.CreatedAt),
+		UpdatedAt:            asTime(row.UpdatedAt),
+	}, nil
+}
+
+func (r *ChangeRequestRepository) UpdateDraftByID(ctx context.Context, id uuid.UUID, payload []byte, notes *string) (*changerequest.ChangeRequest, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tenantID, err := composables.UseTenantID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	q := changerequests_sqlc.New(tx)
+	row, err := q.UpdateOrgChangeRequestDraftByID(ctx, changerequests_sqlc.UpdateOrgChangeRequestDraftByIDParams{
+		TenantID: pgUUID(tenantID),
+		ID:       pgUUID(id),
+		Payload:  payload,
+		Notes:    notes,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &changerequest.ChangeRequest{
+		TenantID:             asUUID(row.TenantID),
+		ID:                   asUUID(row.ID),
+		RequestID:            row.RequestID,
+		RequesterID:          asUUID(row.RequesterID),
+		Status:               row.Status,
+		PayloadSchemaVersion: row.PayloadSchemaVersion,
+		Payload:              json.RawMessage(row.Payload),
+		Notes:                row.Notes,
+		CreatedAt:            asTime(row.CreatedAt),
+		UpdatedAt:            asTime(row.UpdatedAt),
+	}, nil
+}
+
+func (r *ChangeRequestRepository) UpdateStatusByID(ctx context.Context, id uuid.UUID, status string) (*changerequest.ChangeRequest, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tenantID, err := composables.UseTenantID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	q := changerequests_sqlc.New(tx)
+	row, err := q.UpdateOrgChangeRequestStatusByID(ctx, changerequests_sqlc.UpdateOrgChangeRequestStatusByIDParams{
+		TenantID: pgUUID(tenantID),
+		ID:       pgUUID(id),
+		Status:   status,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &changerequest.ChangeRequest{
+		TenantID:             asUUID(row.TenantID),
+		ID:                   asUUID(row.ID),
+		RequestID:            row.RequestID,
+		RequesterID:          asUUID(row.RequesterID),
+		Status:               row.Status,
+		PayloadSchemaVersion: row.PayloadSchemaVersion,
+		Payload:              json.RawMessage(row.Payload),
+		Notes:                row.Notes,
+		CreatedAt:            asTime(row.CreatedAt),
+		UpdatedAt:            asTime(row.UpdatedAt),
+	}, nil
+}
+
+func (r *ChangeRequestRepository) List(ctx context.Context, status string, limit int, cursorUpdatedAt *time.Time, cursorID *uuid.UUID) ([]*changerequest.ChangeRequest, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	tenantID, err := composables.UseTenantID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var cursorAt pgtype.Timestamptz
+	if cursorUpdatedAt != nil && !cursorUpdatedAt.IsZero() {
+		cursorAt = pgtype.Timestamptz{Time: cursorUpdatedAt.UTC(), Valid: true}
+	}
+	var cursorUUID pgtype.UUID
+	if cursorID != nil && *cursorID != uuid.Nil {
+		cursorUUID = pgUUID(*cursorID)
+	}
+
+	q := changerequests_sqlc.New(tx)
+	rows, err := q.ListOrgChangeRequests(ctx, changerequests_sqlc.ListOrgChangeRequestsParams{
+		TenantID: pgUUID(tenantID),
+		Column2:  status,
+		Column3:  cursorAt,
+		Column4:  cursorUUID,
+		Limit:    int32(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]*changerequest.ChangeRequest, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, &changerequest.ChangeRequest{
+			TenantID:             asUUID(row.TenantID),
+			ID:                   asUUID(row.ID),
+			RequestID:            row.RequestID,
+			RequesterID:          asUUID(row.RequesterID),
+			Status:               row.Status,
+			PayloadSchemaVersion: row.PayloadSchemaVersion,
+			Payload:              json.RawMessage(row.Payload),
+			Notes:                row.Notes,
+			CreatedAt:            asTime(row.CreatedAt),
+			UpdatedAt:            asTime(row.UpdatedAt),
+		})
+	}
+	return out, nil
+}

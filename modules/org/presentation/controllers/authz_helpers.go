@@ -19,6 +19,8 @@ var (
 	orgAssignmentsAuthzObject = authz.ObjectName("org", "assignments")
 	orgSnapshotAuthzObject    = authz.ObjectName("org", "snapshot")
 	orgBatchAuthzObject       = authz.ObjectName("org", "batch")
+	orgChangeRequestsAuthzObj = authz.ObjectName("org", "change_requests")
+	orgPreflightAuthzObject   = authz.ObjectName("org", "preflight")
 )
 
 func ensureOrgAuthz(

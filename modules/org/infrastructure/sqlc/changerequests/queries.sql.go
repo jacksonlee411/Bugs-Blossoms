@@ -11,6 +11,48 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getOrgChangeRequestByID = `-- name: GetOrgChangeRequestByID :one
+SELECT
+    tenant_id,
+    id,
+    request_id,
+    requester_id,
+    status,
+    payload_schema_version,
+    payload,
+    notes,
+    created_at,
+    updated_at
+FROM
+    org_change_requests
+WHERE
+    tenant_id = $1
+    AND id = $2
+`
+
+type GetOrgChangeRequestByIDParams struct {
+	TenantID pgtype.UUID `json:"tenant_id"`
+	ID       pgtype.UUID `json:"id"`
+}
+
+func (q *Queries) GetOrgChangeRequestByID(ctx context.Context, arg GetOrgChangeRequestByIDParams) (OrgChangeRequest, error) {
+	row := q.db.QueryRow(ctx, getOrgChangeRequestByID, arg.TenantID, arg.ID)
+	var i OrgChangeRequest
+	err := row.Scan(
+		&i.TenantID,
+		&i.ID,
+		&i.RequestID,
+		&i.RequesterID,
+		&i.Status,
+		&i.PayloadSchemaVersion,
+		&i.Payload,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getOrgChangeRequestByRequestID = `-- name: GetOrgChangeRequestByRequestID :one
 SELECT
     tenant_id,
@@ -53,7 +95,7 @@ func (q *Queries) GetOrgChangeRequestByRequestID(ctx context.Context, arg GetOrg
 	return i, err
 }
 
-const listOrgChangeRequestsByRequester = `-- name: ListOrgChangeRequestsByRequester :many
+const listOrgChangeRequests = `-- name: ListOrgChangeRequests :many
 SELECT
     tenant_id,
     id,
@@ -69,18 +111,35 @@ FROM
     org_change_requests
 WHERE
     tenant_id = $1
-    AND requester_id = $2
+    AND ($2::text = ''
+        OR status = $2)
+    AND ($3::timestamptz IS NULL
+        OR $4::uuid IS NULL
+        OR (updated_at,
+            id) < ($3::timestamptz,
+            $4::uuid))
 ORDER BY
-    updated_at DESC
+    updated_at DESC,
+    id DESC
+LIMIT $5
 `
 
-type ListOrgChangeRequestsByRequesterParams struct {
-	TenantID    pgtype.UUID `json:"tenant_id"`
-	RequesterID pgtype.UUID `json:"requester_id"`
+type ListOrgChangeRequestsParams struct {
+	TenantID pgtype.UUID        `json:"tenant_id"`
+	Column2  string             `json:"column_2"`
+	Column3  pgtype.Timestamptz `json:"column_3"`
+	Column4  pgtype.UUID        `json:"column_4"`
+	Limit    int32              `json:"limit"`
 }
 
-func (q *Queries) ListOrgChangeRequestsByRequester(ctx context.Context, arg ListOrgChangeRequestsByRequesterParams) ([]OrgChangeRequest, error) {
-	rows, err := q.db.Query(ctx, listOrgChangeRequestsByRequester, arg.TenantID, arg.RequesterID)
+func (q *Queries) ListOrgChangeRequests(ctx context.Context, arg ListOrgChangeRequestsParams) ([]OrgChangeRequest, error) {
+	rows, err := q.db.Query(ctx, listOrgChangeRequests,
+		arg.TenantID,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+		arg.Limit,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -108,6 +167,106 @@ func (q *Queries) ListOrgChangeRequestsByRequester(ctx context.Context, arg List
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateOrgChangeRequestDraftByID = `-- name: UpdateOrgChangeRequestDraftByID :one
+UPDATE
+    org_change_requests
+SET
+    payload = $3,
+    notes = $4,
+    updated_at = now()
+WHERE
+    tenant_id = $1
+    AND id = $2
+    AND status = 'draft'
+RETURNING
+    tenant_id,
+    id,
+    request_id,
+    requester_id,
+    status,
+    payload_schema_version,
+    payload,
+    notes,
+    created_at,
+    updated_at
+`
+
+type UpdateOrgChangeRequestDraftByIDParams struct {
+	TenantID pgtype.UUID `json:"tenant_id"`
+	ID       pgtype.UUID `json:"id"`
+	Payload  []byte      `json:"payload"`
+	Notes    *string     `json:"notes"`
+}
+
+func (q *Queries) UpdateOrgChangeRequestDraftByID(ctx context.Context, arg UpdateOrgChangeRequestDraftByIDParams) (OrgChangeRequest, error) {
+	row := q.db.QueryRow(ctx, updateOrgChangeRequestDraftByID,
+		arg.TenantID,
+		arg.ID,
+		arg.Payload,
+		arg.Notes,
+	)
+	var i OrgChangeRequest
+	err := row.Scan(
+		&i.TenantID,
+		&i.ID,
+		&i.RequestID,
+		&i.RequesterID,
+		&i.Status,
+		&i.PayloadSchemaVersion,
+		&i.Payload,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateOrgChangeRequestStatusByID = `-- name: UpdateOrgChangeRequestStatusByID :one
+UPDATE
+    org_change_requests
+SET
+    status = $3,
+    updated_at = now()
+WHERE
+    tenant_id = $1
+    AND id = $2
+RETURNING
+    tenant_id,
+    id,
+    request_id,
+    requester_id,
+    status,
+    payload_schema_version,
+    payload,
+    notes,
+    created_at,
+    updated_at
+`
+
+type UpdateOrgChangeRequestStatusByIDParams struct {
+	TenantID pgtype.UUID `json:"tenant_id"`
+	ID       pgtype.UUID `json:"id"`
+	Status   string      `json:"status"`
+}
+
+func (q *Queries) UpdateOrgChangeRequestStatusByID(ctx context.Context, arg UpdateOrgChangeRequestStatusByIDParams) (OrgChangeRequest, error) {
+	row := q.db.QueryRow(ctx, updateOrgChangeRequestStatusByID, arg.TenantID, arg.ID, arg.Status)
+	var i OrgChangeRequest
+	err := row.Scan(
+		&i.TenantID,
+		&i.ID,
+		&i.RequestID,
+		&i.RequesterID,
+		&i.Status,
+		&i.PayloadSchemaVersion,
+		&i.Payload,
+		&i.Notes,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const upsertOrgChangeRequest = `-- name: UpsertOrgChangeRequest :one

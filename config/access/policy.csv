@@ -8,8 +8,10 @@ p, role:core.superadmin, hrm.positions, *, global, allow
 p, role:core.superadmin, logging.logs, *, global, allow
 p, role:core.superadmin, org.assignments, *, global, allow
 p, role:core.superadmin, org.batch, *, global, allow
+p, role:core.superadmin, org.change_requests, *, global, allow
 p, role:core.superadmin, org.edges, *, global, allow
 p, role:core.superadmin, org.hierarchies, *, global, allow
 p, role:core.superadmin, org.nodes, *, global, allow
 p, role:core.superadmin, org.positions, *, global, allow
+p, role:core.superadmin, org.preflight, *, global, allow
 p, role:core.superadmin, org.snapshot, *, global, allow

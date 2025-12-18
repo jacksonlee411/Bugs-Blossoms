@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -17,6 +19,7 @@ import (
 	coreuser "github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	coredtos "github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
 	coreservices "github.com/iota-uz/iota-sdk/modules/core/services"
+	"github.com/iota-uz/iota-sdk/modules/org/domain/changerequest"
 	"github.com/iota-uz/iota-sdk/modules/org/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
@@ -25,18 +28,20 @@ import (
 )
 
 type OrgAPIController struct {
-	app       application.Application
-	org       *services.OrgService
-	users     *coreservices.UserService
-	apiPrefix string
+	app            application.Application
+	org            *services.OrgService
+	changeRequests *services.ChangeRequestService
+	users          *coreservices.UserService
+	apiPrefix      string
 }
 
 func NewOrgAPIController(app application.Application) application.Controller {
 	return &OrgAPIController{
-		app:       app,
-		org:       app.Service(services.OrgService{}).(*services.OrgService),
-		users:     app.Service(coreservices.UserService{}).(*coreservices.UserService),
-		apiPrefix: "/org/api",
+		app:            app,
+		org:            app.Service(services.OrgService{}).(*services.OrgService),
+		changeRequests: app.Service(services.ChangeRequestService{}).(*services.ChangeRequestService),
+		users:          app.Service(coreservices.UserService{}).(*coreservices.UserService),
+		apiPrefix:      "/org/api",
 	}
 }
 
@@ -69,6 +74,15 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 
 	api.HandleFunc("/snapshot", c.GetSnapshot).Methods(http.MethodGet)
 	api.HandleFunc("/batch", c.Batch).Methods(http.MethodPost)
+
+	api.HandleFunc("/change-requests", c.CreateChangeRequest).Methods(http.MethodPost)
+	api.HandleFunc("/change-requests", c.ListChangeRequests).Methods(http.MethodGet)
+	api.HandleFunc("/change-requests/{id}", c.GetChangeRequest).Methods(http.MethodGet)
+	api.HandleFunc("/change-requests/{id}", c.UpdateChangeRequest).Methods(http.MethodPatch)
+	api.HandleFunc("/change-requests/{id}:submit", c.SubmitChangeRequest).Methods(http.MethodPost)
+	api.HandleFunc("/change-requests/{id}:cancel", c.CancelChangeRequest).Methods(http.MethodPost)
+
+	api.HandleFunc("/preflight", c.Preflight).Methods(http.MethodPost)
 }
 
 type effectiveWindowResponse struct {
@@ -1478,6 +1492,1005 @@ func (c *OrgAPIController) Batch(w http.ResponseWriter, r *http.Request) {
 		Results:        results,
 		EventsEnqueued: eventsEnqueued,
 	})
+}
+
+type changeRequestWriteRequest struct {
+	Notes   *string         `json:"notes,omitempty"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+type changeRequestSummaryResponse struct {
+	ID        string `json:"id"`
+	RequestID string `json:"request_id"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+func (c *OrgAPIController) CreateChangeRequest(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgChangeRequestsEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgChangeRequestsAuthzObj, "write") {
+		return
+	}
+
+	var req changeRequestWriteRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_CHANGE_REQUEST_INVALID_BODY", "invalid json body")
+		return
+	}
+	if err := validateChangeRequestPayload(req.Payload); err != nil {
+		writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_CHANGE_REQUEST_INVALID_BODY", err.Error())
+		return
+	}
+
+	requestID = ensureRequestID(r)
+	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+
+	cr, err := withOrgTx(r.Context(), tenantID, func(txCtx context.Context) (*changerequest.ChangeRequest, error) {
+		return c.changeRequests.SaveDraft(txCtx, services.SaveDraftChangeRequestParams{
+			RequestID:   requestID,
+			RequesterID: requesterID,
+			Payload:     req.Payload,
+			Notes:       req.Notes,
+		})
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, changeRequestSummaryResponse{
+		ID:        cr.ID.String(),
+		RequestID: cr.RequestID,
+		Status:    cr.Status,
+		CreatedAt: cr.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt: cr.UpdatedAt.UTC().Format(time.RFC3339),
+	})
+}
+
+type changeRequestListResponse struct {
+	Total      int                     `json:"total"`
+	Items      []changeRequestListItem `json:"items"`
+	NextCursor *string                 `json:"next_cursor"`
+}
+
+type changeRequestListItem struct {
+	ID          string `json:"id"`
+	RequestID   string `json:"request_id"`
+	Status      string `json:"status"`
+	RequesterID string `json:"requester_id"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+func (c *OrgAPIController) ListChangeRequests(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgChangeRequestsEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgChangeRequestsAuthzObj, "read") {
+		return
+	}
+
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	switch status {
+	case "", "draft", "submitted", "cancelled":
+	default:
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "status is invalid")
+		return
+	}
+
+	limit := 50
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "limit is invalid")
+			return
+		}
+		limit = n
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var cursorAt *time.Time
+	var cursorID *uuid.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("cursor")); raw != "" {
+		at, id, err := parseChangeRequestCursor(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "cursor is invalid")
+			return
+		}
+		cursorAt, cursorID = at, id
+	}
+
+	// Fetch one extra row to detect next_cursor.
+	rows, err := withOrgTx(r.Context(), tenantID, func(txCtx context.Context) ([]*changerequest.ChangeRequest, error) {
+		txCtx = composables.WithTenantID(txCtx, tenantID)
+		return c.changeRequests.List(txCtx, status, limit+1, cursorAt, cursorID)
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	nextCursor := (*string)(nil)
+	if len(rows) > limit {
+		last := rows[limit-1]
+		v := fmt.Sprintf("updated_at:%s:id:%s", last.UpdatedAt.UTC().Format(time.RFC3339), last.ID.String())
+		nextCursor = &v
+		rows = rows[:limit]
+	}
+
+	items := make([]changeRequestListItem, 0, len(rows))
+	for _, cr := range rows {
+		items = append(items, changeRequestListItem{
+			ID:          cr.ID.String(),
+			RequestID:   cr.RequestID,
+			Status:      cr.Status,
+			RequesterID: cr.RequesterID.String(),
+			UpdatedAt:   cr.UpdatedAt.UTC().Format(time.RFC3339),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, changeRequestListResponse{
+		Total:      len(items),
+		Items:      items,
+		NextCursor: nextCursor,
+	})
+}
+
+type changeRequestDetailResponse struct {
+	ID                   string          `json:"id"`
+	TenantID             string          `json:"tenant_id"`
+	RequestID            string          `json:"request_id"`
+	RequesterID          string          `json:"requester_id"`
+	Status               string          `json:"status"`
+	PayloadSchemaVersion int32           `json:"payload_schema_version"`
+	Payload              json.RawMessage `json:"payload"`
+	Notes                *string         `json:"notes,omitempty"`
+	CreatedAt            string          `json:"created_at"`
+	UpdatedAt            string          `json:"updated_at"`
+}
+
+func (c *OrgAPIController) GetChangeRequest(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgChangeRequestsEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgChangeRequestsAuthzObj, "read") {
+		return
+	}
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	cr, err := withOrgTx(r.Context(), tenantID, func(txCtx context.Context) (*changerequest.ChangeRequest, error) {
+		txCtx = composables.WithTenantID(txCtx, tenantID)
+		return c.changeRequests.Get(txCtx, id)
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, changeRequestDetailResponse{
+		ID:                   cr.ID.String(),
+		TenantID:             cr.TenantID.String(),
+		RequestID:            cr.RequestID,
+		RequesterID:          cr.RequesterID.String(),
+		Status:               cr.Status,
+		PayloadSchemaVersion: cr.PayloadSchemaVersion,
+		Payload:              cr.Payload,
+		Notes:                cr.Notes,
+		CreatedAt:            cr.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt:            cr.UpdatedAt.UTC().Format(time.RFC3339),
+	})
+}
+
+func (c *OrgAPIController) UpdateChangeRequest(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgChangeRequestsEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgChangeRequestsAuthzObj, "write") {
+		return
+	}
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req changeRequestWriteRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_CHANGE_REQUEST_INVALID_BODY", "invalid json body")
+		return
+	}
+	if err := validateChangeRequestPayload(req.Payload); err != nil {
+		writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_CHANGE_REQUEST_INVALID_BODY", err.Error())
+		return
+	}
+
+	cr, err := withOrgTx(r.Context(), tenantID, func(txCtx context.Context) (*changerequest.ChangeRequest, error) {
+		txCtx = composables.WithTenantID(txCtx, tenantID)
+		return c.changeRequests.UpdateDraft(txCtx, services.UpdateDraftChangeRequestParams{
+			ID:      id,
+			Payload: req.Payload,
+			Notes:   req.Notes,
+		})
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, changeRequestSummaryResponse{
+		ID:        cr.ID.String(),
+		RequestID: cr.RequestID,
+		Status:    cr.Status,
+		CreatedAt: cr.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt: cr.UpdatedAt.UTC().Format(time.RFC3339),
+	})
+}
+
+func (c *OrgAPIController) SubmitChangeRequest(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgChangeRequestsEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgChangeRequestsAuthzObj, "admin") {
+		return
+	}
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	cr, err := withOrgTx(r.Context(), tenantID, func(txCtx context.Context) (*changerequest.ChangeRequest, error) {
+		txCtx = composables.WithTenantID(txCtx, tenantID)
+		return c.changeRequests.Submit(txCtx, id)
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, changeRequestSummaryResponse{
+		ID:        cr.ID.String(),
+		RequestID: cr.RequestID,
+		Status:    cr.Status,
+		CreatedAt: cr.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt: cr.UpdatedAt.UTC().Format(time.RFC3339),
+	})
+}
+
+func (c *OrgAPIController) CancelChangeRequest(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgChangeRequestsEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgChangeRequestsAuthzObj, "admin") {
+		return
+	}
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	cr, err := withOrgTx(r.Context(), tenantID, func(txCtx context.Context) (*changerequest.ChangeRequest, error) {
+		txCtx = composables.WithTenantID(txCtx, tenantID)
+		return c.changeRequests.Cancel(txCtx, id)
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, changeRequestSummaryResponse{
+		ID:        cr.ID.String(),
+		RequestID: cr.RequestID,
+		Status:    cr.Status,
+		CreatedAt: cr.CreatedAt.UTC().Format(time.RFC3339),
+		UpdatedAt: cr.UpdatedAt.UTC().Format(time.RFC3339),
+	})
+}
+
+type preflightRequest struct {
+	EffectiveDate string         `json:"effective_date"`
+	Commands      []batchCommand `json:"commands"`
+}
+
+type preflightResponse struct {
+	EffectiveDate string          `json:"effective_date"`
+	CommandsCount int             `json:"commands_count"`
+	Impact        preflightImpact `json:"impact"`
+	Warnings      []string        `json:"warnings"`
+}
+
+type preflightImpact struct {
+	OrgNodes       preflightCounters `json:"org_nodes"`
+	OrgAssignments preflightCounters `json:"org_assignments"`
+	Events         map[string]int    `json:"events"`
+	Affected       preflightAffected `json:"affected"`
+}
+
+type preflightCounters struct {
+	Create  int `json:"create"`
+	Update  int `json:"update"`
+	Move    int `json:"move"`
+	Rescind int `json:"rescind"`
+}
+
+type preflightAffected struct {
+	OrgNodeIDsCount  int      `json:"org_node_ids_count"`
+	OrgNodeIDsSample []string `json:"org_node_ids_sample"`
+}
+
+func (c *OrgAPIController) Preflight(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgPreflightEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPreflightAuthzObject, "admin") {
+		return
+	}
+
+	var req preflightRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_PREFLIGHT_INVALID_BODY", "invalid json body")
+		return
+	}
+	if len(req.Commands) < 1 || len(req.Commands) > 100 {
+		writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_PREFLIGHT_TOO_LARGE", "commands size is invalid")
+		return
+	}
+
+	moves := 0
+	for _, cmd := range req.Commands {
+		switch strings.TrimSpace(cmd.Type) {
+		case "node.move", "node.correct_move":
+			moves++
+		}
+	}
+	if moves > 10 {
+		writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_PREFLIGHT_TOO_LARGE", "too many move commands")
+		return
+	}
+
+	globalEffective := strings.TrimSpace(req.EffectiveDate)
+	if globalEffective == "" {
+		globalEffective = time.Now().UTC().Format(time.RFC3339)
+	} else {
+		if _, err := parseEffectiveDate(globalEffective); err != nil {
+			writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_PREFLIGHT_INVALID_BODY", "effective_date is invalid")
+			return
+		}
+	}
+
+	pool, err := composables.UsePool(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, requestID, "ORG_INTERNAL", err.Error())
+		return
+	}
+	tx, err := pool.Begin(r.Context())
+	if err != nil {
+		writeAPIError(w, http.StatusInternalServerError, requestID, "ORG_INTERNAL", err.Error())
+		return
+	}
+	defer func() { _ = tx.Rollback(r.Context()) }()
+
+	txCtx := composables.WithTx(r.Context(), tx)
+	txCtx = composables.WithTenantID(txCtx, tenantID)
+	if err := composables.ApplyTenantRLS(txCtx, tx); err != nil {
+		writeAPIError(w, http.StatusInternalServerError, requestID, "ORG_INTERNAL", err.Error())
+		return
+	}
+	txCtx = services.WithSkipCacheInvalidation(txCtx)
+	txCtx = services.WithSkipOutboxEnqueue(txCtx)
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+
+	// Validation stage: execute commands in a rolled-back transaction.
+	for i, cmd := range req.Commands {
+		cmdType := strings.TrimSpace(cmd.Type)
+		if cmdType == "" {
+			writePreflightCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_PREFLIGHT_INVALID_COMMAND", "type is required")
+			return
+		}
+		payload := cmd.Payload
+		if len(payload) == 0 {
+			writePreflightCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_PREFLIGHT_INVALID_COMMAND", "payload is required")
+			return
+		}
+		payload, err = injectEffectiveDate(payload, globalEffective)
+		if err != nil {
+			writePreflightCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_PREFLIGHT_INVALID_COMMAND", "payload is invalid")
+			return
+		}
+
+		if err := c.executePreflightCommand(txCtx, tenantID, requestID, initiatorID, cmdType, payload); err != nil {
+			var svcErr *services.ServiceError
+			if errors.As(err, &svcErr) {
+				writePreflightCommandError(w, requestID, i, cmdType, svcErr.Status, svcErr.Code, svcErr.Message)
+				return
+			}
+			writePreflightCommandError(w, requestID, i, cmdType, http.StatusInternalServerError, "ORG_INTERNAL", err.Error())
+			return
+		}
+	}
+
+	// Always rollback (no writes).
+	_ = tx.Rollback(r.Context())
+
+	impact, err := c.analyzePreflightImpact(r.Context(), tenantID, globalEffective, req.Commands)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	asOf, _ := parseEffectiveDate(globalEffective)
+	writeJSON(w, http.StatusOK, preflightResponse{
+		EffectiveDate: asOf.UTC().Format(time.RFC3339),
+		CommandsCount: len(req.Commands),
+		Impact:        impact,
+		Warnings:      []string{},
+	})
+}
+
+func (c *OrgAPIController) executePreflightCommand(ctx context.Context, tenantID uuid.UUID, requestID string, initiatorID uuid.UUID, cmdType string, payload json.RawMessage) error {
+	switch cmdType {
+	case "node.create":
+		var body createNodeRequest
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		_, err = c.org.CreateNode(ctx, tenantID, requestID, initiatorID, services.CreateNodeInput{
+			Code:          body.Code,
+			Name:          body.Name,
+			ParentID:      body.ParentID,
+			EffectiveDate: effectiveDate,
+			I18nNames:     body.I18nNames,
+			Status:        body.Status,
+			DisplayOrder:  body.DisplayOrder,
+			LegalEntityID: body.LegalEntityID,
+			CompanyCode:   body.CompanyCode,
+			LocationID:    body.LocationID,
+			ManagerUserID: body.ManagerUserID,
+		})
+		return err
+	case "node.update":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			updateNodeRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		var legalEntityID **uuid.UUID
+		if body.LegalEntityID.Set {
+			legalEntityID = &body.LegalEntityID.Value
+		}
+		var companyCode **string
+		if body.CompanyCode.Set {
+			companyCode = &body.CompanyCode.Value
+		}
+		var locationID **uuid.UUID
+		if body.LocationID.Set {
+			locationID = &body.LocationID.Value
+		}
+		var managerUserID **int64
+		if body.ManagerUserID.Set {
+			managerUserID = &body.ManagerUserID.Value
+		}
+		_, err = c.org.UpdateNode(ctx, tenantID, requestID, initiatorID, services.UpdateNodeInput{
+			NodeID:        body.ID,
+			EffectiveDate: effectiveDate,
+			Name:          body.Name,
+			I18nNames:     body.I18nNames,
+			Status:        body.Status,
+			DisplayOrder:  body.DisplayOrder,
+			LegalEntityID: legalEntityID,
+			CompanyCode:   companyCode,
+			LocationID:    locationID,
+			ManagerUserID: managerUserID,
+		})
+		return err
+	case "node.move":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			moveNodeRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		if body.NewParentID == uuid.Nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "new_parent_id is required"}
+		}
+		_, err = c.org.MoveNode(ctx, tenantID, requestID, initiatorID, services.MoveNodeInput{
+			NodeID:        body.ID,
+			NewParentID:   body.NewParentID,
+			EffectiveDate: effectiveDate,
+		})
+		return err
+	case "node.correct":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			correctNodeRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		var legalEntityID **uuid.UUID
+		if body.LegalEntityID.Set {
+			legalEntityID = &body.LegalEntityID.Value
+		}
+		var companyCode **string
+		if body.CompanyCode.Set {
+			companyCode = &body.CompanyCode.Value
+		}
+		var locationID **uuid.UUID
+		if body.LocationID.Set {
+			locationID = &body.LocationID.Value
+		}
+		var managerUserID **int64
+		if body.ManagerUserID.Set {
+			managerUserID = &body.ManagerUserID.Value
+		}
+		_, err = c.org.CorrectNode(ctx, tenantID, requestID, initiatorID, services.CorrectNodeInput{
+			NodeID:        body.ID,
+			AsOf:          effectiveDate,
+			Name:          body.Name,
+			I18nNames:     body.I18nNames,
+			Status:        body.Status,
+			DisplayOrder:  body.DisplayOrder,
+			LegalEntityID: legalEntityID,
+			CompanyCode:   companyCode,
+			LocationID:    locationID,
+			ManagerUserID: managerUserID,
+		})
+		return err
+	case "node.rescind":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			rescindNodeRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		_, err = c.org.RescindNode(ctx, tenantID, requestID, initiatorID, services.RescindNodeInput{
+			NodeID:        body.ID,
+			EffectiveDate: effectiveDate,
+			Reason:        body.Reason,
+		})
+		return err
+	case "node.shift_boundary":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			shiftBoundaryNodeRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		targetDate, err := parseRequiredEffectiveDate(body.TargetEffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "target_effective_date is required", Cause: err}
+		}
+		newDate, err := parseRequiredEffectiveDate(body.NewEffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "new_effective_date is required", Cause: err}
+		}
+		_, err = c.org.ShiftBoundaryNode(ctx, tenantID, requestID, initiatorID, services.ShiftBoundaryNodeInput{
+			NodeID:              body.ID,
+			TargetEffectiveDate: targetDate,
+			NewEffectiveDate:    newDate,
+		})
+		return err
+	case "node.correct_move":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			correctMoveNodeRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		if body.NewParentID == uuid.Nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "new_parent_id is required"}
+		}
+		_, err = c.org.CorrectMoveNode(ctx, tenantID, requestID, initiatorID, services.CorrectMoveNodeInput{
+			NodeID:        body.ID,
+			EffectiveDate: effectiveDate,
+			NewParentID:   body.NewParentID,
+		})
+		return err
+	case "assignment.create":
+		var body createAssignmentRequest
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		_, err = c.org.CreateAssignment(ctx, tenantID, requestID, initiatorID, services.CreateAssignmentInput{
+			Pernr:          body.Pernr,
+			EffectiveDate:  effectiveDate,
+			PositionID:     body.PositionID,
+			OrgNodeID:      body.OrgNodeID,
+			AssignmentType: body.AssignmentType,
+			SubjectID:      body.SubjectID,
+		})
+		return err
+	case "assignment.update":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			updateAssignmentRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		var positionID *uuid.UUID
+		if body.PositionID.Set {
+			positionID = body.PositionID.Value
+		}
+		var orgNodeID *uuid.UUID
+		if body.OrgNodeID.Set {
+			orgNodeID = body.OrgNodeID.Value
+		}
+		_, err = c.org.UpdateAssignment(ctx, tenantID, requestID, initiatorID, services.UpdateAssignmentInput{
+			AssignmentID:  body.ID,
+			EffectiveDate: effectiveDate,
+			PositionID:    positionID,
+			OrgNodeID:     orgNodeID,
+		})
+		return err
+	case "assignment.correct":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			correctAssignmentRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		_, err := c.org.CorrectAssignment(ctx, tenantID, requestID, initiatorID, services.CorrectAssignmentInput{
+			AssignmentID: body.ID,
+			Pernr:        body.Pernr,
+			PositionID:   body.PositionID,
+			SubjectID:    body.SubjectID,
+		})
+		return err
+	case "assignment.rescind":
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			rescindAssignmentRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		_, err = c.org.RescindAssignment(ctx, tenantID, requestID, initiatorID, services.RescindAssignmentInput{
+			AssignmentID:  body.ID,
+			EffectiveDate: effectiveDate,
+			Reason:        body.Reason,
+		})
+		return err
+	default:
+		return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "unknown type"}
+	}
+}
+
+func (c *OrgAPIController) analyzePreflightImpact(ctx context.Context, tenantID uuid.UUID, effective string, commands []batchCommand) (preflightImpact, error) {
+	out := preflightImpact{
+		Events: map[string]int{
+			"org.changed.v1":            0,
+			"org.assignment.changed.v1": 0,
+		},
+		Affected: preflightAffected{
+			OrgNodeIDsCount:  0,
+			OrgNodeIDsSample: []string{},
+		},
+	}
+
+	asOf, err := parseEffectiveDate(effective)
+	if err != nil || asOf.IsZero() {
+		asOf = time.Now().UTC()
+	}
+
+	nodes, _, err := c.org.GetHierarchyAsOf(ctx, tenantID, "OrgUnit", asOf)
+	if err != nil {
+		return preflightImpact{}, err
+	}
+
+	children := map[uuid.UUID][]uuid.UUID{}
+	for _, n := range nodes {
+		if n.ParentID == nil {
+			continue
+		}
+		children[*n.ParentID] = append(children[*n.ParentID], n.ID)
+	}
+
+	affected := map[uuid.UUID]struct{}{}
+	addAffected := func(id uuid.UUID) {
+		if id == uuid.Nil {
+			return
+		}
+		affected[id] = struct{}{}
+	}
+
+	const maxSubtree = 5000
+	for _, cmd := range commands {
+		switch strings.TrimSpace(cmd.Type) {
+		case "node.create":
+			out.OrgNodes.Create++
+			out.Events["org.changed.v1"]++
+		case "node.update", "node.correct", "node.shift_boundary":
+			out.OrgNodes.Update++
+			out.Events["org.changed.v1"]++
+			var body struct {
+				ID uuid.UUID `json:"id"`
+			}
+			_ = json.Unmarshal(cmd.Payload, &body)
+			addAffected(body.ID)
+		case "node.rescind":
+			out.OrgNodes.Rescind++
+			out.Events["org.changed.v1"]++
+			var body struct {
+				ID uuid.UUID `json:"id"`
+			}
+			_ = json.Unmarshal(cmd.Payload, &body)
+			addAffected(body.ID)
+		case "node.move", "node.correct_move":
+			out.OrgNodes.Move++
+			out.Events["org.changed.v1"]++
+			var body struct {
+				ID uuid.UUID `json:"id"`
+			}
+			_ = json.Unmarshal(cmd.Payload, &body)
+			if body.ID != uuid.Nil {
+				// Count subtree (including self) at asOf.
+				count := 0
+				stack := []uuid.UUID{body.ID}
+				for len(stack) > 0 {
+					n := stack[len(stack)-1]
+					stack = stack[:len(stack)-1]
+					count++
+					if count > maxSubtree {
+						return preflightImpact{}, &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_TOO_LARGE", Message: "subtree impact is too large"}
+					}
+					addAffected(n)
+					stack = append(stack, children[n]...)
+				}
+			}
+		case "assignment.create":
+			out.OrgAssignments.Create++
+			out.Events["org.assignment.changed.v1"]++
+			var body struct {
+				OrgNodeID *uuid.UUID `json:"org_node_id"`
+			}
+			_ = json.Unmarshal(cmd.Payload, &body)
+			if body.OrgNodeID != nil {
+				addAffected(*body.OrgNodeID)
+			}
+		case "assignment.update":
+			out.OrgAssignments.Update++
+			out.Events["org.assignment.changed.v1"]++
+			var body struct {
+				OrgNodeID *uuid.UUID `json:"org_node_id"`
+			}
+			_ = json.Unmarshal(cmd.Payload, &body)
+			if body.OrgNodeID != nil {
+				addAffected(*body.OrgNodeID)
+			}
+		case "assignment.correct":
+			out.OrgAssignments.Update++
+			out.Events["org.assignment.changed.v1"]++
+		case "assignment.rescind":
+			out.OrgAssignments.Rescind++
+			out.Events["org.assignment.changed.v1"]++
+		}
+	}
+
+	sample := make([]string, 0, 20)
+	for id := range affected {
+		if len(sample) >= 20 {
+			break
+		}
+		sample = append(sample, id.String())
+	}
+	out.Affected.OrgNodeIDsCount = len(affected)
+	out.Affected.OrgNodeIDsSample = sample
+	return out, nil
+}
+
+func validateChangeRequestPayload(raw json.RawMessage) error {
+	if len(raw) == 0 {
+		return fmt.Errorf("payload is required")
+	}
+	var payload struct {
+		EffectiveDate string         `json:"effective_date"`
+		Commands      []batchCommand `json:"commands"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&payload); err != nil {
+		return fmt.Errorf("payload is invalid")
+	}
+	if len(payload.Commands) < 1 || len(payload.Commands) > 100 {
+		return fmt.Errorf("commands size is invalid")
+	}
+	if strings.TrimSpace(payload.EffectiveDate) != "" {
+		if _, err := parseEffectiveDate(payload.EffectiveDate); err != nil {
+			return fmt.Errorf("effective_date is invalid")
+		}
+	}
+	for _, cmd := range payload.Commands {
+		t := strings.TrimSpace(cmd.Type)
+		if t == "" {
+			return fmt.Errorf("command type is required")
+		}
+		if !isSupportedBatchCommandType(t) {
+			return fmt.Errorf("unknown command type")
+		}
+		if len(cmd.Payload) == 0 {
+			return fmt.Errorf("command payload is required")
+		}
+	}
+	return nil
+}
+
+func isSupportedBatchCommandType(t string) bool {
+	switch t {
+	case "node.create", "node.update", "node.move", "node.correct", "node.rescind", "node.shift_boundary", "node.correct_move":
+		return true
+	case "assignment.create", "assignment.update", "assignment.correct", "assignment.rescind":
+		return true
+	default:
+		return false
+	}
+}
+
+func requireOrgChangeRequestsEnabled(w http.ResponseWriter, requestID string) bool {
+	if configuration.Use().OrgChangeRequestsEnabled {
+		return true
+	}
+	writeAPIError(w, http.StatusNotFound, requestID, "ORG_NOT_FOUND", "not found")
+	return false
+}
+
+func requireOrgPreflightEnabled(w http.ResponseWriter, requestID string) bool {
+	if configuration.Use().OrgPreflightEnabled {
+		return true
+	}
+	writeAPIError(w, http.StatusNotFound, requestID, "ORG_NOT_FOUND", "not found")
+	return false
+}
+
+func withOrgTx[T any](ctx context.Context, tenantID uuid.UUID, fn func(context.Context) (T, error)) (T, error) {
+	var zero T
+	pool, err := composables.UsePool(ctx)
+	if err != nil {
+		return zero, err
+	}
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		return zero, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	txCtx := composables.WithTx(ctx, tx)
+	txCtx = composables.WithTenantID(txCtx, tenantID)
+	if err := composables.ApplyTenantRLS(txCtx, tx); err != nil {
+		return zero, err
+	}
+
+	out, err := fn(txCtx)
+	if err != nil {
+		return zero, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return zero, err
+	}
+	return out, nil
+}
+
+func parseChangeRequestCursor(raw string) (*time.Time, *uuid.UUID, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil, nil
+	}
+	if !strings.HasPrefix(raw, "updated_at:") {
+		return nil, nil, fmt.Errorf("invalid cursor")
+	}
+	rest := strings.TrimPrefix(raw, "updated_at:")
+	atStr, idStr, ok := strings.Cut(rest, ":id:")
+	if !ok || strings.TrimSpace(atStr) == "" || strings.TrimSpace(idStr) == "" {
+		return nil, nil, fmt.Errorf("invalid cursor")
+	}
+
+	at, err := time.Parse(time.RFC3339, atStr)
+	if err != nil {
+		return nil, nil, err
+	}
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, nil, err
+	}
+	at = at.UTC()
+	return &at, &id, nil
+}
+
+func writePreflightCommandError(w http.ResponseWriter, requestID string, index int, cmdType string, status int, code string, message string) {
+	meta := map[string]string{
+		"command_index": strconv.Itoa(index),
+		"command_type":  cmdType,
+	}
+	if requestID != "" {
+		meta["request_id"] = requestID
+	}
+	writeJSON(w, status, coredtos.APIError{Code: code, Message: message, Meta: meta})
 }
 
 func injectEffectiveDate(payload json.RawMessage, effectiveDate string) (json.RawMessage, error) {
