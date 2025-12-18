@@ -52,6 +52,7 @@ flowchart TD
    - 在事务内使用 `pkg/composables.WithTenantID` 注入 tenant context；
    - 在 `BEGIN` 后第一条 SQL 前调用 `pkg/composables.ApplyTenantRLS(ctx, tx)`（对齐 019A）。
 5. **`subject_id` 映射 SSOT（选定）**：`org_assignments.subject_id` 的确定性映射以 [DEV-PLAN-026](026-org-api-authz-and-events.md) 的“Subject 标识与确定性映射（SSOT）”为唯一事实源；CLI 不允许自行实现漂移算法。
+   - **本计划落地要求（新增）**：在实现 `cmd/org-data` 之前，必须先在 `modules/org/domain/...` 落地可复用函数 `NormalizedSubjectID(tenantID uuid.UUID, subjectType, pernr string) (uuid.UUID, error)`，并用单测冻结输入/输出（对齐 026 §7.3 的 namespace/payload 口径）。
 
 ## 4. 数据契约 (Data Contracts)
 > 本节定义 CSV/manifest 的合同；DB schema 合同以 [DEV-PLAN-021](021-org-schema-and-constraints.md) 为准。
@@ -165,8 +166,13 @@ flowchart TD
    - `nodeCode -> nodeID`（seed 模式下 nodeID 由工具生成 uuid 并写入 DB）
    - `positionCode -> positionID`
 4. `subject_id`：
-   - 若 CSV 未提供 `subject_id`：按 026 的 SSOT 算法生成；
-   - 若提供：必须校验与算法一致，否则报错。
+   - 算法（SSOT）：以 [DEV-PLAN-026 §7.3](026-org-api-authz-and-events.md) 为准，**必须复用** `modules/org/domain/...` 的 `NormalizedSubjectID(...)`：
+     - `namespace = uuid.MustParse("ce7c5394-3959-40ff-9d92-a1c2684d94cc")`
+     - `payload = fmt.Sprintf("%s:%s:%s", tenantID, subjectType, pernr)`（`pernr` 必须 `TrimSpace`）
+     - `subject_id = uuid.NewSHA1(namespace, []byte(payload))`
+   - 规则：
+     - 若 CSV 未提供 `subject_id`：由工具按上述算法生成；
+     - 若提供：必须校验与算法一致，否则报错（CLI validation error / exit=2）。
 
 ### 6.2 Static Validate（不访问 DB）
 - 必填字段、枚举值、JSON shape（必须为 object）、`effective_date < end_date`。
@@ -204,6 +210,7 @@ flowchart TD
 - [DEV-PLAN-019A](019A-rls-tenant-isolation.md)：RLS 注入契约（通过 `pkg/composables` 落地）。
 
 ### 8.2 里程碑（按提交时间填充）
+0. [ ] 先行落地 `NormalizedSubjectID(...)`（对齐 026 §7.3）+ 单测冻结（供 CLI/API 复用）
 1. [ ] CLI 骨架（cobra）+ 命令/flag/退出码契约固化
 2. [ ] CSV Parse/Normalize + Static Validate（含 strict 环路检测）
 3. [ ] DB Dry-Run + seed Apply + manifest
@@ -215,7 +222,9 @@ flowchart TD
 - 单测（`go test ./cmd/org-data/...`）至少覆盖：
   - CSV 解析错误行号/字段定位
   - 环路/重叠/非法日期/非法枚举/非法 JSON
-  - `subject_id` 映射一致性校验（对齐 026）
+  - `subject_id` 映射一致性校验（对齐 026；必须复用 `NormalizedSubjectID(...)`）
+- 单测（`go test ./modules/org/domain/...`）至少覆盖：
+  - `NormalizedSubjectID(...)` 的 namespace/payload/Trim 规则（对齐 026 §7.3）
 - 集成验收（本地 DB）至少覆盖：
   - seed 导入成功后，`org_edges` 的 root edge 与 child edge 均可写入（触发器 path/depth 生效）
   - `rollback --manifest --apply --yes` 能清理导入数据且无 FK 残留
