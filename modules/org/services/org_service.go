@@ -39,8 +39,10 @@ type OrgRepository interface {
 	InsertNodeSlice(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, slice NodeSliceInsert) (uuid.UUID, error)
 	InsertEdge(ctx context.Context, tenantID uuid.UUID, hierarchyType string, parentID *uuid.UUID, childID uuid.UUID, effectiveDate, endDate time.Time) (uuid.UUID, error)
 	NodeExistsAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, hierarchyType string, asOf time.Time) (bool, error)
+	GetNode(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID) (NodeRow, error)
 	GetNodeIsRoot(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID) (bool, error)
 
+	GetNodeSliceAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (NodeSliceRow, error)
 	LockNodeSliceAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (NodeSliceRow, error)
 	TruncateNodeSlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
 	NextNodeSliceEffectiveDate(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, after time.Time) (time.Time, bool, error)
@@ -88,6 +90,13 @@ type HierarchyNode struct {
 	Depth        int        `json:"depth"`
 	DisplayOrder int        `json:"display_order"`
 	Status       string     `json:"status"`
+}
+
+type NodeRow struct {
+	ID     uuid.UUID
+	Code   string
+	IsRoot bool
+	Type   string
 }
 
 type NodeSliceInsert struct {
@@ -262,6 +271,35 @@ func (s *OrgService) GetHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, h
 		s.cache.Set(tenantID, cacheKey, cachedHierarchy{Nodes: nodes, AsOf: asOf})
 	}
 	return nodes, asOf, nil
+}
+
+type NodeAsOf struct {
+	Node  NodeRow
+	Slice NodeSliceRow
+}
+
+func (s *OrgService) GetNodeAsOf(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (*NodeAsOf, error) {
+	if tenantID == uuid.Nil {
+		return nil, newServiceError(400, "ORG_NO_TENANT", "tenant_id is required", nil)
+	}
+	if nodeID == uuid.Nil {
+		return nil, newServiceError(400, "ORG_INVALID_QUERY", "node_id is required", nil)
+	}
+	if asOf.IsZero() {
+		asOf = time.Now().UTC()
+	}
+
+	return inTx(ctx, tenantID, func(txCtx context.Context) (*NodeAsOf, error) {
+		node, err := s.repo.GetNode(txCtx, tenantID, nodeID)
+		if err != nil {
+			return nil, mapPgError(err)
+		}
+		slice, err := s.repo.GetNodeSliceAt(txCtx, tenantID, nodeID, asOf)
+		if err != nil {
+			return nil, mapPgError(err)
+		}
+		return &NodeAsOf{Node: node, Slice: slice}, nil
+	})
 }
 
 type CreateNodeInput struct {

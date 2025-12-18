@@ -265,16 +265,16 @@ e2e:
 		go run cmd/command/main.go e2e migrate; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "run" ]; then \
 		cd e2e && npx playwright test --ui; \
-	elif [ "$(word 2,$(MAKECMDGOALS))" = "ci" ]; then \
-		cd e2e && npx playwright test --workers=1 --reporter=list; \
-	elif [ "$(word 2,$(MAKECMDGOALS))" = "clean" ]; then \
-		go run cmd/command/main.go e2e drop; \
-	elif [ "$(word 2,$(MAKECMDGOALS))" = "dev" ]; then \
-		PORT=3201 ORIGIN='http://default.localhost:3201' DB_NAME=iota_erp_e2e ENABLE_TEST_ENDPOINTS=true air; \
-	else \
-		echo "Usage: make e2e [test|reset|seed|migrate|run|ci|dev|clean]"; \
-		echo "  test         - Set up database and run all e2e tests"; \
-		echo "  reset        - Drop and recreate e2e database with fresh data"; \
+		elif [ "$(word 2,$(MAKECMDGOALS))" = "ci" ]; then \
+			cd e2e && npx playwright test --workers=1 --reporter=list; \
+		elif [ "$(word 2,$(MAKECMDGOALS))" = "clean" ]; then \
+			go run cmd/command/main.go e2e drop; \
+		elif [ "$(word 2,$(MAKECMDGOALS))" = "dev" ]; then \
+			PORT=3201 ORIGIN='http://default.localhost:3201' DB_NAME=iota_erp_e2e ENABLE_TEST_ENDPOINTS=true ORG_ROLLOUT_MODE=enabled ORG_ROLLOUT_TENANTS=00000000-0000-0000-0000-000000000001 air; \
+		else \
+			echo "Usage: make e2e [test|reset|seed|migrate|run|ci|dev|clean]"; \
+			echo "  test         - Set up database and run all e2e tests"; \
+			echo "  reset        - Drop and recreate e2e database with fresh data"; \
 		echo "  seed         - Seed e2e database with test data"; \
 		echo "  migrate      - Run migrations on e2e database"; \
 		echo "  run          - Open Playwright interactive mode (UI mode)"; \

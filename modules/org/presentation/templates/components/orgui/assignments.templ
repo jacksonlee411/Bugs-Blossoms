@@ -1,0 +1,115 @@
+package orgui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/iota-uz/iota-sdk/components/base"
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type AssignmentCreateFormProps struct {
+	EffectiveDate string
+	Pernr         string
+	Errors        map[string]string
+	FormError     string
+}
+
+templ AssignmentCreateForm(props AssignmentCreateFormProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<form
+		class="space-y-3"
+		hx-post={ fmt.Sprintf("/org/assignments?effective_date=%s", props.EffectiveDate) }
+		hx-target="#org-assignments-timeline"
+		hx-swap="innerHTML"
+	>
+		<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+		if props.FormError != "" {
+			<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
+		}
+		@input.Text(&input.Props{
+			Label: pageCtx.T("Org.UI.Assignments.Fields.Pernr"),
+			Error: props.Errors["pernr"],
+			Attrs: templ.Attributes{
+				"id":    "org-pernr",
+				"name":  "pernr",
+				"value": props.Pernr,
+			},
+		})
+		<div data-testid="org-assignment-orgnode-combobox">
+			@base.Combobox(base.ComboboxProps{
+				Searchable:   true,
+				Label:        pageCtx.T("Org.UI.Assignments.Fields.OrgNode"),
+				Name:         "org_node_id",
+				Endpoint:     fmt.Sprintf("/org/nodes/search?effective_date=%s", props.EffectiveDate),
+				Placeholder:  pageCtx.T("Org.UI.Node.Parent.Placeholder"),
+				NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+			}) {
+				<!-- options loaded via HTMX -->
+			}
+		</div>
+		@input.Text(&input.Props{
+			Label: pageCtx.T("Org.UI.Assignments.Fields.PositionID"),
+			Error: props.Errors["position_id"],
+			Attrs: templ.Attributes{
+				"name":        "position_id",
+				"placeholder": "uuid (optional)",
+			},
+		})
+		<div class="flex items-center justify-end">
+			@button.Primary(button.Props{
+				Size: button.SizeSM,
+				Attrs: templ.Attributes{
+					"type": "submit",
+				},
+			}) {
+				{ pageCtx.T("Org.UI.Assignments.Actions.Create") }
+			}
+		</div>
+	</form>
+}
+
+type AssignmentsTimelineProps struct {
+	EffectiveDate string
+	Timeline      *viewmodels.OrgAssignmentsTimeline
+}
+
+templ AssignmentsTimeline(props AssignmentsTimelineProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if props.Timeline == nil || len(props.Timeline.Rows) == 0 {
+		<div class="text-sm text-300">{ pageCtx.T("Org.UI.Assignments.Empty") }</div>
+	} else {
+		<table class="w-full table-auto border-collapse text-sm">
+			<thead class="border-b border-surface-400 text-left text-300">
+				<tr>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Pernr") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Effective") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, row := range props.Timeline.Rows {
+					<tr class="border-b border-surface-400/60">
+						<td class="py-2 pr-2 text-200">{ row.Pernr }</td>
+						<td class="py-2 pr-2 text-200">
+							{ row.EffectiveDate.UTC().Format("2006-01-02") } → { row.EndDate.UTC().Format("2006-01-02") }
+						</td>
+						<td class="py-2 pr-2 text-xs text-300">{ row.OrgNodeID.String() }</td>
+						<td class="py-2 pr-2 text-200">
+							<div class="flex flex-col">
+								<span class="text-xs text-300">{ row.PositionID.String() }</span>
+								if strings.TrimSpace(row.PositionCode) != "" {
+									<span class="text-xs text-400">{ row.PositionCode }</span>
+								}
+							</div>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+}

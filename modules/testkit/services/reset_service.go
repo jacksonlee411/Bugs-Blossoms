@@ -43,6 +43,7 @@ func (s *ResetService) TruncateAllTables(ctx context.Context) error {
 		AND table_type = 'BASE TABLE'
 		AND table_name NOT LIKE '%migration%'
 		AND table_name NOT LIKE 'schema_%'
+		AND table_name NOT LIKE 'goose_db_version%'
 	`
 
 	rows, err := db.Query(ctx, query)

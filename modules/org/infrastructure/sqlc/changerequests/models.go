@@ -36,6 +36,23 @@ type OrgAttributeInheritanceRule struct {
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
 }
 
+type OrgAuditLog struct {
+	TenantID        pgtype.UUID        `json:"tenant_id"`
+	ID              pgtype.UUID        `json:"id"`
+	RequestID       string             `json:"request_id"`
+	TransactionTime pgtype.Timestamptz `json:"transaction_time"`
+	InitiatorID     pgtype.UUID        `json:"initiator_id"`
+	ChangeType      string             `json:"change_type"`
+	EntityType      string             `json:"entity_type"`
+	EntityID        pgtype.UUID        `json:"entity_id"`
+	EffectiveDate   pgtype.Timestamptz `json:"effective_date"`
+	EndDate         pgtype.Timestamptz `json:"end_date"`
+	OldValues       []byte             `json:"old_values"`
+	NewValues       []byte             `json:"new_values"`
+	Meta            []byte             `json:"meta"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+}
+
 type OrgChangeRequest struct {
 	TenantID             pgtype.UUID        `json:"tenant_id"`
 	ID                   pgtype.UUID        `json:"id"`
@@ -92,6 +109,21 @@ type OrgNodeSlice struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+type OrgOutbox struct {
+	ID          pgtype.UUID        `json:"id"`
+	TenantID    pgtype.UUID        `json:"tenant_id"`
+	Topic       string             `json:"topic"`
+	Payload     []byte             `json:"payload"`
+	EventID     pgtype.UUID        `json:"event_id"`
+	Sequence    int64              `json:"sequence"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	PublishedAt pgtype.Timestamptz `json:"published_at"`
+	Attempts    int32              `json:"attempts"`
+	AvailableAt pgtype.Timestamptz `json:"available_at"`
+	LockedAt    pgtype.Timestamptz `json:"locked_at"`
+	LastError   *string            `json:"last_error"`
+}
+
 type OrgPosition struct {
 	TenantID      pgtype.UUID        `json:"tenant_id"`
 	ID            pgtype.UUID        `json:"id"`
@@ -128,6 +160,14 @@ type OrgRoleAssignment struct {
 	EndDate       pgtype.Timestamptz `json:"end_date"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgSetting struct {
+	TenantID        pgtype.UUID        `json:"tenant_id"`
+	FreezeMode      string             `json:"freeze_mode"`
+	FreezeGraceDays int32              `json:"freeze_grace_days"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Tenant struct {

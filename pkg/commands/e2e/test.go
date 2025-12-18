@@ -77,9 +77,17 @@ func Test() error {
 	testCtx, testCancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer testCancel()
 
-	testCmd := exec.CommandContext(testCtx, "npm", "run", "test")
+	testCmd := exec.CommandContext(testCtx, "npm", "run", "test", "--", "--reporter=list")
 	testCmd.Dir = e2eDir
-	testCmd.Env = append(os.Environ(), "BASE_URL="+baseURL)
+	testCmd.Env = append(
+		os.Environ(),
+		"BASE_URL="+baseURL,
+		"DB_HOST="+conf.Database.Host,
+		"DB_PORT="+conf.Database.Port,
+		"DB_USER="+conf.Database.User,
+		"DB_PASSWORD="+conf.Database.Password,
+		"DB_NAME="+E2E_DB_NAME,
+	)
 	testCmd.Stdout = os.Stdout
 	testCmd.Stderr = os.Stderr
 

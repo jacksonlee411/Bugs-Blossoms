@@ -652,6 +652,8 @@ jobs:
           SID_COOKIE_KEY: sid
           GO_APP_ENV: development
           ENABLE_TEST_ENDPOINTS: true
+          ORG_ROLLOUT_MODE: enabled
+          ORG_ROLLOUT_TENANTS: 00000000-0000-0000-0000-000000000001
         run: |
           go run cmd/server/main.go &
           SERVER_PID=$!
