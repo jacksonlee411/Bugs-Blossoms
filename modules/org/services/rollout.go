@@ -23,7 +23,9 @@ func OrgRolloutEnabledForTenant(tenantID uuid.UUID) bool {
 		return false
 	}
 
-	for _, part := range strings.Split(raw, ",") {
+	for _, part := range strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ' ' || r == '\n' || r == '\t'
+	}) {
 		part = strings.TrimSpace(part)
 		if part == "" {
 			continue

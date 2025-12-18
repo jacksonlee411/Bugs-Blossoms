@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/iota-uz/iota-sdk/pkg/logging"
 
 	"github.com/caarlos0/env/v11"
@@ -344,6 +346,20 @@ func (c *Configuration) validateOrgRollout() error {
 		return fmt.Errorf("invalid ORG_READ_STRATEGY=%q (expected path|recursive)", c.OrgReadStrategy)
 	}
 	c.OrgReadStrategy = strategy
+
+	rawTenants := strings.TrimSpace(c.OrgRolloutTenants)
+	if rawTenants != "" {
+		for _, part := range strings.FieldsFunc(rawTenants, func(r rune) bool {
+			return r == ',' || r == ' ' || r == '\n' || r == '\t'
+		}) {
+			if strings.TrimSpace(part) == "" {
+				continue
+			}
+			if _, err := uuid.Parse(part); err != nil {
+				return fmt.Errorf("invalid ORG_ROLLOUT_TENANTS entry=%q: %w", part, err)
+			}
+		}
+	}
 
 	return nil
 }
