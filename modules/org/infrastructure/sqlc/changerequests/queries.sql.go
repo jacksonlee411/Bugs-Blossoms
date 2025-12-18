@@ -111,14 +111,16 @@ FROM
     org_change_requests
 WHERE
     tenant_id = $1
-    AND ($2::text = '' OR status = $2)
-    AND (
-        $3::timestamptz IS NULL
+    AND ($2::text = ''
+        OR status = $2)
+    AND ($3::timestamptz IS NULL
         OR $4::uuid IS NULL
-        OR (updated_at, id) < ($3::timestamptz, $4::uuid)
-    )
+        OR (updated_at,
+            id) < ($3::timestamptz,
+            $4::uuid))
 ORDER BY
-    updated_at DESC, id DESC
+    updated_at DESC,
+    id DESC
 LIMIT $5
 `
 
@@ -168,7 +170,8 @@ func (q *Queries) ListOrgChangeRequests(ctx context.Context, arg ListOrgChangeRe
 }
 
 const updateOrgChangeRequestDraftByID = `-- name: UpdateOrgChangeRequestDraftByID :one
-UPDATE org_change_requests
+UPDATE
+    org_change_requests
 SET
     payload = $3,
     notes = $4,
@@ -178,7 +181,16 @@ WHERE
     AND id = $2
     AND status = 'draft'
 RETURNING
-    tenant_id, id, request_id, requester_id, status, payload_schema_version, payload, notes, created_at, updated_at
+    tenant_id,
+    id,
+    request_id,
+    requester_id,
+    status,
+    payload_schema_version,
+    payload,
+    notes,
+    created_at,
+    updated_at
 `
 
 type UpdateOrgChangeRequestDraftByIDParams struct {
@@ -212,7 +224,8 @@ func (q *Queries) UpdateOrgChangeRequestDraftByID(ctx context.Context, arg Updat
 }
 
 const updateOrgChangeRequestStatusByID = `-- name: UpdateOrgChangeRequestStatusByID :one
-UPDATE org_change_requests
+UPDATE
+    org_change_requests
 SET
     status = $3,
     updated_at = now()
@@ -220,7 +233,16 @@ WHERE
     tenant_id = $1
     AND id = $2
 RETURNING
-    tenant_id, id, request_id, requester_id, status, payload_schema_version, payload, notes, created_at, updated_at
+    tenant_id,
+    id,
+    request_id,
+    requester_id,
+    status,
+    payload_schema_version,
+    payload,
+    notes,
+    created_at,
+    updated_at
 `
 
 type UpdateOrgChangeRequestStatusByIDParams struct {
