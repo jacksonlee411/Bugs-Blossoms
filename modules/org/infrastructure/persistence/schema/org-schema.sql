@@ -230,3 +230,83 @@ CREATE INDEX org_assignments_tenant_position_effective_idx ON org_assignments (t
 
 CREATE INDEX org_assignments_tenant_pernr_effective_idx ON org_assignments (tenant_id, pernr, effective_date);
 
+CREATE TABLE org_attribute_inheritance_rules (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    hierarchy_type text NOT NULL,
+    attribute_name text NOT NULL,
+    can_override boolean NOT NULL DEFAULT FALSE,
+    inheritance_break_node_type text NULL,
+    effective_date timestamptz NOT NULL,
+    end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_attribute_inheritance_rules_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_attribute_inheritance_rules_effective_check CHECK (effective_date < end_date)
+);
+
+ALTER TABLE org_attribute_inheritance_rules
+    ADD CONSTRAINT org_attribute_inheritance_rules_no_overlap
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, hierarchy_type gist_text_ops WITH =, attribute_name gist_text_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+
+CREATE INDEX org_attribute_inheritance_rules_tenant_hierarchy_attribute_effective_idx ON org_attribute_inheritance_rules (tenant_id, hierarchy_type, attribute_name, effective_date);
+
+CREATE TABLE org_roles (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    code varchar(64) NOT NULL,
+    name varchar(255) NOT NULL,
+    description text NULL,
+    is_system boolean NOT NULL DEFAULT TRUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_roles_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_roles_tenant_id_code_key UNIQUE (tenant_id, code)
+);
+
+CREATE INDEX org_roles_tenant_name_idx ON org_roles (tenant_id, name);
+
+CREATE TABLE org_role_assignments (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    role_id uuid NOT NULL,
+    subject_type text NOT NULL DEFAULT 'user',
+    subject_id uuid NOT NULL,
+    org_node_id uuid NOT NULL,
+    effective_date timestamptz NOT NULL,
+    end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_role_assignments_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_role_assignments_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_role_assignments_subject_type_check CHECK (subject_type IN ('user', 'group')),
+    CONSTRAINT org_role_assignments_role_fk FOREIGN KEY (tenant_id, role_id) REFERENCES org_roles (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_role_assignments_org_node_fk FOREIGN KEY (tenant_id, org_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT
+);
+
+ALTER TABLE org_role_assignments
+    ADD CONSTRAINT org_role_assignments_no_overlap
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, role_id gist_uuid_ops WITH =, subject_type gist_text_ops WITH =, subject_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+
+CREATE INDEX org_role_assignments_tenant_node_effective_idx ON org_role_assignments (tenant_id, org_node_id, effective_date);
+
+CREATE INDEX org_role_assignments_tenant_subject_effective_idx ON org_role_assignments (tenant_id, subject_type, subject_id, effective_date);
+
+CREATE TABLE org_change_requests (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    request_id text NOT NULL,
+    requester_id uuid NOT NULL,
+    status text NOT NULL DEFAULT 'draft',
+    payload_schema_version int NOT NULL DEFAULT 1,
+    payload jsonb NOT NULL,
+    notes text NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_change_requests_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_change_requests_status_check CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled')),
+    CONSTRAINT org_change_requests_tenant_id_request_id_key UNIQUE (tenant_id, request_id)
+);
+
+CREATE INDEX org_change_requests_tenant_requester_status_updated_idx ON org_change_requests (tenant_id, requester_id, status, updated_at DESC);
+

@@ -110,7 +110,7 @@ flowchart LR
 | `id` | `uuid` | `pk` | `gen_random_uuid()` | 主键 |
 | `role_id` | `uuid` | `not null` |  | FK → `org_roles.id` |
 | `subject_type` | `text` | `not null` | `user` | `user` / `group`（占位） |
-| `subject_id` | `uuid` | `not null` |  | user_id / group_id |
+| `subject_id` | `uuid` | `not null` |  | `user`：`modules/core/authzutil.NormalizedUserUUID(tenant_id, user)`；`group`：`user_groups.id` |
 | `org_node_id` | `uuid` | `not null` |  | FK → `org_nodes.id` |
 | `effective_date` | `timestamptz` | `not null` |  |  |
 | `end_date` | `timestamptz` | `not null` | `9999-12-31` |  |
@@ -138,13 +138,15 @@ flowchart LR
 | `tenant_id` | `uuid` | `not null` |  | 租户 |
 | `id` | `uuid` | `pk` | `gen_random_uuid()` | 主键 |
 | `request_id` | `text` | `not null` |  | 与 `X-Request-Id` 对齐（默认是 UUID 字符串），用于链路串联 |
-| `requester_id` | `uuid` | `not null` |  | FK → `users.id` |
+| `requester_id` | `uuid` | `not null` |  | **与 022/025 的 `initiator_id` 同口径**：`modules/core/authzutil.NormalizedUserUUID(tenant_id, user)`（不做 DB FK） |
 | `status` | `text` | `not null` | `draft` | `draft/submitted/approved/rejected/cancelled`（预留） |
 | `payload_schema_version` | `int` | `not null` | `1` | 向后兼容 |
 | `payload` | `jsonb` | `not null` |  | 建议复用 026 的 `/org/api/batch` body 结构 |
 | `notes` | `text` | `null` |  | 备注 |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
+
+> 说明：仓库内 `users.id` 为 `int8`（全局 users 表），而 Org 事件/审计统一使用“稳定 UUID”（见 025 的 `initiator_id` 口径）。因此占位表中用 `requester_id uuid` 存储规范化用户 UUID，并由应用层校验/映射，不在 DB 层做外键约束。
 
 **约束与索引（建议）**：
 - `check (status in ('draft','submitted','approved','rejected','cancelled'))`
@@ -304,7 +306,7 @@ flowchart LR
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - Schema：
   - 占位表全部创建完成，约束/索引满足本计划定义；与 021 的核心表不冲突。
-  - `atlas migrate diff` 生成迁移后，`atlas migrate lint` 通过（按 021/011A 的工具链口径执行）。
+  - `atlas migrate diff --env org_dev <name>` 生成迁移后，`make org lint` 通过（内部运行 `atlas migrate lint --env org_ci`）。
 - 生成物：
   - 运行 `make sqlc-generate`（或等价命令）后 `git status --short` 干净。
 - 契约：
@@ -317,7 +319,7 @@ flowchart LR
 - 契约演进：若事件字段需调整，只允许通过发布新 Topic 版本（`v2`）演进；旧版保留一段兼容期并提供 `/org/api/snapshot` 纠偏。
 
 ## 11. 任务清单（落地追踪）
-1. [ ] **Schema 与迁移**：在 `modules/org/infrastructure/atlas/schema.hcl` 补充 4.1~4.4 的表/索引/约束，生成迁移并通过 lint。
+1. [ ] **Schema 与迁移**：在 `modules/org/infrastructure/persistence/schema/org-schema.sql` 补充 4.1~4.4 的表/索引/约束；执行 `atlas migrate diff --env org_dev <name>` 生成 `migrations/org` 迁移，并运行 `atlas migrate hash --dir file://migrations/org` 更新 `migrations/org/atlas.sum`；最后 `make org lint` 与 `make org migrate up` 可通过。
 2. [ ] **事件契约定义**：在 `modules/org/domain/events`（或等价目录）定义 v1 事件结构体（字段对齐第 5 节），并记录 Topic/版本演进规则。
 3. [ ] **sqlc 查询与服务占位**：新增 SQL 并运行 `make sqlc-generate`；服务层添加草稿保存占位（可空实现），保持 `git status --short` 干净。
 4. [ ] **Readiness 记录**：记录命令与结果到 `docs/dev-records/DEV-PLAN-022-READINESS.md`（迁移生成/上下行/生成物校验）。
