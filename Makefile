@@ -359,5 +359,5 @@ watch coverage verbose docker score report linux docker-base docker-prod up down
 # HRM sqlc generation
 sqlc-generate:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0 generate -f sqlc.yaml
-	gofmt -w modules/hrm/infrastructure/sqlc
-	go run golang.org/x/tools/cmd/goimports@v0.26.0 -w modules/hrm/infrastructure/sqlc
+	gofmt -w modules/hrm/infrastructure/sqlc modules/org/infrastructure/sqlc
+	go run golang.org/x/tools/cmd/goimports@v0.26.0 -w modules/hrm/infrastructure/sqlc modules/org/infrastructure/sqlc
