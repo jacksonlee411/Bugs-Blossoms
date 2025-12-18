@@ -49,13 +49,13 @@ func (r *OrgRepository) InsertNodeSlice(ctx context.Context, tenantID uuid.UUID,
 		return uuid.Nil, err
 	}
 
-	i18nNames := []byte(`{}`)
+	i18nNames := "{}"
 	if slice.I18nNames != nil {
-		if b, err := json.Marshal(slice.I18nNames); err == nil {
-			i18nNames = b
-		} else {
+		b, err := json.Marshal(slice.I18nNames)
+		if err != nil {
 			return uuid.Nil, err
 		}
+		i18nNames = string(b)
 	}
 
 	var id uuid.UUID
@@ -75,7 +75,7 @@ INSERT INTO org_node_slices (
 	effective_date,
 	end_date
 )
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 RETURNING id
 	`,
 		pgUUID(tenantID),
