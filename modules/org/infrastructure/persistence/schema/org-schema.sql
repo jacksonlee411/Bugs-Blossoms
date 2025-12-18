@@ -247,12 +247,7 @@ CREATE TABLE org_attribute_inheritance_rules (
 
 ALTER TABLE org_attribute_inheritance_rules
     ADD CONSTRAINT org_attribute_inheritance_rules_no_overlap
-    EXCLUDE USING gist (
-        tenant_id gist_uuid_ops WITH =,
-        hierarchy_type gist_text_ops WITH =,
-        attribute_name gist_text_ops WITH =,
-        tstzrange(effective_date, end_date, '[)') WITH &&
-    );
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, hierarchy_type gist_text_ops WITH =, attribute_name gist_text_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
 
 CREATE INDEX org_attribute_inheritance_rules_tenant_hierarchy_attribute_effective_idx ON org_attribute_inheritance_rules (tenant_id, hierarchy_type, attribute_name, effective_date);
 
@@ -291,14 +286,7 @@ CREATE TABLE org_role_assignments (
 
 ALTER TABLE org_role_assignments
     ADD CONSTRAINT org_role_assignments_no_overlap
-    EXCLUDE USING gist (
-        tenant_id gist_uuid_ops WITH =,
-        role_id gist_uuid_ops WITH =,
-        subject_type gist_text_ops WITH =,
-        subject_id gist_uuid_ops WITH =,
-        org_node_id gist_uuid_ops WITH =,
-        tstzrange(effective_date, end_date, '[)') WITH &&
-    );
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, role_id gist_uuid_ops WITH =, subject_type gist_text_ops WITH =, subject_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
 
 CREATE INDEX org_role_assignments_tenant_node_effective_idx ON org_role_assignments (tenant_id, org_node_id, effective_date);
 
@@ -321,3 +309,4 @@ CREATE TABLE org_change_requests (
 );
 
 CREATE INDEX org_change_requests_tenant_requester_status_updated_idx ON org_change_requests (tenant_id, requester_id, status, updated_at DESC);
+
