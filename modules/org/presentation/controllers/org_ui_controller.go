@@ -315,10 +315,18 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 	}
 	if len(fieldErrs) > 0 {
 		w.WriteHeader(http.StatusUnprocessableEntity)
+		var orgNodeIDStr, orgNodeLabel string
+		if orgNodeID != nil {
+			orgNodeIDStr = orgNodeID.String()
+			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
+		}
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 			Mode:          orgui.AssignmentFormCreate,
 			EffectiveDate: effectiveDateStr,
 			Pernr:         pernr,
+			OrgNodeID:     orgNodeIDStr,
+			OrgNodeLabel:  orgNodeLabel,
+			PositionID:    positionRaw,
 			Errors:        fieldErrs,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
@@ -336,10 +344,18 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
 		w.WriteHeader(statusCode)
+		var orgNodeIDStr, orgNodeLabel string
+		if orgNodeID != nil {
+			orgNodeIDStr = orgNodeID.String()
+			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
+		}
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 			Mode:          orgui.AssignmentFormCreate,
 			EffectiveDate: effectiveDateStr,
 			Pernr:         pernr,
+			OrgNodeID:     orgNodeIDStr,
+			OrgNodeLabel:  orgNodeLabel,
+			PositionID:    positionRaw,
 			Errors:        map[string]string{},
 			FormError:     formErr,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
@@ -522,13 +538,18 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 	}
 	if len(fieldErrs) > 0 {
 		w.WriteHeader(http.StatusUnprocessableEntity)
+		var orgNodeIDStr, orgNodeLabel string
+		if orgNodeID != nil {
+			orgNodeIDStr = orgNodeID.String()
+			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
+		}
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 			Mode:          orgui.AssignmentFormEdit,
 			EffectiveDate: effectiveDateStr,
 			Pernr:         pernr,
 			AssignmentID:  assignmentID.String(),
-			OrgNodeID:     orgNodeRaw,
-			OrgNodeLabel:  strings.TrimSpace(orgNodeRaw),
+			OrgNodeID:     orgNodeIDStr,
+			OrgNodeLabel:  orgNodeLabel,
 			PositionID:    positionRaw,
 			Errors:        fieldErrs,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
@@ -546,13 +567,18 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
 		w.WriteHeader(statusCode)
+		var orgNodeIDStr, orgNodeLabel string
+		if orgNodeID != nil {
+			orgNodeIDStr = orgNodeID.String()
+			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
+		}
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 			Mode:          orgui.AssignmentFormEdit,
 			EffectiveDate: effectiveDateStr,
 			Pernr:         pernr,
 			AssignmentID:  assignmentID.String(),
-			OrgNodeID:     orgNodeRaw,
-			OrgNodeLabel:  strings.TrimSpace(orgNodeRaw),
+			OrgNodeID:     orgNodeIDStr,
+			OrgNodeLabel:  orgNodeLabel,
 			PositionID:    positionRaw,
 			Errors:        map[string]string{},
 			FormError:     formErr,
@@ -1013,6 +1039,21 @@ func (c *OrgUIController) getNodeDetails(r *http.Request, tenantID uuid.UUID, no
 		return nil, err
 	}
 	return mappers.NodeDetailsToViewModel(node), nil
+}
+
+func (c *OrgUIController) orgNodeLabelFor(r *http.Request, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) string {
+	label := nodeID.String()
+	details, err := c.getNodeDetails(r, tenantID, nodeID, asOf)
+	if err != nil || details == nil {
+		return label
+	}
+	if strings.TrimSpace(details.Code) != "" {
+		return fmt.Sprintf("%s (%s)", strings.TrimSpace(details.Name), strings.TrimSpace(details.Code))
+	}
+	if strings.TrimSpace(details.Name) != "" {
+		return strings.TrimSpace(details.Name)
+	}
+	return label
 }
 
 func tenantAndUserFromContext(r *http.Request) (uuid.UUID, coreuser.User, bool) {
