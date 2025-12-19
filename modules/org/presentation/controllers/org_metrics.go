@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -61,7 +60,7 @@ func (w *statusRecordingResponseWriter) Flush() {
 func (w *statusRecordingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 	h, ok := w.ResponseWriter.(http.Hijacker)
 	if !ok {
-		return nil, nil, httputil.ErrNotSupported
+		return nil, nil, http.ErrNotSupported
 	}
 	return h.Hijack()
 }
@@ -69,7 +68,7 @@ func (w *statusRecordingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, e
 func (w *statusRecordingResponseWriter) Push(target string, opts *http.PushOptions) error {
 	p, ok := w.ResponseWriter.(http.Pusher)
 	if !ok {
-		return httputil.ErrNotSupported
+		return http.ErrNotSupported
 	}
 	return p.Push(target, opts)
 }
