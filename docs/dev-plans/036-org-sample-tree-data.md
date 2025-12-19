@@ -126,7 +126,7 @@ flowchart TD
    - `飞虫与鲜花` 为 root 展示名；root 下包含 `房地产/物业管理/互联网行业` 一级业务单元。
    - 部门节点数：`254`（≥200）；深链最深节点：`IT-DEEP-16`（目标 `max_depth=16`）。
 3. [X] 导入验证（dry-run + apply）并产出对账摘要（2025-12-18 12:44 UTC）
-   - 先 dry-run，再 apply（导入到“空租户”）。
+   - 先 dry-run，再 apply（导入到“Org 数据为空”的租户；本地演示推荐使用 Default Tenant）。
    - 留存对账摘要与 manifest 路径（见 5.2）。
 4. [X] 回滚演练（manifest）（2025-12-18 12:44 UTC）
    - 使用 manifest 回滚并确认无 FK 残留（对齐 023 的验收口径）。
