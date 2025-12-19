@@ -145,6 +145,7 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 	orgNodeID uuid.UUID,
 	asOf time.Time,
 	includeInherited bool,
+	backend services.DeepReadBackend,
 	roleCode *string,
 	subjectType *string,
 	subjectID *uuid.UUID,
@@ -161,8 +162,10 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 
 	var q query
 	if includeInherited {
-		var path string
-		err := tx.QueryRow(ctx, `
+		switch backend {
+		case services.DeepReadBackendEdges:
+			var path string
+			err := tx.QueryRow(ctx, `
 		SELECT path::text
 		FROM org_edges
 		WHERE tenant_id=$1
@@ -173,11 +176,11 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 		ORDER BY effective_date DESC
 		LIMIT 1
 		`, pgUUID(tenantID), hierarchyType, pgUUID(orgNodeID), asOf).Scan(&path)
-		if err != nil {
-			return nil, err
-		}
+			if err != nil {
+				return nil, err
+			}
 
-		q.sql = `
+			q.sql = `
 		SELECT
 			a.id,
 			a.role_id,
@@ -202,7 +205,75 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 			AND a.end_date > $4
 			AND e.path @> $3::ltree
 		`
-		q.args = []any{pgUUID(tenantID), hierarchyType, path, asOf}
+			q.args = []any{pgUUID(tenantID), hierarchyType, path, asOf}
+		case services.DeepReadBackendClosure:
+			buildID, err := activeClosureBuildID(ctx, tx, tenantID, hierarchyType)
+			if err != nil {
+				return nil, err
+			}
+
+			q.sql = `
+		SELECT
+			a.id,
+			a.role_id,
+			r.code,
+			a.subject_type,
+			a.subject_id,
+			a.org_node_id,
+			a.effective_date,
+			a.end_date
+		FROM org_role_assignments a
+		JOIN org_roles r
+			ON r.tenant_id=a.tenant_id
+			AND r.id=a.role_id
+			JOIN org_hierarchy_closure c
+				ON c.tenant_id=a.tenant_id
+				AND c.hierarchy_type=$2
+				AND c.build_id=$3
+				AND c.ancestor_node_id=a.org_node_id
+				AND c.descendant_node_id=$4
+				AND tstzrange(c.effective_date, c.end_date, '[)') @> $5::timestamptz
+			WHERE a.tenant_id=$1
+				AND a.effective_date <= $5
+				AND a.end_date > $5
+			`
+			q.args = []any{pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(orgNodeID), asOf}
+		case services.DeepReadBackendSnapshot:
+			asOfDate := asOf.UTC().Format("2006-01-02")
+			buildID, err := activeSnapshotBuildID(ctx, tx, tenantID, hierarchyType, asOfDate)
+			if err != nil {
+				return nil, err
+			}
+
+			q.sql = `
+		SELECT
+			a.id,
+			a.role_id,
+			r.code,
+			a.subject_type,
+			a.subject_id,
+			a.org_node_id,
+			a.effective_date,
+			a.end_date
+		FROM org_role_assignments a
+		JOIN org_roles r
+			ON r.tenant_id=a.tenant_id
+			AND r.id=a.role_id
+		JOIN org_hierarchy_snapshots s
+			ON s.tenant_id=a.tenant_id
+			AND s.hierarchy_type=$2
+			AND s.as_of_date=$3::date
+			AND s.build_id=$4
+			AND s.ancestor_node_id=a.org_node_id
+			AND s.descendant_node_id=$5
+		WHERE a.tenant_id=$1
+			AND a.effective_date <= $6
+			AND a.end_date > $6
+		`
+			q.args = []any{pgUUID(tenantID), hierarchyType, asOfDate, pgUUID(buildID), pgUUID(orgNodeID), asOf}
+		default:
+			return nil, fmt.Errorf("unsupported deep read backend: %s", backend)
+		}
 	} else {
 		q.sql = `
 		SELECT

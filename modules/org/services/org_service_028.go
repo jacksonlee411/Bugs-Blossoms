@@ -315,6 +315,11 @@ func (s *OrgService) ListRoleAssignments(
 		return nil, time.Time{}, newServiceError(404, "ORG_ROLE_READ_DISABLED", "role read is disabled", nil)
 	}
 
+	backendKey := DeepReadBackendEdges
+	if includeInherited {
+		backendKey = OrgDeepReadBackendForTenant(tenantID)
+	}
+
 	cacheKey := repo.CacheKey(
 		"org",
 		"role_assignments",
@@ -322,6 +327,7 @@ func (s *OrgService) ListRoleAssignments(
 		orgNodeID,
 		orgDateKey(asOf),
 		includeInherited,
+		backendKey,
 		strings.TrimSpace(derefString(roleCode)),
 		strings.TrimSpace(derefString(subjectType)),
 		derefUUID(subjectID),
@@ -343,7 +349,7 @@ func (s *OrgService) ListRoleAssignments(
 		if !exists {
 			return nil, newServiceError(404, "ORG_NODE_NOT_FOUND_AT_DATE", "org_node_id not found at effective_date", nil)
 		}
-		return s.repo.ListRoleAssignmentsAsOf(txCtx, tenantID, hierarchyType, orgNodeID, asOf, includeInherited, roleCode, subjectType, subjectID)
+		return s.repo.ListRoleAssignmentsAsOf(txCtx, tenantID, hierarchyType, orgNodeID, asOf, includeInherited, backendKey, roleCode, subjectType, subjectID)
 	})
 	if err != nil {
 		return nil, time.Time{}, err
