@@ -17,19 +17,21 @@
 				"MetaTitle": "组织结构",
 				"Title": "组织结构"
 			},
-			"Assignments": {
-				"MetaTitle": "人员分配",
-				"Title": "人员分配",
-				"CreateTitle": "创建分配",
-				"TimelineTitle": "时间线",
-				"Empty": "请输入 pernr 后刷新查看时间线。",
-				"Actions": {
-					"Create": "创建",
-					"Refresh": "刷新时间线"
-				},
-				"Fields": {
-					"Pernr": "Pernr",
-					"OrgNode": "组织节点",
+				"Assignments": {
+					"MetaTitle": "人员分配",
+					"Title": "人员分配",
+					"CreateTitle": "创建分配",
+					"EditTitle": "编辑分配",
+					"TimelineTitle": "时间线",
+					"Empty": "请输入 pernr 后刷新查看时间线。",
+					"Actions": {
+						"Create": "创建",
+						"Edit": "编辑",
+						"Refresh": "刷新时间线"
+					},
+					"Fields": {
+						"Pernr": "Pernr",
+						"OrgNode": "组织节点",
 					"PositionID": "职位 ID（可选）"
 				},
 				"Table": {

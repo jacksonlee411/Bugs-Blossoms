@@ -21,10 +21,12 @@
         "MetaTitle": "Assignments",
         "Title": "Assignments",
         "CreateTitle": "Create assignment",
+        "EditTitle": "Edit assignment",
         "TimelineTitle": "Timeline",
         "Empty": "Enter a pernr and refresh to see the timeline.",
         "Actions": {
           "Create": "Create",
+          "Edit": "Edit",
           "Refresh": "Refresh timeline"
         },
         "Fields": {
