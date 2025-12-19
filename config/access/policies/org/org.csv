@@ -9,3 +9,6 @@ p, role:core.superadmin, org.change_requests, *, global, allow
 p, role:core.superadmin, org.preflight, *, global, allow
 p, role:core.superadmin, org.roles, *, global, allow
 p, role:core.superadmin, org.role_assignments, *, global, allow
+p, role:core.superadmin, org.security_group_mappings, *, global, allow
+p, role:core.superadmin, org.links, *, global, allow
+p, role:core.superadmin, org.permission_preview, *, global, allow

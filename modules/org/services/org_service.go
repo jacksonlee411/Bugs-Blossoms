@@ -39,6 +39,19 @@ type OrgRepository interface {
 	ListRoles(ctx context.Context, tenantID uuid.UUID) ([]OrgRole, error)
 	ListRoleAssignmentsAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, orgNodeID uuid.UUID, asOf time.Time, includeInherited bool, backend DeepReadBackend, roleCode *string, subjectType *string, subjectID *uuid.UUID) ([]RoleAssignmentRow, error)
 
+	// DEV-PLAN-032: security group mappings + business object links.
+	ListSecurityGroupMappings(ctx context.Context, tenantID uuid.UUID, filter SecurityGroupMappingListFilter) ([]SecurityGroupMappingRow, error)
+	InsertSecurityGroupMapping(ctx context.Context, tenantID uuid.UUID, in SecurityGroupMappingInsert) (uuid.UUID, error)
+	LockSecurityGroupMappingByID(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) (SecurityGroupMappingRow, error)
+	UpdateSecurityGroupMappingEndDate(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, endDate time.Time) error
+	ListSecurityGroupMappingsForNodesAsOf(ctx context.Context, tenantID uuid.UUID, orgNodeIDs []uuid.UUID, asOf time.Time) ([]SecurityGroupMappingRow, error)
+
+	ListOrgLinks(ctx context.Context, tenantID uuid.UUID, filter OrgLinkListFilter) ([]OrgLinkRow, error)
+	InsertOrgLink(ctx context.Context, tenantID uuid.UUID, in OrgLinkInsert) (uuid.UUID, error)
+	LockOrgLinkByID(ctx context.Context, tenantID uuid.UUID, id uuid.UUID) (OrgLinkRow, error)
+	UpdateOrgLinkEndDate(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, endDate time.Time) error
+	ListOrgLinksForNodeAsOf(ctx context.Context, tenantID uuid.UUID, orgNodeID uuid.UUID, asOf time.Time, limit int) ([]OrgLinkRow, error)
+
 	ListSnapshotNodes(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotEdges(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotPositions(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)

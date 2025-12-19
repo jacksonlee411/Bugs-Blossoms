@@ -23,6 +23,9 @@ var (
 	orgPreflightAuthzObject       = authz.ObjectName("org", "preflight")
 	orgRolesAuthzObject           = authz.ObjectName("org", "roles")
 	orgRoleAssignmentsAuthzObject = authz.ObjectName("org", "role_assignments")
+	orgSecurityGroupMappingsObj   = authz.ObjectName("org", "security_group_mappings")
+	orgLinksAuthzObject           = authz.ObjectName("org", "links")
+	orgPermissionPreviewAuthzObj  = authz.ObjectName("org", "permission_preview")
 )
 
 func ensureOrgAuthz(
