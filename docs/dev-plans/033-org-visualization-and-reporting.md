@@ -20,17 +20,17 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] **组织图导出（JSON）**：提供 `GET /org/api/hierarchies:export`（见 §5.1），支持：
+  - [X] **组织图导出（JSON）**：提供 `GET /org/api/hierarchies:export`（见 §5.1），支持：
     - as-of（`effective_date`）
     - subtree（`root_node_id` + `max_depth`）
     - 可选 include（security groups / links）
-  - [ ] **节点路径查询**：提供 `GET /org/api/nodes/{id}:path`（见 §5.2），返回 root→node 的路径数组（含来源与 depth），并具备稳定错误码。
-  - [ ] **人员路径查询**：提供 `GET /org/api/reports/person-path`（见 §5.3），基于 primary assignment as-of 定位 org node 并返回路径。
-  - [ ] **BI 视图/快照（SSOT）**：定义 `org_reporting`（见 §4），按 `as_of_date` 索引，面向 BI/对账消费：
+  - [X] **节点路径查询**：提供 `GET /org/api/nodes/{id}:path`（见 §5.2），返回 root→node 的路径数组（含来源与 depth），并具备稳定错误码。
+  - [X] **人员路径查询**：提供 `GET /org/api/reports/person-path`（见 §5.3），基于 primary assignment as-of 定位 org node 并返回路径。
+  - [X] **BI 视图/快照（SSOT）**：定义 `org_reporting`（见 §4），按 `as_of_date` 索引，面向 BI/对账消费：
     - 每节点一行（路径拍平、属性、security groups、links 的可选展开）
     - 只读取 active build（与 029 snapshot builds 对齐）
-  - [ ] **性能与可复现**：为路径查询与导出提供 query budget/分页限制，避免 O(N) 级 SQL roundtrip。
-  - [ ] Readiness：新增 `docs/dev-records/DEV-PLAN-033-READINESS.md`（实现阶段落盘），记录门禁命令与输出摘要。
+  - [X] **性能与可复现**：为路径查询与导出提供 query budget/分页限制，避免 O(N) 级 SQL roundtrip。
+  - [X] Readiness：新增 `docs/dev-records/DEV-PLAN-033-READINESS.md`（实现阶段落盘），记录门禁命令与输出摘要。
 - **非目标 (Out of Scope)**：
   - 不实现 PNG/SVG 服务端渲染（MVP 仅提供 JSON；SVG/PNG 由前端/外部工具消费 JSON 后生成）。
   - 不建设长期 BI ETL/调度/告警（归属 034 运维治理）；本计划仅定义快照/视图与可重复构建入口。
@@ -299,10 +299,10 @@ WHERE b.is_active = TRUE AND b.status = 'ready';
   - `docs/dev-plans/032-org-permission-mapping-and-associations.md`：security groups / links（如启用 include 与 reporting 维度）。
   - `docs/dev-plans/026-org-api-authz-and-events.md`：Authz/403 payload/路由治理口径。
 - **里程碑**：
-  1. [ ] 路由与控制器：`hierarchies:export`、`nodes:{id}:path`、`reports/person-path`。
-  2. [ ] 路径查询实现：按 029 后端切换，无递归、无 N+1。
-  3. [ ] BI：`org_reporting_nodes` + `org_reporting` view（迁移 + build 入口）。
-  4. [ ] Readiness：新增 `docs/dev-records/DEV-PLAN-033-READINESS.md`。
+  1. [X] 路由与控制器：`hierarchies:export`、`nodes:{id}:path`、`reports/person-path`。
+  2. [X] 路径查询实现：按 029 后端切换，无递归、无 N+1。
+  3. [X] BI：`org_reporting_nodes` + `org_reporting` view（迁移 + build 入口）。
+  4. [X] Readiness：新增 `docs/dev-records/DEV-PLAN-033-READINESS.md`。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **功能**：

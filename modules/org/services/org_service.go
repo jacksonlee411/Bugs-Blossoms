@@ -63,6 +63,9 @@ type OrgRepository interface {
 	ActivateDeepReadClosureBuild(ctx context.Context, tenantID uuid.UUID, hierarchyType string, buildID uuid.UUID) (uuid.UUID, error)
 	PruneDeepReadClosureBuilds(ctx context.Context, tenantID uuid.UUID, hierarchyType string, keep int) (DeepReadPruneResult, error)
 
+	// DEV-PLAN-033: BI reporting snapshot build (consumes active snapshot build from 029).
+	BuildOrgReportingNodes(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOfDate time.Time, includeSecurityGroups bool, includeLinks bool, apply bool, sourceRequestID string) (OrgReportingBuildResult, error)
+
 	GetOrgSettings(ctx context.Context, tenantID uuid.UUID) (OrgSettings, error)
 	InsertAuditLog(ctx context.Context, tenantID uuid.UUID, log AuditLogInsert) (uuid.UUID, error)
 
@@ -73,6 +76,13 @@ type OrgRepository interface {
 	NodeExistsAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, hierarchyType string, asOf time.Time) (bool, error)
 	GetNode(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID) (NodeRow, error)
 	GetNodeIsRoot(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID) (bool, error)
+	GetTenantRootNodeID(ctx context.Context, tenantID uuid.UUID) (uuid.UUID, error)
+
+	// DEV-PLAN-033: Export/path helpers.
+	ListOrgNodesAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, nodeIDs []uuid.UUID, asOf time.Time) ([]OrgNodeAsOfRow, error)
+	ListDescendantsForExportAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, rootNodeID uuid.UUID, asOf time.Time, backend DeepReadBackend, afterNodeID *uuid.UUID, maxDepth *int, limit int) ([]DeepReadRelation, error)
+	ResolveSecurityGroupKeysForNodesAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, nodeIDs []uuid.UUID, asOf time.Time, backend DeepReadBackend) (map[uuid.UUID][]string, error)
+	ListOrgLinkSummariesForNodesAsOf(ctx context.Context, tenantID uuid.UUID, nodeIDs []uuid.UUID, asOf time.Time) (map[uuid.UUID][]OrgLinkSummary, error)
 
 	GetNodeSliceAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (NodeSliceRow, error)
 	LockNodeSliceAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (NodeSliceRow, error)
