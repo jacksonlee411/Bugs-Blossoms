@@ -27,18 +27,28 @@ type OrgRepository interface {
 	ListHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, error)
 	ListHierarchyAsOfRecursive(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, error)
 
+	// DEV-PLAN-029: deep read (ancestors/descendants) without recursive CTE.
+	ListAncestorsAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, descendantNodeID uuid.UUID, asOf time.Time, backend DeepReadBackend) ([]DeepReadRelation, error)
+	ListDescendantsAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, ancestorNodeID uuid.UUID, asOf time.Time, backend DeepReadBackend) ([]DeepReadRelation, error)
+
 	// DEV-PLAN-028: inheritance read side helpers.
 	ListNodeAttributesAsOf(ctx context.Context, tenantID uuid.UUID, nodeIDs []uuid.UUID, asOf time.Time) (map[uuid.UUID]OrgNodeAttributes, error)
 	ListAttributeInheritanceRulesAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]AttributeInheritanceRule, error)
 
 	// DEV-PLAN-028: role read side helpers.
 	ListRoles(ctx context.Context, tenantID uuid.UUID) ([]OrgRole, error)
-	ListRoleAssignmentsAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, orgNodeID uuid.UUID, asOf time.Time, includeInherited bool, roleCode *string, subjectType *string, subjectID *uuid.UUID) ([]RoleAssignmentRow, error)
+	ListRoleAssignmentsAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, orgNodeID uuid.UUID, asOf time.Time, includeInherited bool, backend DeepReadBackend, roleCode *string, subjectType *string, subjectID *uuid.UUID) ([]RoleAssignmentRow, error)
 
 	ListSnapshotNodes(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotEdges(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotPositions(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
 	ListSnapshotAssignments(ctx context.Context, tenantID uuid.UUID, asOf time.Time, afterID *uuid.UUID, limit int) ([]SnapshotItem, error)
+
+	// DEV-PLAN-029: refresh/build tools for deep read derived tables.
+	BuildDeepReadSnapshot(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOfDate time.Time, apply bool, sourceRequestID string) (DeepReadBuildResult, error)
+	BuildDeepReadClosure(ctx context.Context, tenantID uuid.UUID, hierarchyType string, apply bool, sourceRequestID string) (DeepReadBuildResult, error)
+	ActivateDeepReadClosureBuild(ctx context.Context, tenantID uuid.UUID, hierarchyType string, buildID uuid.UUID) (uuid.UUID, error)
+	PruneDeepReadClosureBuilds(ctx context.Context, tenantID uuid.UUID, hierarchyType string, keep int) (DeepReadPruneResult, error)
 
 	GetOrgSettings(ctx context.Context, tenantID uuid.UUID) (OrgSettings, error)
 	InsertAuditLog(ctx context.Context, tenantID uuid.UUID, log AuditLogInsert) (uuid.UUID, error)

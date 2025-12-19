@@ -49,3 +49,26 @@ func OrgCacheEnabled() bool {
 func OrgReadStrategy() string {
 	return configuration.Use().OrgReadStrategy
 }
+
+func OrgDeepReadEnabled() bool {
+	return configuration.Use().OrgDeepReadEnabled
+}
+
+func OrgDeepReadBackendForTenant(tenantID uuid.UUID) DeepReadBackend {
+	if tenantID == uuid.Nil {
+		return DeepReadBackendEdges
+	}
+	if !OrgDeepReadEnabled() {
+		return DeepReadBackendEdges
+	}
+	if !OrgRolloutEnabledForTenant(tenantID) {
+		return DeepReadBackendEdges
+	}
+
+	switch DeepReadBackend(configuration.Use().OrgDeepReadBackend) {
+	case DeepReadBackendEdges, DeepReadBackendClosure, DeepReadBackendSnapshot:
+		return DeepReadBackend(configuration.Use().OrgDeepReadBackend)
+	default:
+		return DeepReadBackendEdges
+	}
+}

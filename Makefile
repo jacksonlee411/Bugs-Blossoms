@@ -220,6 +220,58 @@ org-perf-bench:
 	  --output "$$OUTPUT" \
 	  $$ED_FLAG
 
+.PHONY: org-snapshot-build
+org-snapshot-build:
+	@set -eu; \
+	TENANT_ID="$${TENANT_ID:?TENANT_ID is required}"; \
+	HIERARCHY_TYPE="$${HIERARCHY_TYPE:-OrgUnit}"; \
+	AS_OF_DATE="$${AS_OF_DATE:-$$(date -u +%F)}"; \
+	REQ_ID="$${REQUEST_ID:-}"; \
+	APPLY_FLAG=""; \
+	if [ "$${APPLY:-0}" = "1" ]; then APPLY_FLAG="--apply"; fi; \
+	go run ./cmd/org-deep-read snapshot build \
+	  --tenant "$$TENANT_ID" \
+	  --hierarchy "$$HIERARCHY_TYPE" \
+	  --as-of-date "$$AS_OF_DATE" \
+	  $$APPLY_FLAG \
+	  $${REQ_ID:+--request-id "$$REQ_ID"}
+
+.PHONY: org-closure-build
+org-closure-build:
+	@set -eu; \
+	TENANT_ID="$${TENANT_ID:?TENANT_ID is required}"; \
+	HIERARCHY_TYPE="$${HIERARCHY_TYPE:-OrgUnit}"; \
+	REQ_ID="$${REQUEST_ID:-}"; \
+	APPLY_FLAG=""; \
+	if [ "$${APPLY:-0}" = "1" ]; then APPLY_FLAG="--apply"; fi; \
+	go run ./cmd/org-deep-read closure build \
+	  --tenant "$$TENANT_ID" \
+	  --hierarchy "$$HIERARCHY_TYPE" \
+	  $$APPLY_FLAG \
+	  $${REQ_ID:+--request-id "$$REQ_ID"}
+
+.PHONY: org-closure-activate
+org-closure-activate:
+	@set -eu; \
+	TENANT_ID="$${TENANT_ID:?TENANT_ID is required}"; \
+	HIERARCHY_TYPE="$${HIERARCHY_TYPE:-OrgUnit}"; \
+	BUILD_ID="$${BUILD_ID:?BUILD_ID is required}"; \
+	go run ./cmd/org-deep-read closure activate \
+	  --tenant "$$TENANT_ID" \
+	  --hierarchy "$$HIERARCHY_TYPE" \
+	  --build-id "$$BUILD_ID"
+
+.PHONY: org-closure-prune
+org-closure-prune:
+	@set -eu; \
+	TENANT_ID="$${TENANT_ID:?TENANT_ID is required}"; \
+	HIERARCHY_TYPE="$${HIERARCHY_TYPE:-OrgUnit}"; \
+	KEEP="$${KEEP:-2}"; \
+	go run ./cmd/org-deep-read closure prune \
+	  --tenant "$$TENANT_ID" \
+	  --hierarchy "$$HIERARCHY_TYPE" \
+	  --keep "$$KEEP"
+
 # Run tests with optional subcommands (test, watch, coverage, verbose, package, docker)
 test:
 	@if [ "$(word 1,$(MAKECMDGOALS))" != "test" ]; then \
