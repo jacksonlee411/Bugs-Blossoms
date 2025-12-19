@@ -9,15 +9,12 @@ import (
 )
 
 func TestPgUserQueryRepository_FindUsers(t *testing.T) {
-	t.Parallel()
-
 	// Create repository
 	userQueryRepo := query.NewPgUserQueryRepository()
+	fixtures := setupTest(t)
 
 	// Test without any filters
 	t.Run("find all users", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -31,8 +28,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test with search
 	t.Run("search users", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -47,8 +42,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test find by ID
 	t.Run("find user by ID", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		// Since we don't have a user yet, this should return an error
 		user, err := userQueryRepo.FindUserByID(fixtures.Ctx, 999999)
 		require.Error(t, err)
@@ -57,8 +50,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test with filters
 	t.Run("find users with filters", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -78,8 +69,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test with sorting
 	t.Run("find users with sorting", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -98,8 +87,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test with multiple sort fields
 	t.Run("find users with multiple sort fields", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -119,8 +106,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test with sorting and nulls last
 	t.Run("find users with nulls last sorting", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -139,8 +124,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test search with sorting
 	t.Run("search users with sorting", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -160,8 +143,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test with combined filters and sorting
 	t.Run("find users with filters and sorting", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -186,8 +167,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test with IN filter
 	t.Run("find users with IN filter", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.FindParams{
 			Limit:  10,
 			Offset: 0,
@@ -207,8 +186,6 @@ func TestPgUserQueryRepository_FindUsers(t *testing.T) {
 
 	// Test pagination
 	t.Run("find users with pagination", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		// First page
 		params1 := &query.FindParams{
 			Limit:  5,

@@ -205,6 +205,10 @@ type Configuration struct {
 	OrgChangeRequestsEnabled bool `env:"ORG_CHANGE_REQUESTS_ENABLED" envDefault:"false"`
 	OrgPreflightEnabled      bool `env:"ORG_PREFLIGHT_ENABLED" envDefault:"false"`
 
+	// DEV-PLAN-031: Org data quality checks & fixes (CLI guard rails).
+	OrgDataQualityEnabled   bool `env:"ORG_DATA_QUALITY_ENABLED" envDefault:"false"`
+	OrgDataFixesMaxCommands int  `env:"ORG_DATA_FIXES_MAX_COMMANDS" envDefault:"100"`
+
 	// Dev-only endpoints (e.g. /_dev/*). In production, these are disabled by default unless explicitly enabled.
 	EnableDevEndpoints bool `env:"ENABLE_DEV_ENDPOINTS" envDefault:"false"`
 
