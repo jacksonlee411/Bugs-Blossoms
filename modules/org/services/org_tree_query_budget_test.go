@@ -250,13 +250,14 @@ func buildPerfNodes(tb testing.TB, tenantID uuid.UUID, count int, profile string
 		siblingOrder := map[uuid.UUID]int{}
 		for i := 1; i < count; i++ {
 			parent := queue[0]
+			parentID := parent
 			nodeID := uuid.NewSHA1(namespace, []byte(fmt.Sprintf("node:%d", i)))
 			order := siblingOrder[parent]
 			siblingOrder[parent] = order + 1
 			nodes = append(nodes, perfNode{
 				ID:           nodeID,
 				Code:         fmt.Sprintf("D%04d", i),
-				ParentID:     &parent,
+				ParentID:     &parentID,
 				DisplayOrder: order,
 			})
 			queue = append(queue, nodeID)
@@ -269,11 +270,12 @@ func buildPerfNodes(tb testing.TB, tenantID uuid.UUID, count int, profile string
 	case "wide":
 		parent := rootID
 		for i := 1; i < count; i++ {
+			parentID := parent
 			nodeID := uuid.NewSHA1(namespace, []byte(fmt.Sprintf("node:%d", i)))
 			nodes = append(nodes, perfNode{
 				ID:           nodeID,
 				Code:         fmt.Sprintf("D%04d", i),
-				ParentID:     &parent,
+				ParentID:     &parentID,
 				DisplayOrder: i - 1,
 			})
 		}
@@ -281,11 +283,12 @@ func buildPerfNodes(tb testing.TB, tenantID uuid.UUID, count int, profile string
 	case "deep":
 		parent := rootID
 		for i := 1; i < count; i++ {
+			parentID := parent
 			nodeID := uuid.NewSHA1(namespace, []byte(fmt.Sprintf("node:%d", i)))
 			nodes = append(nodes, perfNode{
 				ID:           nodeID,
 				Code:         fmt.Sprintf("D%04d", i),
-				ParentID:     &parent,
+				ParentID:     &parentID,
 				DisplayOrder: 0,
 			})
 			parent = nodeID

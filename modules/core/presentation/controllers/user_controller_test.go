@@ -57,8 +57,6 @@ func TestUsersController_Delete_SelfDeletionPrevention(t *testing.T) {
 	// - modules/core/services/user_service_test.go (CanUserBeDeleted and Delete tests)
 	//
 	// These controller tests verify proper HTTP responses and status codes
-	t.Parallel()
-
 	// Create test environment with admin permissions for user deletion
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(modules.BuiltInModules...).
@@ -104,7 +102,15 @@ func TestUsersController_Delete_LastUserInTenant(t *testing.T) {
 func TestUsersController_Delete_Permissions(t *testing.T) {
 	// This test verifies authorization requirements for user deletion
 	// Note: The actual deletion functionality is comprehensively tested in service layer
-	t.Parallel()
+	suite := itf.NewSuiteBuilder(t).
+		WithModules(modules.BuiltInModules...).
+		Build()
+
+	controller := controllers.NewUsersController(suite.Env().App, &controllers.UsersControllerOptions{
+		BasePath:         "/users",
+		PermissionSchema: &rbac.PermissionSchema{}, // Empty schema for tests
+	})
+	suite.Register(controller)
 
 	testCases := []struct {
 		name           string
@@ -134,16 +140,7 @@ func TestUsersController_Delete_Permissions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			suite := itf.NewSuiteBuilder(t).
-				WithModules(modules.BuiltInModules...).
-				AsUser(tc.permissions...).
-				Build()
-
-			controller := controllers.NewUsersController(suite.Env().App, &controllers.UsersControllerOptions{
-				BasePath:         "/users",
-				PermissionSchema: &rbac.PermissionSchema{}, // Empty schema for tests
-			})
-			suite.Register(controller)
+			suite.AsUser(itf.User(tc.permissions...))
 
 			// Use non-existent user ID to test authorization without triggering deletion events
 			nonExistentID := uint(99999)
@@ -157,8 +154,6 @@ func TestUsersController_Delete_Permissions(t *testing.T) {
 }
 
 func TestUsersController_Delete_EdgeCases(t *testing.T) {
-	t.Parallel()
-
 	suite := itf.NewSuiteBuilder(t).
 		WithModules(modules.BuiltInModules...).
 		AsUser(permissions.UserDelete, permissions.UserRead).

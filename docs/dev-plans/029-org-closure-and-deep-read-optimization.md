@@ -1,10 +1,11 @@
 # DEV-PLAN-029：Org 闭包表与深层读取优化（Step 9）
 
-**状态**: 已评审（2025-12-18 01:44 UTC）
+**状态**: 已实施（2025-12-19 UTC）
 
 ## 0. 进度速记
 - 本计划对应 `docs/dev-plans/020-organization-lifecycle.md` 的步骤 9：为“全树/深层级读取”提供可扩展的读模型，热点查询禁止递归 CTE，优先走闭包表/快照。
 - 021 已落地 `org_edges.path (ltree)` 作为 M1 基线；029 在不改变写语义的前提下，新增读侧派生表与刷新任务，使读路径可平滑切换与一键回滚。
+- 已落地 closure/snapshot 表结构、build/activate/prune 工具（CLI+Make 入口）、读路径 feature flag、以及一致性与 query budget 测试；实测记录见 `docs/dev-records/DEV-PLAN-029-READINESS.md`。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：`docs/dev-plans/020-organization-lifecycle.md` → 步骤 9「优化深层级读取性能」。
@@ -18,12 +19,12 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] 引入时态闭包表 `org_hierarchy_closure`（ancestor/descendant/depth + effective window），仅供查询（写侧不做同步级联更新）。
-  - [ ] 引入 as-of 快照表 `org_hierarchy_snapshots`（按 `as_of_date` 索引），用于热点深读（全树/子树/路径拍平）走快照路径。
-  - [ ] 提供幂等刷新任务：支持按 `tenant_id + hierarchy_type`（以及可选 `as_of_date`）重建 closure/snapshots，并写入 build 元数据。
-  - [ ] 提供原子切换与回滚：通过 build pointer（active build）实现“新 build 就绪 → 秒级切换 → 可回退到上一个 build”。
-  - [ ] 读路径可切换：通过 feature flag/配置在 `edges(path)` 与 `closure/snapshots` 间切换，并保留回退路径。
-  - [ ] Readiness：准备 `docs/dev-records/DEV-PLAN-029-READINESS.md`，记录命令/耗时/结果与回滚演练。
+  - [x] 引入时态闭包表 `org_hierarchy_closure`（ancestor/descendant/depth + effective window），仅供查询（写侧不做同步级联更新）。
+  - [x] 引入 as-of 快照表 `org_hierarchy_snapshots`（按 `as_of_date` 索引），用于热点深读（全树/子树/路径拍平）走快照路径。
+  - [x] 提供幂等刷新任务：支持按 `tenant_id + hierarchy_type`（以及可选 `as_of_date`）重建 closure/snapshots，并写入 build 元数据。
+  - [x] 提供原子切换与回滚：通过 build pointer（active build）实现“新 build 就绪 → 秒级切换 → 可回退到上一个 build”。
+  - [x] 读路径可切换：通过 feature flag/配置在 `edges(path)` 与 `closure/snapshots` 间切换，并保留回退路径。
+  - [x] Readiness：准备 `docs/dev-records/DEV-PLAN-029-READINESS.md`，记录命令/耗时/结果与回滚演练。
 - **非目标（本计划明确不做）**：
   - 不改变 024/025 的写语义（Insert/Correct/Rescind/冻结窗口等）。
   - 不交付可视化导出/高级报表 API（归属 033）。
@@ -272,11 +273,11 @@ flowchart TD
   - `docs/dev-plans/027-org-performance-and-rollout.md`：query budget 与灰度/回滚口径参考。
   - `docs/dev-plans/033-org-visualization-and-reporting.md`：消费方（路径/报表）将依赖本计划产出。
 - **里程碑**：
-  1. [ ] 迁移落地：新增 closure/snapshot/build 表结构与索引（Org Atlas+Goose）
-  2. [ ] snapshot build 工具落地（可对单租户/日期生成并切换 active）
-  3. [ ] repo 查询切换（feature flag + 回退路径），并提供一致性对照测试
-  4. [ ] temporal closure build（如确需支持任意 as-of 时刻）
-  5. [ ] prune/回滚演练与 readiness 记录落盘
+  1. [x] 迁移落地：新增 closure/snapshot/build 表结构与索引（Org Atlas+Goose）
+  2. [x] snapshot build 工具落地（可对单租户/日期生成并切换 active）
+  3. [x] repo 查询切换（feature flag + 回退路径），并提供一致性对照测试
+  4. [x] temporal closure build（如确需支持任意 as-of 时刻）
+  5. [x] prune/回滚演练与 readiness 记录落盘
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **正确性（一致性）**：

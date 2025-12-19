@@ -197,6 +197,10 @@ type Configuration struct {
 	OrgReadStrategy   string `env:"ORG_READ_STRATEGY" envDefault:"path"`
 	OrgCacheEnabled   bool   `env:"ORG_CACHE_ENABLED" envDefault:"false"`
 
+	// DEV-PLAN-029: Org deep-read derived tables (closure/snapshots) rollout flags.
+	OrgDeepReadEnabled bool   `env:"ORG_DEEP_READ_ENABLED" envDefault:"false"`
+	OrgDeepReadBackend string `env:"ORG_DEEP_READ_BACKEND" envDefault:"edges"`
+
 	// DEV-PLAN-028: Org inheritance + role read side (default off).
 	OrgInheritanceEnabled bool `env:"ORG_INHERITANCE_ENABLED" envDefault:"false"`
 	OrgRoleReadEnabled    bool `env:"ORG_ROLE_READ_ENABLED" envDefault:"false"`
@@ -204,6 +208,10 @@ type Configuration struct {
 	// DEV-PLAN-030: Org change requests & preflight APIs.
 	OrgChangeRequestsEnabled bool `env:"ORG_CHANGE_REQUESTS_ENABLED" envDefault:"false"`
 	OrgPreflightEnabled      bool `env:"ORG_PREFLIGHT_ENABLED" envDefault:"false"`
+
+	// DEV-PLAN-031: Org data quality checks & fixes (CLI guard rails).
+	OrgDataQualityEnabled   bool `env:"ORG_DATA_QUALITY_ENABLED" envDefault:"false"`
+	OrgDataFixesMaxCommands int  `env:"ORG_DATA_FIXES_MAX_COMMANDS" envDefault:"100"`
 
 	// Dev-only endpoints (e.g. /_dev/*). In production, these are disabled by default unless explicitly enabled.
 	EnableDevEndpoints bool `env:"ENABLE_DEV_ENDPOINTS" envDefault:"false"`
@@ -354,6 +362,17 @@ func (c *Configuration) validateOrgRollout() error {
 		return fmt.Errorf("invalid ORG_READ_STRATEGY=%q (expected path|recursive)", c.OrgReadStrategy)
 	}
 	c.OrgReadStrategy = strategy
+
+	deepReadBackend := strings.ToLower(strings.TrimSpace(c.OrgDeepReadBackend))
+	if deepReadBackend == "" {
+		deepReadBackend = "edges"
+	}
+	switch deepReadBackend {
+	case "edges", "closure", "snapshot":
+	default:
+		return fmt.Errorf("invalid ORG_DEEP_READ_BACKEND=%q (expected edges|closure|snapshot)", c.OrgDeepReadBackend)
+	}
+	c.OrgDeepReadBackend = deepReadBackend
 
 	rawTenants := strings.TrimSpace(c.OrgRolloutTenants)
 	if rawTenants != "" {

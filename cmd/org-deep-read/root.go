@@ -9,23 +9,20 @@ import (
 
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:           "org-data",
-		Short:         "Org data import/export/rollback tool (DEV-PLAN-023)",
+		Use:           "org-deep-read",
+		Short:         "Org deep read build/refresh tool (DEV-PLAN-029)",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
 
-	cmd.AddCommand(newImportCmd())
-	cmd.AddCommand(newExportCmd())
-	cmd.AddCommand(newRollbackCmd())
-	cmd.AddCommand(newQualityCmd())
+	cmd.AddCommand(newSnapshotCmd())
+	cmd.AddCommand(newClosureCmd())
 	return cmd
 }
 
 func Execute() {
 	if err := newRootCmd().Execute(); err != nil {
-		code := exitCode(err)
 		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(code)
+		os.Exit(1)
 	}
 }
