@@ -366,6 +366,7 @@ flowchart LR
 
 ## 后续动作
 - 记录本计划在 `docs/dev-records/DEV-PLAN-020-ORG-PILOT.md` 的 PoC/联调日志。
+- （2025-12-19）已完成步骤 12：DEV-PLAN-032（权限映射与业务关联）落地；Readiness：`docs/dev-records/DEV-PLAN-032-READINESS.md`。
 - 与产品/HR BP 对齐 Workday 关键流程（Supervisory、Matrix、Effective Dating）。
 - 建立 Workday parity checklist（含 BP、安全域、Retro、Position 管理）并在每个里程碑更新。
 - 准备下一阶段（DEV-PLAN-021）聚焦“组织预算与人员编制”。

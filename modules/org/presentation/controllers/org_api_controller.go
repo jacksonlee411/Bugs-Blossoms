@@ -76,6 +76,16 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/roles", c.GetRoles).Methods(http.MethodGet)
 	api.HandleFunc("/role-assignments", c.GetRoleAssignments).Methods(http.MethodGet)
 
+	api.HandleFunc("/security-group-mappings", c.GetSecurityGroupMappings).Methods(http.MethodGet)
+	api.HandleFunc("/security-group-mappings", c.CreateSecurityGroupMapping).Methods(http.MethodPost)
+	api.HandleFunc("/security-group-mappings/{id}:rescind", c.RescindSecurityGroupMapping).Methods(http.MethodPost)
+
+	api.HandleFunc("/links", c.GetLinks).Methods(http.MethodGet)
+	api.HandleFunc("/links", c.CreateLink).Methods(http.MethodPost)
+	api.HandleFunc("/links/{id}:rescind", c.RescindLink).Methods(http.MethodPost)
+
+	api.HandleFunc("/permission-preview", c.GetPermissionPreview).Methods(http.MethodGet)
+
 	api.HandleFunc("/snapshot", c.GetSnapshot).Methods(http.MethodGet)
 	api.HandleFunc("/batch", c.Batch).Methods(http.MethodPost)
 
@@ -413,6 +423,598 @@ func (c *OrgAPIController) GetRoleAssignments(w http.ResponseWriter, r *http.Req
 		EffectiveDate:    effectiveDate.UTC().Format(time.RFC3339),
 		IncludeInherited: includeInherited,
 		Items:            items,
+	})
+}
+
+type securityGroupMappingItem struct {
+	ID               string                  `json:"id"`
+	OrgNodeID        string                  `json:"org_node_id"`
+	SecurityGroupKey string                  `json:"security_group_key"`
+	AppliesToSubtree bool                    `json:"applies_to_subtree"`
+	EffectiveWindow  effectiveWindowResponse `json:"effective_window"`
+}
+
+type listSecurityGroupMappingsResponse struct {
+	TenantID      string                     `json:"tenant_id"`
+	EffectiveDate *string                    `json:"effective_date"`
+	Items         []securityGroupMappingItem `json:"items"`
+	NextCursor    *string                    `json:"next_cursor"`
+}
+
+func (c *OrgAPIController) GetSecurityGroupMappings(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgSecurityGroupMappingsObj, "admin") {
+		return
+	}
+
+	var orgNodeID *uuid.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("org_node_id")); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "org_node_id is invalid")
+			return
+		}
+		orgNodeID = &id
+	}
+
+	var securityGroupKey *string
+	if raw := strings.TrimSpace(r.URL.Query().Get("security_group_key")); raw != "" {
+		securityGroupKey = &raw
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+	var asOfPtr *time.Time
+	if !asOf.IsZero() {
+		asOfPtr = &asOf
+	}
+
+	limit := 200
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "limit is invalid")
+			return
+		}
+		limit = n
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	var cursorAt *time.Time
+	var cursorID *uuid.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("cursor")); raw != "" {
+		at, id, err := parseEffectiveIDCursor(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "cursor is invalid")
+			return
+		}
+		cursorAt, cursorID = at, id
+	}
+
+	res, err := c.org.ListSecurityGroupMappings(r.Context(), tenantID, services.SecurityGroupMappingListFilter{
+		OrgNodeID:        orgNodeID,
+		SecurityGroupKey: securityGroupKey,
+		AsOf:             asOfPtr,
+		Limit:            limit,
+		CursorAt:         cursorAt,
+		CursorID:         cursorID,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	items := make([]securityGroupMappingItem, 0, len(res.Items))
+	for _, row := range res.Items {
+		items = append(items, securityGroupMappingItem{
+			ID:               row.ID.String(),
+			OrgNodeID:        row.OrgNodeID.String(),
+			SecurityGroupKey: row.SecurityGroupKey,
+			AppliesToSubtree: row.AppliesToSubtree,
+			EffectiveWindow: effectiveWindowResponse{
+				EffectiveDate: row.EffectiveDate.UTC().Format(time.RFC3339),
+				EndDate:       row.EndDate.UTC().Format(time.RFC3339),
+			},
+		})
+	}
+
+	var ed *string
+	if res.EffectiveDate != nil && !res.EffectiveDate.IsZero() {
+		v := res.EffectiveDate.UTC().Format(time.RFC3339)
+		ed = &v
+	}
+
+	writeJSON(w, http.StatusOK, listSecurityGroupMappingsResponse{
+		TenantID:      tenantID.String(),
+		EffectiveDate: ed,
+		Items:         items,
+		NextCursor:    res.NextCursor,
+	})
+}
+
+type createSecurityGroupMappingRequest struct {
+	OrgNodeID        uuid.UUID `json:"org_node_id"`
+	SecurityGroupKey string    `json:"security_group_key"`
+	AppliesToSubtree bool      `json:"applies_to_subtree"`
+	EffectiveDate    string    `json:"effective_date"`
+}
+
+func (c *OrgAPIController) CreateSecurityGroupMapping(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgSecurityGroupMappingsEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgSecurityGroupMappingsObj, "admin") {
+		return
+	}
+
+	var req createSecurityGroupMappingRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.CreateSecurityGroupMapping(r.Context(), tenantID, requestID, initiatorID, services.CreateSecurityGroupMappingInput{
+		OrgNodeID:        req.OrgNodeID,
+		SecurityGroupKey: req.SecurityGroupKey,
+		AppliesToSubtree: req.AppliesToSubtree,
+		EffectiveDate:    effectiveDate,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type response struct {
+		ID              string                  `json:"id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusCreated, response{
+		ID: res.ID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type rescindSecurityGroupMappingRequest struct {
+	EffectiveDate string `json:"effective_date"`
+	Reason        string `json:"reason"`
+}
+
+func (c *OrgAPIController) RescindSecurityGroupMapping(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgSecurityGroupMappingsEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgSecurityGroupMappingsObj, "admin") {
+		return
+	}
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req rescindSecurityGroupMappingRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.RescindSecurityGroupMapping(r.Context(), tenantID, requestID, initiatorID, services.RescindSecurityGroupMappingInput{
+		ID:            id,
+		EffectiveDate: effectiveDate,
+		Reason:        req.Reason,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type response struct {
+		ID              string                  `json:"id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, response{
+		ID: res.ID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type orgLinkItem struct {
+	ID              string                  `json:"id"`
+	OrgNodeID       string                  `json:"org_node_id"`
+	ObjectType      string                  `json:"object_type"`
+	ObjectKey       string                  `json:"object_key"`
+	LinkType        string                  `json:"link_type"`
+	Metadata        json.RawMessage         `json:"metadata"`
+	EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+}
+
+type listOrgLinksResponse struct {
+	TenantID      string        `json:"tenant_id"`
+	EffectiveDate *string       `json:"effective_date"`
+	Items         []orgLinkItem `json:"items"`
+	NextCursor    *string       `json:"next_cursor"`
+}
+
+func (c *OrgAPIController) GetLinks(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgLinksAuthzObject, "admin") {
+		return
+	}
+
+	var orgNodeID *uuid.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("org_node_id")); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "org_node_id is invalid")
+			return
+		}
+		orgNodeID = &id
+	}
+
+	var objectType *string
+	if raw := strings.TrimSpace(r.URL.Query().Get("object_type")); raw != "" {
+		objectType = &raw
+	}
+	var objectKey *string
+	if raw := strings.TrimSpace(r.URL.Query().Get("object_key")); raw != "" {
+		objectKey = &raw
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+	var asOfPtr *time.Time
+	if !asOf.IsZero() {
+		asOfPtr = &asOf
+	}
+
+	limit := 200
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "limit is invalid")
+			return
+		}
+		limit = n
+	}
+	if limit < 1 {
+		limit = 1
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+
+	var cursorAt *time.Time
+	var cursorID *uuid.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("cursor")); raw != "" {
+		at, id, err := parseEffectiveIDCursor(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "cursor is invalid")
+			return
+		}
+		cursorAt, cursorID = at, id
+	}
+
+	res, err := c.org.ListOrgLinks(r.Context(), tenantID, services.OrgLinkListFilter{
+		OrgNodeID:  orgNodeID,
+		ObjectType: objectType,
+		ObjectKey:  objectKey,
+		AsOf:       asOfPtr,
+		Limit:      limit,
+		CursorAt:   cursorAt,
+		CursorID:   cursorID,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	items := make([]orgLinkItem, 0, len(res.Items))
+	for _, row := range res.Items {
+		items = append(items, orgLinkItem{
+			ID:         row.ID.String(),
+			OrgNodeID:  row.OrgNodeID.String(),
+			ObjectType: row.ObjectType,
+			ObjectKey:  row.ObjectKey,
+			LinkType:   row.LinkType,
+			Metadata:   row.Metadata,
+			EffectiveWindow: effectiveWindowResponse{
+				EffectiveDate: row.EffectiveDate.UTC().Format(time.RFC3339),
+				EndDate:       row.EndDate.UTC().Format(time.RFC3339),
+			},
+		})
+	}
+
+	var ed *string
+	if res.EffectiveDate != nil && !res.EffectiveDate.IsZero() {
+		v := res.EffectiveDate.UTC().Format(time.RFC3339)
+		ed = &v
+	}
+
+	writeJSON(w, http.StatusOK, listOrgLinksResponse{
+		TenantID:      tenantID.String(),
+		EffectiveDate: ed,
+		Items:         items,
+		NextCursor:    res.NextCursor,
+	})
+}
+
+type createLinkRequest struct {
+	OrgNodeID     uuid.UUID      `json:"org_node_id"`
+	ObjectType    string         `json:"object_type"`
+	ObjectKey     string         `json:"object_key"`
+	LinkType      string         `json:"link_type"`
+	Metadata      map[string]any `json:"metadata"`
+	EffectiveDate string         `json:"effective_date"`
+}
+
+func (c *OrgAPIController) CreateLink(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgLinksEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgLinksAuthzObject, "admin") {
+		return
+	}
+
+	var req createLinkRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.CreateOrgLink(r.Context(), tenantID, requestID, initiatorID, services.CreateOrgLinkInput{
+		OrgNodeID:     req.OrgNodeID,
+		ObjectType:    req.ObjectType,
+		ObjectKey:     req.ObjectKey,
+		LinkType:      req.LinkType,
+		Metadata:      req.Metadata,
+		EffectiveDate: effectiveDate,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type response struct {
+		ID              string                  `json:"id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusCreated, response{
+		ID: res.ID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type rescindLinkRequest struct {
+	EffectiveDate string `json:"effective_date"`
+	Reason        string `json:"reason"`
+}
+
+func (c *OrgAPIController) RescindLink(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgLinksEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgLinksAuthzObject, "admin") {
+		return
+	}
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req rescindLinkRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.RescindOrgLink(r.Context(), tenantID, requestID, initiatorID, services.RescindOrgLinkInput{
+		ID:            id,
+		EffectiveDate: effectiveDate,
+		Reason:        req.Reason,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type response struct {
+		ID              string                  `json:"id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, response{
+		ID: res.ID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type permissionPreviewSecurityGroupItem struct {
+	SecurityGroupKey string `json:"security_group_key"`
+	AppliesToSubtree bool   `json:"applies_to_subtree"`
+	SourceOrgNodeID  string `json:"source_org_node_id"`
+	SourceDepth      int    `json:"source_depth"`
+}
+
+type permissionPreviewResponse struct {
+	TenantID       string                               `json:"tenant_id"`
+	OrgNodeID      string                               `json:"org_node_id"`
+	EffectiveDate  string                               `json:"effective_date"`
+	SecurityGroups []permissionPreviewSecurityGroupItem `json:"security_groups"`
+	Links          []services.PermissionPreviewLink     `json:"links"`
+	Warnings       []string                             `json:"warnings"`
+}
+
+func (c *OrgAPIController) GetPermissionPreview(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !requireOrgPermissionPreviewEnabled(w, requestID) {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPermissionPreviewAuthzObj, "admin") {
+		return
+	}
+
+	orgNodeRaw := strings.TrimSpace(r.URL.Query().Get("org_node_id"))
+	if orgNodeRaw == "" {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "org_node_id is required")
+		return
+	}
+	orgNodeID, err := uuid.Parse(orgNodeRaw)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "org_node_id is invalid")
+		return
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+	if asOf.IsZero() {
+		asOf = time.Now().UTC()
+	}
+
+	includeRaw := strings.TrimSpace(r.URL.Query().Get("include"))
+	includeSecurityGroups := true
+	includeLinks := true
+	if includeRaw != "" {
+		includeSecurityGroups = false
+		includeLinks = false
+		for _, part := range strings.Split(includeRaw, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			switch part {
+			case "security_groups":
+				includeSecurityGroups = true
+			case "links":
+				includeLinks = true
+			default:
+				writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "include is invalid")
+				return
+			}
+		}
+	}
+
+	limitLinks := 200
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit_links")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "limit_links is invalid")
+			return
+		}
+		limitLinks = n
+	}
+	if limitLinks < 1 {
+		limitLinks = 1
+	}
+	if limitLinks > 1000 {
+		limitLinks = 1000
+	}
+
+	res, err := c.org.PermissionPreview(r.Context(), tenantID, services.PermissionPreviewInput{
+		OrgNodeID:             orgNodeID,
+		EffectiveDate:         asOf,
+		IncludeSecurityGroups: includeSecurityGroups,
+		IncludeLinks:          includeLinks,
+		LimitLinks:            limitLinks,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	sg := make([]permissionPreviewSecurityGroupItem, 0, len(res.SecurityGroups))
+	for _, row := range res.SecurityGroups {
+		sg = append(sg, permissionPreviewSecurityGroupItem{
+			SecurityGroupKey: row.SecurityGroupKey,
+			AppliesToSubtree: row.AppliesToSubtree,
+			SourceOrgNodeID:  row.SourceOrgNodeID.String(),
+			SourceDepth:      row.SourceDepth,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, permissionPreviewResponse{
+		TenantID:       res.TenantID.String(),
+		OrgNodeID:      res.OrgNodeID.String(),
+		EffectiveDate:  res.EffectiveDate.UTC().Format(time.RFC3339),
+		SecurityGroups: sg,
+		Links:          res.Links,
+		Warnings:       res.Warnings,
 	})
 }
 
@@ -1740,6 +2342,120 @@ func (c *OrgAPIController) Batch(w http.ResponseWriter, r *http.Request) {
 				eventsEnqueued += len(res.GeneratedEvents)
 			}
 
+		case "security_group_mapping.create":
+			if !configuration.Use().OrgSecurityGroupMappingsEnabled {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusNotFound, "ORG_NOT_FOUND", "not found")
+				return
+			}
+			var body createSecurityGroupMappingRequest
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.CreateSecurityGroupMapping(txCtx, tenantID, requestID, initiatorID, services.CreateSecurityGroupMappingInput{
+				OrgNodeID:        body.OrgNodeID,
+				SecurityGroupKey: body.SecurityGroupKey,
+				AppliesToSubtree: body.AppliesToSubtree,
+				EffectiveDate:    effectiveDate,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.ID.String()}})
+
+		case "security_group_mapping.rescind":
+			if !configuration.Use().OrgSecurityGroupMappingsEnabled {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusNotFound, "ORG_NOT_FOUND", "not found")
+				return
+			}
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				rescindSecurityGroupMappingRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.RescindSecurityGroupMapping(txCtx, tenantID, requestID, initiatorID, services.RescindSecurityGroupMappingInput{
+				ID:            body.ID,
+				EffectiveDate: effectiveDate,
+				Reason:        body.Reason,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.ID.String()}})
+
+		case "link.create":
+			if !configuration.Use().OrgLinksEnabled {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusNotFound, "ORG_NOT_FOUND", "not found")
+				return
+			}
+			var body createLinkRequest
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.CreateOrgLink(txCtx, tenantID, requestID, initiatorID, services.CreateOrgLinkInput{
+				OrgNodeID:     body.OrgNodeID,
+				ObjectType:    body.ObjectType,
+				ObjectKey:     body.ObjectKey,
+				LinkType:      body.LinkType,
+				Metadata:      body.Metadata,
+				EffectiveDate: effectiveDate,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.ID.String()}})
+
+		case "link.rescind":
+			if !configuration.Use().OrgLinksEnabled {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusNotFound, "ORG_NOT_FOUND", "not found")
+				return
+			}
+			var body struct {
+				ID uuid.UUID `json:"id"`
+				rescindLinkRequest
+			}
+			if err := json.Unmarshal(payload, &body); err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
+				return
+			}
+			effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+			if err != nil {
+				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "effective_date is required")
+				return
+			}
+			res, err := c.org.RescindOrgLink(txCtx, tenantID, requestID, initiatorID, services.RescindOrgLinkInput{
+				ID:            body.ID,
+				EffectiveDate: effectiveDate,
+				Reason:        body.Reason,
+			})
+			if err != nil {
+				writeBatchServiceError(w, requestID, i, cmdType, err)
+				return
+			}
+			results = append(results, batchCommandResult{Index: i, Type: cmdType, Ok: true, Result: map[string]any{"id": res.ID.String()}})
+
 		default:
 			writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "unknown type")
 			return
@@ -2522,6 +3238,88 @@ func (c *OrgAPIController) executePreflightCommand(ctx context.Context, tenantID
 			Reason:        body.Reason,
 		})
 		return err
+	case "security_group_mapping.create":
+		if !configuration.Use().OrgSecurityGroupMappingsEnabled {
+			return &services.ServiceError{Status: http.StatusNotFound, Code: "ORG_NOT_FOUND", Message: "not found"}
+		}
+		var body createSecurityGroupMappingRequest
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		_, err = c.org.CreateSecurityGroupMapping(ctx, tenantID, requestID, initiatorID, services.CreateSecurityGroupMappingInput{
+			OrgNodeID:        body.OrgNodeID,
+			SecurityGroupKey: body.SecurityGroupKey,
+			AppliesToSubtree: body.AppliesToSubtree,
+			EffectiveDate:    effectiveDate,
+		})
+		return err
+	case "security_group_mapping.rescind":
+		if !configuration.Use().OrgSecurityGroupMappingsEnabled {
+			return &services.ServiceError{Status: http.StatusNotFound, Code: "ORG_NOT_FOUND", Message: "not found"}
+		}
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			rescindSecurityGroupMappingRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		_, err = c.org.RescindSecurityGroupMapping(ctx, tenantID, requestID, initiatorID, services.RescindSecurityGroupMappingInput{
+			ID:            body.ID,
+			EffectiveDate: effectiveDate,
+			Reason:        body.Reason,
+		})
+		return err
+	case "link.create":
+		if !configuration.Use().OrgLinksEnabled {
+			return &services.ServiceError{Status: http.StatusNotFound, Code: "ORG_NOT_FOUND", Message: "not found"}
+		}
+		var body createLinkRequest
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		_, err = c.org.CreateOrgLink(ctx, tenantID, requestID, initiatorID, services.CreateOrgLinkInput{
+			OrgNodeID:     body.OrgNodeID,
+			ObjectType:    body.ObjectType,
+			ObjectKey:     body.ObjectKey,
+			LinkType:      body.LinkType,
+			Metadata:      body.Metadata,
+			EffectiveDate: effectiveDate,
+		})
+		return err
+	case "link.rescind":
+		if !configuration.Use().OrgLinksEnabled {
+			return &services.ServiceError{Status: http.StatusNotFound, Code: "ORG_NOT_FOUND", Message: "not found"}
+		}
+		var body struct {
+			ID uuid.UUID `json:"id"`
+			rescindLinkRequest
+		}
+		if err := json.Unmarshal(payload, &body); err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
+		}
+		effectiveDate, err := parseRequiredEffectiveDate(body.EffectiveDate)
+		if err != nil {
+			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "effective_date is required", Cause: err}
+		}
+		_, err = c.org.RescindOrgLink(ctx, tenantID, requestID, initiatorID, services.RescindOrgLinkInput{
+			ID:            body.ID,
+			EffectiveDate: effectiveDate,
+			Reason:        body.Reason,
+		})
+		return err
 	default:
 		return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "unknown type"}
 	}
@@ -2692,6 +3490,10 @@ func isSupportedBatchCommandType(t string) bool {
 		return true
 	case "assignment.create", "assignment.update", "assignment.correct", "assignment.rescind":
 		return true
+	case "security_group_mapping.create", "security_group_mapping.rescind":
+		return true
+	case "link.create", "link.rescind":
+		return true
 	default:
 		return false
 	}
@@ -2707,6 +3509,30 @@ func requireOrgChangeRequestsEnabled(w http.ResponseWriter, requestID string) bo
 
 func requireOrgPreflightEnabled(w http.ResponseWriter, requestID string) bool {
 	if configuration.Use().OrgPreflightEnabled {
+		return true
+	}
+	writeAPIError(w, http.StatusNotFound, requestID, "ORG_NOT_FOUND", "not found")
+	return false
+}
+
+func requireOrgSecurityGroupMappingsEnabled(w http.ResponseWriter, requestID string) bool {
+	if configuration.Use().OrgSecurityGroupMappingsEnabled {
+		return true
+	}
+	writeAPIError(w, http.StatusNotFound, requestID, "ORG_NOT_FOUND", "not found")
+	return false
+}
+
+func requireOrgLinksEnabled(w http.ResponseWriter, requestID string) bool {
+	if configuration.Use().OrgLinksEnabled {
+		return true
+	}
+	writeAPIError(w, http.StatusNotFound, requestID, "ORG_NOT_FOUND", "not found")
+	return false
+}
+
+func requireOrgPermissionPreviewEnabled(w http.ResponseWriter, requestID string) bool {
+	if configuration.Use().OrgPermissionPreviewEnabled {
 		return true
 	}
 	writeAPIError(w, http.StatusNotFound, requestID, "ORG_NOT_FOUND", "not found")
@@ -2750,6 +3576,32 @@ func parseChangeRequestCursor(raw string) (*time.Time, *uuid.UUID, error) {
 		return nil, nil, fmt.Errorf("invalid cursor")
 	}
 	rest := strings.TrimPrefix(raw, "updated_at:")
+	atStr, idStr, ok := strings.Cut(rest, ":id:")
+	if !ok || strings.TrimSpace(atStr) == "" || strings.TrimSpace(idStr) == "" {
+		return nil, nil, fmt.Errorf("invalid cursor")
+	}
+
+	at, err := time.Parse(time.RFC3339, atStr)
+	if err != nil {
+		return nil, nil, err
+	}
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return nil, nil, err
+	}
+	at = at.UTC()
+	return &at, &id, nil
+}
+
+func parseEffectiveIDCursor(raw string) (*time.Time, *uuid.UUID, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil, nil
+	}
+	if !strings.HasPrefix(raw, "effective_date:") {
+		return nil, nil, fmt.Errorf("invalid cursor")
+	}
+	rest := strings.TrimPrefix(raw, "effective_date:")
 	atStr, idStr, ok := strings.Cut(rest, ":id:")
 	if !ok || strings.TrimSpace(atStr) == "" || strings.TrimSpace(idStr) == "" {
 		return nil, nil, fmt.Errorf("invalid cursor")

@@ -209,6 +209,11 @@ type Configuration struct {
 	OrgChangeRequestsEnabled bool `env:"ORG_CHANGE_REQUESTS_ENABLED" envDefault:"false"`
 	OrgPreflightEnabled      bool `env:"ORG_PREFLIGHT_ENABLED" envDefault:"false"`
 
+	// DEV-PLAN-032: Org permission mapping & associations (default off).
+	OrgSecurityGroupMappingsEnabled bool `env:"ORG_SECURITY_GROUP_MAPPINGS_ENABLED" envDefault:"false"`
+	OrgLinksEnabled                 bool `env:"ORG_LINKS_ENABLED" envDefault:"false"`
+	OrgPermissionPreviewEnabled     bool `env:"ORG_PERMISSION_PREVIEW_ENABLED" envDefault:"false"`
+
 	// DEV-PLAN-031: Org data quality checks & fixes (CLI guard rails).
 	OrgDataQualityEnabled   bool `env:"ORG_DATA_QUALITY_ENABLED" envDefault:"false"`
 	OrgDataFixesMaxCommands int  `env:"ORG_DATA_FIXES_MAX_COMMANDS" envDefault:"100"`
