@@ -23,10 +23,11 @@
 
 ## 3. 复现步骤（导入前校验 → 导入 → 对账 → 回滚）
 
-> 说明：`cmd/org-data import` 默认 dry-run；显式 `--apply` 才写库。seed 模式要求目标租户为空租户（见 023 安全网）。
+> 说明：`cmd/org-data import` 默认 dry-run；显式 `--apply` 才写库。seed 模式要求目标租户 **Org 数据为空**（见 023 安全网）；可使用 Default Tenant，但务必保证其 Org 数据为空。
 
 1. 选择租户：
    - `TENANT_ID=<tenant_uuid>`
+   - 本地演示推荐：`TENANT_ID=00000000-0000-0000-0000-000000000001`（Default Tenant）
 2. Dry-run（导入前校验，不落库）：
    - `go run ./cmd/org-data import --tenant $TENANT_ID --input docs/samples/org/036-manufacturing`
 3. Apply（落库 + manifest）：
@@ -75,3 +76,22 @@
 - 导入后对账摘要（JSON，一行）：
   - `{"dataset_id":"org-036-manufacturing","tenant_id":"00000000-0000-0000-0000-000000000001","as_of_date":"2025-01-01T00:00:00Z","nodes_total":254,"max_depth":16,"root_name":"飞虫与鲜花","root_children":["房地产","物业管理","互联网行业"],"manifest_path":"/tmp/org-036-default-tenant/import_manifest_20251218T124901Z_6129123c-2ef3-4076-9d3f-1044d4a0dc52.json"}`
 - 说明：本次导入用于“保留示例数据”，未执行回滚；如需清理，请按 023 使用 manifest 回滚。
+
+## 6. 实际跑通记录（2025-12-19，本地 5440，保留数据）
+
+- 时间：2025-12-19 08:29 UTC
+- DB：`postgres://postgres@localhost:5440/iota_erp_020`（PG17，`compose.dev.yml`）
+- Redis：`localhost:6381`
+- tenant：`00000000-0000-0000-0000-000000000001`（Default Tenant；导入前 `org_nodes=0`）
+- 预置（环境准备）：
+  - `DB_HOST=localhost DB_PORT=5440 DB_USER=postgres DB_PASSWORD=postgres DB_NAME=iota_erp_020 make db migrate up`
+  - `DB_HOST=localhost DB_PORT=5440 DB_USER=postgres DB_PASSWORD=postgres DB_NAME=iota_erp_020 make org migrate up`
+- import dry-run 输出（stdout JSON 一行）：
+  - `{"status":"dry_run","run_id":"cf5df8ab-535c-4e7c-a0ae-6ea04fb4916c","tenant_id":"00000000-0000-0000-0000-000000000001","backend":"db","mode":"seed","apply":false,"input_dir":"docs/samples/org/036-manufacturing","output_dir":"docs/samples/org/036-manufacturing","counts":{"nodes_rows":254,"positions_rows":5,"assignments_rows":5}}`
+- import apply 输出（stdout JSON 一行）：
+  - `{"status":"applied","run_id":"80b3cb9b-a71b-451d-b797-30d0cff053fa","tenant_id":"00000000-0000-0000-0000-000000000001","backend":"db","mode":"seed","apply":true,"input_dir":"docs/samples/org/036-manufacturing","output_dir":"/tmp/org-036-00000000-0000-0000-0000-000000000001","manifest_version":1,"counts":{"nodes_rows":254,"positions_rows":5,"assignments_rows":5}}`
+- 导入后对账摘要（JSON，一行）：
+  - `{"dataset_id" : "org-036-manufacturing", "tenant_id" : "00000000-0000-0000-0000-000000000001", "as_of_date" : "2025-01-01T00:00:00Z", "nodes_total" : 254, "max_depth" : 16, "root_name" : "飞虫与鲜花", "root_children" : ["互联网行业", "房地产", "物业管理"], "manifest_path" : "/tmp/org-036-00000000-0000-0000-0000-000000000001/import_manifest_20251219T082907Z_80b3cb9b-a71b-451d-b797-30d0cff053fa.json"}`
+- deep-read（可选，用于 029/035 的查询冒烟）：
+  - closure build：`{"command":"closure build","tenant_id":"00000000-0000-0000-0000-000000000001","build_id":"ee054f9b-36e9-435f-a9eb-80f2d15ae49f","activated":true,"row_count":1191,"max_depth":16}`
+  - snapshot build：`{"command":"snapshot build","tenant_id":"00000000-0000-0000-0000-000000000001","as_of_date":"2025-01-01","build_id":"919c1180-3906-4b94-9c34-f11439e66985","activated":true,"row_count":1191,"max_depth":16}`
