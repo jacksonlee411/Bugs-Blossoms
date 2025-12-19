@@ -142,6 +142,7 @@ modules/{module}/
 - DEV-PLAN-029 Readiness：`docs/dev-records/DEV-PLAN-029-READINESS.md`
 - DEV-PLAN-030 Readiness：`docs/dev-records/DEV-PLAN-030-READINESS.md`
 - DEV-PLAN-031 Readiness：`docs/dev-records/DEV-PLAN-031-READINESS.md`
+- DEV-PLAN-034 Readiness：`docs/dev-records/DEV-PLAN-034-READINESS.md`
 - DEV-PLAN-035 Readiness：`docs/dev-records/DEV-PLAN-035-READINESS.md`
 - 全局路由策略统一（DEV-PLAN-018）：`docs/dev-plans/018-routing-strategy.md`
 - DEV-PLAN-018A 路由策略评审输入：`docs/dev-plans/018A-routing-strategy-review.md`

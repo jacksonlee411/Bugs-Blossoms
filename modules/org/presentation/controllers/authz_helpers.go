@@ -26,6 +26,7 @@ var (
 	orgSecurityGroupMappingsObj   = authz.ObjectName("org", "security_group_mappings")
 	orgLinksAuthzObject           = authz.ObjectName("org", "links")
 	orgPermissionPreviewAuthzObj  = authz.ObjectName("org", "permission_preview")
+	orgOpsAuthzObject             = authz.ObjectName("org", "ops")
 )
 
 func ensureOrgAuthz(

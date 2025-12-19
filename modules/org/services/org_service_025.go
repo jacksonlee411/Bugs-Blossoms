@@ -144,7 +144,7 @@ func (s *OrgService) CorrectNode(ctx context.Context, tenantID uuid.UUID, reques
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -318,7 +318,7 @@ func (s *OrgService) RescindNode(ctx context.Context, tenantID uuid.UUID, reques
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -483,7 +483,7 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -662,7 +662,7 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -812,7 +812,7 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -924,7 +924,7 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }

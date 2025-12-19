@@ -191,9 +191,11 @@ func (s *OrgService) GetHierarchyResolvedAttributes(ctx context.Context, tenantI
 	if s != nil && s.cache != nil {
 		if cachedAny, ok := s.cache.Get(cacheKey); ok {
 			if cached, ok := cachedAny.(cachedHierarchyResolvedAttributes); ok {
+				recordCacheRequest("hierarchy", true)
 				return cached.Nodes, cached.AsOf, cached.Sources, cached.RuleAttributes, nil
 			}
 		}
+		recordCacheRequest("hierarchy", false)
 	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (cachedHierarchyResolvedAttributes, error) {
@@ -275,9 +277,11 @@ func (s *OrgService) ListRoles(ctx context.Context, tenantID uuid.UUID) ([]OrgRo
 	if s != nil && s.cache != nil {
 		if cachedAny, ok := s.cache.Get(cacheKey); ok {
 			if cached, ok := cachedAny.([]OrgRole); ok {
+				recordCacheRequest("snapshot", true)
 				return cached, nil
 			}
 		}
+		recordCacheRequest("snapshot", false)
 	}
 
 	roles, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]OrgRole, error) {
@@ -335,9 +339,11 @@ func (s *OrgService) ListRoleAssignments(
 	if s != nil && s.cache != nil {
 		if cachedAny, ok := s.cache.Get(cacheKey); ok {
 			if cached, ok := cachedAny.(cachedRoleAssignments); ok {
+				recordCacheRequest("snapshot", true)
 				return cached.Items, cached.AsOf, nil
 			}
 		}
+		recordCacheRequest("snapshot", false)
 	}
 
 	const hierarchyType = "OrgUnit"

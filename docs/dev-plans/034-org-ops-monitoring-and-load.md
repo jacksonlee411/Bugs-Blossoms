@@ -5,6 +5,7 @@
 ## 0. 进度速记
 - 本计划交付“可观测性（metrics/health）+ 可重复压测 + 运维脚本入口”，用于支撑 Org 长期运行与灰度/回滚演练。
 - 线上热点查询禁止递归：递归 CTE 仅允许在离线 build/压测数据构建中使用；在线读路径必须复用 029 的 deep-read 后端选择。
+- 已实现：`/org/api/ops/health`、Org v1 指标、`org-load`（见 `docs/dev-records/DEV-PLAN-034-READINESS.md`）。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：`docs/dev-plans/020-organization-lifecycle.md` **步骤 14：运维、治理与压测**。
@@ -22,22 +23,22 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] **指标（Prometheus）**：定义并落地 Org 领域指标（见 §4.1），覆盖：
+  - [X] **指标（Prometheus）**：定义并落地 Org 领域指标（见 §4.1），覆盖：
     - API 维度（请求量/错误率/延迟）
     - DB 维度（关键写冲突/重试、query budget 守卫）
     - Cache 维度（命中率、失效次数）
     - Outbox 维度（复用 017/`pkg/outbox` 指标，确保 org_outbox 纳入）
     - Deep-read build（029 closure/snapshot build 时长、行数、成功/失败）
-  - [ ] **健康/就绪检查**：
-    - [ ] 全局 `/health`（既有）保持轻量、快速、生产受保护（OpsGuard）。
-    - [ ] 新增 Org 级 `/org/api/ops/health`（见 §5.3）：输出“可执行的排障线索”（outbox backlog、snapshot build freshness、cache 状态），并要求 `org.ops admin`。
-  - [ ] **自动化压测（可重复）**：
-    - [ ] 提供 `org-load`（Go CLI）或等价脚本入口（见 §5.4），覆盖读/写混合场景，输出 `org_load_report.v1`（见 §4.3）。
-    - [ ] 固化最小压测 profile（1k/10k 节点、混合读写），并定义阈值/失败判定（见 §9）。
-  - [ ] **运维脚本入口（统一）**：
-    - [ ] 复用并收敛已有能力：导入/回滚（023）、灰度/回滚（027）、snapshot/closure refresh/activate/prune（029）、质量修复（031）。
-    - [ ] 以 `Makefile` 入口为准，避免“脚本散落且无法追溯”。
-  - [ ] Readiness：新增 `docs/dev-records/DEV-PLAN-034-READINESS.md`（实现阶段落盘），记录门禁命令、压测结果摘要与关键指标截图/采样。
+  - [X] **健康/就绪检查**：
+    - [X] 全局 `/health`（既有）保持轻量、快速、生产受保护（OpsGuard）。
+    - [X] 新增 Org 级 `/org/api/ops/health`（见 §5.3）：输出“可执行的排障线索”（outbox backlog、snapshot build freshness、cache 状态），并要求 `org.ops admin`。
+  - [X] **自动化压测（可重复）**：
+    - [X] 提供 `org-load`（Go CLI）或等价脚本入口（见 §5.4），覆盖读/写混合场景，输出 `org_load_report.v1`（见 §4.3）。
+    - [X] 固化最小压测 profile（1k/10k 节点、混合读写），并定义阈值/失败判定（见 §9）。
+  - [X] **运维脚本入口（统一）**：
+    - [X] 复用并收敛已有能力：导入/回滚（023）、灰度/回滚（027）、snapshot/closure refresh/activate/prune（029）、质量修复（031）。
+    - [X] 以 `Makefile` 入口为准，避免“脚本散落且无法追溯”。
+  - [X] Readiness：新增 `docs/dev-records/DEV-PLAN-034-READINESS.md`（实现阶段落盘），记录门禁命令、压测结果摘要与关键指标截图/采样。
 - **非目标 (Out of Scope)**：
   - 不在本计划内建设完整 SRE 体系（值班轮值、跨环境告警模板库、Grafana 作为代码等），只提供最小可运行基线。
   - 不引入重量级外部压测工具链（如 k6/locust）作为硬依赖；优先使用 Go CLI 以减少环境漂移（如需引入另起评审）。
@@ -236,10 +237,10 @@ flowchart TD
   - 029：deep-read build 与回滚（健康检查与压测后端选择依赖）。
   - 017：outbox 指标与排障口径。
 - **里程碑**：
-  1. [ ] 指标 v1 落地（Prometheus 可 scrape，Org 关键端点覆盖）。
-  2. [ ] `GET /org/api/ops/health` 落地（含 outbox/deep-read freshness）。
-  3. [ ] `org-load` v1 落地（固定 profile + JSON report + 阈值判定）。
-  4. [ ] `docs/dev-records/DEV-PLAN-034-READINESS.md` 补齐（门禁+压测结果+排障演练）。
+  1. [X] 指标 v1 落地（Prometheus 可 scrape，Org 关键端点覆盖）。
+  2. [X] `GET /org/api/ops/health` 落地（含 outbox/deep-read freshness）。
+  3. [X] `org-load` v1 落地（固定 profile + JSON report + 阈值判定）。
+  4. [X] `docs/dev-records/DEV-PLAN-034-READINESS.md` 补齐（门禁+压测结果+排障演练）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **可观测性**：

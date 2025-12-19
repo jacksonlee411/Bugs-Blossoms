@@ -220,6 +220,42 @@ org-perf-bench:
 	  --output "$$OUTPUT" \
 	  $$ED_FLAG
 
+.PHONY: org-load-smoke
+org-load-smoke:
+	@set -eu; \
+	BASE_URL="$${BASE_URL:-http://localhost:3200}"; \
+	TENANT_ID="$${TENANT_ID:?TENANT_ID is required}"; \
+	SID="$${SID:?SID is required}"; \
+	go run ./cmd/org-load smoke \
+	  --base-url "$$BASE_URL" \
+	  --tenant "$$TENANT_ID" \
+	  --sid "$$SID"
+
+.PHONY: org-load-run
+org-load-run:
+	@set -eu; \
+	mkdir -p ./tmp/org-load; \
+	BASE_URL="$${BASE_URL:-http://localhost:3200}"; \
+	TENANT_ID="$${TENANT_ID:?TENANT_ID is required}"; \
+	SID="$${SID:?SID is required}"; \
+	PROFILE="$${PROFILE:-org_read_1k}"; \
+	EFFECTIVE_DATE="$${EFFECTIVE_DATE:-$$(date -u +%F)}"; \
+	OUTPUT="$${OUTPUT:-./tmp/org-load/org_load_report_$${PROFILE}_$$(date -u +%Y%m%dT%H%M%SZ).json}"; \
+	P99_LIMIT_MS="$${P99_LIMIT_MS:-}"; \
+	PARENT_NODE_ID="$${PARENT_NODE_ID:-}"; \
+	EXTRA_FLAGS=""; \
+	if [ -n "$$P99_LIMIT_MS" ]; then EXTRA_FLAGS="$$EXTRA_FLAGS --p99-limit-ms $$P99_LIMIT_MS"; fi; \
+	if [ -n "$$PARENT_NODE_ID" ]; then EXTRA_FLAGS="$$EXTRA_FLAGS --parent-node-id $$PARENT_NODE_ID"; fi; \
+	go run ./cmd/org-load run \
+	  --profile "$$PROFILE" \
+	  --base-url "$$BASE_URL" \
+	  --tenant "$$TENANT_ID" \
+	  --sid "$$SID" \
+	  --effective-date "$$EFFECTIVE_DATE" \
+	  --out "$$OUTPUT" \
+	  $$EXTRA_FLAGS; \
+	echo "wrote $$OUTPUT"
+
 .PHONY: org-snapshot-build
 org-snapshot-build:
 	@set -eu; \

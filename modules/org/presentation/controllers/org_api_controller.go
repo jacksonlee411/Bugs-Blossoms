@@ -56,47 +56,49 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 		middleware.ProvideUser(),
 	)
 
-	api.HandleFunc("/hierarchies", c.GetHierarchies).Methods(http.MethodGet)
+	api.HandleFunc("/ops/health", c.instrumentAPI("ops.health.get", c.GetOpsHealth)).Methods(http.MethodGet)
 
-	api.HandleFunc("/nodes", c.CreateNode).Methods(http.MethodPost)
-	api.HandleFunc("/nodes/{id}", c.UpdateNode).Methods(http.MethodPatch)
-	api.HandleFunc("/nodes/{id}:resolved-attributes", c.GetNodeResolvedAttributes).Methods(http.MethodGet)
-	api.HandleFunc("/nodes/{id}:move", c.MoveNode).Methods(http.MethodPost)
-	api.HandleFunc("/nodes/{id}:correct", c.CorrectNode).Methods(http.MethodPost)
-	api.HandleFunc("/nodes/{id}:rescind", c.RescindNode).Methods(http.MethodPost)
-	api.HandleFunc("/nodes/{id}:shift-boundary", c.ShiftBoundaryNode).Methods(http.MethodPost)
-	api.HandleFunc("/nodes/{id}:correct-move", c.CorrectMoveNode).Methods(http.MethodPost)
+	api.HandleFunc("/hierarchies", c.instrumentAPI("hierarchies.get", c.GetHierarchies)).Methods(http.MethodGet)
 
-	api.HandleFunc("/assignments", c.GetAssignments).Methods(http.MethodGet)
-	api.HandleFunc("/assignments", c.CreateAssignment).Methods(http.MethodPost)
-	api.HandleFunc("/assignments/{id}", c.UpdateAssignment).Methods(http.MethodPatch)
-	api.HandleFunc("/assignments/{id}:correct", c.CorrectAssignment).Methods(http.MethodPost)
-	api.HandleFunc("/assignments/{id}:rescind", c.RescindAssignment).Methods(http.MethodPost)
+	api.HandleFunc("/nodes", c.instrumentAPI("nodes.create", c.CreateNode)).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}", c.instrumentAPI("nodes.update", c.UpdateNode)).Methods(http.MethodPatch)
+	api.HandleFunc("/nodes/{id}:resolved-attributes", c.instrumentAPI("nodes.resolved_attributes.get", c.GetNodeResolvedAttributes)).Methods(http.MethodGet)
+	api.HandleFunc("/nodes/{id}:move", c.instrumentAPI("nodes.move", c.MoveNode)).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:correct", c.instrumentAPI("nodes.correct", c.CorrectNode)).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:rescind", c.instrumentAPI("nodes.rescind", c.RescindNode)).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:shift-boundary", c.instrumentAPI("nodes.shift_boundary", c.ShiftBoundaryNode)).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:correct-move", c.instrumentAPI("nodes.correct_move", c.CorrectMoveNode)).Methods(http.MethodPost)
 
-	api.HandleFunc("/roles", c.GetRoles).Methods(http.MethodGet)
-	api.HandleFunc("/role-assignments", c.GetRoleAssignments).Methods(http.MethodGet)
+	api.HandleFunc("/assignments", c.instrumentAPI("assignments.list", c.GetAssignments)).Methods(http.MethodGet)
+	api.HandleFunc("/assignments", c.instrumentAPI("assignments.create", c.CreateAssignment)).Methods(http.MethodPost)
+	api.HandleFunc("/assignments/{id}", c.instrumentAPI("assignments.update", c.UpdateAssignment)).Methods(http.MethodPatch)
+	api.HandleFunc("/assignments/{id}:correct", c.instrumentAPI("assignments.correct", c.CorrectAssignment)).Methods(http.MethodPost)
+	api.HandleFunc("/assignments/{id}:rescind", c.instrumentAPI("assignments.rescind", c.RescindAssignment)).Methods(http.MethodPost)
 
-	api.HandleFunc("/security-group-mappings", c.GetSecurityGroupMappings).Methods(http.MethodGet)
-	api.HandleFunc("/security-group-mappings", c.CreateSecurityGroupMapping).Methods(http.MethodPost)
-	api.HandleFunc("/security-group-mappings/{id}:rescind", c.RescindSecurityGroupMapping).Methods(http.MethodPost)
+	api.HandleFunc("/roles", c.instrumentAPI("roles.list", c.GetRoles)).Methods(http.MethodGet)
+	api.HandleFunc("/role-assignments", c.instrumentAPI("role_assignments.list", c.GetRoleAssignments)).Methods(http.MethodGet)
 
-	api.HandleFunc("/links", c.GetLinks).Methods(http.MethodGet)
-	api.HandleFunc("/links", c.CreateLink).Methods(http.MethodPost)
-	api.HandleFunc("/links/{id}:rescind", c.RescindLink).Methods(http.MethodPost)
+	api.HandleFunc("/security-group-mappings", c.instrumentAPI("security_group_mappings.list", c.GetSecurityGroupMappings)).Methods(http.MethodGet)
+	api.HandleFunc("/security-group-mappings", c.instrumentAPI("security_group_mappings.create", c.CreateSecurityGroupMapping)).Methods(http.MethodPost)
+	api.HandleFunc("/security-group-mappings/{id}:rescind", c.instrumentAPI("security_group_mappings.rescind", c.RescindSecurityGroupMapping)).Methods(http.MethodPost)
 
-	api.HandleFunc("/permission-preview", c.GetPermissionPreview).Methods(http.MethodGet)
+	api.HandleFunc("/links", c.instrumentAPI("links.list", c.GetLinks)).Methods(http.MethodGet)
+	api.HandleFunc("/links", c.instrumentAPI("links.create", c.CreateLink)).Methods(http.MethodPost)
+	api.HandleFunc("/links/{id}:rescind", c.instrumentAPI("links.rescind", c.RescindLink)).Methods(http.MethodPost)
 
-	api.HandleFunc("/snapshot", c.GetSnapshot).Methods(http.MethodGet)
-	api.HandleFunc("/batch", c.Batch).Methods(http.MethodPost)
+	api.HandleFunc("/permission-preview", c.instrumentAPI("permission_preview.get", c.GetPermissionPreview)).Methods(http.MethodGet)
 
-	api.HandleFunc("/change-requests", c.CreateChangeRequest).Methods(http.MethodPost)
-	api.HandleFunc("/change-requests", c.ListChangeRequests).Methods(http.MethodGet)
-	api.HandleFunc("/change-requests/{id}", c.GetChangeRequest).Methods(http.MethodGet)
-	api.HandleFunc("/change-requests/{id}", c.UpdateChangeRequest).Methods(http.MethodPatch)
-	api.HandleFunc("/change-requests/{id}:submit", c.SubmitChangeRequest).Methods(http.MethodPost)
-	api.HandleFunc("/change-requests/{id}:cancel", c.CancelChangeRequest).Methods(http.MethodPost)
+	api.HandleFunc("/snapshot", c.instrumentAPI("snapshot.get", c.GetSnapshot)).Methods(http.MethodGet)
+	api.HandleFunc("/batch", c.instrumentAPI("batch.post", c.Batch)).Methods(http.MethodPost)
 
-	api.HandleFunc("/preflight", c.Preflight).Methods(http.MethodPost)
+	api.HandleFunc("/change-requests", c.instrumentAPI("change_requests.create", c.CreateChangeRequest)).Methods(http.MethodPost)
+	api.HandleFunc("/change-requests", c.instrumentAPI("change_requests.list", c.ListChangeRequests)).Methods(http.MethodGet)
+	api.HandleFunc("/change-requests/{id}", c.instrumentAPI("change_requests.get", c.GetChangeRequest)).Methods(http.MethodGet)
+	api.HandleFunc("/change-requests/{id}", c.instrumentAPI("change_requests.update", c.UpdateChangeRequest)).Methods(http.MethodPatch)
+	api.HandleFunc("/change-requests/{id}:submit", c.instrumentAPI("change_requests.submit", c.SubmitChangeRequest)).Methods(http.MethodPost)
+	api.HandleFunc("/change-requests/{id}:cancel", c.instrumentAPI("change_requests.cancel", c.CancelChangeRequest)).Methods(http.MethodPost)
+
+	api.HandleFunc("/preflight", c.instrumentAPI("preflight.post", c.Preflight)).Methods(http.MethodPost)
 }
 
 type effectiveWindowResponse struct {
@@ -2481,7 +2483,7 @@ func (c *OrgAPIController) Batch(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusInternalServerError, requestID, "ORG_INTERNAL", err.Error())
 		return
 	}
-	c.org.InvalidateTenantCache(tenantID)
+	c.org.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 
 	type batchResponse struct {
 		DryRun         bool                 `json:"dry_run"`
