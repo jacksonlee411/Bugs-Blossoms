@@ -80,6 +80,50 @@ type OrgEdge struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+type OrgHierarchyClosure struct {
+	TenantID         pgtype.UUID        `json:"tenant_id"`
+	HierarchyType    string             `json:"hierarchy_type"`
+	BuildID          pgtype.UUID        `json:"build_id"`
+	AncestorNodeID   pgtype.UUID        `json:"ancestor_node_id"`
+	DescendantNodeID pgtype.UUID        `json:"descendant_node_id"`
+	Depth            int32              `json:"depth"`
+	EffectiveDate    pgtype.Timestamptz `json:"effective_date"`
+	EndDate          pgtype.Timestamptz `json:"end_date"`
+}
+
+type OrgHierarchyClosureBuild struct {
+	TenantID        pgtype.UUID        `json:"tenant_id"`
+	HierarchyType   string             `json:"hierarchy_type"`
+	BuildID         pgtype.UUID        `json:"build_id"`
+	Status          string             `json:"status"`
+	IsActive        bool               `json:"is_active"`
+	BuiltAt         pgtype.Timestamptz `json:"built_at"`
+	SourceRequestID *string            `json:"source_request_id"`
+	Notes           *string            `json:"notes"`
+}
+
+type OrgHierarchySnapshot struct {
+	TenantID         pgtype.UUID `json:"tenant_id"`
+	HierarchyType    string      `json:"hierarchy_type"`
+	AsOfDate         pgtype.Date `json:"as_of_date"`
+	BuildID          pgtype.UUID `json:"build_id"`
+	AncestorNodeID   pgtype.UUID `json:"ancestor_node_id"`
+	DescendantNodeID pgtype.UUID `json:"descendant_node_id"`
+	Depth            int32       `json:"depth"`
+}
+
+type OrgHierarchySnapshotBuild struct {
+	TenantID        pgtype.UUID        `json:"tenant_id"`
+	HierarchyType   string             `json:"hierarchy_type"`
+	AsOfDate        pgtype.Date        `json:"as_of_date"`
+	BuildID         pgtype.UUID        `json:"build_id"`
+	Status          string             `json:"status"`
+	IsActive        bool               `json:"is_active"`
+	BuiltAt         pgtype.Timestamptz `json:"built_at"`
+	SourceRequestID *string            `json:"source_request_id"`
+	Notes           *string            `json:"notes"`
+}
+
 type OrgNode struct {
 	TenantID  pgtype.UUID        `json:"tenant_id"`
 	ID        pgtype.UUID        `json:"id"`
