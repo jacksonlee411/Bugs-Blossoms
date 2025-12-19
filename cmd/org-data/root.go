@@ -18,6 +18,7 @@ func newRootCmd() *cobra.Command {
 	cmd.AddCommand(newImportCmd())
 	cmd.AddCommand(newExportCmd())
 	cmd.AddCommand(newRollbackCmd())
+	cmd.AddCommand(newQualityCmd())
 	return cmd
 }
 

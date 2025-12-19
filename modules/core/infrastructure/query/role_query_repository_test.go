@@ -8,18 +8,13 @@ import (
 )
 
 func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
-	t.Parallel()
-
 	roleQueryRepo := query.NewPgRoleQueryRepository()
+	fixtures := setupTest(t)
+	roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
+	require.NoError(t, err)
+	require.NotNil(t, roles)
 
 	t.Run("find all roles with user counts", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-		require.NotNil(t, roles)
-
 		// Verify each role has required fields
 		for _, role := range roles {
 			require.NotEmpty(t, role.ID)
@@ -29,12 +24,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("roles with zero users have count of 0", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-
 		// LEFT JOIN should include roles with 0 users
 		for _, role := range roles {
 			require.GreaterOrEqual(t, role.UsersCount, 0)
@@ -42,12 +31,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("roles can have multiple users", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-
 		// User counts should be non-negative
 		for _, role := range roles {
 			require.GreaterOrEqual(t, role.UsersCount, 0)
@@ -55,12 +38,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("only returns roles for current tenant", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-
 		// All roles should belong to the test tenant
 		for _, role := range roles {
 			require.NotEmpty(t, role.ID)
@@ -68,12 +45,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("system roles cannot be updated or deleted", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-
 		// Find system roles and verify permissions
 		hasSystemRole := false
 		for _, role := range roles {
@@ -94,12 +65,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("roles are ordered by name ascending", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-
 		if len(roles) > 1 {
 			// Verify roles are sorted by name
 			for i := 1; i < len(roles); i++ {
@@ -113,12 +78,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("user counts match actual user_roles relationships", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-
 		// User counts should be accurate
 		for _, role := range roles {
 			require.GreaterOrEqual(t, role.UsersCount, 0)
@@ -126,12 +85,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("users are counted distinctly per role", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-
 		// The query uses COUNT(DISTINCT ur.user_id)
 		for _, role := range roles {
 			require.GreaterOrEqual(t, role.UsersCount, 0)
@@ -139,12 +92,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("all role fields are populated correctly", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
-
 		for _, role := range roles {
 			// Verify all required fields are present
 			require.NotEmpty(t, role.ID)
@@ -157,11 +104,6 @@ func TestPgRoleQueryRepository_FindRolesWithCounts(t *testing.T) {
 	})
 
 	t.Run("handles empty results gracefully", func(t *testing.T) {
-		t.Parallel()
-		fixtures := setupTest(t)
-
-		roles, err := roleQueryRepo.FindRolesWithCounts(fixtures.Ctx)
-		require.NoError(t, err)
 		require.NotNil(t, roles)
 		// Should return empty slice, not error
 	})

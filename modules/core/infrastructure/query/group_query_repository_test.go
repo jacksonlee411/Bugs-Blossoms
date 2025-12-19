@@ -3,21 +3,19 @@ package query_test
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/query"
 	"github.com/iota-uz/iota-sdk/pkg/repo"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
-	t.Parallel()
-
 	// Create repository
 	groupQueryRepo := query.NewPgGroupQueryRepository()
+	fixtures := setupTest(t)
 
 	// Test without any filters
 	t.Run("find all groups", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -31,8 +29,6 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test with search
 	t.Run("search groups", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -47,18 +43,14 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test find by ID
 	t.Run("find group by ID", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		// Since we don't have a group yet, this should return an error
-		group, err := groupQueryRepo.FindGroupByID(fixtures.Ctx, "non-existent-id")
+		group, err := groupQueryRepo.FindGroupByID(fixtures.Ctx, uuid.NewString())
 		require.Error(t, err)
 		require.Nil(t, group)
 	})
 
 	// Test with filters
 	t.Run("find groups with filters", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -78,8 +70,6 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test with sorting
 	t.Run("find groups with sorting", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -98,8 +88,6 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test with multiple sort fields
 	t.Run("find groups with multiple sort fields", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -119,8 +107,6 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test with sorting and nulls last
 	t.Run("find groups with nulls last sorting", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -139,8 +125,6 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test search with sorting
 	t.Run("search groups with sorting", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -160,8 +144,6 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test with combined filters and sorting
 	t.Run("find groups with filters and sorting", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -186,8 +168,6 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test with IN filter
 	t.Run("find groups with IN filter", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		params := &query.GroupFindParams{
 			Limit:  10,
 			Offset: 0,
@@ -207,8 +187,6 @@ func TestPgGroupQueryRepository_FindGroups(t *testing.T) {
 
 	// Test pagination
 	t.Run("find groups with pagination", func(t *testing.T) {
-		fixtures := setupTest(t)
-
 		// First page
 		params1 := &query.GroupFindParams{
 			Limit:  5,

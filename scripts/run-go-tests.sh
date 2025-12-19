@@ -11,4 +11,17 @@ if [[ ${#packages[@]} -eq 0 ]]; then
   exit 0
 fi
 
-GOWORK=off go test "$@" "${packages[@]}"
+has_timeout=0
+for arg in "$@"; do
+  if [[ "$arg" == -timeout || "$arg" == -timeout=* ]]; then
+    has_timeout=1
+    break
+  fi
+done
+
+extra_args=()
+if [[ $has_timeout -eq 0 ]]; then
+  extra_args+=("-timeout=20m")
+fi
+
+GOWORK=off go test "${extra_args[@]}" "$@" "${packages[@]}"

@@ -1,10 +1,11 @@
 # DEV-PLAN-031：Org 数据质量与修复（Step 11）
 
-**状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已完成（2025-12-19）— 已落地 `org-data quality` 与 Readiness 记录（PR #87）
 
 ## 0. 进度速记
 - 本计划聚焦“数据质量规则/报告 + 可回滚的批量修复工具”，为 Org 进入长期运行提供最小治理闭环。
 - 修复工具默认 **dry-run**，任何写入必须显式 `--apply` + `--yes` 二次确认，并生成 manifest 以支持回滚。
+- 已落地：`org-data quality check/plan/apply/rollback`、质量规则 v1（`ORG_Q_001`~`ORG_Q_008`）、以及 `docs/dev-records/DEV-PLAN-031-READINESS.md`。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：`docs/dev-plans/020-organization-lifecycle.md` **步骤 11：强化数据质量**。
@@ -20,20 +21,20 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] **质量规则（v1）**：覆盖以下最小口径并给出稳定 rule_id（见 §6.2）：
+  - [X] **质量规则（v1）**：覆盖以下最小口径并给出稳定 rule_id（见 §6.2）：
     - 编码格式（regex）检查（node/position）。
     - “必填项/结构完整性”检查：node 必须有 slice/edge；root 规则；孤儿/多 root/parent=null 异常等。
     - 叶子节点需岗位（as-of 视图下 leaf 必须存在 active position）。
     - assignment 的 `subject_id` 映射一致性（SSOT：026），以及可安全自动修复的 whitespace/映射漂移问题。
-  - [ ] **质量报告（SSOT）**：定义稳定 JSON 输出格式 `org_quality_report.v1`（见 §4.1），用于：
+  - [X] **质量报告（SSOT）**：定义稳定 JSON 输出格式 `org_quality_report.v1`（见 §4.1），用于：
     - CI/Readiness 留档（`docs/dev-records/DEV-PLAN-031-READINESS.md`）
     - 运维对账（跨环境 diff）
     - 修复工具生成 fix plan 的输入
-  - [ ] **批量修复工具（v1）**：
-    - [ ] 支持从报告生成 **fix plan**（仅包含“可自动修复且可回滚”的问题）。
-    - [ ] 支持 `dry-run`（默认）与 `--apply` 执行；执行入口复用 026 的 `POST /org/api/batch`（避免绕过审计/outbox/冻结窗口）。
-    - [ ] 每次执行必须生成 **fix manifest**（见 §4.3），并提供 `rollback` 子命令按 manifest 逆向回滚。
-  - [ ] **门禁与可复现**：本计划落地后至少满足本仓库门禁，并在 Readiness 记录中可重复执行（见 §9）。
+  - [X] **批量修复工具（v1）**：
+    - [X] 支持从报告生成 **fix plan**（仅包含“可自动修复且可回滚”的问题）。
+    - [X] 支持 `dry-run`（默认）与 `--apply` 执行；执行入口复用 026 的 `POST /org/api/batch`（避免绕过审计/outbox/冻结窗口）。
+    - [X] 每次执行必须生成 **fix manifest**（见 §4.3），并提供 `rollback` 子命令按 manifest 逆向回滚。
+  - [X] **门禁与可复现**：本计划落地后至少满足本仓库门禁，并在 Readiness 记录中可重复执行（见 §9）。
 
 - **非目标 (Out of Scope)**：
   - 不引入新的 Org 表结构（如需持久化质量结果到 DB，必须另起计划并走 Org Atlas+Goose 工具链）。
@@ -329,10 +330,10 @@ flowchart TD
   - `docs/dev-plans/026-org-api-authz-and-events.md`：batch/snapshot 与 subject_id 映射 SSOT。
   - `docs/dev-plans/030-org-change-requests-and-preflight.md`：preflight 与变更记录（可选但推荐纳入执行链路）。
 - **里程碑**：
-  1. [ ] 落地 `org-data quality check` 与 v1 规则集（含报告 JSON）。
-  2. [ ] 落地 `plan/apply/rollback`（仅 assignment.correct autofix）。
-  3. [ ] 补齐单元测试与最小集成测试（含 dry-run 与回滚校验）。
-  4. [ ] 新增 `docs/dev-records/DEV-PLAN-031-READINESS.md`，记录命令/环境/输出摘要。
+  1. [X] 落地 `org-data quality check` 与 v1 规则集（含报告 JSON）。
+  2. [X] 落地 `plan/apply/rollback`（仅 assignment.correct autofix）。
+  3. [X] 补齐单元测试与最小集成测试（含 dry-run 与回滚校验）。
+  4. [X] 新增 `docs/dev-records/DEV-PLAN-031-READINESS.md`，记录命令/环境/输出摘要。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **规则正确性**：

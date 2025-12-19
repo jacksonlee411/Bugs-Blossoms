@@ -22,6 +22,7 @@ SELECT
   n.id,
   jsonb_build_object(
     'org_node_id', n.id,
+    'is_root', n.is_root,
     'code', n.code,
     'name', s.name,
     'status', s.status,
