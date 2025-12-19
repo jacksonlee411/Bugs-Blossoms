@@ -13,8 +13,8 @@ p, role:core.superadmin, org.edges, *, global, allow
 p, role:core.superadmin, org.hierarchies, *, global, allow
 p, role:core.superadmin, org.links, *, global, allow
 p, role:core.superadmin, org.nodes, *, global, allow
-p, role:core.superadmin, org.permission_preview, *, global, allow
 p, role:core.superadmin, org.ops, *, global, allow
+p, role:core.superadmin, org.permission_preview, *, global, allow
 p, role:core.superadmin, org.positions, *, global, allow
 p, role:core.superadmin, org.preflight, *, global, allow
 p, role:core.superadmin, org.role_assignments, *, global, allow
