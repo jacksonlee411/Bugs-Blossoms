@@ -25,40 +25,50 @@ func indentClass(depth int) string {
 	return fmt.Sprintf("padding-left: %drem;", steps)
 }
 
-templ Tree(props TreeProps) {
+templ TreeContent(props TreeProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	<div id="org-tree" hx-swap-oob?={ props.SwapOOB }>
-		if props.Tree == nil || len(props.Tree.Nodes) == 0 {
-			<div class="p-3 text-sm text-300">
-				{ pageCtx.T("Org.UI.Tree.Empty") }
-			</div>
-		} else {
-			<ul class="space-y-1 p-2">
-				for _, n := range props.Tree.Nodes {
-					<li style={ indentClass(n.Depth) }>
-						<button
-							type="button"
-							class={
-								"w-full text-left rounded-md px-2 py-1.5 text-sm flex items-center justify-between gap-2",
-								templ.KV("bg-surface-100 text-100", n.Selected),
-								templ.KV("hover:bg-surface-200 text-200", !n.Selected),
+	if props.Tree == nil || len(props.Tree.Nodes) == 0 {
+		<div class="p-3 text-sm text-300">
+			{ pageCtx.T("Org.UI.Tree.Empty") }
+		</div>
+	} else {
+		<ul class="space-y-1 p-2">
+			for _, n := range props.Tree.Nodes {
+				<li style={ indentClass(n.Depth) }>
+					<button
+						type="button"
+						class={
+							"w-full text-left rounded-md px-2 py-1.5 text-sm flex items-center justify-between gap-2",
+							templ.KV("bg-surface-100 text-100", n.Selected),
+							templ.KV("hover:bg-surface-200 text-200", !n.Selected),
+						}
+						hx-get={ fmt.Sprintf("/org/nodes/%s?effective_date=%s", n.ID.String(), props.EffectiveDate) }
+						hx-target="#org-node-panel"
+						hx-swap="innerHTML"
+						hx-push-url={ fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", props.EffectiveDate, n.ID.String()) }
+					>
+						<span class="truncate">
+							<span class="font-medium">{ strings.TrimSpace(n.Name) }</span>
+							if strings.TrimSpace(n.Code) != "" {
+								<span class="ml-2 text-xs text-400">{ n.Code }</span>
 							}
-							hx-get={ fmt.Sprintf("/org/nodes/%s?effective_date=%s", n.ID.String(), props.EffectiveDate) }
-							hx-target="#org-node-panel"
-							hx-swap="innerHTML"
-							hx-push-url={ fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", props.EffectiveDate, n.ID.String()) }
-						>
-							<span class="truncate">
-								<span class="font-medium">{ strings.TrimSpace(n.Name) }</span>
-								if strings.TrimSpace(n.Code) != "" {
-									<span class="ml-2 text-xs text-400">{ n.Code }</span>
-								}
-							</span>
-							<span class="text-[11px] text-400">{ n.Status }</span>
-						</button>
-					</li>
-				}
-			</ul>
-		}
-	</div>
+						</span>
+						<span class="text-[11px] text-400">{ n.Status }</span>
+					</button>
+				</li>
+			}
+		</ul>
+	}
+}
+
+templ Tree(props TreeProps) {
+	if props.SwapOOB {
+		<div id="org-tree" hx-swap-oob="true">
+			@TreeContent(props)
+		</div>
+	} else {
+		<div id="org-tree">
+			@TreeContent(props)
+		</div>
+	}
 }

@@ -3,6 +3,7 @@ package orgui
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/iota-uz/iota-sdk/components/base"
 	"github.com/iota-uz/iota-sdk/components/base/button"
@@ -10,6 +11,134 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
+
+type AssignmentFormMode string
+
+const (
+	AssignmentFormCreate AssignmentFormMode = "create"
+	AssignmentFormEdit   AssignmentFormMode = "edit"
+)
+
+type AssignmentFormProps struct {
+	Mode          AssignmentFormMode
+	EffectiveDate string
+	Pernr         string
+
+	AssignmentID string
+	OrgNodeID    string
+	OrgNodeLabel string
+	PositionID   string
+
+	Errors    map[string]string
+	FormError string
+}
+
+templ AssignmentForm(props AssignmentFormProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ title := "" }}
+	{{ action := "" }}
+	{{ method := "post" }}
+	{{ submitLabel := "" }}
+	{{ pernrReadonly := false }}
+	switch props.Mode {
+		case AssignmentFormEdit:
+			{{ title = pageCtx.T("Org.UI.Assignments.EditTitle") }}
+			{{ action = fmt.Sprintf("/org/assignments/%s", strings.TrimSpace(props.AssignmentID)) }}
+			{{ method = "patch" }}
+			{{ submitLabel = pageCtx.T("Org.UI.Actions.Save") }}
+			{{ pernrReadonly = true }}
+		default:
+			{{ title = pageCtx.T("Org.UI.Assignments.CreateTitle") }}
+			{{ action = "/org/assignments" }}
+			{{ method = "post" }}
+			{{ submitLabel = pageCtx.T("Org.UI.Assignments.Actions.Create") }}
+	}
+	{{pernrAttrs := templ.Attributes{
+	"id":    "org-pernr",
+	"name":  "pernr",
+	"value": props.Pernr,
+}
+	}}
+	if pernrReadonly {
+		{{ pernrAttrs["readonly"] = true }}
+	}
+	<div id="org-assignment-form" class="space-y-3">
+		<div class="flex items-center justify-between gap-3">
+			<div class="text-sm font-medium text-100">{ title }</div>
+			if props.Mode == AssignmentFormEdit {
+				@button.Ghost(button.Props{
+					Size: button.SizeSM,
+					Attrs: templ.Attributes{
+						"data-testid": "org-assignment-cancel-edit",
+						"type":        "button",
+						"hx-get":      fmt.Sprintf("/org/assignments/form?effective_date=%s&pernr=%s", props.EffectiveDate, props.Pernr),
+						"hx-target":   "#org-assignment-form",
+						"hx-swap":     "outerHTML",
+					},
+				}) {
+					{ pageCtx.T("Cancel") }
+				}
+			}
+		</div>
+		<form
+			class="space-y-3"
+			hx-target="#org-assignment-form"
+			hx-swap="outerHTML"
+			if method == "patch" {
+				hx-patch={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+			} else {
+				hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+			}
+		>
+			<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+			if props.FormError != "" {
+				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
+			}
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Org.UI.Assignments.Fields.Pernr"),
+				Error: props.Errors["pernr"],
+				Attrs: pernrAttrs,
+			})
+			<div data-testid="org-assignment-orgnode-combobox">
+				@base.Combobox(base.ComboboxProps{
+					Searchable:   true,
+					Label:        pageCtx.T("Org.UI.Assignments.Fields.OrgNode"),
+					Name:         "org_node_id",
+					Endpoint:     fmt.Sprintf("/org/nodes/search?effective_date=%s", props.EffectiveDate),
+					Placeholder:  pageCtx.T("Org.UI.Node.Parent.Placeholder"),
+					NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+				}) {
+					if strings.TrimSpace(props.OrgNodeID) != "" {
+						<option value={ props.OrgNodeID } selected>{ props.OrgNodeLabel }</option>
+					}
+					<!-- options loaded via HTMX -->
+				}
+			</div>
+			if props.Errors["org_node_id"] != "" {
+				<div class="text-xs text-red-200">{ props.Errors["org_node_id"] }</div>
+			}
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Org.UI.Assignments.Fields.PositionID"),
+				Error: props.Errors["position_id"],
+				Attrs: templ.Attributes{
+					"name":        "position_id",
+					"value":       props.PositionID,
+					"placeholder": "uuid (optional)",
+				},
+			})
+			<div class="flex items-center justify-end">
+				@button.Primary(button.Props{
+					Size: button.SizeSM,
+					Attrs: templ.Attributes{
+						"type": "submit",
+					},
+				}) {
+					{ submitLabel }
+				}
+			</div>
+		</form>
+	</div>
+}
 
 type AssignmentCreateFormProps struct {
 	EffectiveDate string
@@ -23,8 +152,8 @@ templ AssignmentCreateForm(props AssignmentCreateFormProps) {
 	<form
 		class="space-y-3"
 		hx-post={ fmt.Sprintf("/org/assignments?effective_date=%s", props.EffectiveDate) }
-		hx-target="#org-assignments-timeline"
-		hx-swap="innerHTML"
+		hx-target="#org-assignment-form"
+		hx-swap="outerHTML"
 	>
 		<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
 		if props.FormError != "" {
@@ -51,6 +180,9 @@ templ AssignmentCreateForm(props AssignmentCreateFormProps) {
 				<!-- options loaded via HTMX -->
 			}
 		</div>
+		if props.Errors["org_node_id"] != "" {
+			<div class="text-xs text-red-200">{ props.Errors["org_node_id"] }</div>
+		}
 		@input.Text(&input.Props{
 			Label: pageCtx.T("Org.UI.Assignments.Fields.PositionID"),
 			Error: props.Errors["position_id"],
@@ -79,6 +211,10 @@ type AssignmentsTimelineProps struct {
 
 templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ asOf := time.Now().UTC() }}
+	if parsed, err := time.Parse("2006-01-02", strings.TrimSpace(props.EffectiveDate)); err == nil {
+		{{ asOf = time.Date(parsed.Year(), parsed.Month(), parsed.Day(), 0, 0, 0, 0, time.UTC) }}
+	}
 	if props.Timeline == nil || len(props.Timeline.Rows) == 0 {
 		<div class="text-sm text-300">{ pageCtx.T("Org.UI.Assignments.Empty") }</div>
 	} else {
@@ -89,10 +225,14 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Effective") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
+					if pageCtx.CanAuthz("org.assignments", "assign") {
+						<th class="py-2 pr-2">{ pageCtx.T("Actions") }</th>
+					}
 				</tr>
 			</thead>
 			<tbody>
 				for _, row := range props.Timeline.Rows {
+					{{ canEdit := !asOf.Before(row.EffectiveDate) && asOf.Before(row.EndDate) }}
 					<tr class="border-b border-surface-400/60">
 						<td class="py-2 pr-2 text-200">{ row.Pernr }</td>
 						<td class="py-2 pr-2 text-200">
@@ -107,6 +247,27 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 								}
 							</div>
 						</td>
+						if pageCtx.CanAuthz("org.assignments", "assign") {
+							<td class="py-2 pr-2">
+								if canEdit {
+									@button.Secondary(button.Props{
+										Size:  button.SizeSM,
+										Class: "px-2 py-1",
+										Attrs: templ.Attributes{
+											"data-testid": fmt.Sprintf("org-assignment-edit-%s", row.ID.String()),
+											"type":        "button",
+											"hx-get":      fmt.Sprintf("/org/assignments/%s/edit?effective_date=%s&pernr=%s", row.ID.String(), props.EffectiveDate, row.Pernr),
+											"hx-target":   "#org-assignment-form",
+											"hx-swap":     "outerHTML",
+										},
+									}) {
+										{ pageCtx.T("Org.UI.Assignments.Actions.Edit") }
+									}
+								} else {
+									<span class="text-xs text-400">—</span>
+								}
+							</td>
+						}
 					</tr>
 				}
 			</tbody>

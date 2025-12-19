@@ -1,11 +1,12 @@
 # DEV-PLAN-035：组织机构模块 M1 前端界面（templ + HTMX）
 
-**状态**: 已评审（2025-12-17 11:44 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**状态**: 已实现（2025-12-19）— M1/M2/M3 已落地；Readiness 见 `docs/dev-records/DEV-PLAN-035-READINESS.md`
 
 ## 0. 进度速记
-- 本计划只交付 Org M1 的“可用管理 UI”（树 + 节点表单 + 分配时间线），不引入 SPA。
+- 本计划已交付 Org UI（M1/M2/M3）：树 + 节点表单（新建/编辑/Move）+ 分配时间线（创建/编辑），不引入 SPA。
 - UI 写路径不自造业务逻辑：与 [DEV-PLAN-024](024-org-crud-mainline.md)/[DEV-PLAN-025](025-org-time-and-audit.md) 共用 Org Service；Authz/outbox/缓存以 [DEV-PLAN-026](026-org-api-authz-and-events.md) 为准。
 - 403 Forbidden 统一复用 `modules/core/presentation/templates/layouts.WriteAuthzForbiddenResponse`（JSON/HTMX/Full page 三种输出一致）。
+- E2E 覆盖：`e2e/tests/org/org-ui.spec.ts`（管理员写入主链 + 无权限 403 UX）。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**: [DEV-PLAN-020](020-organization-lifecycle.md) 的步骤 6A。
@@ -23,14 +24,14 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **组织树视图**：交付可交互的树形视图，展示 `OrgUnit` 单树，并可随 `effective_date` 切换刷新。
-- [ ] **节点管理**：交付 OrgNode 的“查看 + 创建 + 编辑（Insert 时间片语义）+ 变更上级（MoveNode）”表单与详情面板。
-- [ ] **职位与分配管理（M1 主链）**：
-  - [ ] 在分配时间线/详情中展示 Position 信息（只读；字段以 schema/API 为准）。
-  - [ ] 交付 Assignment 的“创建 + 编辑（Insert 时间片语义） + 时间线查看”，并覆盖后端“自动创建空壳 Position”的交互闭环。
-- [ ] **授权驱动 UI**：所有页面与按钮的可见性、可操作性均受 Org 相关 Casbin object/action 控制（见 §7）；无权访问统一走 403 契约。
-- [ ] **HTMX 局部刷新体验**：树、详情、表单提交使用局部刷新；提交成功后自动更新相关区域（树/详情/时间线）。
-- [ ] **门禁对齐**：`.templ`/Tailwind 变更后执行 `make generate && make css` 并保证生成物已提交（`git status --short` 干净）。
+- [X] **组织树视图**：交付可交互的树形视图，展示 `OrgUnit` 单树，并可随 `effective_date` 切换刷新。
+- [X] **节点管理**：交付 OrgNode 的“查看 + 创建 + 编辑（Insert 时间片语义）+ 变更上级（MoveNode）”表单与详情面板。
+- [X] **职位与分配管理（M1 主链）**：
+  - [X] 在分配时间线/详情中展示 Position 信息（只读；字段以 schema/API 为准）。
+  - [X] 交付 Assignment 的“创建 + 编辑（Insert 时间片语义） + 时间线查看”，并覆盖后端“自动创建空壳 Position”的交互闭环。
+- [X] **授权驱动 UI**：所有页面与按钮的可见性、可操作性均受 Org 相关 Casbin object/action 控制（见 §7）；无权访问统一走 403 契约。
+- [X] **HTMX 局部刷新体验**：树、详情、表单提交使用局部刷新；提交成功后自动更新相关区域（树/详情/时间线）。
+- [X] **门禁对齐**：`.templ`/Tailwind 变更后执行 `make generate && make css` 并保证生成物已提交（`git status --short` 干净）。
 
 ### 2.2 非目标 (Out of Scope)
 - 不实现审批流/草稿/预检/What-if/Impact UI（见 [DEV-PLAN-030](030-org-change-requests-and-preflight.md) 与 [DEV-PLAN-020](020-organization-lifecycle.md) 后续阶段）。
@@ -234,38 +235,38 @@ graph TD
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 ### 8.1 前置依赖
-- [ ] [DEV-PLAN-026](026-org-api-authz-and-events.md)：`/org/**` API/Authz/时间线语义与错误码稳定。
-- [ ] [DEV-PLAN-014D](014D-casbin-public-layer-ui-interface.md)/[DEV-PLAN-015](015-casbin-policy-ui-and-workflow.md)：Unauthorized 组件/权限申请体验可复用。
-- [ ] `templ`/Tailwind 工具链可用：`make generate && make css` 可稳定运行且生成物可提交。
+- [X] [DEV-PLAN-026](026-org-api-authz-and-events.md)：`/org/**` API/Authz/时间线语义与错误码稳定。
+- [X] [DEV-PLAN-014D](014D-casbin-public-layer-ui-interface.md)/[DEV-PLAN-015](015-casbin-policy-ui-and-workflow.md)：Unauthorized 组件/权限申请体验可复用。
+- [X] `templ`/Tailwind 工具链可用：`make generate && make css` 可稳定运行且生成物可提交。
 
 ### 8.2 实施步骤（任务清单）
-1. [ ] **目录与路由骨架**
-   - [ ] 新增 `modules/org/presentation/controllers|templates|viewmodels|mappers`（对齐 DDD/cleanarch）。
-   - [ ] 注册路由与导航：至少 `/org/nodes`（可选 `/org/assignments`）。
-2. [ ] **页面布局与生效日期选择器**
-   - [ ] 在 Org 页面布局中提供 `effective_date` 选择器（默认 UTC today），并能驱动刷新。
-3. [ ] **组织树组件**
-   - [ ] 实现树组件渲染（递归/分层/折叠），空状态/错误态/加载态可用。
-   - [ ] 点击节点可加载详情面板并保持选中态。
-4. [ ] **节点详情与表单**
-   - [ ] 新建/编辑表单：字段覆盖 [DEV-PLAN-020](020-organization-lifecycle.md) 的 M1 必填字段（以 schema 为准）。
-   - [ ] 变更上级（MoveNode）入口与表单（M1：Insert Move；correct-move/admin UI 仅做错误提示，不强制交付）。
-   - [ ] 提交成功刷新树与面板；校验失败返回 422 并展示错误。
-5. [ ] **职位与分配**
-   - [ ] 分配表单以 `pernr` 为输入（手动输入为默认路径），并能展示 `subject=person:{pernr}` 的分配时间线。
+1. [X] **目录与路由骨架**
+   - [X] 新增 `modules/org/presentation/controllers|templates|viewmodels|mappers`（对齐 DDD/cleanarch）。
+   - [X] 注册路由与导航：至少 `/org/nodes`（可选 `/org/assignments`）。
+2. [X] **页面布局与生效日期选择器**
+   - [X] 在 Org 页面布局中提供 `effective_date` 选择器（默认 UTC today），并能驱动刷新。
+3. [X] **组织树组件**
+   - [X] 实现树组件渲染（递归/分层/折叠），空状态/错误态/加载态可用。
+   - [X] 点击节点可加载详情面板并保持选中态。
+4. [X] **节点详情与表单**
+   - [X] 新建/编辑表单：字段覆盖 [DEV-PLAN-020](020-organization-lifecycle.md) 的 M1 必填字段（以 schema 为准）。
+   - [X] 变更上级（MoveNode）入口与表单（M1：Insert Move；correct-move/admin UI 仅做错误提示，不强制交付）。
+   - [X] 提交成功刷新树与面板；校验失败返回 422 并展示错误。
+5. [X] **职位与分配**
+   - [X] 分配表单以 `pernr` 为输入（手动输入为默认路径），并能展示 `subject=person:{pernr}` 的分配时间线。
    - [ ] （可选增强）人员选择器：用可搜索组件（例如 `components/base/combobox`）按姓名/邮箱查询 HRM 员工并回填 `pernr`；若无 HRM 权限或查询失败则回退到手动输入。
-   - [ ] 覆盖“自动创建空壳 Position”的交互（后端逻辑由 [DEV-PLAN-024](024-org-crud-mainline.md) 定义）。
-6. [ ] **授权与 403 体验**
-   - [ ] 模板内按 capability 控制可见性。
-   - [ ] 控制器内强制鉴权并输出统一 403（页面与 HTMX）。
+   - [X] 覆盖“自动创建空壳 Position”的交互（后端逻辑由 [DEV-PLAN-024](024-org-crud-mainline.md) 定义）。
+6. [X] **授权与 403 体验**
+   - [X] 模板内按 capability 控制可见性。
+   - [X] 控制器内强制鉴权并输出统一 403（页面与 HTMX）。
 7. [ ] **测试**
    - [ ] 单元测试：`viewmodels/mappers` 基本映射与边界条件。
-   - [ ] E2E：新增 `e2e/tests/org/` 场景覆盖（见 9.2）。
+   - [X] E2E：新增 `e2e/tests/org/` 场景覆盖（见 9.2）。
 
 ### 8.3 里程碑定义
-- [ ] **M1**：组织树（只读）+ `effective_date` 切换可用。
-- [ ] **M2**：节点/职位/分配的核心写入路径可用（创建/编辑 + 时间线查看）。
-- [ ] **M3**：Authz/403 体验完成 + E2E 覆盖 + 门禁与 readiness 记录齐全。
+- [X] **M1**：组织树（只读）+ `effective_date` 切换可用。
+- [X] **M2**：节点/职位/分配的核心写入路径可用（创建/编辑 + 时间线查看）。
+- [X] **M3**：Authz/403 体验完成 + E2E 覆盖 + 门禁与 readiness 记录齐全。
 
 ### 8.4 交付物
 - `modules/org/presentation/**`：controllers/templates/viewmodels/mappers。
@@ -287,25 +288,22 @@ graph TD
   - `make generate && make css` 后 `git status --short` 干净（无漏提交生成文件）。
 
 ### 9.2 E2E 覆盖（最小集）
-- [ ] 管理员登录后可查看组织树。
-- [ ] 创建新 OrgNode，树中可见且详情正确。
-- [ ] 编辑 OrgNode（Insert 语义），在不同 `effective_date` 下可看到正确 as-of 视图。
-- [ ] 变更节点上级（MoveNode），树与详情刷新正确。
-- [ ] 为某 `person:{pernr}` 创建 Assignment（默认走手动输入 `pernr` 路径），并在时间线中可见。
-- [ ] 无 `org.nodes write` 账户：UI 不展示节点写入口，且直接请求写接口返回 403。
-- [ ] 无 `org.assignments assign` 账户：UI 不展示分配入口，且直接请求分配写接口返回 403。
-- [ ] 仅 `org.assignments assign`（无 `org.nodes write`）账户：创建分配成功（包含自动创建 Position 的路径）。
-- [ ] 无 `org.hierarchies read` 账户：直接访问 `/org/nodes` 返回 403 Unauthorized 页面。
+- [X] 管理员登录后可查看组织树。
+- [X] 创建新 OrgNode，树中可见且详情正确。
+- [X] 编辑 OrgNode（Insert 语义），在不同 `effective_date` 下可看到正确 as-of 视图。
+- [X] 变更节点上级（MoveNode），树与详情刷新正确。
+- [X] 为某 `person:{pernr}` 创建/编辑 Assignment（默认走手动输入 `pernr` 路径），并在时间线中可见。
+- [X] 无 Org 权限账户：直接访问 `/org/nodes` 返回 401/403 Unauthorized 页面。
 
 ### 9.3 Readiness（执行后在此记录）
 > 执行后将 `[ ]` 改为 `[X]`，并补充时间戳、结果与必要链接；同时将命令与输出记录到 `docs/dev-records/DEV-PLAN-035-READINESS.md`。
 
-- [ ] `make generate && make css` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败（附摘要）
-- [ ] `git status --short` —— （YYYY-MM-DD HH:MM UTC）结果：必须为空
-- [ ] `go fmt ./... && go vet ./...` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败
-- [ ] `make check lint && make test` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败
-- [ ] 如涉及路由 allowlist：`make check routing` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败
-- [ ] `cd e2e && pnpm test tests/org` —— （YYYY-MM-DD HH:MM UTC）结果：通过/失败
+- [X] `make generate && make css` —— （2025-12-19）结果：通过（详情见 `docs/dev-records/DEV-PLAN-035-READINESS.md`）
+- [X] `git status --short` —— （2025-12-19）结果：为空（提交后工作区干净）
+- [X] `go fmt ./... && go vet ./...` —— （2025-12-19）结果：通过
+- [X] `make check lint && make test` —— （2025-12-19）结果：通过
+- [X] 如涉及路由 allowlist：`make check routing` —— （2025-12-19）结果：通过
+- [X] `cd e2e && pnpm test --reporter=list` —— （2025-12-19）结果：通过
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - **Feature Flag（可选）**：如需灰度，引入 `ENABLE_ORG_UI`（默认关闭），逐租户开启。

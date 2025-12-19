@@ -1,6 +1,7 @@
 package org
 
 import (
+	"github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/templates/components/orgui"
@@ -42,14 +43,14 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 						hx-target="#org-assignments-page"
 						hx-swap="outerHTML"
 						hx-push-url="true"
-						hx-include="[name='effective_date']"
+						hx-include="#org-pernr, [name='effective_date']"
 					/>
 				</div>
 			</div>
 			@orgui.Subnav(orgui.SubnavProps{
 				EffectiveDate:  props.EffectiveDate,
 				Active:         "assignments",
-				CanAssignments: true,
+				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
 			})
 			if len(props.Errors) > 0 {
 				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
@@ -63,15 +64,31 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 			<div class="grid grid-cols-12 gap-4">
 				<div class="col-span-12 lg:col-span-4">
 					<div class="rounded-lg border border-surface-400 bg-surface-300">
-						<div class="border-b border-surface-400 p-3">
-							<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Assignments.CreateTitle") }</div>
-						</div>
 						<div class="p-4 space-y-3">
-							@orgui.AssignmentCreateForm(orgui.AssignmentCreateFormProps{
-								EffectiveDate: props.EffectiveDate,
-								Pernr:         props.Pernr,
-								Errors:        map[string]string{},
-							})
+							if pageCtx.CanAuthz("org.assignments", "assign") {
+								@orgui.AssignmentForm(orgui.AssignmentFormProps{
+									Mode:          orgui.AssignmentFormCreate,
+									EffectiveDate: props.EffectiveDate,
+									Pernr:         props.Pernr,
+									Errors:        map[string]string{},
+								})
+							} else {
+								<div class="space-y-2">
+									<label class="block text-xs font-medium text-200" for="org-pernr">{ pageCtx.T("Org.UI.Assignments.Fields.Pernr") }</label>
+									<input
+										id="org-pernr"
+										name="pernr"
+										type="text"
+										value={ props.Pernr }
+										class="w-full rounded-md border border-surface-400 bg-surface-200 px-3 py-2 text-sm text-100"
+									/>
+								</div>
+								@authorization.Unauthorized(&authorization.UnauthorizedProps{
+									Object:    "org.assignments",
+									Action:    "assign",
+									Operation: pageCtx.T("Org.UI.Assignments.CreateTitle"),
+								})
+							}
 							@button.Secondary(button.Props{
 								Size: button.SizeSM,
 								Attrs: templ.Attributes{
