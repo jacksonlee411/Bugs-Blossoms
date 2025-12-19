@@ -22,6 +22,6 @@ func (h *OutboxEventsHandler) onOrgEventV1(meta *outbox.Meta, ev *events.OrgEven
 	if h == nil || h.org == nil || meta == nil || ev == nil {
 		return nil
 	}
-	h.org.InvalidateTenantCache(meta.TenantID)
+	h.org.InvalidateTenantCacheWithReason(meta.TenantID, "outbox_event")
 	return nil
 }

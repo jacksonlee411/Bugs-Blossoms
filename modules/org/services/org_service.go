@@ -264,11 +264,16 @@ func newServiceError(status int, code, message string, cause error) *ServiceErro
 	return &ServiceError{Status: status, Code: code, Message: message, Cause: cause}
 }
 
-func (s *OrgService) InvalidateTenantCache(tenantID uuid.UUID) {
+func (s *OrgService) InvalidateTenantCacheWithReason(tenantID uuid.UUID, reason string) {
 	if s == nil || s.cache == nil {
 		return
 	}
 	s.cache.InvalidateTenant(tenantID)
+	recordCacheInvalidate(reason)
+}
+
+func (s *OrgService) InvalidateTenantCache(tenantID uuid.UUID) {
+	s.InvalidateTenantCacheWithReason(tenantID, "manual")
 }
 
 func (s *OrgService) GetHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) ([]HierarchyNode, time.Time, error) {
@@ -286,9 +291,11 @@ func (s *OrgService) GetHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, h
 	if s != nil && s.cache != nil {
 		if cachedAny, ok := s.cache.Get(cacheKey); ok {
 			if cached, ok := cachedAny.(cachedHierarchy); ok {
+				recordCacheRequest("hierarchy", true)
 				return cached.Nodes, cached.AsOf, nil
 			}
 		}
+		recordCacheRequest("hierarchy", false)
 	}
 
 	nodes, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]HierarchyNode, error) {
@@ -513,7 +520,7 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -723,7 +730,7 @@ func (s *OrgService) UpdateNode(ctx context.Context, tenantID uuid.UUID, request
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -914,7 +921,7 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -1079,7 +1086,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -1251,7 +1258,7 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		return nil, err
 	}
 	if !shouldSkipCacheInvalidation(ctx) {
-		s.InvalidateTenantCache(tenantID)
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
 	}
 	return written, nil
 }
@@ -1285,9 +1292,11 @@ func (s *OrgService) GetAssignments(ctx context.Context, tenantID uuid.UUID, sub
 		if s != nil && s.cache != nil {
 			if cachedAny, ok := s.cache.Get(cacheKey); ok {
 				if cached, ok := cachedAny.(cachedAssignments); ok {
+					recordCacheRequest("assignments", true)
 					return cached.Rows, nil
 				}
 			}
+			recordCacheRequest("assignments", false)
 		}
 
 		rows, err := s.repo.ListAssignmentsAsOf(txCtx, tenantID, subjectUUID, *asOf)

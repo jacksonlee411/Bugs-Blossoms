@@ -26,9 +26,11 @@ func (s *OrgService) ListAncestorsAsOf(ctx context.Context, tenantID uuid.UUID, 
 	if s != nil && s.cache != nil && OrgCacheEnabled() {
 		if cachedAny, ok := s.cache.Get(cacheKey); ok {
 			if cached, ok := cachedAny.(cachedRelations); ok {
+				recordCacheRequest("snapshot", true)
 				return cached.Items, cached.AsOf, nil
 			}
 		}
+		recordCacheRequest("snapshot", false)
 	}
 
 	out, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]DeepReadRelation, error) {
@@ -67,9 +69,11 @@ func (s *OrgService) ListDescendantsAsOf(ctx context.Context, tenantID uuid.UUID
 	if s != nil && s.cache != nil && OrgCacheEnabled() {
 		if cachedAny, ok := s.cache.Get(cacheKey); ok {
 			if cached, ok := cachedAny.(cachedRelations); ok {
+				recordCacheRequest("snapshot", true)
 				return cached.Items, cached.AsOf, nil
 			}
 		}
+		recordCacheRequest("snapshot", false)
 	}
 
 	out, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]DeepReadRelation, error) {
