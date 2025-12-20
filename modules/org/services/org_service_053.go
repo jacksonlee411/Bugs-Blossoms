@@ -3,14 +3,18 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/iota-uz/iota-sdk/modules/org/domain/events"
 )
+
+const maxReportsToDepth = 128
 
 type CreatePositionInput struct {
 	Code            string
@@ -105,6 +109,10 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			return nil, mapPgError(err)
 		}
 
+		if err := s.validateReportsToNoCycle(txCtx, tenantID, positionID, in.EffectiveDate, in.ReportsToID); err != nil {
+			return nil, err
+		}
+
 		sliceID, err := s.repo.InsertPositionSlice(txCtx, tenantID, positionID, PositionSliceInsert{
 			OrgNodeID:           in.OrgNodeID,
 			Title:               in.Title,
@@ -175,6 +183,247 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			SliceID:       sliceID,
 			EffectiveDate: in.EffectiveDate,
 			EndDate:       endOfTime,
+			GeneratedEvents: []events.OrgEventV1{
+				ev,
+			},
+		}
+		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
+			return nil, err
+		}
+		return res, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !shouldSkipCacheInvalidation(ctx) {
+		s.InvalidateTenantCacheWithReason(tenantID, "write_commit")
+	}
+	return written, nil
+}
+
+func (s *OrgService) validateReportsToNoCycle(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time, reportsToID *uuid.UUID) error {
+	if reportsToID == nil || *reportsToID == uuid.Nil {
+		return nil
+	}
+
+	visited := make(map[uuid.UUID]struct{}, 8)
+	current := *reportsToID
+	for i := 0; i < maxReportsToDepth; i++ {
+		if current == uuid.Nil {
+			return nil
+		}
+		if current == positionID {
+			return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_REPORTS_TO_CYCLE", "reports_to creates a cycle", nil)
+		}
+		if _, ok := visited[current]; ok {
+			return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_REPORTS_TO_CYCLE", "reports_to creates a cycle", nil)
+		}
+		visited[current] = struct{}{}
+
+		row, err := s.repo.GetPositionSliceAt(ctx, tenantID, current, asOf)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_NOT_FOUND_AT_DATE", "reports_to_position_id not found at effective_date", err)
+			}
+			return mapPgError(err)
+		}
+		if row.ReportsToPositionID == nil || *row.ReportsToPositionID == uuid.Nil {
+			return nil
+		}
+		current = *row.ReportsToPositionID
+	}
+	return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_REPORTS_TO_CYCLE", "reports_to creates a cycle", nil)
+}
+
+type ShiftBoundaryPositionInput struct {
+	PositionID          uuid.UUID
+	TargetEffectiveDate time.Time
+	NewEffectiveDate    time.Time
+	ReasonCode          string
+	ReasonNote          *string
+}
+
+type ShiftBoundaryPositionResult struct {
+	PositionID      uuid.UUID
+	TargetStart     time.Time
+	NewStart        time.Time
+	GeneratedEvents []events.OrgEventV1
+}
+
+func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UUID, requestID string, initiatorID uuid.UUID, in ShiftBoundaryPositionInput) (*ShiftBoundaryPositionResult, error) {
+	if tenantID == uuid.Nil {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
+	}
+	if requestID == "" {
+		requestID = uuid.NewString()
+	}
+	txTime := time.Now().UTC()
+	if in.PositionID == uuid.Nil || in.TargetEffectiveDate.IsZero() || in.NewEffectiveDate.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_id/target_effective_date/new_effective_date are required", nil)
+	}
+	if !in.NewEffectiveDate.Before(endOfTime) {
+		return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date is invalid", nil)
+	}
+
+	reasonCode := strings.TrimSpace(in.ReasonCode)
+	if reasonCode == "" {
+		reasonCode = "legacy"
+	}
+
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*ShiftBoundaryPositionResult, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+
+		target, err := s.repo.LockPositionSliceStartingAt(txCtx, tenantID, in.PositionID, in.TargetEffectiveDate)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_NOT_FOUND_AT_DATE", "target slice not found", err)
+			}
+			return nil, mapPgError(err)
+		}
+		if !in.NewEffectiveDate.Before(target.EndDate) {
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date must be before target end_date", nil)
+		}
+
+		prev, err := s.repo.LockPositionSliceEndingAt(txCtx, tenantID, in.PositionID, in.TargetEffectiveDate)
+		if err != nil {
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_SWALLOW", "previous slice not found", err)
+		}
+		if !in.NewEffectiveDate.After(prev.EffectiveDate) {
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_SWALLOW", "new_effective_date would swallow previous slice", nil)
+		}
+
+		affectedAt := in.TargetEffectiveDate
+		if in.NewEffectiveDate.Before(affectedAt) {
+			affectedAt = in.NewEffectiveDate
+		}
+		freeze, err := s.freezeCheck(settings, txTime, affectedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		prevOld := map[string]any{
+			"slice_id":       prev.ID.String(),
+			"position_id":    in.PositionID.String(),
+			"effective_date": prev.EffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":       prev.EndDate.UTC().Format(time.RFC3339),
+		}
+		targetOld := map[string]any{
+			"slice_id":       target.ID.String(),
+			"position_id":    in.PositionID.String(),
+			"effective_date": target.EffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":       target.EndDate.UTC().Format(time.RFC3339),
+		}
+
+		if in.NewEffectiveDate.After(in.TargetEffectiveDate) {
+			if err := s.repo.UpdatePositionSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.UpdatePositionSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
+				return nil, mapPgError(err)
+			}
+		} else {
+			if err := s.repo.UpdatePositionSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.UpdatePositionSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
+				return nil, mapPgError(err)
+			}
+		}
+
+		prevNew := map[string]any{
+			"slice_id":       prev.ID.String(),
+			"position_id":    in.PositionID.String(),
+			"effective_date": prev.EffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":       in.NewEffectiveDate.UTC().Format(time.RFC3339),
+		}
+		targetNew := map[string]any{
+			"slice_id":       target.ID.String(),
+			"position_id":    in.PositionID.String(),
+			"effective_date": in.NewEffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":       target.EndDate.UTC().Format(time.RFC3339),
+		}
+
+		opDetails := map[string]any{
+			"target_effective_date": in.TargetEffectiveDate.UTC().Format(time.RFC3339),
+			"new_effective_date":    in.NewEffectiveDate.UTC().Format(time.RFC3339),
+		}
+		meta := map[string]any{
+			"reason_code": reasonCode,
+			"reason_note": in.ReasonNote,
+		}
+
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:        requestID,
+			TransactionTime:  txTime,
+			InitiatorID:      initiatorID,
+			ChangeType:       "position.corrected",
+			EntityType:       "org_position",
+			EntityID:         in.PositionID,
+			EffectiveDate:    prev.EffectiveDate,
+			EndDate:          in.NewEffectiveDate,
+			OldValues:        prevOld,
+			NewValues:        prevNew,
+			Meta:             meta,
+			Operation:        "ShiftBoundary",
+			OperationDetails: opDetails,
+			FreezeMode:       freeze.Mode,
+			FreezeViolation:  freeze.Violation,
+			FreezeCutoffUTC:  freeze.CutoffUTC,
+			AffectedAtUTC:    affectedAt,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:        requestID,
+			TransactionTime:  txTime,
+			InitiatorID:      initiatorID,
+			ChangeType:       "position.corrected",
+			EntityType:       "org_position",
+			EntityID:         in.PositionID,
+			EffectiveDate:    in.NewEffectiveDate,
+			EndDate:          target.EndDate,
+			OldValues:        targetOld,
+			NewValues:        targetNew,
+			Meta:             meta,
+			Operation:        "ShiftBoundary",
+			OperationDetails: opDetails,
+			FreezeMode:       freeze.Mode,
+			FreezeViolation:  freeze.Violation,
+			FreezeCutoffUTC:  freeze.CutoffUTC,
+			AffectedAtUTC:    affectedAt,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		view, err := s.repo.GetPositionAsOf(txCtx, tenantID, in.PositionID, in.NewEffectiveDate)
+		if err != nil {
+			return nil, mapPgError(err)
+		}
+
+		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "position.corrected", "org_position", in.PositionID, in.NewEffectiveDate, endOfTime)
+		if payload, err := json.Marshal(map[string]any{
+			"position_id":      in.PositionID.String(),
+			"code":             view.Code,
+			"org_node_id":      view.OrgNodeID.String(),
+			"lifecycle_status": view.LifecycleStatus,
+			"is_auto_created":  view.IsAutoCreated,
+			"capacity_fte":     view.CapacityFTE,
+			"effective_date":   view.EffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":         view.EndDate.UTC().Format(time.RFC3339),
+		}); err == nil {
+			ev.NewValues = payload
+		}
+
+		res := &ShiftBoundaryPositionResult{
+			PositionID:  in.PositionID,
+			TargetStart: in.TargetEffectiveDate,
+			NewStart:    in.NewEffectiveDate,
 			GeneratedEvents: []events.OrgEventV1{
 				ev,
 			},
@@ -372,6 +621,10 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_OVER_CAPACITY", "position capacity would be below occupied_fte", nil)
 		}
 
+		if err := s.validateReportsToNoCycle(txCtx, tenantID, in.PositionID, in.EffectiveDate, reportsTo); err != nil {
+			return nil, err
+		}
+
 		if err := s.repo.TruncatePositionSlice(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
 			return nil, mapPgError(err)
 		}
@@ -567,6 +820,14 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			if occupied > *in.CapacityFTE {
 				return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_OVER_CAPACITY", "position capacity would be below occupied_fte", nil)
 			}
+		}
+
+		reportsTo := target.ReportsToPositionID
+		if in.ReportsToID != nil {
+			reportsTo = in.ReportsToID
+		}
+		if err := s.validateReportsToNoCycle(txCtx, tenantID, in.PositionID, target.EffectiveDate, reportsTo); err != nil {
+			return nil, err
 		}
 
 		patch := PositionSliceInPlacePatch{

@@ -78,6 +78,7 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/positions/{id}", c.instrumentAPI("positions.update", c.UpdatePosition)).Methods(http.MethodPatch)
 	api.HandleFunc("/positions/{id}:correct", c.instrumentAPI("positions.correct", c.CorrectPosition)).Methods(http.MethodPost)
 	api.HandleFunc("/positions/{id}:rescind", c.instrumentAPI("positions.rescind", c.RescindPosition)).Methods(http.MethodPost)
+	api.HandleFunc("/positions/{id}:shift-boundary", c.instrumentAPI("positions.shift_boundary", c.ShiftBoundaryPosition)).Methods(http.MethodPost)
 
 	api.HandleFunc("/assignments", c.instrumentAPI("assignments.list", c.GetAssignments)).Methods(http.MethodGet)
 	api.HandleFunc("/assignments", c.instrumentAPI("assignments.create", c.CreateAssignment)).Methods(http.MethodPost)
@@ -2350,6 +2351,69 @@ func (c *OrgAPIController) RescindPosition(w http.ResponseWriter, r *http.Reques
 			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
 		},
 	})
+}
+
+type shiftBoundaryPositionRequest struct {
+	TargetEffectiveDate string  `json:"target_effective_date"`
+	NewEffectiveDate    string  `json:"new_effective_date"`
+	ReasonCode          string  `json:"reason_code"`
+	ReasonNote          *string `json:"reason_note"`
+}
+
+func (c *OrgAPIController) ShiftBoundaryPosition(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "admin") {
+		return
+	}
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+	var req shiftBoundaryPositionRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	target, err := parseRequiredEffectiveDate(req.TargetEffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "target_effective_date is required")
+		return
+	}
+	newStart, err := parseRequiredEffectiveDate(req.NewEffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "new_effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.ShiftBoundaryPosition(r.Context(), tenantID, requestID, initiatorID, services.ShiftBoundaryPositionInput{
+		PositionID:          positionID,
+		TargetEffectiveDate: target,
+		NewEffectiveDate:    newStart,
+		ReasonCode:          req.ReasonCode,
+		ReasonNote:          req.ReasonNote,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type shiftBoundaryPositionResponse struct {
+		PositionID string `json:"position_id"`
+		Shifted    struct {
+			TargetEffectiveDate string `json:"target_effective_date"`
+			NewEffectiveDate    string `json:"new_effective_date"`
+		} `json:"shifted"`
+	}
+	var resp shiftBoundaryPositionResponse
+	resp.PositionID = res.PositionID.String()
+	resp.Shifted.TargetEffectiveDate = res.TargetStart.UTC().Format(time.RFC3339)
+	resp.Shifted.NewEffectiveDate = res.NewStart.UTC().Format(time.RFC3339)
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request) {

@@ -164,6 +164,14 @@ CREATE INDEX org_outbox_tenant_published
 | `POST /org/api/nodes/{id}:rescind`（025） | `org.nodes` | `admin` |
 | `POST /org/api/nodes/{id}:shift-boundary`（025） | `org.nodes` | `admin` |
 | `POST /org/api/nodes/{id}:correct-move`（025） | `org.edges` | `admin` |
+| `GET /org/api/positions`（053） | `org.positions` | `read` |
+| `GET /org/api/positions/{id}`（053） | `org.positions` | `read` |
+| `GET /org/api/positions/{id}/timeline`（053） | `org.positions` | `read` |
+| `POST /org/api/positions`（053） | `org.positions` | `write` |
+| `PATCH /org/api/positions/{id}`（053） | `org.positions` | `write` |
+| `POST /org/api/positions/{id}:correct`（053） | `org.positions` | `admin` |
+| `POST /org/api/positions/{id}:rescind`（053） | `org.positions` | `admin` |
+| `POST /org/api/positions/{id}:shift-boundary`（053） | `org.positions` | `admin` |
 | `GET /org/api/assignments`（024） | `org.assignments` | `read` |
 | `POST /org/api/assignments`（024） | `org.assignments` | `assign` |
 | `PATCH /org/api/assignments/{id}`（024） | `org.assignments` | `assign` |
