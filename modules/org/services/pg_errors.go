@@ -30,6 +30,8 @@ func mapPgErrorToServiceError(err error) error {
 		switch pgErr.ConstraintName {
 		case "org_nodes_tenant_id_code_key":
 			return newServiceError(http.StatusConflict, "ORG_CODE_CONFLICT", "code already exists", err)
+		case "org_positions_tenant_id_code_key":
+			return newServiceError(http.StatusConflict, "ORG_POSITION_CODE_CONFLICT", "position code already exists", err)
 		case "org_nodes_tenant_root_unique":
 			return newServiceError(http.StatusConflict, "ORG_OVERLAP", "root already exists", err)
 		default:

@@ -280,20 +280,21 @@ func (r *OrgRepository) LockAssignmentByID(ctx context.Context, tenantID uuid.UU
 		return services.AssignmentRow{}, err
 	}
 	row := tx.QueryRow(ctx, `
-SELECT
-	id,
-	position_id,
-	subject_type,
-	subject_id,
-	pernr,
-	assignment_type,
-	is_primary,
-	effective_date,
-	end_date
-FROM org_assignments
-WHERE tenant_id=$1 AND id=$2
-FOR UPDATE
-`, pgUUID(tenantID), pgUUID(assignmentID))
+	SELECT
+		id,
+		position_id,
+		subject_type,
+		subject_id,
+		pernr,
+		assignment_type,
+		is_primary,
+		allocated_fte,
+		effective_date,
+		end_date
+	FROM org_assignments
+	WHERE tenant_id=$1 AND id=$2
+	FOR UPDATE
+	`, pgUUID(tenantID), pgUUID(assignmentID))
 	var out services.AssignmentRow
 	if err := row.Scan(
 		&out.ID,
@@ -303,6 +304,7 @@ FOR UPDATE
 		&out.Pernr,
 		&out.AssignmentType,
 		&out.IsPrimary,
+		&out.AllocatedFTE,
 		&out.EffectiveDate,
 		&out.EndDate,
 	); err != nil {

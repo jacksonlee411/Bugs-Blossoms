@@ -97,6 +97,19 @@ type OrgRepository interface {
 	PositionExistsAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (bool, error)
 	InsertAutoPosition(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, orgNodeID uuid.UUID, code string, effectiveDate time.Time) error
 	GetPositionOrgNodeAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (uuid.UUID, error)
+	LockPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionSliceRow, error)
+	SumAllocatedFTEAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (float64, error)
+	InsertPosition(ctx context.Context, tenantID uuid.UUID, in PositionInsert) (uuid.UUID, error)
+	InsertPositionSlice(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, in PositionSliceInsert) (uuid.UUID, error)
+	GetPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionSliceRow, error)
+	TruncatePositionSlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
+	NextPositionSliceEffectiveDate(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, after time.Time) (time.Time, bool, error)
+	ListPositionSlicesTimeline(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID) ([]PositionSliceRow, error)
+	ListPositionsAsOf(ctx context.Context, tenantID uuid.UUID, asOf time.Time, filter PositionListFilter) ([]PositionViewRow, error)
+	GetPositionAsOf(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionViewRow, error)
+	DeletePositionSlicesFrom(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, from time.Time) error
+	UpdatePositionSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch PositionSliceInPlacePatch) error
+	HasPositionSubordinatesAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (bool, error)
 
 	LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (AssignmentRow, error)
 	TruncateAssignment(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, endDate time.Time) error
@@ -200,6 +213,7 @@ type AssignmentInsert struct {
 	Pernr           string
 	AssignmentType  string
 	IsPrimary       bool
+	AllocatedFTE    float64
 	EffectiveDate   time.Time
 	EndDate         time.Time
 	AssignmentSlice uuid.UUID
@@ -213,6 +227,7 @@ type AssignmentRow struct {
 	Pernr          string
 	AssignmentType string
 	IsPrimary      bool
+	AllocatedFTE   float64
 	EffectiveDate  time.Time
 	EndDate        time.Time
 }
@@ -229,6 +244,7 @@ type AssignmentViewRow struct {
 	OrgNodeID      uuid.UUID  `json:"org_node_id"`
 	AssignmentType string     `json:"assignment_type"`
 	IsPrimary      bool       `json:"is_primary"`
+	AllocatedFTE   float64    `json:"allocated_fte"`
 	EffectiveDate  time.Time  `json:"effective_date"`
 	EndDate        time.Time  `json:"end_date"`
 	PositionCode   *string    `json:"position_code,omitempty"`
@@ -939,7 +955,10 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 type CreateAssignmentInput struct {
 	Pernr          string
 	EffectiveDate  time.Time
+	ReasonCode     string
+	ReasonNote     *string
 	AssignmentType string
+	AllocatedFTE   float64
 	PositionID     *uuid.UUID
 	OrgNodeID      *uuid.UUID
 	SubjectID      *uuid.UUID
@@ -965,6 +984,17 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	in.Pernr = strings.TrimSpace(in.Pernr)
 	if in.Pernr == "" || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "pernr/effective_date are required", nil)
+	}
+	reasonCode := strings.TrimSpace(in.ReasonCode)
+	if reasonCode == "" {
+		reasonCode = "legacy"
+	}
+	allocatedFTE := in.AllocatedFTE
+	if allocatedFTE < 0 {
+		return nil, newServiceError(400, "ORG_INVALID_BODY", "allocated_fte must be > 0", nil)
+	}
+	if allocatedFTE == 0 {
+		allocatedFTE = 1.0
 	}
 
 	assignmentType := strings.TrimSpace(in.AssignmentType)
@@ -1031,6 +1061,18 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			}
 		}
 
+		posSlice, err := s.repo.LockPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
+		if err != nil {
+			return nil, mapPgError(err)
+		}
+		occupied, err := s.repo.SumAllocatedFTEAt(txCtx, tenantID, positionID, in.EffectiveDate)
+		if err != nil {
+			return nil, err
+		}
+		if occupied+allocatedFTE > posSlice.CapacityFTE {
+			return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
+		}
+
 		assignmentID, err := s.repo.InsertAssignment(txCtx, tenantID, AssignmentInsert{
 			PositionID:     positionID,
 			SubjectType:    "person",
@@ -1038,6 +1080,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			Pernr:          in.Pernr,
 			AssignmentType: assignmentType,
 			IsPrimary:      true,
+			AllocatedFTE:   allocatedFTE,
 			EffectiveDate:  in.EffectiveDate,
 			EndDate:        endOfTime,
 		})
@@ -1063,8 +1106,13 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				"pernr":           in.Pernr,
 				"assignment_type": assignmentType,
 				"is_primary":      true,
+				"allocated_fte":   allocatedFTE,
 				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
 				"end_date":        endOfTime.UTC().Format(time.RFC3339),
+			},
+			Meta: map[string]any{
+				"reason_code": reasonCode,
+				"reason_note": in.ReasonNote,
 			},
 			Operation:       "Create",
 			FreezeMode:      freeze.Mode,
@@ -1104,6 +1152,9 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 type UpdateAssignmentInput struct {
 	AssignmentID  uuid.UUID
 	EffectiveDate time.Time
+	ReasonCode    string
+	ReasonNote    *string
+	AllocatedFTE  *float64
 	PositionID    *uuid.UUID
 	OrgNodeID     *uuid.UUID
 }
@@ -1126,6 +1177,10 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	txTime := time.Now().UTC()
 	if in.AssignmentID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "id/effective_date are required", nil)
+	}
+	reasonCode := strings.TrimSpace(in.ReasonCode)
+	if reasonCode == "" {
+		reasonCode = "legacy"
 	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdateAssignmentResult, error) {
@@ -1190,6 +1245,44 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			}
 		}
 
+		newAllocatedFTE := current.AllocatedFTE
+		if in.AllocatedFTE != nil {
+			if *in.AllocatedFTE <= 0 {
+				return nil, newServiceError(400, "ORG_INVALID_BODY", "allocated_fte must be > 0", nil)
+			}
+			newAllocatedFTE = *in.AllocatedFTE
+		}
+
+		idsToLock := []uuid.UUID{current.PositionID, positionID}
+		if current.PositionID == positionID {
+			idsToLock = []uuid.UUID{positionID}
+		} else if strings.Compare(current.PositionID.String(), positionID.String()) > 0 {
+			idsToLock[0], idsToLock[1] = idsToLock[1], idsToLock[0]
+		}
+		var newPosSlice PositionSliceRow
+		for _, id := range idsToLock {
+			slice, err := s.repo.LockPositionSliceAt(txCtx, tenantID, id, in.EffectiveDate)
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+			if id == positionID {
+				newPosSlice = slice
+			}
+		}
+		occupiedNew, err := s.repo.SumAllocatedFTEAt(txCtx, tenantID, positionID, in.EffectiveDate)
+		if err != nil {
+			return nil, err
+		}
+		if current.PositionID == positionID {
+			occupiedNew -= current.AllocatedFTE
+			if occupiedNew < 0 {
+				occupiedNew = 0
+			}
+		}
+		if occupiedNew+newAllocatedFTE > newPosSlice.CapacityFTE {
+			return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
+		}
+
 		if err := s.repo.TruncateAssignment(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
 			return nil, mapPgError(err)
 		}
@@ -1201,6 +1294,7 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			Pernr:          current.Pernr,
 			AssignmentType: current.AssignmentType,
 			IsPrimary:      current.IsPrimary,
+			AllocatedFTE:   newAllocatedFTE,
 			EffectiveDate:  in.EffectiveDate,
 			EndDate:        newEnd,
 		})
@@ -1225,6 +1319,7 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				"pernr":           current.Pernr,
 				"assignment_type": current.AssignmentType,
 				"is_primary":      current.IsPrimary,
+				"allocated_fte":   current.AllocatedFTE,
 				"effective_date":  current.EffectiveDate.UTC().Format(time.RFC3339),
 				"end_date":        current.EndDate.UTC().Format(time.RFC3339),
 			},
@@ -1236,8 +1331,13 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				"pernr":           current.Pernr,
 				"assignment_type": current.AssignmentType,
 				"is_primary":      current.IsPrimary,
+				"allocated_fte":   newAllocatedFTE,
 				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
 				"end_date":        newEnd.UTC().Format(time.RFC3339),
+			},
+			Meta: map[string]any{
+				"reason_code": reasonCode,
+				"reason_note": in.ReasonNote,
 			},
 			Operation:       "Update",
 			FreezeMode:      freeze.Mode,

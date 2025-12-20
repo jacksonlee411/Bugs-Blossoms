@@ -230,6 +230,7 @@ flowchart TD
 {
   "pernr": "000123",
   "effective_date": "2025-01-01",
+  "reason_code": "assign",
   "assignment_type": "primary",
   "position_id": "uuid|null",
   "org_node_id": "uuid|null",
@@ -238,12 +239,13 @@ flowchart TD
 ```
 
 **Rules**
-- `pernr/effective_date` 必填。
+- `pernr/effective_date/reason_code` 必填。
 - `assignment_type` 缺省 `primary`；M1 仅允许写入 `primary`（否则 422 `ORG_ASSIGNMENT_TYPE_DISABLED`）。
 - 必须满足二选一：
   - 显式提供 `position_id`
   - 或提供 `org_node_id` 以触发自动创建空壳 Position（见 §6.5）
 - `subject_id` 若提供则必须与 026 SSOT 映射一致，否则 422 `ORG_SUBJECT_MISMATCH`。
+- `reason_code` 用于审计治理：写入 `org_audit_logs.meta.reason_code`（对齐 052）；兼容期允许后端填充 `legacy`，进入强制后缺失则 400 `ORG_INVALID_BODY`。
 
 **Response 201**
 ```json
@@ -256,6 +258,7 @@ flowchart TD
 ```
 
 **Errors**
+- 400 `ORG_INVALID_BODY`：缺少 `effective_date/reason_code` 等必填
 - 409 `ORG_PRIMARY_CONFLICT`：违反 primary 唯一（DB exclude）
 - 422 `ORG_NODE_NOT_FOUND_AT_DATE`：`org_node_id` 在 `effective_date` 不存在（自动创建路径）
 - 422 `ORG_POSITION_NOT_FOUND_AT_DATE`：`position_id` 在 `effective_date` 不存在
@@ -265,13 +268,14 @@ flowchart TD
 ```json
 {
   "effective_date": "2025-02-01",
+  "reason_code": "transfer",
   "position_id": "uuid|null",
   "org_node_id": "uuid|null"
 }
 ```
 
 **Rules**
-- 必须提供 `effective_date`；禁止提交 `end_date`。
+- 必须提供 `effective_date` 与 `reason_code`；禁止提交 `end_date`。
 - 允许“改岗位/改组织归属”通过 Insert 新片段实现；若未提供 `position_id`，必须提供 `org_node_id` 以自动创建新的空壳 Position。
 - `effective_date` 等于当前片段起点时返回 422 `ORG_USE_CORRECT`（由 025 提供）。
 

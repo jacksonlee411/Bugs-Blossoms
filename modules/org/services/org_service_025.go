@@ -669,6 +669,8 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 
 type CorrectAssignmentInput struct {
 	AssignmentID uuid.UUID
+	ReasonCode   string
+	ReasonNote   *string
 	Pernr        *string
 	PositionID   *uuid.UUID
 	SubjectID    *uuid.UUID
@@ -691,6 +693,10 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 	txTime := time.Now().UTC()
 	if in.AssignmentID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "id is required", nil)
+	}
+	reasonCode := strings.TrimSpace(in.ReasonCode)
+	if reasonCode == "" {
+		reasonCode = "legacy"
 	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CorrectAssignmentResult, error) {
@@ -717,6 +723,7 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 			"pernr":           current.Pernr,
 			"assignment_type": current.AssignmentType,
 			"is_primary":      current.IsPrimary,
+			"allocated_fte":   current.AllocatedFTE,
 			"effective_date":  current.EffectiveDate.UTC().Format(time.RFC3339),
 			"end_date":        current.EndDate.UTC().Format(time.RFC3339),
 		}
@@ -769,6 +776,7 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 			"pernr":           updated.Pernr,
 			"assignment_type": updated.AssignmentType,
 			"is_primary":      updated.IsPrimary,
+			"allocated_fte":   updated.AllocatedFTE,
 			"effective_date":  updated.EffectiveDate.UTC().Format(time.RFC3339),
 			"end_date":        updated.EndDate.UTC().Format(time.RFC3339),
 		}
@@ -784,6 +792,10 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 			EndDate:         updated.EndDate,
 			OldValues:       oldValues,
 			NewValues:       newValues,
+			Meta: map[string]any{
+				"reason_code": reasonCode,
+				"reason_note": in.ReasonNote,
+			},
 			Operation:       "Correct",
 			FreezeMode:      freeze.Mode,
 			FreezeViolation: freeze.Violation,
@@ -820,6 +832,8 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 type RescindAssignmentInput struct {
 	AssignmentID  uuid.UUID
 	EffectiveDate time.Time
+	ReasonCode    string
+	ReasonNote    *string
 	Reason        string
 }
 
@@ -840,6 +854,17 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 	txTime := time.Now().UTC()
 	if in.AssignmentID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "id/effective_date are required", nil)
+	}
+	reasonCode := strings.TrimSpace(in.ReasonCode)
+	if reasonCode == "" {
+		reasonCode = "legacy"
+	}
+	reasonNote := in.ReasonNote
+	if reasonNote == nil {
+		legacy := strings.TrimSpace(in.Reason)
+		if legacy != "" {
+			reasonNote = &legacy
+		}
 	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*RescindAssignmentResult, error) {
@@ -879,7 +904,6 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 			"assignment_id":  updated.ID.String(),
 			"effective_date": updated.EffectiveDate.UTC().Format(time.RFC3339),
 			"end_date":       updated.EndDate.UTC().Format(time.RFC3339),
-			"reason":         strings.TrimSpace(in.Reason),
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -895,7 +919,8 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 			NewValues:       newValues,
 			Operation:       "Rescind",
 			Meta: map[string]any{
-				"reason": strings.TrimSpace(in.Reason),
+				"reason_code": reasonCode,
+				"reason_note": reasonNote,
 			},
 			FreezeMode:      freeze.Mode,
 			FreezeViolation: freeze.Violation,

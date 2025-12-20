@@ -16,6 +16,7 @@ var (
 	orgHierarchiesAuthzObject     = authz.ObjectName("org", "hierarchies")
 	orgNodesAuthzObject           = authz.ObjectName("org", "nodes")
 	orgEdgesAuthzObject           = authz.ObjectName("org", "edges")
+	orgPositionsAuthzObject       = authz.ObjectName("org", "positions")
 	orgAssignmentsAuthzObject     = authz.ObjectName("org", "assignments")
 	orgSnapshotAuthzObject        = authz.ObjectName("org", "snapshot")
 	orgBatchAuthzObject           = authz.ObjectName("org", "batch")

@@ -134,23 +134,26 @@ func (r *OrgRepository) ListSnapshotPositions(ctx context.Context, tenantID uuid
 	}
 
 	q := `
-SELECT
-  p.id,
-  jsonb_build_object(
-    'org_position_id', p.id,
-    'org_node_id', p.org_node_id,
-    'code', p.code,
-    'title', p.title,
-    'status', p.status,
-    'is_auto_created', p.is_auto_created,
-    'effective_date', p.effective_date,
-    'end_date', p.end_date
-  ) AS new_values
-FROM org_positions p
-WHERE p.tenant_id = $1
-  AND p.effective_date <= $2
-  AND p.end_date > $2
-`
+	SELECT
+	  p.id,
+	  jsonb_build_object(
+	    'position_id', p.id,
+	    'org_node_id', s.org_node_id,
+	    'code', p.code,
+	    'lifecycle_status', s.lifecycle_status,
+	    'is_auto_created', p.is_auto_created,
+	    'capacity_fte', s.capacity_fte,
+	    'effective_date', s.effective_date,
+	    'end_date', s.end_date
+	  ) AS new_values
+	FROM org_positions p
+	JOIN org_position_slices s
+	  ON s.tenant_id = p.tenant_id
+	  AND s.position_id = p.id
+	  AND s.effective_date <= $2
+	  AND s.end_date > $2
+	WHERE p.tenant_id = $1
+	`
 	args := []any{pgUUID(tenantID), asOf}
 	if afterID != nil && *afterID != uuid.Nil {
 		q += " AND p.id > $3"
@@ -188,21 +191,22 @@ func (r *OrgRepository) ListSnapshotAssignments(ctx context.Context, tenantID uu
 	}
 
 	q := `
-SELECT
-  a.id,
-  jsonb_build_object(
-    'org_assignment_id', a.id,
-    'position_id', a.position_id,
-    'subject_type', a.subject_type,
-    'subject_id', a.subject_id,
-    'pernr', a.pernr,
-    'assignment_type', a.assignment_type,
-    'is_primary', a.is_primary,
-    'effective_date', a.effective_date,
-    'end_date', a.end_date
-  ) AS new_values
-FROM org_assignments a
-WHERE a.tenant_id = $1
+	SELECT
+	  a.id,
+	  jsonb_build_object(
+	    'org_assignment_id', a.id,
+	    'position_id', a.position_id,
+	    'subject_type', a.subject_type,
+	    'subject_id', a.subject_id,
+	    'pernr', a.pernr,
+	    'assignment_type', a.assignment_type,
+	    'is_primary', a.is_primary,
+	    'allocated_fte', a.allocated_fte,
+	    'effective_date', a.effective_date,
+	    'end_date', a.end_date
+	  ) AS new_values
+	FROM org_assignments a
+	WHERE a.tenant_id = $1
   AND a.effective_date <= $2
   AND a.end_date > $2
 `
