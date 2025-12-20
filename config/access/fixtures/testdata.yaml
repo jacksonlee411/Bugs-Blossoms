@@ -16,3 +16,49 @@
   action: edit
   legacy: false
   note: anonymous user lacks edit
+
+- subject: role:org.staffing.viewer
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.positions
+  action: read
+  legacy: true
+  note: staffing viewer can read positions
+- subject: role:org.staffing.viewer
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.positions
+  action: write
+  legacy: false
+  note: staffing viewer cannot write positions
+
+- subject: role:org.staffing.editor
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.assignments
+  action: assign
+  legacy: true
+  note: staffing editor can assign
+- subject: role:org.staffing.editor
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.positions
+  action: admin
+  legacy: false
+  note: staffing editor cannot do strong governance operations
+
+- subject: role:org.staffing.admin
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.positions
+  action: admin
+  legacy: true
+  note: staffing admin can do strong governance operations
+
+- subject: role:org.staffing.reports
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.position_reports
+  action: read
+  legacy: true
+  note: staffing reports can read reports
+- subject: role:org.staffing.reports
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.positions
+  action: read
+  legacy: false
+  note: staffing reports cannot read positions by default

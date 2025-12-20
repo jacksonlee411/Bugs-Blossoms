@@ -161,6 +161,7 @@ modules/{module}/
 - 移除 warehouse（仓库）模块（DEV-PLAN-041）：`docs/dev-plans/041-remove-warehouse-module.md`
 - 职位管理业务需求（DEV-PLAN-050）：`docs/dev-plans/050-position-management-business-requirements.md`
 - 职位管理实施蓝图（DEV-PLAN-051）：`docs/dev-plans/051-position-management-implementation-blueprint.md`
+- DEV-PLAN-051 Readiness：`docs/dev-records/DEV-PLAN-051-READINESS.md`
 - 职位管理子计划：契约冻结（DEV-PLAN-052）：`docs/dev-plans/052-position-contract-freeze-and-decisions.md`
 - 职位管理子计划：Position Core（DEV-PLAN-053）：`docs/dev-plans/053-position-core-schema-service-api.md`
 - 职位管理子计划：Authz（DEV-PLAN-054）：`docs/dev-plans/054-position-authz-policy-and-gates.md`

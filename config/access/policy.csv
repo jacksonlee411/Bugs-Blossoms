@@ -21,3 +21,16 @@ p, role:core.superadmin, org.role_assignments, *, global, allow
 p, role:core.superadmin, org.roles, *, global, allow
 p, role:core.superadmin, org.security_group_mappings, *, global, allow
 p, role:core.superadmin, org.snapshot, *, global, allow
+p, role:org.staffing.admin, org.assignments, admin, *, allow
+p, role:org.staffing.admin, org.assignments, assign, *, allow
+p, role:org.staffing.admin, org.assignments, read, *, allow
+p, role:org.staffing.admin, org.positions, admin, *, allow
+p, role:org.staffing.admin, org.positions, read, *, allow
+p, role:org.staffing.admin, org.positions, write, *, allow
+p, role:org.staffing.editor, org.assignments, assign, *, allow
+p, role:org.staffing.editor, org.assignments, read, *, allow
+p, role:org.staffing.editor, org.positions, read, *, allow
+p, role:org.staffing.editor, org.positions, write, *, allow
+p, role:org.staffing.reports, org.position_reports, read, *, allow
+p, role:org.staffing.viewer, org.assignments, read, *, allow
+p, role:org.staffing.viewer, org.positions, read, *, allow
