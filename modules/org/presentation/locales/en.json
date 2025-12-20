@@ -6,7 +6,8 @@
     "UI": {
       "Tabs": {
         "Structure": "Structure",
-        "Assignments": "Assignments"
+        "Assignments": "Assignments",
+        "Positions": "Positions"
       },
       "Shared": {
         "AsOf": "As of",
@@ -52,8 +53,81 @@
       },
       "Actions": {
         "Create": "Create",
+        "Edit": "Edit",
         "Save": "Save",
         "Move": "Move"
+      },
+      "Positions": {
+        "MetaTitle": "Positions",
+        "Title": "Positions",
+        "ListTitle": "Positions",
+        "DetailsTitle": "Details",
+        "TimelineTitle": "Timeline",
+        "Empty": "Select an org node to see positions.",
+        "DetailsEmpty": "Select a position from the list.",
+        "TimelineEmpty": "No timeline yet.",
+        "CreateTitle": "Create position",
+        "EditTitle": "Edit position",
+        "SystemReadonly": "System positions are read-only.",
+        "Badge": {
+          "System": "SYSTEM"
+        },
+        "Actions": {
+          "Create": "Create position"
+        },
+        "Filters": {
+          "Query": "Search",
+          "QueryPlaceholder": "code or title",
+          "Lifecycle": "Lifecycle",
+          "LifecycleAll": "All",
+          "StaffingState": "Staffing",
+          "StaffingAll": "All",
+          "IncludeDescendants": "Scope",
+          "IncludeDescendantsYes": "Subtree",
+          "IncludeDescendantsNo": "This node",
+          "ShowSystem": "System",
+          "ShowSystemYes": "Show",
+          "ShowSystemNo": "Hide"
+        },
+        "Columns": {
+          "Code": "Code",
+          "Title": "Title",
+          "Status": "Status",
+          "Staffing": "Staffing",
+          "FTE": "FTE"
+        },
+        "Fields": {
+          "Code": "Code",
+          "OrgNode": "Org node",
+          "Title": "Title",
+          "Lifecycle": "Lifecycle",
+          "Staffing": "Staffing",
+          "FTE": "FTE",
+          "Capacity": "Capacity FTE",
+          "CapacityFTE": "Capacity FTE",
+          "ReportsTo": "Reports to",
+          "ReasonCode": "Reason code",
+          "ReasonNote": "Reason note"
+        },
+        "Lifecycle": {
+          "Planned": "Planned",
+          "Active": "Active",
+          "Inactive": "Inactive",
+          "Rescinded": "Rescinded"
+        },
+        "Staffing": {
+          "Empty": "Empty",
+          "PartiallyFilled": "Partially filled",
+          "Filled": "Filled"
+        },
+        "ReportsTo": {
+          "Placeholder": "Search positions…"
+        },
+        "Pagination": {
+          "Page": "Page",
+          "Prev": "Prev",
+          "Next": "Next"
+        }
       },
       "Node": {
         "CreateTitle": "Create node",

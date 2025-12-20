@@ -12,6 +12,13 @@ type TreeProps struct {
 	Tree          *viewmodels.OrgTree
 	EffectiveDate string
 	SwapOOB       bool
+
+	NodeGetURL  func(nodeID, effectiveDate string) string
+	NodePushURL func(nodeID, effectiveDate string) string
+	Target      string
+	Swap        string
+	Include     string
+	PushURL     string
 }
 
 func indentClass(depth int) string {
@@ -34,6 +41,29 @@ templ TreeContent(props TreeProps) {
 	} else {
 		<ul class="space-y-1 p-2">
 			for _, n := range props.Tree.Nodes {
+				{{ nodeID := n.ID.String() }}
+				{{ getURL := "" }}
+				if props.NodeGetURL != nil {
+					{{ getURL = props.NodeGetURL(nodeID, props.EffectiveDate) }}
+				} else {
+					{{ getURL = fmt.Sprintf("/org/nodes/%s?effective_date=%s", nodeID, props.EffectiveDate) }}
+				}
+				{{ pushURL := props.PushURL }}
+				if pushURL == "" {
+					if props.NodePushURL != nil {
+						{{ pushURL = props.NodePushURL(nodeID, props.EffectiveDate) }}
+					} else {
+						{{ pushURL = fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", props.EffectiveDate, nodeID) }}
+					}
+				}
+				{{ target := props.Target }}
+				if target == "" {
+					{{ target = "#org-node-panel" }}
+				}
+				{{ swap := props.Swap }}
+				if swap == "" {
+					{{ swap = "innerHTML" }}
+				}
 				<li style={ indentClass(n.Depth) }>
 					<button
 						type="button"
@@ -42,10 +72,13 @@ templ TreeContent(props TreeProps) {
 							templ.KV("bg-surface-100 text-100", n.Selected),
 							templ.KV("hover:bg-surface-200 text-200", !n.Selected),
 						}
-						hx-get={ fmt.Sprintf("/org/nodes/%s?effective_date=%s", n.ID.String(), props.EffectiveDate) }
-						hx-target="#org-node-panel"
-						hx-swap="innerHTML"
-						hx-push-url={ fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", props.EffectiveDate, n.ID.String()) }
+						hx-get={ getURL }
+						hx-target={ target }
+						hx-swap={ swap }
+						if props.Include != "" {
+							hx-include={ props.Include }
+						}
+						hx-push-url={ pushURL }
 					>
 						<span class="truncate">
 							<span class="font-medium">{ strings.TrimSpace(n.Name) }</span>

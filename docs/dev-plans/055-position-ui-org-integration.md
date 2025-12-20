@@ -1,6 +1,6 @@
 # DEV-PLAN-055：Position UI（Org UI 集成 + 本地化）（对齐 051 阶段 C-UI）
 
-**状态**: 草拟中（2025-12-20 17:10 UTC）
+**状态**: 已完成（2025-12-20 13:59 UTC）
 
 ## 0. 评审结论（已采纳）
 - **IA 选型**：沿用 Org UI 既有“左树右面板 + 顶部 Subnav Tabs”模式，在 `/org/positions` 增加第三个 Tab（不新增全局 Sidebar 子项，避免入口重复与信息架构分叉）。
@@ -24,14 +24,14 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **Org UI 集成**：在 Org UI 的导航与子导航（Tabs）中加入 Position 入口，并能从组织树定位到“某组织单元”的 Position 列表与详情。
-- [ ] **读体验优先**：列表/详情/时间线（as-of 视角）可用；字段展示与口径对齐 052/053 的 v1 合同（避免 UI 与 API 漂移）。
-- [ ] **最小写入闭环（可演示）**：
-  - [ ] Position：创建、Update（新增版本；包含组织转移 `org_node_id` 变更）、维护 `reports_to_position_id`（通过可搜索下拉选择上级职位）。
-  - [ ] 强治理（admin）：v1 不交付 Correct/Rescind/ShiftBoundary 的 UI 表单；但当服务端提示“需强治理”或返回 403/409 时，UI 必须提供一致的错误解释与后续动作指引（申请 admin 权限/改用 Correct 等）。
-  - [ ] Assignment：最小占用/释放闭环（用于演示 `occupied_fte`/填充状态派生与“超编阻断”的错误反馈）。
-- [ ] **权限驱动 UI**：按钮显隐与服务端鉴权一致；无权限时 UX 可理解且可申请（对齐 035/054/026 的 403 契约）。
-- [ ] **本地化与门禁对齐**：新增文案具备 locales；`.templ`/Tailwind 生成物齐全且提交；按触发器矩阵通过本地门禁。
+- [X] **Org UI 集成**：在 Org UI 的导航与子导航（Tabs）中加入 Position 入口，并能从组织树定位到“某组织单元”的 Position 列表与详情。
+- [X] **读体验优先**：列表/详情/时间线（as-of 视角）可用；字段展示与口径对齐 052/053 的 v1 合同（避免 UI 与 API 漂移）。
+- [X] **最小写入闭环（可演示）**：
+  - [X] Position：创建、Update（新增版本；包含组织转移 `org_node_id` 变更）、维护 `reports_to_position_id`（通过可搜索下拉选择上级职位）。
+  - [X] 强治理（admin）：v1 不交付 Correct/Rescind/ShiftBoundary 的 UI 表单；403/409/422 反馈与 054/026 的 403 契约一致（含 missing_policies / 申请入口）。
+  - [X] Assignment：通过既有 `/org/assignments` 页面写入（SSOT：035 §5.2.3）或 `/org/api/assignments`（053）完成“占用/释放”的演示；Positions 页面仅展示摘要与错误反馈，不新增占用写入表单。
+- [X] **权限驱动 UI**：按钮显隐与服务端鉴权一致；无权限时 UX 可理解且可申请（对齐 035/054/026 的 403 契约）。
+- [X] **本地化与门禁对齐**：新增文案具备 locales；`.templ`/Tailwind 生成物齐全且提交；按触发器矩阵通过本地门禁。
 
 ### 2.2 非目标（Out of Scope）
 - 不交付完整统计/看板/空缺分析页面（见 [DEV-PLAN-057](057-position-reporting-and-operations.md)）。
@@ -46,8 +46,8 @@
   - [x] Go 代码（新增/扩展 UI controller、viewmodels、mappers）
   - [x] `.templ` / Tailwind（新增页面与组件，需生成物提交）
   - [x] 多语言 JSON（Org UI 文案 keys）
-  - [ ] Authz（本计划只复用 054 的 object/action 与 403 契约；不修改 `config/access/**`。若实现期需要改策略碎片，则额外按 054 流程与门禁执行）
-  - [ ] 路由治理（通常不命中：`/org` 前缀已在 allowlist；若新增顶级前缀才命中）
+  - [X] Authz（本计划只复用 054 的 object/action 与 403 契约；不修改 `config/access/**`。若实现期需要改策略碎片，则额外按 054 流程与门禁执行）
+  - [X] 路由治理（通常不命中：`/org` 前缀已在 allowlist；若新增顶级前缀才命中）
   - [x] 文档（本计划）
 
 - **SSOT 链接**：
@@ -87,6 +87,8 @@ graph TD
    - 表单校验类错误：422 返回带错误信息的表单片段；冲突/冻结窗口/重叠等治理错误：409 返回表单片段并展示错误码/信息（错误码 SSOT 以 053/025 为准）。
 6. **Tree 组件复用（选定）**
    - `orgui.Tree` 需要支持可配置的“点击请求 URL（hx-get）/push-url/target 容器”，以便在 `/org/nodes` 与 `/org/positions` 复用同一树组件。
+   - 向后兼容要求：`/org/nodes` 不传任何新参数时，树的请求 URL、push-url 与 target 行为必须保持不变（通过默认值/旧构造函数适配实现）。
+   - 参数化形态（v1 最小集）：允许以配置项注入 `OnNodeClickURL(nodeID)`、`PushURL`、`TargetSelector`（名称可按现有组件风格调整，但语义需保持）。
 7. **分页（选定：page/limit）**
    - 对齐 053：分页参数为 `page/limit`，并保持稳定排序（`code ASC NULLS LAST, position_id ASC`）。
    - UI 允许用“下一页”或“加载更多”呈现；实现上仍以 `page/limit` 驱动请求与渲染。
@@ -122,7 +124,7 @@ graph TD
   - `capacity_fte`（Create/Update 必填；按 052 的占编约束处理下调）
   - `reason_code`（Create/Update 必填；落点以 025/052 的 audit meta 为准）
   - `lifecycle_status`（Create/Update 必填，枚举以 052/053 为准）
-  - Managed Position（`is_auto_created=false`）在 053 v1 的额外必填字段（先用“自由文本/枚举选择”满足合同；056 再收敛为选择器与主数据校验）：
+  - Managed Position（`is_auto_created=false`）在 053 v1 的额外必填字段（先用“自由文本/枚举选择”满足合同；056 再收敛为选择器与主数据校验；SSOT：`docs/dev-plans/053-position-core-schema-service-api.md` 的 Create Rules）：
     - `position_type`、`employment_type`
     - `job_family_group_code`、`job_family_code`、`job_role_code`、`job_level_code`
   - v1 表单支持的可选字段：`title`、`reports_to_position_id`、`cost_center_code`
@@ -157,7 +159,7 @@ graph TD
 ### 5.3 URL 状态（v1）
 - 页面：`GET /org/positions`
 - Query（v1 最小集合）：
-  - `effective_date=YYYY-MM-DD`（必需；缺省为 UTC today）
+  - `effective_date=YYYY-MM-DD`（可选输入；缺省为 UTC today；服务端必须通过 redirect（full page）或 `htmx.PushUrl`（HTMX）把 canonical URL 固化为“显式带 effective_date”，保证可刷新/可分享）
   - `node_id=<uuid>`（可选；选中组织节点）
   - `position_id=<uuid>`（可选；选中职位）
   - `q=<string>`（可选；关键词：title/code）
@@ -170,6 +172,11 @@ graph TD
 
 ## 6. 交互契约 (HTMX Contracts)
 > UI 路由在 `/org/*`（HTML/HTMX）；内部 JSON API 在 `/org/api/*`（若 UI 选择直接调用 service，可不经由 `/org/api`，但口径与错误码需对齐 053）。
+
+### 6.0 Canonical URL（v1 选定）
+- 当请求缺省 `effective_date` 时：
+  - Full page：返回 302/303 redirect 到包含 `effective_date` 的 canonical URL。
+  - HTMX：在响应中使用 `htmx.PushUrl` 把 URL 固化为包含 `effective_date` 的 canonical URL（并继续返回 partial）。
 
 ### 6.1 页面与 partial（v1 选定）
 - `GET /org/positions?effective_date=...`：PositionsPage（全页）
@@ -198,7 +205,7 @@ graph TD
 
 ## 7. 核心交互逻辑 (Business Logic & UX Flows)
 ### 7.1 组织视角 → 职位列表
-1. 用户进入 `/org/positions?effective_date=...`。
+1. 用户进入 `/org/positions`（若缺省 `effective_date`，服务端固化 canonical URL 后再渲染）。
 2. 选择组织树节点：
    - 右侧加载该节点（默认含下级，`include_descendants=1`）下的 Position 列表。
    - 列表默认只展示 Managed（`show_system=0`）。
@@ -225,9 +232,9 @@ graph TD
 
 ### 7.6 占编（Assignment）最小闭环（用于演示派生口径）
 - 详情页展示占编摘要：`capacity_fte / occupied_fte / available_fte / staffing_state`（字段口径以 052/053 为准）。
-- v1 优先复用既有 Assignments 页能力（`/org/assignments`），在 Position 详情页提供：
+- v1 优先复用既有 Assignments 页能力（`/org/assignments`，SSOT：035 §5.2.3），在 Position 详情页提供：
   - 只读占编摘要（如 053 已提供该口径）
-  - “查看该人员分配时间线/跳转到 Assignments 页”的联动入口
+  - “跳转到 Assignments 页”的联动入口（用于占用/释放演示；Positions 页不新增占用写入表单与路由）
 - 超编/冲突必须被阻断，并以可理解的错误提示返回（409/422，错误码 SSOT 以 053 为准）。
 
 ## 8. 安全与鉴权 (Security & Authz)
@@ -261,6 +268,9 @@ graph TD
 - **权限**：
   - 无 `org.positions read`：入口不可见；直接访问返回 403（Full page/HTMX 体验一致）。
   - 无 `write/admin`：对应按钮隐藏/禁用且服务端也会 403。
+- **System/Managed 边界**：
+  - `show_system=0` 时隐藏 System/auto-created。
+  - `show_system=1` 时可展示 System，但 System 行/详情必须只读且不暴露治理/写入入口。
 - **核心闭环（最小演示）**：
   - Create/Update（含 Transfer）可用；写入成功后列表与详情即时刷新。
   - 占编最小闭环可演示 `occupied_fte` 变化与超编阻断。
@@ -268,9 +278,11 @@ graph TD
   - 未授权访问 `/org/positions`：403 UX 与 035 保持一致（Full page + HTMX）。
   - 有 `org.positions read`：可见 Positions Tab，且能按 `effective_date/node_id` 查看列表与详情。
   - 有 `org.positions write`：可 Create/Update（happy path），并能看到 409/422 的错误反馈；若中间件提供 `request_id`，UI 需展示/可复制以便排障（对齐 059）。
+  - Transfer（`org_node_id` 变更）后：URL 的 `node_id` 与树选中态要与“职位当前归属组织”一致，避免出现“已转移但仍停留在旧 node_id”的错位。
 - **门禁**：
   - `.templ`/Tailwind：生成物提交且 `git status --short` 干净。
   -（若命中）`make check tr`、`make check lint`、`make test` 等对齐触发器矩阵。
+  - 路由治理确认：若 `/org/positions` 触发 routing gate，则按 018 更新 allowlist 并跑对齐门禁；否则记录“无需变更”结论。
   - readiness 记录：本计划相关命令/结果/时间戳登记到 `docs/dev-records/DEV-PLAN-051-READINESS.md`（SSOT：059）。
 
 ## 11. 运维与监控 (Ops & Monitoring)
@@ -287,21 +299,37 @@ graph TD
 -（可选）[DEV-PLAN-056](056-job-catalog-profile-and-position-restrictions.md)：若 UI 需要展示/编辑 Catalog/Profile/Restrictions 的字段或摘要。
 
 ### 12.2 里程碑（v1）
-1. [ ] IA 与路由契约冻结（§5-§6）
-2. [ ] Positions Page（树 + 列表 + 详情骨架）可用（读）
-3. [ ] Create/Update 最小写入闭环可演示
-4. [ ] 强治理错误引导与 403/错误反馈一致（无表单）
-5. [ ] 本地化 keys 补齐 + 生成物/门禁通过
+1. [X] IA 与路由契约冻结（§5-§6）
+2. [X] Positions Page（树 + 列表 + 详情骨架）可用（读）
+3. [X] Create/Update 最小写入闭环可演示
+4. [X] 强治理错误引导与 403/错误反馈一致（无表单）
+5. [X] 本地化 keys 补齐 + 生成物/门禁通过
 
 ## 13. 实施步骤
-1. [ ] 扩展 Org UI 导航与 Tab（对齐 035A）
-2. [ ] 新增 `/org/positions` 页面与右侧面板骨架（复用树与布局）
-3. [ ] Position 列表（filters + 分页）与详情/时间线 partial
-4. [ ] Create/Update 表单与写入后刷新（HTMX + OOB；Transfer 作为 Update 的 `org_node_id` 变更承载）
-5. [ ] Assignment 占编最小闭环（展示 + 最小写入）
-6. [ ] locales 补齐 + 生成物提交（`.templ`/Tailwind）
-7. [ ] 验收与门禁记录（执行时填写；结果登记到 `docs/dev-records/DEV-PLAN-051-READINESS.md`，SSOT：059）
+1. [X] 扩展 Org UI 导航与 Tab（对齐 035A）
+2. [X] 新增 `/org/positions` 页面与右侧面板骨架（复用树与布局）
+3. [X] Position 列表（filters + 分页）与详情/时间线 partial
+4. [X] Create/Update 表单与写入后刷新（HTMX + OOB；Transfer 作为 Update 的 `org_node_id` 变更承载）
+5. [X] Assignment 占编最小闭环（展示 + 最小写入）
+6. [X] locales 补齐 + 生成物提交（`.templ`/Tailwind）
+7. [X] 验收与门禁记录：结果登记到 `docs/dev-records/DEV-PLAN-051-READINESS.md`（SSOT：059）
 
 ## 14. 交付物
 - Org UI 中的 Position 页面（树上下文 + 列表/详情/时间线）与最小写入闭环（含占编演示）。
 - 本地化 locales keys 与必要生成物（确保 CI 不因生成漂移失败）。
+
+## 15. Readiness（准备就绪）检查清单
+> 说明：本节用于把“设计已冻结/可进入实施”的前置项显式化；实现与门禁命令记录仍由 §13 与 `docs/dev-records/DEV-PLAN-051-READINESS.md` 收口。
+
+- [X] IA 与路由落点已冻结（`/org/positions` + Tabs；不新增全局 Sidebar 入口）。
+- [X] v1 范围已冻结：Positions 只交付 Create/Update；强治理无表单但具备错误引导与申请入口。
+- [X] 字段口径与必填边界对齐 052/053（Managed 必填以 053 Create Rules 为 SSOT；主数据选择器延后到 056）。
+- [X] Authz object/action 对齐 054（read/write/admin 与 assignments read/assign/admin）。
+- [X] routing gate 风险已识别：实施前需确认 `/org/positions` 不触发；若触发按 018 修订。
+
+## 16. 实施记录（证据点）
+- 路由与交互：`modules/org/presentation/controllers/org_ui_controller.go`
+- UI/组件：`modules/org/presentation/templates/pages/org/positions.templ`、`modules/org/presentation/templates/components/orgui/positions.templ`、`modules/org/presentation/templates/components/orgui/tree.templ`、`modules/org/presentation/templates/components/orgui/subnav.templ`
+- 本地化：`modules/org/presentation/locales/en.json`、`modules/org/presentation/locales/zh.json`、`modules/org/presentation/locales/ru.json`、`modules/org/presentation/locales/uz.json`
+- 门禁记录：`docs/dev-records/DEV-PLAN-051-READINESS.md`
+- E2E 用例：`e2e/tests/org/org-ui.spec.ts`

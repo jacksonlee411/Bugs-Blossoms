@@ -11,6 +11,7 @@ type SubnavProps struct {
 	EffectiveDate  string
 	Active         string
 	CanAssignments bool
+	CanPositions   bool
 }
 
 templ Subnav(props SubnavProps) {
@@ -38,6 +39,19 @@ templ Subnav(props SubnavProps) {
 			>
 				@icons.Users(icons.Props{Size: "18"})
 				{ pageCtx.T("Org.UI.Tabs.Assignments") }
+			</a>
+		}
+		if props.CanPositions {
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/org/positions?effective_date=%s", props.EffectiveDate)) }
+				class={
+					"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+					templ.KV("border-primary bg-primary/10 text-100", props.Active == "positions"),
+					templ.KV("border-surface-400 bg-surface-200 text-200 hover:bg-surface-100", props.Active != "positions"),
+				}
+			>
+				@icons.Briefcase(icons.Props{Size: "18"})
+				{ pageCtx.T("Org.UI.Tabs.Positions") }
 			</a>
 		}
 	</div>

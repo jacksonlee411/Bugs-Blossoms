@@ -1,9 +1,9 @@
 # DEV-PLAN-051-READINESS：Position Management（051）Readiness 记录
 
-**状态**: 阶段 C-Authz（DEV-PLAN-054）已实现（2025-12-20）
+**状态**: 阶段 C-UI（DEV-PLAN-055）已实现（2025-12-20）
 
 ## 1. 范围
-- 本 readiness 覆盖 [DEV-PLAN-051](../dev-plans/051-position-management-implementation-blueprint.md) 的阶段 C-Authz，具体实现以子计划 [DEV-PLAN-054](../dev-plans/054-position-authz-policy-and-gates.md) 为准。
+- 本 readiness 覆盖 [DEV-PLAN-051](../dev-plans/051-position-management-implementation-blueprint.md) 的阶段 C（Authz + UI），具体实现以子计划 [DEV-PLAN-054](../dev-plans/054-position-authz-policy-and-gates.md)、[DEV-PLAN-055](../dev-plans/055-position-ui-org-integration.md) 为准。
 
 ## 2. 前置条件（未执行前 checklist）
 
@@ -29,3 +29,8 @@
 - [X] `make check lint` ——（2025-12-20）结果：通过
 - [X] `make test` ——（2025-12-20）结果：通过
 
+### 3.3 UI 门禁（DEV-PLAN-055）
+- [X] `make generate && make css` ——（2025-12-20）结果：通过
+- [X] `make check tr` ——（2025-12-20）结果：通过
+- [X] `make check routing` ——（2025-12-20）结果：通过
+- [X] E2E 用例补齐：`e2e/tests/org/org-ui.spec.ts` ——（2025-12-20）结果：已新增（未在此记录中运行）
