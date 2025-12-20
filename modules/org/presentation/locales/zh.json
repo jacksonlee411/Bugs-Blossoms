@@ -6,7 +6,8 @@
 		"UI": {
 			"Tabs": {
 				"Structure": "组织结构",
-				"Assignments": "人员分配"
+				"Assignments": "人员分配",
+				"Positions": "职位"
 			},
 			"Shared": {
 				"AsOf": "生效视图",
@@ -52,8 +53,81 @@
 			},
 			"Actions": {
 				"Create": "创建",
+				"Edit": "编辑",
 				"Save": "保存",
 				"Move": "移动"
+			},
+			"Positions": {
+				"MetaTitle": "职位",
+				"Title": "职位",
+				"ListTitle": "职位",
+				"DetailsTitle": "详情",
+				"TimelineTitle": "时间线",
+				"Empty": "请选择组织节点查看职位。",
+				"DetailsEmpty": "请从列表选择一个职位。",
+				"TimelineEmpty": "暂无时间线。",
+				"CreateTitle": "创建职位",
+				"EditTitle": "编辑职位",
+				"SystemReadonly": "系统职位只读。",
+				"Badge": {
+					"System": "系统"
+				},
+				"Actions": {
+					"Create": "创建职位"
+				},
+				"Filters": {
+					"Query": "搜索",
+					"QueryPlaceholder": "编码或名称",
+					"Lifecycle": "生命周期",
+					"LifecycleAll": "全部",
+					"StaffingState": "占编",
+					"StaffingAll": "全部",
+					"IncludeDescendants": "范围",
+					"IncludeDescendantsYes": "子树",
+					"IncludeDescendantsNo": "当前节点",
+					"ShowSystem": "系统",
+					"ShowSystemYes": "显示",
+					"ShowSystemNo": "隐藏"
+				},
+				"Columns": {
+					"Code": "编码",
+					"Title": "名称",
+					"Status": "状态",
+					"Staffing": "占编",
+					"FTE": "FTE"
+				},
+				"Fields": {
+					"Code": "编码",
+					"OrgNode": "组织节点",
+					"Title": "名称",
+					"Lifecycle": "生命周期",
+					"Staffing": "占编",
+					"FTE": "FTE",
+					"Capacity": "编制（FTE）",
+					"CapacityFTE": "编制（FTE）",
+					"ReportsTo": "汇报给",
+					"ReasonCode": "原因编码",
+					"ReasonNote": "原因说明"
+				},
+				"Lifecycle": {
+					"Planned": "规划",
+					"Active": "启用",
+					"Inactive": "停用",
+					"Rescinded": "撤销"
+				},
+				"Staffing": {
+					"Empty": "空缺",
+					"PartiallyFilled": "部分填充",
+					"Filled": "已填充"
+				},
+				"ReportsTo": {
+					"Placeholder": "搜索职位…"
+				},
+				"Pagination": {
+					"Page": "页",
+					"Prev": "上一页",
+					"Next": "下一页"
+				}
 			},
 			"Node": {
 				"CreateTitle": "新建节点",

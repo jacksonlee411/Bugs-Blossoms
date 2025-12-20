@@ -1,0 +1,586 @@
+package orgui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/google/uuid"
+	icons "github.com/iota-uz/icons/phosphor"
+	"github.com/iota-uz/iota-sdk/components/base"
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type PositionsPanelProps struct {
+	EffectiveDate      string
+	NodeID             string
+	Q                  string
+	LifecycleStatus    string
+	StaffingState      string
+	ShowSystem         bool
+	IncludeDescendants bool
+	Page               int
+	Limit              int
+
+	Positions          []viewmodels.OrgPositionRow
+	SelectedPositionID string
+	SelectedPosition   *viewmodels.OrgPositionDetails
+	Timeline           []viewmodels.OrgPositionTimelineItem
+}
+
+templ PositionsPanel(props PositionsPanelProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div class="space-y-4">
+		<form id="org-positions-filters" class="flex flex-wrap items-end gap-3">
+			<input type="hidden" name="node_id" value={ props.NodeID }/>
+			<input type="hidden" name="page" value={ fmt.Sprintf("%d", maxInt(props.Page, 1)) }/>
+			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", clampInt(props.Limit, 1, 200)) }/>
+			<div class="flex-1 min-w-[220px]">
+				@input.Text(&input.Props{
+					Label: pageCtx.T("Org.UI.Positions.Filters.Query"),
+					Attrs: templ.Attributes{
+						"name":        "q",
+						"value":       props.Q,
+						"placeholder": pageCtx.T("Org.UI.Positions.Filters.QueryPlaceholder"),
+						"hx-get":      "/org/positions/panel",
+						"hx-trigger":  "keyup changed delay:300ms",
+						"hx-target":   "#org-positions-panel",
+						"hx-swap":     "innerHTML",
+						"hx-push-url": "true",
+						"hx-include":  "#org-positions-filters, [name='effective_date']",
+					},
+				})
+			</div>
+			<div class="min-w-[160px]">
+				@base.Select(&base.SelectProps{
+					Label: pageCtx.T("Org.UI.Positions.Filters.Lifecycle"),
+					Attrs: templ.Attributes{
+						"name":        "lifecycle_status",
+						"hx-get":      "/org/positions/panel",
+						"hx-trigger":  "change",
+						"hx-target":   "#org-positions-panel",
+						"hx-swap":     "innerHTML",
+						"hx-push-url": "true",
+						"hx-include":  "#org-positions-filters, [name='effective_date']",
+					},
+				}) {
+					<option value="" selected?={ strings.TrimSpace(props.LifecycleStatus) == "" }>{ pageCtx.T("Org.UI.Positions.Filters.LifecycleAll") }</option>
+					<option value="planned" selected?={ props.LifecycleStatus == "planned" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Planned") }</option>
+					<option value="active" selected?={ props.LifecycleStatus == "active" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Active") }</option>
+					<option value="inactive" selected?={ props.LifecycleStatus == "inactive" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Inactive") }</option>
+					<option value="rescinded" selected?={ props.LifecycleStatus == "rescinded" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Rescinded") }</option>
+				}
+			</div>
+			<div class="min-w-[170px]">
+				@base.Select(&base.SelectProps{
+					Label: pageCtx.T("Org.UI.Positions.Filters.StaffingState"),
+					Attrs: templ.Attributes{
+						"name":        "staffing_state",
+						"hx-get":      "/org/positions/panel",
+						"hx-trigger":  "change",
+						"hx-target":   "#org-positions-panel",
+						"hx-swap":     "innerHTML",
+						"hx-push-url": "true",
+						"hx-include":  "#org-positions-filters, [name='effective_date']",
+					},
+				}) {
+					<option value="" selected?={ strings.TrimSpace(props.StaffingState) == "" }>{ pageCtx.T("Org.UI.Positions.Filters.StaffingAll") }</option>
+					<option value="empty" selected?={ props.StaffingState == "empty" }>{ pageCtx.T("Org.UI.Positions.Staffing.Empty") }</option>
+					<option value="partially_filled" selected?={ props.StaffingState == "partially_filled" }>{ pageCtx.T("Org.UI.Positions.Staffing.PartiallyFilled") }</option>
+					<option value="filled" selected?={ props.StaffingState == "filled" }>{ pageCtx.T("Org.UI.Positions.Staffing.Filled") }</option>
+				}
+			</div>
+			<div class="min-w-[150px]">
+				@base.Select(&base.SelectProps{
+					Label: pageCtx.T("Org.UI.Positions.Filters.IncludeDescendants"),
+					Attrs: templ.Attributes{
+						"name":        "include_descendants",
+						"hx-get":      "/org/positions/panel",
+						"hx-trigger":  "change",
+						"hx-target":   "#org-positions-panel",
+						"hx-swap":     "innerHTML",
+						"hx-push-url": "true",
+						"hx-include":  "#org-positions-filters, [name='effective_date']",
+					},
+				}) {
+					<option value="1" selected?={ props.IncludeDescendants }>{ pageCtx.T("Org.UI.Positions.Filters.IncludeDescendantsYes") }</option>
+					<option value="0" selected?={ !props.IncludeDescendants }>{ pageCtx.T("Org.UI.Positions.Filters.IncludeDescendantsNo") }</option>
+				}
+			</div>
+			<div class="min-w-[140px]">
+				@base.Select(&base.SelectProps{
+					Label: pageCtx.T("Org.UI.Positions.Filters.ShowSystem"),
+					Attrs: templ.Attributes{
+						"name":        "show_system",
+						"hx-get":      "/org/positions/panel",
+						"hx-trigger":  "change",
+						"hx-target":   "#org-positions-panel",
+						"hx-swap":     "innerHTML",
+						"hx-push-url": "true",
+						"hx-include":  "#org-positions-filters, [name='effective_date']",
+					},
+				}) {
+					<option value="0" selected?={ !props.ShowSystem }>{ pageCtx.T("Org.UI.Positions.Filters.ShowSystemNo") }</option>
+					<option value="1" selected?={ props.ShowSystem }>{ pageCtx.T("Org.UI.Positions.Filters.ShowSystemYes") }</option>
+				}
+			</div>
+		</form>
+		<div class="grid grid-cols-12 gap-4">
+			<div class="col-span-12 xl:col-span-6">
+				<div class="rounded-lg border border-surface-400 bg-surface-300">
+					<div class="flex items-center justify-between border-b border-surface-400 p-3">
+						<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Positions.ListTitle") }</div>
+						if strings.TrimSpace(props.NodeID) != "" && pageCtx.CanAuthz("org.positions", "write") {
+							@button.Primary(button.Props{
+								Size:  button.SizeSM,
+								Class: "px-2 py-1",
+								Attrs: templ.Attributes{
+									"type":      "button",
+									"hx-get":    fmt.Sprintf("/org/positions/new?effective_date=%s&node_id=%s", props.EffectiveDate, props.NodeID),
+									"hx-target": "#org-position-details",
+									"hx-swap":   "innerHTML",
+								},
+							}) {
+								{ pageCtx.T("Org.UI.Positions.Actions.Create") }
+							}
+						}
+					</div>
+					<div id="org-positions-list" class="p-3">
+						@PositionsList(PositionsListProps{
+							EffectiveDate:      props.EffectiveDate,
+							Positions:          props.Positions,
+							SelectedPositionID: props.SelectedPositionID,
+							Limit:              props.Limit,
+							Page:               props.Page,
+						})
+					</div>
+				</div>
+			</div>
+			<div class="col-span-12 xl:col-span-6">
+				<div class="rounded-lg border border-surface-400 bg-surface-300 min-h-[280px]">
+					<div class="border-b border-surface-400 p-3">
+						<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Positions.DetailsTitle") }</div>
+					</div>
+					<div id="org-position-details" class="p-4">
+						@PositionDetails(PositionDetailsProps{
+							EffectiveDate: props.EffectiveDate,
+							NodeID:        props.NodeID,
+							Position:      props.SelectedPosition,
+						})
+					</div>
+					<div class="border-t border-surface-400 p-3">
+						<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Positions.TimelineTitle") }</div>
+					</div>
+					<div id="org-position-timeline" class="p-4">
+						@PositionTimeline(PositionTimelineProps{
+							Items: props.Timeline,
+						})
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+}
+
+type PositionsListProps struct {
+	EffectiveDate      string
+	Positions          []viewmodels.OrgPositionRow
+	SelectedPositionID string
+	Page               int
+	Limit              int
+}
+
+templ PositionsList(props PositionsListProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if len(props.Positions) == 0 {
+		<div class="text-sm text-300">{ pageCtx.T("Org.UI.Positions.Empty") }</div>
+	} else {
+		<div class="overflow-x-auto">
+			<table class="w-full text-sm">
+				<thead>
+					<tr class="text-left text-300">
+						<th class="py-2 pr-3">{ pageCtx.T("Org.UI.Positions.Columns.Code") }</th>
+						<th class="py-2 pr-3">{ pageCtx.T("Org.UI.Positions.Columns.Title") }</th>
+						<th class="py-2 pr-3">{ pageCtx.T("Org.UI.Positions.Columns.Status") }</th>
+						<th class="py-2 pr-3">{ pageCtx.T("Org.UI.Positions.Columns.Staffing") }</th>
+						<th class="py-2 text-right">{ pageCtx.T("Org.UI.Positions.Columns.FTE") }</th>
+					</tr>
+				</thead>
+				<tbody class="divide-y divide-surface-400">
+					for _, p := range props.Positions {
+						{{ rowSelected := props.SelectedPositionID != "" && p.ID.String() == props.SelectedPositionID }}
+						<tr class={ templ.KV("bg-surface-200", rowSelected) }>
+							<td class="py-2 pr-3">
+								<button
+									type="button"
+									class="text-left text-100 hover:underline"
+									data-testid={ fmt.Sprintf("org-position-row-%s", p.ID.String()) }
+									hx-get={ fmt.Sprintf("/org/positions/%s", p.ID.String()) }
+									hx-target="#org-position-details"
+									hx-swap="innerHTML"
+									hx-push-url="true"
+									hx-include="#org-positions-filters, [name='effective_date']"
+								>
+									{ p.Code }
+								</button>
+								if p.IsAutoCreated {
+									<span class="ml-2 rounded bg-surface-400 px-1.5 py-0.5 text-[10px] text-300">{ pageCtx.T("Org.UI.Positions.Badge.System") }</span>
+								}
+							</td>
+							<td class="py-2 pr-3 text-200">
+								if strings.TrimSpace(p.Title) == "" {
+									<span class="text-400">—</span>
+								} else {
+									{ p.Title }
+								}
+							</td>
+							<td class="py-2 pr-3 text-200">{ p.LifecycleStatus }</td>
+							<td class="py-2 pr-3 text-200">{ p.StaffingState }</td>
+							<td class="py-2 text-right text-200">{ fmt.Sprintf("%.2f / %.2f", p.OccupiedFTE, p.CapacityFTE) }</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+		<div class="mt-3 flex items-center justify-between text-xs text-400">
+			<div>{ pageCtx.T("Org.UI.Positions.Pagination.Page") }: { fmt.Sprintf("%d", maxInt(props.Page, 1)) }</div>
+			<div class="flex items-center gap-2">
+				if props.Page > 1 {
+					@button.Secondary(button.Props{
+						Size: button.SizeSM,
+						Attrs: templ.Attributes{
+							"type":        "button",
+							"hx-get":      fmt.Sprintf("/org/positions/panel?page=%d", props.Page-1),
+							"hx-target":   "#org-positions-panel",
+							"hx-swap":     "innerHTML",
+							"hx-push-url": "true",
+							"hx-include":  "#org-positions-filters, [name='effective_date']",
+						},
+					}) {
+						{ pageCtx.T("Org.UI.Positions.Pagination.Prev") }
+					}
+				}
+				if len(props.Positions) >= clampInt(props.Limit, 1, 200) {
+					@button.Secondary(button.Props{
+						Size: button.SizeSM,
+						Attrs: templ.Attributes{
+							"type":        "button",
+							"hx-get":      fmt.Sprintf("/org/positions/panel?page=%d", maxInt(props.Page, 1)+1),
+							"hx-target":   "#org-positions-panel",
+							"hx-swap":     "innerHTML",
+							"hx-push-url": "true",
+							"hx-include":  "#org-positions-filters, [name='effective_date']",
+						},
+					}) {
+						{ pageCtx.T("Org.UI.Positions.Pagination.Next") }
+					}
+				}
+			</div>
+		</div>
+	}
+}
+
+type PositionDetailsProps struct {
+	EffectiveDate string
+	NodeID        string
+	Position      *viewmodels.OrgPositionDetails
+}
+
+templ PositionDetails(props PositionDetailsProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if props.Position == nil {
+		<div class="text-sm text-300">{ pageCtx.T("Org.UI.Positions.DetailsEmpty") }</div>
+	} else {
+		<div class="space-y-3">
+			<div class="flex items-center justify-between gap-3">
+				<div class="text-sm font-semibold text-100">{ props.Position.Row.Code }</div>
+				if pageCtx.CanAuthz("org.positions", "write") && !props.Position.Row.IsAutoCreated {
+					@button.Ghost(button.Props{
+						Size: button.SizeSM,
+						Icon: icons.PencilSimple(icons.Props{Size: "18"}),
+						Attrs: templ.Attributes{
+							"type":      "button",
+							"hx-get":    fmt.Sprintf("/org/positions/%s/edit?effective_date=%s", props.Position.Row.ID.String(), props.EffectiveDate),
+							"hx-target": "#org-position-details",
+							"hx-swap":   "innerHTML",
+						},
+					}) {
+						{ pageCtx.T("Org.UI.Actions.Edit") }
+					}
+				}
+			</div>
+			<div class="grid grid-cols-2 gap-3 text-sm">
+				<div>
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.Title") }</div>
+					<div class="text-200">{ ternaryString(strings.TrimSpace(props.Position.Row.Title) == "", "—", props.Position.Row.Title) }</div>
+				</div>
+				<div>
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.Lifecycle") }</div>
+					<div class="text-200">{ props.Position.Row.LifecycleStatus }</div>
+				</div>
+				<div>
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.Staffing") }</div>
+					<div class="text-200">{ props.Position.Row.StaffingState }</div>
+				</div>
+				<div>
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.FTE") }</div>
+					<div class="text-200">{ fmt.Sprintf("%.2f / %.2f", props.Position.Row.OccupiedFTE, props.Position.Row.CapacityFTE) }</div>
+				</div>
+				<div class="col-span-2">
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.ReportsTo") }</div>
+					<div class="text-200">
+						if props.Position.ReportsToPositionID == nil || *props.Position.ReportsToPositionID == uuid.Nil {
+							<span class="text-400">—</span>
+						} else {
+							{ props.Position.ReportsToPositionID.String() }
+						}
+					</div>
+				</div>
+			</div>
+			if props.Position.Row.IsAutoCreated {
+				<div class="rounded-md border border-surface-400 bg-surface-200 p-3 text-xs text-300">
+					{ pageCtx.T("Org.UI.Positions.SystemReadonly") }
+				</div>
+			}
+		</div>
+	}
+}
+
+type PositionTimelineProps struct {
+	Items []viewmodels.OrgPositionTimelineItem
+}
+
+templ PositionTimeline(props PositionTimelineProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if len(props.Items) == 0 {
+		<div class="text-sm text-300">{ pageCtx.T("Org.UI.Positions.TimelineEmpty") }</div>
+	} else {
+		<ul class="space-y-2">
+			for _, it := range props.Items {
+				<li class="rounded-md border border-surface-400 bg-surface-200 p-3">
+					<div class="flex items-center justify-between gap-3">
+						<div class="text-sm text-100">{ it.EffectiveDate.UTC().Format("2006-01-02") } → { it.EndDate.UTC().Format("2006-01-02") }</div>
+						<div class="text-xs text-400">{ it.LifecycleStatus }</div>
+					</div>
+					<div class="mt-1 text-xs text-300">
+						{ pageCtx.T("Org.UI.Positions.Fields.Capacity") }: { fmt.Sprintf("%.2f", it.CapacityFTE) }
+					</div>
+				</li>
+			}
+		</ul>
+	}
+}
+
+type PositionFormMode string
+
+const (
+	PositionFormCreate PositionFormMode = "create"
+	PositionFormEdit   PositionFormMode = "edit"
+)
+
+type PositionFormProps struct {
+	Mode          PositionFormMode
+	EffectiveDate string
+	NodeID        string
+	PositionID    string
+
+	Code            string
+	OrgNodeID       string
+	OrgNodeLabel    string
+	Title           string
+	LifecycleStatus string
+	CapacityFTE     string
+	ReportsToID     string
+	ReportsToLabel  string
+	ReasonCode      string
+	ReasonNote      string
+
+	Errors    map[string]string
+	FormError string
+}
+
+templ PositionForm(props PositionFormProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ title := "" }}
+	{{ action := "" }}
+	{{ method := "post" }}
+	{{ submitLabel := "" }}
+	{{ cancelGet := "" }}
+	{{ cancelTarget := "" }}
+	switch props.Mode {
+		case PositionFormCreate:
+			{{ title = pageCtx.T("Org.UI.Positions.CreateTitle") }}
+			{{ action = "/org/positions" }}
+			{{ method = "post" }}
+			{{ submitLabel = pageCtx.T("Org.UI.Actions.Create") }}
+			{{ cancelGet = fmt.Sprintf("/org/positions/panel?node_id=%s", props.NodeID) }}
+			{{ cancelTarget = "#org-positions-panel" }}
+		case PositionFormEdit:
+			{{ title = pageCtx.T("Org.UI.Positions.EditTitle") }}
+			{{ action = fmt.Sprintf("/org/positions/%s", props.PositionID) }}
+			{{ method = "patch" }}
+			{{ submitLabel = pageCtx.T("Org.UI.Actions.Save") }}
+			{{ cancelGet = fmt.Sprintf("/org/positions/%s?effective_date=%s", props.PositionID, props.EffectiveDate) }}
+			{{ cancelTarget = "#org-position-details" }}
+	}
+	{{codeAttrs := templ.Attributes{
+	"name":  "code",
+	"value": props.Code,
+}
+	}}
+	if props.Mode == PositionFormEdit {
+		{{ codeAttrs["readonly"] = true }}
+	}
+	<div class="space-y-3">
+		<div class="flex items-center justify-between gap-3">
+			<div class="text-sm font-semibold text-100">{ title }</div>
+			@button.Ghost(button.Props{
+				Size: button.SizeSM,
+				Icon: icons.X(icons.Props{Size: "18"}),
+				Attrs: templ.Attributes{
+					"type":        "button",
+					"hx-get":      cancelGet,
+					"hx-target":   cancelTarget,
+					"hx-swap":     "innerHTML",
+					"hx-push-url": "true",
+					"hx-include":  "#org-positions-filters, [name='effective_date']",
+				},
+			}) {
+				{ pageCtx.T("Cancel") }
+			}
+		</div>
+		if props.FormError != "" {
+			<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
+		}
+		<form
+			class="space-y-3"
+			hx-target="#org-position-details"
+			hx-swap="innerHTML"
+			hx-include="#org-positions-filters, [name='effective_date']"
+			if method == "patch" {
+				hx-patch={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+			} else {
+				hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+			}
+		>
+			<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+			if strings.TrimSpace(props.NodeID) != "" {
+				<input type="hidden" name="node_id" value={ props.NodeID }/>
+			}
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Org.UI.Positions.Fields.Code"),
+				Error: props.Errors["code"],
+				Attrs: codeAttrs,
+			})
+			<div data-testid="org-position-orgnode-combobox">
+				@base.Combobox(base.ComboboxProps{
+					Searchable:   true,
+					Label:        pageCtx.T("Org.UI.Positions.Fields.OrgNode"),
+					Name:         "org_node_id",
+					Endpoint:     fmt.Sprintf("/org/nodes/search?effective_date=%s", props.EffectiveDate),
+					Placeholder:  pageCtx.T("Org.UI.Node.Parent.Placeholder"),
+					NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+				}) {
+					if strings.TrimSpace(props.OrgNodeID) != "" {
+						<option value={ props.OrgNodeID } selected>{ props.OrgNodeLabel }</option>
+					}
+					<!-- options loaded via HTMX -->
+				}
+			</div>
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Org.UI.Positions.Fields.Title"),
+				Attrs: templ.Attributes{
+					"name":  "title",
+					"value": props.Title,
+				},
+			})
+			@base.Select(&base.SelectProps{
+				Label: pageCtx.T("Org.UI.Positions.Fields.Lifecycle"),
+				Attrs: templ.Attributes{
+					"name": "lifecycle_status",
+				},
+			}) {
+				<option value="planned" selected?={ props.LifecycleStatus == "planned" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Planned") }</option>
+				<option value="active" selected?={ props.LifecycleStatus == "" || props.LifecycleStatus == "active" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Active") }</option>
+				<option value="inactive" selected?={ props.LifecycleStatus == "inactive" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Inactive") }</option>
+				<option value="rescinded" selected?={ props.LifecycleStatus == "rescinded" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Rescinded") }</option>
+			}
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Org.UI.Positions.Fields.CapacityFTE"),
+				Error: props.Errors["capacity_fte"],
+				Attrs: templ.Attributes{
+					"name":  "capacity_fte",
+					"type":  "number",
+					"step":  "0.01",
+					"value": props.CapacityFTE,
+				},
+			})
+			<div data-testid="org-position-reportsto-combobox">
+				@base.Combobox(base.ComboboxProps{
+					Searchable:   true,
+					Label:        pageCtx.T("Org.UI.Positions.Fields.ReportsTo"),
+					Name:         "reports_to_position_id",
+					Endpoint:     fmt.Sprintf("/org/positions/search?effective_date=%s", props.EffectiveDate),
+					Placeholder:  pageCtx.T("Org.UI.Positions.ReportsTo.Placeholder"),
+					NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+				}) {
+					if strings.TrimSpace(props.ReportsToID) != "" {
+						<option value={ props.ReportsToID } selected>{ props.ReportsToLabel }</option>
+					}
+					<!-- options loaded via HTMX -->
+				}
+			</div>
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Org.UI.Positions.Fields.ReasonCode"),
+				Error: props.Errors["reason_code"],
+				Attrs: templ.Attributes{
+					"name":  "reason_code",
+					"value": props.ReasonCode,
+				},
+			})
+			@input.TextArea(&input.TextAreaProps{
+				Label: pageCtx.T("Org.UI.Positions.Fields.ReasonNote"),
+				Value: props.ReasonNote,
+				Attrs: templ.Attributes{
+					"name": "reason_note",
+				},
+			})
+			<div class="flex items-center justify-end gap-2 pt-2">
+				@button.Primary(button.Props{
+					Size: button.SizeSM,
+					Attrs: templ.Attributes{
+						"type": "submit",
+					},
+				}) {
+					{ submitLabel }
+				}
+			</div>
+		</form>
+	</div>
+}
+
+func clampInt(v, minV, maxV int) int {
+	if v < minV {
+		return minV
+	}
+	if v > maxV {
+		return maxV
+	}
+	return v
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func ternaryString(cond bool, a, b string) string {
+	if cond {
+		return a
+	}
+	return b
+}

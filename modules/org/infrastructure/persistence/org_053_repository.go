@@ -544,7 +544,20 @@ func (r *OrgRepository) ListPositionsAsOf(ctx context.Context, tenantID uuid.UUI
 	args := []any{pgUUID(tenantID), asOf}
 	argPos := 3
 
-	if filter.OrgNodeID != nil && *filter.OrgNodeID != uuid.Nil {
+	if len(filter.OrgNodeIDs) > 0 {
+		ids := make([]uuid.UUID, 0, len(filter.OrgNodeIDs))
+		for _, id := range filter.OrgNodeIDs {
+			if id == uuid.Nil {
+				continue
+			}
+			ids = append(ids, id)
+		}
+		if len(ids) > 0 {
+			q += fmt.Sprintf(" AND s.org_node_id = ANY($%d)", argPos)
+			args = append(args, pgUUIDArray(ids))
+			argPos++
+		}
+	} else if filter.OrgNodeID != nil && *filter.OrgNodeID != uuid.Nil {
 		q += fmt.Sprintf(" AND s.org_node_id = $%d", argPos)
 		args = append(args, pgUUID(*filter.OrgNodeID))
 		argPos++
@@ -582,8 +595,23 @@ func (r *OrgRepository) ListPositionsAsOf(ctx context.Context, tenantID uuid.UUI
 		s.capacity_fte,
 		s.effective_date,
 		s.end_date
-	ORDER BY p.code ASC
 	`
+	if filter.StaffingState != nil {
+		v := strings.TrimSpace(*filter.StaffingState)
+		switch v {
+		case "":
+		case "empty":
+			q += " HAVING COALESCE(SUM(a.allocated_fte), 0) = 0"
+		case "partially_filled":
+			q += " HAVING COALESCE(SUM(a.allocated_fte), 0) > 0 AND COALESCE(SUM(a.allocated_fte), 0) < s.capacity_fte"
+		case "filled":
+			q += " HAVING COALESCE(SUM(a.allocated_fte), 0) >= s.capacity_fte"
+		default:
+			return nil, fmt.Errorf("invalid staffing_state")
+		}
+	}
+
+	q += ` ORDER BY p.code ASC, p.id ASC `
 	q += fmt.Sprintf(" LIMIT $%d OFFSET $%d", argPos, argPos+1)
 	args = append(args, limit, offset)
 

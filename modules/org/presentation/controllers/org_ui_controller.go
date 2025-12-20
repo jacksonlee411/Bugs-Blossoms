@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -80,6 +81,15 @@ func (c *OrgUIController) Register(r *mux.Router) {
 	router.HandleFunc("/assignments", c.CreateAssignment).Methods(http.MethodPost)
 	router.HandleFunc("/assignments/{id}/edit", c.EditAssignmentForm).Methods(http.MethodGet)
 	router.HandleFunc("/assignments/{id}", c.UpdateAssignment).Methods(http.MethodPatch)
+
+	router.HandleFunc("/positions", c.PositionsPage).Methods(http.MethodGet)
+	router.HandleFunc("/positions/panel", c.PositionsPanel).Methods(http.MethodGet)
+	router.HandleFunc("/positions/search", c.PositionSearchOptions).Methods(http.MethodGet)
+	router.HandleFunc("/positions/new", c.NewPositionForm).Methods(http.MethodGet)
+	router.HandleFunc("/positions", c.CreatePosition).Methods(http.MethodPost)
+	router.HandleFunc("/positions/{id}", c.PositionDetails).Methods(http.MethodGet)
+	router.HandleFunc("/positions/{id}/edit", c.EditPositionForm).Methods(http.MethodGet)
+	router.HandleFunc("/positions/{id}", c.UpdatePosition).Methods(http.MethodPatch)
 }
 
 func (c *OrgUIController) RedirectRoot(w http.ResponseWriter, r *http.Request) {
@@ -112,6 +122,7 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
 	ensureOrgPageCapabilities(r, orgNodesAuthzObject, "write")
 	ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "write")
 
@@ -212,6 +223,7 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 		return
 	}
 	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "assign")
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
 
 	effectiveDate, err := effectiveDateFromRequest(r)
 	if err != nil {
@@ -256,6 +268,906 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 		Timeline:      timeline,
 	}
 	templ.Handler(orgtemplates.AssignmentsPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+type positionsQuery struct {
+	effectiveDateProvided bool
+	effectiveDate         time.Time
+	effectiveDateStr      string
+
+	nodeID      *uuid.UUID
+	q           string
+	status      string
+	staff       string
+	page        int
+	limit       int
+	showSys     bool
+	includeDesc bool
+}
+
+func positionsQueryFromRequest(r *http.Request) (positionsQuery, error) {
+	var out positionsQuery
+
+	rawEffective := strings.TrimSpace(r.URL.Query().Get("effective_date"))
+	out.effectiveDateProvided = rawEffective != ""
+
+	effectiveDate, err := effectiveDateFromRequest(r)
+	if err != nil {
+		return positionsQuery{}, err
+	}
+	if effectiveDate.IsZero() {
+		effectiveDate = time.Now().UTC()
+	}
+	out.effectiveDate = effectiveDate.UTC()
+	out.effectiveDateStr = out.effectiveDate.Format("2006-01-02")
+
+	if v := strings.TrimSpace(param(r, "node_id")); v != "" {
+		if parsed, err := uuid.Parse(v); err == nil {
+			out.nodeID = &parsed
+		}
+	}
+
+	out.q = strings.TrimSpace(param(r, "q"))
+	out.status = strings.TrimSpace(param(r, "lifecycle_status"))
+	out.staff = strings.TrimSpace(param(r, "staffing_state"))
+
+	out.includeDesc = true
+	if v := strings.TrimSpace(param(r, "include_descendants")); v != "" {
+		out.includeDesc = v != "0" && strings.ToLower(v) != "false"
+	}
+	out.showSys = false
+	if v := strings.TrimSpace(param(r, "show_system")); v != "" {
+		out.showSys = v == "1" || strings.ToLower(v) == "true"
+	}
+
+	out.page = 1
+	if v := strings.TrimSpace(param(r, "page")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			out.page = n
+		}
+	}
+	out.limit = 25
+	if v := strings.TrimSpace(param(r, "limit")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 200 {
+			out.limit = n
+		}
+	}
+	return out, nil
+}
+
+func canonicalPositionsURL(q positionsQuery, positionID *uuid.UUID) string {
+	v := url.Values{}
+	v.Set("effective_date", q.effectiveDateStr)
+	if q.nodeID != nil && *q.nodeID != uuid.Nil {
+		v.Set("node_id", q.nodeID.String())
+	}
+	if positionID != nil && *positionID != uuid.Nil {
+		v.Set("position_id", positionID.String())
+	}
+	if strings.TrimSpace(q.q) != "" {
+		v.Set("q", q.q)
+	}
+	if strings.TrimSpace(q.status) != "" {
+		v.Set("lifecycle_status", q.status)
+	}
+	if strings.TrimSpace(q.staff) != "" {
+		v.Set("staffing_state", q.staff)
+	}
+	if q.includeDesc {
+		v.Set("include_descendants", "1")
+	} else {
+		v.Set("include_descendants", "0")
+	}
+	if q.showSys {
+		v.Set("show_system", "1")
+	} else {
+		v.Set("show_system", "0")
+	}
+	v.Set("page", strconv.Itoa(q.page))
+	v.Set("limit", strconv.Itoa(q.limit))
+	return "/org/positions?" + v.Encode()
+}
+
+func (c *OrgUIController) PositionsPage(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgPositionsAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgHierarchiesAuthzObject, "read") {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "read") {
+		return
+	}
+	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "write", "admin")
+
+	q, err := positionsQueryFromRequest(r)
+	if err != nil {
+		http.Error(w, "invalid query", http.StatusBadRequest)
+		return
+	}
+	if !q.effectiveDateProvided && !htmx.IsHxRequest(r) {
+		http.Redirect(w, r, canonicalPositionsURL(q, nil), http.StatusFound)
+		return
+	}
+	if !q.effectiveDateProvided && htmx.IsHxRequest(r) {
+		htmx.PushUrl(w, canonicalPositionsURL(q, nil))
+	}
+
+	var selectedNodeID *uuid.UUID
+	if q.nodeID != nil {
+		selectedNodeID = q.nodeID
+	}
+
+	var errs []string
+	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", q.effectiveDate)
+	if err != nil {
+		errs = append(errs, err.Error())
+	}
+	tree := mappers.HierarchyToTree(nodes, selectedNodeID)
+
+	panelProps, selectedPositionID, timeline, selectedPosition, err := c.buildPositionsPanel(r, tenantID, q, uuid.Nil, nodes)
+	if err != nil {
+		errs = append(errs, err.Error())
+	}
+
+	if v := strings.TrimSpace(param(r, "position_id")); v != "" {
+		if parsed, err := uuid.Parse(v); err == nil {
+			selectedPositionID = parsed.String()
+			details, tl, err := c.getPositionDetails(r, tenantID, parsed, q.effectiveDate)
+			if err != nil {
+				errs = append(errs, err.Error())
+			} else {
+				selectedPosition = details
+				timeline = tl
+			}
+		}
+	}
+
+	panelProps.SelectedPositionID = selectedPositionID
+	panelProps.SelectedPosition = selectedPosition
+	panelProps.Timeline = timeline
+
+	props := orgtemplates.PositionsPageProps{
+		EffectiveDate: q.effectiveDateStr,
+		Tree:          tree,
+		Panel:         panelProps,
+		Errors:        errs,
+	}
+	templ.Handler(orgtemplates.PositionsPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func positionsTreeProps(tree *viewmodels.OrgTree, effectiveDateStr string) orgui.TreeProps {
+	return orgui.TreeProps{
+		Tree:          tree,
+		EffectiveDate: effectiveDateStr,
+		SwapOOB:       true,
+		NodeGetURL: func(nodeID, effectiveDate string) string {
+			return fmt.Sprintf("/org/positions/panel?node_id=%s", nodeID)
+		},
+		Target:  "#org-positions-panel",
+		Swap:    "innerHTML",
+		Include: "#org-positions-filters, [name='effective_date']",
+		PushURL: "true",
+	}
+}
+
+func (c *OrgUIController) PositionsPanel(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgPositionsAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgHierarchiesAuthzObject, "read") {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "read") {
+		return
+	}
+	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "write", "admin")
+
+	q, err := positionsQueryFromRequest(r)
+	if err != nil {
+		http.Error(w, "invalid query", http.StatusBadRequest)
+		return
+	}
+	htmx.PushUrl(w, canonicalPositionsURL(q, nil))
+
+	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", q.effectiveDate)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tree := mappers.HierarchyToTree(nodes, q.nodeID)
+
+	panelProps, selectedPositionID, timeline, selectedPosition, err := c.buildPositionsPanel(r, tenantID, q, uuid.Nil, nodes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	panelProps.SelectedPositionID = selectedPositionID
+	panelProps.SelectedPosition = selectedPosition
+	panelProps.Timeline = timeline
+	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
+		if err := orgui.PositionsPanel(panelProps).Render(ctx, ww); err != nil {
+			return err
+		}
+		return orgui.Tree(positionsTreeProps(tree, q.effectiveDateStr)).Render(ctx, ww)
+	})
+	templ.Handler(component, templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) PositionDetails(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgPositionsAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "read") {
+		return
+	}
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "write", "admin")
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	q, err := positionsQueryFromRequest(r)
+	if err != nil {
+		http.Error(w, "invalid query", http.StatusBadRequest)
+		return
+	}
+	htmx.PushUrl(w, canonicalPositionsURL(q, &positionID))
+
+	panelProps, _, timeline, details, err := c.buildPositionsPanel(r, tenantID, q, positionID, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	panelProps.SelectedPositionID = positionID.String()
+	panelProps.SelectedPosition = details
+	panelProps.Timeline = timeline
+
+	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
+		if err := orgui.PositionDetails(orgui.PositionDetailsProps{
+			EffectiveDate: q.effectiveDateStr,
+			NodeID:        uuidPtrString(q.nodeID),
+			Position:      details,
+		}).Render(ctx, ww); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(ww, `<div id="org-positions-list" class="p-3" hx-swap-oob="true">`); err != nil {
+			return err
+		}
+		if err := orgui.PositionsList(orgui.PositionsListProps{
+			EffectiveDate:      q.effectiveDateStr,
+			Positions:          panelProps.Positions,
+			SelectedPositionID: positionID.String(),
+			Page:               q.page,
+			Limit:              q.limit,
+		}).Render(ctx, ww); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(ww, `</div>`); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(ww, `<div id="org-position-timeline" class="p-4" hx-swap-oob="true">`); err != nil {
+			return err
+		}
+		if err := orgui.PositionTimeline(orgui.PositionTimelineProps{Items: timeline}).Render(ctx, ww); err != nil {
+			return err
+		}
+		_, err = io.WriteString(ww, `</div>`)
+		return err
+	})
+	templ.Handler(component, templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) PositionSearchOptions(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgPositionsAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "read") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromRequest(r)
+	if err != nil || effectiveDate.IsZero() {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("effective_date is required"))
+		return
+	}
+
+	raw := strings.TrimSpace(r.URL.Query().Get("q"))
+	var qStr *string
+	if raw != "" {
+		qStr = &raw
+	}
+	rows, _, err := c.org.GetPositions(r.Context(), tenantID, services.GetPositionsInput{
+		AsOf:   &effectiveDate,
+		Q:      qStr,
+		Limit:  50,
+		Offset: 0,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	options := make([]*base.ComboboxOption, 0, len(rows))
+	for _, row := range rows {
+		label := strings.TrimSpace(row.Code)
+		if row.Title != nil && strings.TrimSpace(*row.Title) != "" {
+			label = fmt.Sprintf("%s — %s", label, strings.TrimSpace(*row.Title))
+		}
+		options = append(options, &base.ComboboxOption{Value: row.PositionID.String(), Label: label})
+		if len(options) >= 50 {
+			break
+		}
+	}
+	templ.Handler(orgui.NodeSearchOptions(options), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) NewPositionForm(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgPositionsAuthzObject, "write")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "write") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromRequest(r)
+	if err != nil || effectiveDate.IsZero() {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("effective_date is required"))
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	nodeID := strings.TrimSpace(param(r, "node_id"))
+	nodeLabel := ""
+	if parsed, err := uuid.Parse(nodeID); err == nil {
+		nodeLabel = c.orgNodeLabelFor(r, tenantID, parsed, effectiveDate)
+	}
+	templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
+		Mode:            orgui.PositionFormCreate,
+		EffectiveDate:   effectiveDateStr,
+		NodeID:          nodeID,
+		Code:            "",
+		OrgNodeID:       nodeID,
+		OrgNodeLabel:    nodeLabel,
+		LifecycleStatus: "active",
+		CapacityFTE:     "1.00",
+		ReasonCode:      "create",
+		Errors:          map[string]string{},
+	}), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgPositionsAuthzObject, "write")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "write") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromRequest(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	code := strings.TrimSpace(param(r, "code"))
+	orgNodeRaw := strings.TrimSpace(param(r, "org_node_id"))
+	orgNodeID, err := uuid.Parse(orgNodeRaw)
+	if err != nil {
+		http.Error(w, "invalid org_node_id", http.StatusBadRequest)
+		return
+	}
+	titleRaw := strings.TrimSpace(param(r, "title"))
+	var title *string
+	if titleRaw != "" {
+		title = &titleRaw
+	}
+	lifecycle := strings.TrimSpace(param(r, "lifecycle_status"))
+	capacity := 1.0
+	if raw := strings.TrimSpace(param(r, "capacity_fte")); raw != "" {
+		v, err := strconv.ParseFloat(raw, 64)
+		if err != nil {
+			http.Error(w, "invalid capacity_fte", http.StatusBadRequest)
+			return
+		}
+		capacity = v
+	}
+	var reportsTo *uuid.UUID
+	if raw := strings.TrimSpace(param(r, "reports_to_position_id")); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			http.Error(w, "invalid reports_to_position_id", http.StatusBadRequest)
+			return
+		}
+		reportsTo = &id
+	}
+	reasonCode := strings.TrimSpace(param(r, "reason_code"))
+	reasonNoteRaw := strings.TrimSpace(param(r, "reason_note"))
+	var reasonNote *string
+	if reasonNoteRaw != "" {
+		reasonNote = &reasonNoteRaw
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	requestID := ensureRequestID(r)
+	res, err := c.org.CreatePosition(r.Context(), tenantID, requestID, initiatorID, services.CreatePositionInput{
+		Code:            code,
+		OrgNodeID:       orgNodeID,
+		EffectiveDate:   effectiveDate,
+		Title:           title,
+		LifecycleStatus: lifecycle,
+		CapacityFTE:     capacity,
+		ReportsToID:     reportsTo,
+		ReasonCode:      reasonCode,
+		ReasonNote:      reasonNote,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		formErr = attachRequestID(formErr, requestID)
+		w.WriteHeader(statusCode)
+		nodeLabel := c.orgNodeLabelFor(r, tenantID, orgNodeID, effectiveDate)
+		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
+			Mode:            orgui.PositionFormCreate,
+			EffectiveDate:   effectiveDateStr,
+			NodeID:          orgNodeID.String(),
+			Code:            code,
+			OrgNodeID:       orgNodeID.String(),
+			OrgNodeLabel:    nodeLabel,
+			Title:           titleRaw,
+			LifecycleStatus: lifecycle,
+			CapacityFTE:     fmt.Sprintf("%.2f", capacity),
+			ReasonCode:      reasonCode,
+			ReasonNote:      reasonNoteRaw,
+			Errors:          map[string]string{},
+			FormError:       formErr,
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	q, _ := positionsQueryFromRequest(r)
+	q.nodeID = &orgNodeID
+	htmx.PushUrl(w, canonicalPositionsURL(q, &res.PositionID))
+
+	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", q.effectiveDate)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tree := mappers.HierarchyToTree(nodes, q.nodeID)
+
+	panelProps, selectedPositionID, timeline, details, err := c.buildPositionsPanel(r, tenantID, q, res.PositionID, nodes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	panelProps.SelectedPositionID = selectedPositionID
+	panelProps.SelectedPosition = details
+	panelProps.Timeline = timeline
+
+	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
+		if err := orgui.PositionDetails(orgui.PositionDetailsProps{
+			EffectiveDate: effectiveDateStr,
+			NodeID:        orgNodeID.String(),
+			Position:      details,
+		}).Render(ctx, ww); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(ww, `<div id="org-positions-panel" hx-swap-oob="true">`); err != nil {
+			return err
+		}
+		if err := orgui.PositionsPanel(panelProps).Render(ctx, ww); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(ww, `</div>`); err != nil {
+			return err
+		}
+		return orgui.Tree(positionsTreeProps(tree, effectiveDateStr)).Render(ctx, ww)
+	})
+	templ.Handler(component, templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) EditPositionForm(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgPositionsAuthzObject, "write")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "write") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromRequest(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	row, _, err := c.org.GetPosition(r.Context(), tenantID, positionID, &effectiveDate)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	slices, err := c.org.GetPositionTimeline(r.Context(), tenantID, positionID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	sliceAt := mappers.FindPositionSliceAt(slices, effectiveDate)
+	reportsToID := ""
+	reportsToLabel := ""
+	if sliceAt != nil && sliceAt.ReportsToPositionID != nil && *sliceAt.ReportsToPositionID != uuid.Nil {
+		reportsToID = sliceAt.ReportsToPositionID.String()
+		reportsToLabel = reportsToID
+	}
+	nodeLabel := c.orgNodeLabelFor(r, tenantID, row.OrgNodeID, effectiveDate)
+	title := ""
+	if row.Title != nil {
+		title = strings.TrimSpace(*row.Title)
+	}
+	templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
+		Mode:            orgui.PositionFormEdit,
+		EffectiveDate:   effectiveDateStr,
+		NodeID:          strings.TrimSpace(param(r, "node_id")),
+		PositionID:      positionID.String(),
+		Code:            row.Code,
+		OrgNodeID:       row.OrgNodeID.String(),
+		OrgNodeLabel:    nodeLabel,
+		Title:           title,
+		LifecycleStatus: row.LifecycleStatus,
+		CapacityFTE:     fmt.Sprintf("%.2f", row.CapacityFTE),
+		ReportsToID:     reportsToID,
+		ReportsToLabel:  reportsToLabel,
+		ReasonCode:      "update",
+		ReasonNote:      "",
+		Errors:          map[string]string{},
+	}), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgPositionsAuthzObject, "write")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "write") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromRequest(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	orgNodeRaw := strings.TrimSpace(param(r, "org_node_id"))
+	orgNodeID, err := uuid.Parse(orgNodeRaw)
+	if err != nil {
+		http.Error(w, "invalid org_node_id", http.StatusBadRequest)
+		return
+	}
+	titleRaw := strings.TrimSpace(param(r, "title"))
+	var title *string
+	if titleRaw != "" {
+		title = &titleRaw
+	}
+	lifecycleRaw := strings.TrimSpace(param(r, "lifecycle_status"))
+	var lifecycle *string
+	if lifecycleRaw != "" {
+		lifecycle = &lifecycleRaw
+	}
+	capacityRaw := strings.TrimSpace(param(r, "capacity_fte"))
+	var capacity *float64
+	if capacityRaw != "" {
+		v, err := strconv.ParseFloat(capacityRaw, 64)
+		if err != nil {
+			http.Error(w, "invalid capacity_fte", http.StatusBadRequest)
+			return
+		}
+		capacity = &v
+	}
+	var reportsTo *uuid.UUID
+	if raw := strings.TrimSpace(param(r, "reports_to_position_id")); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			http.Error(w, "invalid reports_to_position_id", http.StatusBadRequest)
+			return
+		}
+		reportsTo = &id
+	}
+	reasonCode := strings.TrimSpace(param(r, "reason_code"))
+	reasonNoteRaw := strings.TrimSpace(param(r, "reason_note"))
+	var reasonNote *string
+	if reasonNoteRaw != "" {
+		reasonNote = &reasonNoteRaw
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	requestID := ensureRequestID(r)
+	_, err = c.org.UpdatePosition(r.Context(), tenantID, requestID, initiatorID, services.UpdatePositionInput{
+		PositionID:      positionID,
+		EffectiveDate:   effectiveDate,
+		ReasonCode:      reasonCode,
+		ReasonNote:      reasonNote,
+		OrgNodeID:       &orgNodeID,
+		Title:           title,
+		LifecycleStatus: lifecycle,
+		CapacityFTE:     capacity,
+		ReportsToID:     reportsTo,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		formErr = attachRequestID(formErr, requestID)
+		w.WriteHeader(statusCode)
+		nodeLabel := c.orgNodeLabelFor(r, tenantID, orgNodeID, effectiveDate)
+		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
+			Mode:            orgui.PositionFormEdit,
+			EffectiveDate:   effectiveDateStr,
+			NodeID:          strings.TrimSpace(param(r, "node_id")),
+			PositionID:      positionID.String(),
+			Code:            strings.TrimSpace(param(r, "code")),
+			OrgNodeID:       orgNodeID.String(),
+			OrgNodeLabel:    nodeLabel,
+			Title:           titleRaw,
+			LifecycleStatus: lifecycleRaw,
+			CapacityFTE:     capacityRaw,
+			ReportsToID:     strings.TrimSpace(param(r, "reports_to_position_id")),
+			ReportsToLabel:  strings.TrimSpace(param(r, "reports_to_position_id")),
+			ReasonCode:      reasonCode,
+			ReasonNote:      reasonNoteRaw,
+			Errors:          map[string]string{},
+			FormError:       formErr,
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	q, _ := positionsQueryFromRequest(r)
+	q.nodeID = &orgNodeID
+	htmx.PushUrl(w, canonicalPositionsURL(q, &positionID))
+
+	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", q.effectiveDate)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tree := mappers.HierarchyToTree(nodes, q.nodeID)
+
+	panelProps, selectedPositionID, timeline, details, err := c.buildPositionsPanel(r, tenantID, q, positionID, nodes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	panelProps.SelectedPositionID = selectedPositionID
+	panelProps.SelectedPosition = details
+	panelProps.Timeline = timeline
+
+	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
+		if err := orgui.PositionDetails(orgui.PositionDetailsProps{
+			EffectiveDate: effectiveDateStr,
+			NodeID:        orgNodeID.String(),
+			Position:      details,
+		}).Render(ctx, ww); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(ww, `<div id="org-positions-panel" hx-swap-oob="true">`); err != nil {
+			return err
+		}
+		if err := orgui.PositionsPanel(panelProps).Render(ctx, ww); err != nil {
+			return err
+		}
+		if _, err := io.WriteString(ww, `</div>`); err != nil {
+			return err
+		}
+		return orgui.Tree(positionsTreeProps(tree, effectiveDateStr)).Render(ctx, ww)
+	})
+	templ.Handler(component, templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) buildPositionsPanel(r *http.Request, tenantID uuid.UUID, q positionsQuery, selectedPositionID uuid.UUID, hierarchyNodes []services.HierarchyNode) (orgui.PositionsPanelProps, string, []viewmodels.OrgPositionTimelineItem, *viewmodels.OrgPositionDetails, error) {
+	out := orgui.PositionsPanelProps{
+		EffectiveDate:      q.effectiveDateStr,
+		NodeID:             uuidPtrString(q.nodeID),
+		Q:                  q.q,
+		LifecycleStatus:    q.status,
+		StaffingState:      q.staff,
+		ShowSystem:         q.showSys,
+		IncludeDescendants: q.includeDesc,
+		Page:               q.page,
+		Limit:              q.limit,
+		Positions:          []viewmodels.OrgPositionRow{},
+		SelectedPositionID: "",
+		SelectedPosition:   nil,
+		Timeline:           nil,
+	}
+
+	if q.nodeID == nil || *q.nodeID == uuid.Nil {
+		return out, "", nil, nil, nil
+	}
+
+	var orgNodeIDs []uuid.UUID
+	if q.includeDesc {
+		nodes := hierarchyNodes
+		if nodes == nil {
+			fetched, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", q.effectiveDate)
+			if err != nil {
+				return out, "", nil, nil, err
+			}
+			nodes = fetched
+		}
+		orgNodeIDs = descendantNodeIDs(nodes, *q.nodeID)
+	} else {
+		orgNodeIDs = []uuid.UUID{*q.nodeID}
+	}
+
+	var qPtr *string
+	if strings.TrimSpace(q.q) != "" {
+		v := q.q
+		qPtr = &v
+	}
+	var lifecyclePtr *string
+	if strings.TrimSpace(q.status) != "" {
+		v := q.status
+		lifecyclePtr = &v
+	}
+	var staffPtr *string
+	if strings.TrimSpace(q.staff) != "" {
+		v := q.staff
+		staffPtr = &v
+	}
+
+	var isAutoCreated *bool
+	if !q.showSys {
+		v := false
+		isAutoCreated = &v
+	}
+	offset := (q.page - 1) * q.limit
+
+	rows, _, err := c.org.GetPositions(r.Context(), tenantID, services.GetPositionsInput{
+		AsOf:            &q.effectiveDate,
+		OrgNodeIDs:      orgNodeIDs,
+		Q:               qPtr,
+		LifecycleStatus: lifecyclePtr,
+		StaffingState:   staffPtr,
+		IsAutoCreated:   isAutoCreated,
+		Limit:           q.limit,
+		Offset:          offset,
+	})
+	if err != nil {
+		return out, "", nil, nil, err
+	}
+	out.Positions = mappers.PositionsToViewModels(rows)
+
+	if selectedPositionID == uuid.Nil {
+		return out, "", nil, nil, nil
+	}
+	details, timeline, err := c.getPositionDetails(r, tenantID, selectedPositionID, q.effectiveDate)
+	if err != nil {
+		return out, "", nil, nil, err
+	}
+	return out, selectedPositionID.String(), timeline, details, nil
+}
+
+func (c *OrgUIController) getPositionDetails(r *http.Request, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (*viewmodels.OrgPositionDetails, []viewmodels.OrgPositionTimelineItem, error) {
+	row, _, err := c.org.GetPosition(r.Context(), tenantID, positionID, &asOf)
+	if err != nil {
+		return nil, nil, err
+	}
+	slices, err := c.org.GetPositionTimeline(r.Context(), tenantID, positionID)
+	if err != nil {
+		return nil, nil, err
+	}
+	sliceAt := mappers.FindPositionSliceAt(slices, asOf)
+	var reportsTo *uuid.UUID
+	if sliceAt != nil {
+		reportsTo = sliceAt.ReportsToPositionID
+	}
+	return mappers.PositionDetailsFrom(row, reportsTo), mappers.PositionTimelineToViewModels(slices), nil
+}
+
+func descendantNodeIDs(nodes []services.HierarchyNode, root uuid.UUID) []uuid.UUID {
+	children := map[uuid.UUID][]uuid.UUID{}
+	for _, n := range nodes {
+		if n.ParentID == nil || *n.ParentID == uuid.Nil {
+			continue
+		}
+		children[*n.ParentID] = append(children[*n.ParentID], n.ID)
+	}
+	out := make([]uuid.UUID, 0, 32)
+	queue := []uuid.UUID{root}
+	seen := map[uuid.UUID]bool{root: true}
+	for len(queue) > 0 {
+		id := queue[0]
+		queue = queue[1:]
+		out = append(out, id)
+		for _, child := range children[id] {
+			if seen[child] {
+				continue
+			}
+			seen[child] = true
+			queue = append(queue, child)
+		}
+	}
+	return out
+}
+
+func uuidPtrString(id *uuid.UUID) string {
+	if id == nil || *id == uuid.Nil {
+		return ""
+	}
+	return id.String()
+}
+
+func attachRequestID(msg, requestID string) string {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return msg
+	}
+	if strings.TrimSpace(msg) == "" {
+		return fmt.Sprintf("request_id: %s", requestID)
+	}
+	return fmt.Sprintf("%s (request_id: %s)", msg, requestID)
+}
+
+func param(r *http.Request, key string) string {
+	v := strings.TrimSpace(r.URL.Query().Get(key))
+	if v != "" {
+		return v
+	}
+	return strings.TrimSpace(r.FormValue(key))
 }
 
 func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Request) {

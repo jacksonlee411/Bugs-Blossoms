@@ -531,8 +531,10 @@ func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UU
 type GetPositionsInput struct {
 	AsOf            *time.Time
 	OrgNodeID       *uuid.UUID
+	OrgNodeIDs      []uuid.UUID
 	Q               *string
 	LifecycleStatus *string
+	StaffingState   *string
 	IsAutoCreated   *bool
 	Limit           int
 	Offset          int
@@ -550,8 +552,10 @@ func (s *OrgService) GetPositions(ctx context.Context, tenantID uuid.UUID, in Ge
 	rows, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]PositionViewRow, error) {
 		filter := PositionListFilter{
 			OrgNodeID:       in.OrgNodeID,
+			OrgNodeIDs:      in.OrgNodeIDs,
 			Q:               in.Q,
 			LifecycleStatus: in.LifecycleStatus,
+			StaffingState:   in.StaffingState,
 			IsAutoCreated:   in.IsAutoCreated,
 			Limit:           in.Limit,
 			Offset:          in.Offset,

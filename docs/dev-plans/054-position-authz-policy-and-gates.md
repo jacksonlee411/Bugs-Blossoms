@@ -1,6 +1,6 @@
 # DEV-PLAN-054：Position 权限（Authz）与策略门禁（对齐 051 阶段 C-Authz）
 
-**状态**: 草拟中（2025-12-20 16:55 UTC）
+**状态**: 已完成（2025-12-20 12:49 UTC）
 
 ## 0. 评审结论（已采纳）
 - v1 固化 `read/write/assign/admin`（不引入新 action），并对齐 Org API（026）现有口径。
@@ -16,11 +16,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **能力覆盖**：object/action 覆盖 050 §9 的能力清单，并明确哪些能力属于 `admin`（强治理）边界。
-- [ ] **API 鉴权落地**：053 的 Position/Assignment v1 API 入口逐一接入 `ensureOrgAuthz`（对齐 026），鉴权失败统一返回 `modules/core/authzutil.ForbiddenPayload`（含 missing_policies / 申请入口 / debug_url）。
-- [ ] **策略碎片可复现**：仅修改 `config/access/policies/**` 策略碎片；聚合产物由 `make authz-pack` 生成（禁止手改 `config/access/policy.csv*`）。
-- [ ] **门禁可通过**：本计划落地后可通过 `make authz-test && make authz-lint`（以及命中 Go 代码时的仓库 Go 门禁）。
-- [ ] **最小越权测试集**：至少覆盖“无权限读不到/写不了”“不能 Correct/Rescind/ShiftBoundary”“不能读统计（如拆分为独立 object）”三类越权路径，并能定位到缺失的 object/action。
+- [X] **能力覆盖**：object/action 覆盖 050 §9 的能力清单，并明确哪些能力属于 `admin`（强治理）边界。
+- [X] **API 鉴权落地**：053 的 Position/Assignment v1 API 入口逐一接入 `ensureOrgAuthz`（对齐 026），鉴权失败统一返回 `modules/core/authzutil.ForbiddenPayload`（含 missing_policies / 申请入口 / debug_url）。
+- [X] **策略碎片可复现**：仅修改 `config/access/policies/**` 策略碎片；聚合产物由 `make authz-pack` 生成（禁止手改 `config/access/policy.csv*`）。
+- [X] **门禁可通过**：本计划落地后可通过 `make authz-test && make authz-lint`（以及命中 Go 代码时的仓库 Go 门禁）。
+- [X] **最小越权测试集**：至少覆盖“无权限读不到/写不了”“不能 Correct/Rescind/ShiftBoundary”“不能读统计（如拆分为独立 object）”三类越权路径，并能定位到缺失的 object/action。
 
 ### 2.2 非目标（Out of Scope）
 - 不在本计划内引入“按 OrgNode 范围”的 ABAC/行级权限模型（如需做，需单独立项并评审 Casbin matcher/attrs 或服务层 org-scope 方案）。
@@ -159,22 +159,22 @@ flowchart TD
 - `role:org.staffing.governance.admin`（056/025 用）：`org.governance read/admin`
 
 ### 5.3 最小策略草案（落地时生成/评审）
-- [ ] 为上述角色补齐 `p, role:..., <object>, <action>, *, allow` 条目（domain 选 `*`；除 `role:core.superadmin` 外不使用 `*` action）。
-- [ ] 保持 `role:core.superadmin` 的兜底能力不变（`*`/`*`/`*`），确保调试与回归不被阻断。
-- [ ] v1 不引入 role-to-role 继承（不新增 `g/g2` 角色链），用显式 `p` 条目展开 viewer/editor/admin 关系，降低排障成本。
+- [X] 为上述角色补齐 `p, role:..., <object>, <action>, *, allow` 条目（domain 选 `*`；除 `role:core.superadmin` 外不使用 `*` action）。
+- [X] 保持 `role:core.superadmin` 的兜底能力不变（`*`/`*`/`*`），确保调试与回归不被阻断。
+- [X] v1 不引入 role-to-role 继承（不新增 `g/g2` 角色链），用显式 `p` 条目展开 viewer/editor/admin 关系，降低排障成本。
 
 ## 6. 测试与验收标准 (Acceptance Criteria)
 ### 6.1 自动化测试（最小集）
-- [ ] **Authz fixtures（策略决策锁定）**：在 `config/access/fixtures/testdata.yaml` 增补 viewer/editor/admin/reports 等角色的 allow/deny 用例，确保 `make authz-lint` 能回归新 object/action。
-- [ ] **Controller 级鉴权测试（端点映射 + 403 契约）**：无用户/租户时返回 403，且 `ForbiddenPayload.object/action/missing_policies` 与端点映射一致（对齐既有 HRM/Authz helper 测试风格）。
-- [ ] **Enforce 模式下的拒绝回归**：对需要“真 403”的用例（如 `write`≠`admin`），测试中将 Authz mode 强制为 `enforce`（建议用临时 `AUTHZ_FLAG_CONFIG` + `authz.Reset()`，避免受仓库默认 `shadow` 影响）。
-- [ ] **强治理测试**：具备 `write` 但无 `admin` 时，Correct/Rescind/ShiftBoundary 必须 403（并可申请）。
-- [ ] **统计隔离测试**：具备 `org.positions read` 但无 `org.position_reports read` 时，统计端点 403（v1 已选定独立 reports object）。
-- [ ] **assign vs admin**：具备 `assign` 但无 `admin` 时，允许占用/释放但不允许更正历史。
+- [X] **Authz fixtures（策略决策锁定）**：在 `config/access/fixtures/testdata.yaml` 增补 viewer/editor/admin/reports 等角色的 allow/deny 用例，确保 `make authz-lint` 能回归新 object/action。
+- [X] **Controller 级鉴权测试（端点映射 + 403 契约）**：无用户/租户时返回 403，且 `ForbiddenPayload.object/action/missing_policies` 与端点映射一致（对齐既有 HRM/Authz helper 测试风格）。
+- [X] **Enforce 模式下的拒绝回归**：对需要“真 403”的用例（如 `write`≠`admin`），测试中将 Authz mode 强制为 `enforce`（建议用临时 `AUTHZ_FLAG_CONFIG` + `authz.Reset()`，避免受仓库默认 `shadow` 影响）。
+- [X] **强治理测试**：具备 `write` 但无 `admin` 时，Correct/Rescind/ShiftBoundary 必须 403（并可申请）。
+- [X] **统计隔离测试**：具备 `org.positions read` 但无 `org.position_reports read` 时，统计端点 403（v1 已选定独立 reports object）。
+- [X] **assign vs admin**：具备 `assign` 但无 `admin` 时，允许占用/释放但不允许更正历史。
 
 ### 6.2 门禁（执行时填写）
-- [ ] 执行并通过：`make authz-test && make authz-lint`（若修改策略碎片，需先 `make authz-pack` 并确保 `policy.csv`/`.rev` 生成物提交）。
-- [ ] 记录命令/结果/时间戳到 `docs/dev-records/DEV-PLAN-051-READINESS.md`（SSOT：059）。
+- [X] 执行并通过：`make authz-test && make authz-lint`（若修改策略碎片，需先 `make authz-pack` 并确保 `policy.csv`/`.rev` 生成物提交）。
+- [X] 记录命令/结果/时间戳到 `docs/dev-records/DEV-PLAN-051-READINESS.md`（SSOT：059）。
 
 ## 7. 运维与排障 (Ops & Monitoring)
 - **排障入口**：403 必须返回 `ForbiddenPayload`（含 `request_id`、`missing_policies`、`request_url`、`debug_url`、`base_revision`），保证“看见拒绝 → 能自助申请/调试”闭环。
@@ -187,19 +187,24 @@ flowchart TD
   - [DEV-PLAN-053](053-position-core-schema-service-api.md)：API 入口与错误码/403 契约落地（Authz 接入点）。
   -（可选）[DEV-PLAN-056](056-job-catalog-profile-and-position-restrictions.md)：主数据与治理入口的 object 扩展。
 - **里程碑**：
-  1. [ ] object/action 与端点映射冻结（§4.2/§4.3）。
-  2. [ ] 策略碎片落地 + pack 产物可复现（§5）。
-  3. [ ] API 接入 ensureOrgAuthz + 403 契约回归（§2.1）。
-  4. [ ] 最小越权测试集通过（§6.1）。
-  5. [ ] readiness 记录补齐：`docs/dev-records/DEV-PLAN-051-READINESS.md`（SSOT：059）。
+  1. [X] object/action 与端点映射冻结（§4.2/§4.3）。
+  2. [X] 策略碎片落地 + pack 产物可复现（§5）。
+  3. [X] API 接入 ensureOrgAuthz + 403 契约回归（§2.1）。
+  4. [X] 最小越权测试集通过（§6.1）。
+  5. [X] readiness 记录补齐：`docs/dev-records/DEV-PLAN-051-READINESS.md`（SSOT：059）。
 
 ## 9. 实施步骤
-1. [ ] 冻结 object/action 与端点映射（对齐 050 §9、026 口径与 053 API）
-2. [ ] 落地策略碎片（新增 `config/access/policies/org/staffing.csv`）
-3. [ ] 执行 `make authz-pack` 并确保生成物提交（禁止手改聚合文件）
-4. [ ] 在 Position/Assignment API controller 中统一接入 `ensureOrgAuthz`，并对齐 403 ForbiddenPayload 契约
-5. [ ] 补齐最小越权测试用例集（覆盖 read/write/assign/admin 的边界）
-6. [ ] 执行门禁并把命令/结果/时间戳记录到 `docs/dev-records/DEV-PLAN-051-READINESS.md`（SSOT：059）
+1. [X] 冻结 object/action 与端点映射（对齐 050 §9、026 口径与 053 API）
+2. [X] 落地策略碎片（`config/access/policies/org/staffing.csv`）
+3. [X] 执行 `make authz-pack` 并确保生成物提交（禁止手改聚合文件）
+4. [X] 在 Position/Assignment API controller 中统一接入 `ensureOrgAuthz`，并对齐 403 ForbiddenPayload 契约
+5. [X] 补齐最小越权测试用例集（覆盖 read/write/assign/admin 的边界）
+6. [X] 执行门禁并把命令/结果/时间戳记录到 `docs/dev-records/DEV-PLAN-051-READINESS.md`（SSOT：059）
+
+## 11. 实施记录（证据点）
+- 策略碎片：`config/access/policies/org/staffing.csv`
+- 聚合产物：`config/access/policy.csv`、`config/access/policy.csv.rev`（由 `make authz-pack` 生成）
+- Readiness 记录：`docs/dev-records/DEV-PLAN-051-READINESS.md`
 
 ## 10. 交付物
 - Position/Assignment/Reporting/Governance 的 object/action 定义与策略碎片（含最小角色集合）。

@@ -56,8 +56,10 @@ type PositionSliceInPlacePatch struct {
 
 type PositionListFilter struct {
 	OrgNodeID       *uuid.UUID
+	OrgNodeIDs      []uuid.UUID
 	Q               *string
 	LifecycleStatus *string
+	StaffingState   *string
 	IsAutoCreated   *bool
 	Limit           int
 	Offset          int
