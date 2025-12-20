@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/iota-uz/iota-sdk/modules/org/domain/events"
 	"github.com/iota-uz/iota-sdk/modules/org/domain/subjectid"
@@ -712,6 +714,19 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 
 		freeze, err := s.freezeCheck(settings, txTime, current.EffectiveDate)
 		if err != nil {
+			var svcErr *ServiceError
+			if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
+				logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
+					"tenant_id":       tenantID.String(),
+					"assignment_id":   current.ID.String(),
+					"pernr":           current.Pernr,
+					"subject_id":      current.SubjectID.String(),
+					"assignment_type": current.AssignmentType,
+					"effective_date":  current.EffectiveDate.UTC().Format(time.RFC3339),
+					"error_code":      svcErr.Code,
+					"operation":       "Correct",
+				})
+			}
 			return nil, err
 		}
 
@@ -872,14 +887,27 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 		if err != nil {
 			return nil, err
 		}
-		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
-		if err != nil {
-			return nil, err
-		}
 
 		current, err := s.repo.LockAssignmentByID(txCtx, tenantID, in.AssignmentID)
 		if err != nil {
 			return nil, mapPgError(err)
+		}
+		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
+		if err != nil {
+			var svcErr *ServiceError
+			if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
+				logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
+					"tenant_id":       tenantID.String(),
+					"assignment_id":   current.ID.String(),
+					"pernr":           current.Pernr,
+					"subject_id":      current.SubjectID.String(),
+					"assignment_type": current.AssignmentType,
+					"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
+					"error_code":      svcErr.Code,
+					"operation":       "Rescind",
+				})
+			}
+			return nil, err
 		}
 		if !in.EffectiveDate.After(current.EffectiveDate) || !in.EffectiveDate.Before(current.EndDate) {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_INVALID_RESCIND_DATE", "effective_date must be within current window", nil)

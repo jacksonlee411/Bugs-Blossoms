@@ -1,12 +1,12 @@
 # DEV-PLAN-058：任职管理增强（对齐 050 §10，051 阶段 F）
 
-**状态**: 草拟中（2025-12-20 05:12 UTC）
+**状态**: 已完成（2025-12-20 20:20 UTC）
 
 ## 0. 进度速记
 - 本计划对齐 050 §10 的“任职管理后续能力清单”，作为 051 阶段 F 的独立里程碑：在不阻塞 053（v1）上线的前提下，分增量交付“任职类型/计划任职/多段任职/历史更正与审计增强”。
 - 已有基线能力（当前代码）：
   - Org API 已提供 `/org/api/assignments`（list/create/update/correct/rescind）与 batch command（`assignment.*`）。
-  - Correct/Rescind 已复用 025 的冻结窗口与审计落盘；但扩展任职类型目前被禁用（`EnableOrgExtendedAssignmentTypes` 尚未启用）。
+  - Correct/Rescind 已复用 025 的冻结窗口与审计落盘；扩展任职类型已受 feature flag 控制（默认关闭；开启 `EnableOrgExtendedAssignmentTypes` 后允许写入 `matrix/dotted`，并保持 `is_primary` 与 `assignment_type` 一致）。
   - “计划任职/未来调岗”已可通过 `PATCH /org/api/assignments/{id}`（Insert slice）在单事务内完成：截断旧窗 + 插入新窗（可换岗）。
 
 ## 1. 背景与上下文 (Context)
@@ -29,11 +29,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **任职类型可用**：支持至少“主任职/兼任/代理”（050 §10），并明确默认规则、互斥约束与对占编/统计的影响。
-- [ ] **计划任职可用**：允许创建未来生效的任职；提供“调岗/转任职”的原子命令，避免人工拼接导致冲突。
-- [ ] **多段任职事件可追溯**：同一员工在同一职位可出现多段任职；列表/时间线可解释；vacancy/time-to-fill 可复用。
-- [ ] **历史更正与审计增强**：支持更正历史（Correct）与撤销（Rescind）并保留可追溯审计；冻结窗口策略一致且可灰度（disabled/shadow/enforce）。
-- [ ] **门禁与可回滚**：触发的本地门禁可通过；扩展能力具备 feature flag 灰度与快速回退路径（对齐 059）。
+- [X] **任职类型可用**：支持至少“主任职/兼任/代理”（050 §10），并明确默认规则、互斥约束与对占编/统计的影响。
+- [X] **计划任职可用**：允许创建未来生效的任职；提供“调岗/转任职”的原子命令，避免人工拼接导致冲突。
+- [X] **多段任职事件可追溯**：同一员工在同一职位可出现多段任职；列表/时间线可解释；vacancy/time-to-fill 可复用。
+- [X] **历史更正与审计增强**：支持更正历史（Correct）与撤销（Rescind）并保留可追溯审计；冻结窗口策略一致且可灰度（disabled/shadow/enforce）。
+- [X] **门禁与可回滚**：触发的本地门禁可通过；扩展能力具备 feature flag 灰度与快速回退路径（对齐 059）。
 
 ### 2.2 非目标（Out of Scope）
 - 不实现招聘全链路与招聘事件（本计划的 vacancy/time-to-fill 仍以 Position/Assignment 的时间线推导为准）。
@@ -65,6 +65,16 @@
   - **迁移与开关协同**：本计划默认不改 schema；若并行期间确需 schema/约束调整，必须与 056 的迁移排序协同，并提供 059 要求的回滚演练路径（优先开关回滚）。
   - **reason_code 收口归口 059**：不得在 058 中提前把 reason_code 从兼容态直接加严到 enforce；收口策略以 052/059 为准。
 
+### 2.5 前置条件（评审检查清单）
+> 目的：明确“可开始编码”的前置条件与“可上线收口”的后置依赖，避免把收口门槛误当成实现阻塞点。
+
+- [X] 合同与主链 SSOT 已就绪：052 已冻结；025/026（时间/审计/outbox）、053（Position/Assignment v1）、054（Authz）已完成。
+- [X] Schema 已具备本计划 v2 所需字段/约束：`org_assignments.assignment_type/is_primary/allocated_fte` 与 primary/overlap EXCLUDE 已落地（058 默认不新增迁移）。
+- [X] 写入口语义已具备：Assignment Create/Update（Insert slice）、Correct/Rescind、冻结窗口与审计/outbox 口径已存在（058 只做增量扩展与对齐说明）。
+- 上线收口（生产灰度/回滚/可观测）依赖 059：把任何新能力切到“生产可用”前，需补齐 readiness 记录、冒烟闭环与回滚演练（优先开关回滚；非 058 关闭条件）。
+- 057 统计/空缺口径冻结：`vacant but planned`、time-to-fill 取值窗口、是否展示 non-primary 等口径需由 057 明确为 SSOT；058 不在此处抢跑定义。
+- 与 056 的强校验协同策略明确：若 Restrictions 校验命中 Assignment 写入口，必须先以 shadow 落地并提供可观测埋点，避免误伤 System/auto position 链路。
+
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.1 任职以“时间片 + 审计/outbox”作为 SSOT（选定）
 - 任职仍使用 Org 的 valid-time 时间片模型（`effective_date/end_date`），并复用 025 的冻结窗口与审计落盘；禁止绕过 service 直接写表（否则无法保证审计/outbox/冻结窗口一致）。
@@ -85,6 +95,7 @@ flowchart LR
   - `primary`：主任职（同一 subject 同窗仅一个 primary，现有排他约束兜底）
   - `matrix`：兼任（允许与 primary 重叠；是否占编由 v1 规则冻结）
   - `dotted`：代理/临时任职（允许与 primary 重叠；默认需显式 end_date 或通过 rescind 截断）
+- 现状：服务层已改为“开关开启才允许写入”，并确保 `is_primary` 与 `assignment_type` 的 DB check 约束一致。
 - 若业务最终要求不同命名（例如 `acting`），以“新增值 + 兼容旧值”的方式演进，避免破坏存量数据与审计链路。
 
 ### 3.3 计划任职优先复用现有 `assignment.update`（Insert slice）（选定）
@@ -203,23 +214,36 @@ flowchart LR
 - 053：Assignment v1 合同稳定（写入口/错误码/事件）。
 - 025/026：冻结窗口、审计、outbox、subject_id 映射。
 - 054：Authz 能力与门禁测试。
+- 059：上线收口（readiness/灰度/回滚/可观测）——实现阶段不阻塞，但生产可用前必须完成对齐。
 
 ### 8.2 里程碑（建议拆分为独立增量）
-1. [ ] F1：任职类型（primary/matrix/dotted）启用 + 最小测试集 + Authz 对齐
-2. [ ] F2：计划任职/原子转任职（复用 `assignment.update` Insert slice）+ 文档/示例/对账查询
-3. [ ] F3：多段任职事件回归（同一员工同一职位多段任职）+ 对账查询/导出入口
-4. [ ] F4：历史更正审计增强（reason/回放）+ readiness 记录（对齐 059）
+1. [X] F1：任职类型（primary/matrix/dotted）启用 + 最小测试集 + Authz 对齐
+2. [X] F2：计划任职/原子转任职（复用 `assignment.update` Insert slice）+ 示例/集成测试
+3. [X] F3：多段任职事件回归（同一员工同一职位多段任职）+ timeline/审计/outbox 覆盖
+4. [X] F4：历史更正审计增强（reason/回放）+ 门禁记录（对齐 059 的收口口径）
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **正确性**：
   - 主任职互斥可复现：同一 subject 同窗只能存在一个 primary。
+  - 任职类型灰度可控：feature flag 关闭时拒绝非 primary；开启后允许写入，且 `is_primary` 与 `assignment_type` 一致。
   - 转任职原子性：同一 request 内完成“截断旧任职 + 创建新任职”，且审计/outbox 一致。
   - 多段任职可追溯：同一员工在同一职位多段任职可被查询并可用于 vacancy/time-to-fill 推导。
+  - 占编口径不漂移：容量校验与 `occupied_fte/staffing_state` 仍仅统计 `assignment_type='primary'`，non-primary 不影响占编与 vacancy 计算输入。
 - **门禁**：
   - 触发的门禁按 `AGENTS.md` 执行；涉及 Authz 必跑 `make authz-test && make authz-lint`；如触发 schema 变更按 021A 执行。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - **Feature Flag（灰度）**：
   - `EnableOrgExtendedAssignmentTypes`：控制非 primary 类型写入（默认关闭）。
+- **灰度边界（对齐 059）**：
+  - 058 实现阶段仅提供“可灰度开启”的能力，不把任何新校验直接推到 enforce；生产启用前必须完成 059 的 readiness/冒烟/回滚演练。
 - **结构化日志**：对非 primary 写入、以及“换岗/调岗”（`assignment.update` 且 position_id 发生变化）与冻结窗口拒绝路径输出 `tenant_id, pernr, subject_id, assignment_type, effective_date, error_code`。
 - **回滚策略**：优先通过关闭 feature flag 禁用新能力；必要时通过 `assignment.correct` 纠偏未来切片或 `assignment.rescind` 截断（对齐 059 的收口策略）。
+
+## 11. 实施记录（门禁与结果）
+- [X] `go fmt ./... && go vet ./...` ——（2025-12-20 20:20 UTC）结果：通过
+- [X] `make check lint` ——（2025-12-20 20:20 UTC）结果：通过
+- [X] `make test` ——（2025-12-20 20:20 UTC）结果：通过
+- [X] `make authz-test && make authz-lint` ——（2025-12-20 20:20 UTC）结果：通过
+- [X] `make check doc` ——（2025-12-20 20:20 UTC）结果：通过
+- [X] 集成测试覆盖：`modules/org/services/org_058_assignment_management_integration_test.go`
