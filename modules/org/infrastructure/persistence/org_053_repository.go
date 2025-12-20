@@ -130,7 +130,108 @@ func (r *OrgRepository) GetPositionSliceAt(ctx context.Context, tenantID uuid.UU
 	return out, nil
 }
 
+func (r *OrgRepository) LockPositionSliceStartingAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, effectiveDate time.Time) (services.PositionSliceRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return services.PositionSliceRow{}, err
+	}
+
+	row := tx.QueryRow(ctx, `
+	SELECT
+		id,
+		position_id,
+		org_node_id,
+		title,
+		lifecycle_status,
+		capacity_fte,
+		reports_to_position_id,
+		effective_date,
+		end_date
+	FROM org_position_slices
+	WHERE tenant_id=$1 AND position_id=$2 AND effective_date=$3
+	LIMIT 1
+	FOR UPDATE
+	`, pgUUID(tenantID), pgUUID(positionID), effectiveDate.UTC())
+
+	var out services.PositionSliceRow
+	var title pgtype.Text
+	var reportsTo pgtype.UUID
+	if err := row.Scan(
+		&out.ID,
+		&out.PositionID,
+		&out.OrgNodeID,
+		&title,
+		&out.LifecycleStatus,
+		&out.CapacityFTE,
+		&reportsTo,
+		&out.EffectiveDate,
+		&out.EndDate,
+	); err != nil {
+		return services.PositionSliceRow{}, err
+	}
+	out.Title = nullableText(title)
+	out.ReportsToPositionID = nullableUUID(reportsTo)
+	return out, nil
+}
+
+func (r *OrgRepository) LockPositionSliceEndingAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, endDate time.Time) (services.PositionSliceRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return services.PositionSliceRow{}, err
+	}
+
+	row := tx.QueryRow(ctx, `
+	SELECT
+		id,
+		position_id,
+		org_node_id,
+		title,
+		lifecycle_status,
+		capacity_fte,
+		reports_to_position_id,
+		effective_date,
+		end_date
+	FROM org_position_slices
+	WHERE tenant_id=$1 AND position_id=$2 AND end_date=$3
+	LIMIT 1
+	FOR UPDATE
+	`, pgUUID(tenantID), pgUUID(positionID), endDate.UTC())
+
+	var out services.PositionSliceRow
+	var title pgtype.Text
+	var reportsTo pgtype.UUID
+	if err := row.Scan(
+		&out.ID,
+		&out.PositionID,
+		&out.OrgNodeID,
+		&title,
+		&out.LifecycleStatus,
+		&out.CapacityFTE,
+		&reportsTo,
+		&out.EffectiveDate,
+		&out.EndDate,
+	); err != nil {
+		return services.PositionSliceRow{}, err
+	}
+	out.Title = nullableText(title)
+	out.ReportsToPositionID = nullableUUID(reportsTo)
+	return out, nil
+}
+
 func (r *OrgRepository) TruncatePositionSlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error {
+	return r.UpdatePositionSliceEndDate(ctx, tenantID, sliceID, endDate)
+}
+
+func (r *OrgRepository) UpdatePositionSliceEffectiveDate(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, effectiveDate time.Time) error {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET effective_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), effectiveDate.UTC())
+	return err
+}
+
+func (r *OrgRepository) UpdatePositionSliceEndDate(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return err

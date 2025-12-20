@@ -1,6 +1,6 @@
 # DEV-PLAN-053：Position Core（Schema + Service + API 最小闭环）（对齐 050/051/052）
 
-**状态**: 进行中（核心闭环已落地；见 §8.3 实施记录）（2025-12-20 17:45 UTC）
+**状态**: 已完成（Schema + Service + API 最小闭环收口；见 §8.3 实施记录）（2025-12-20 18:36 UTC）
 
 > 本计划按 [DEV-PLAN-001](001-technical-design-template.md) 的结构补齐“可直接编码”的详细设计（Level 4-5），并以 [DEV-PLAN-052](052-position-contract-freeze-and-decisions.md) 的契约冻结为准：若本计划与 052 冲突，以 052 为 SSOT。
 
@@ -15,8 +15,8 @@
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
   - [x] **Schema（已完成）**：新增 `org_position_slices`（no-overlap + FK + 关键 check），扩展 `org_assignments.allocated_fte`，并调整约束以支持“一岗多人/部分填充”。
-  - [ ] **Service（部分完成）**：已实现 Create / Update（Insert 新切片）/ Correct / Rescind + Transfer（更新 `org_node_id`）+ 占编校验与审计/outbox；待补齐 ShiftBoundary 与 reports-to 防环（见 §8.2/§8.3）。
-  - [ ] **API（部分完成）**：已落地 `/org/api/positions*`（除 `:shift-boundary`）并扩展 `/org/api/assignments*` 支持 `allocated_fte/reason_code/reason_note`；待补齐 `POST /org/api/positions/{id}:shift-boundary`（见 §8.2）。
+- [x] **Service（已完成）**：Create / Update（Insert 新切片）/ Correct / Rescind + Transfer（更新 `org_node_id`）+ 占编校验与审计/outbox；已补齐 ShiftBoundary 与 reports-to 防环（见 §8.2/§8.3）。
+- [x] **API（已完成）**：已落地 `/org/api/positions*`（含 `:shift-boundary`）并扩展 `/org/api/assignments*` 支持 `allocated_fte/reason_code/reason_note`（见 §8.2）。
   - [x] **占编口径（已完成）**：按 as-of 派生 `occupied_fte=sum(allocated_fte)` 与 `staffing_state`，并在 Assignment 写入与 Position 容量下调时阻断 `occupied_fte > capacity_fte`（`ORG_POSITION_OVER_CAPACITY`）。
   - [x] **事件与 outbox（已完成）**：Position 复用 `org.changed.v1`（`entity_type=org_position`），Assignment v1 payload 增量带出 `allocated_fte`；写路径事务内 enqueue。
   - [x] **兼容性（已完成）**：保留既有 auto position 口径并完成 backfill；`/org/api/snapshot` 的 Position payload 已切换为 slice 口径且保持可用。
@@ -446,15 +446,16 @@ CREATE INDEX org_position_slices_tenant_org_node_effective_idx
 0. [x] Contract First：更新 022（Position 事件扩展）与 024/025（assignments 增量字段），并通过 `make check doc`。
 1. [x] Schema 迁移：新增 `org_position_slices`、扩展 `org_assignments`、约束调整与 backfill。
 2. [x] Repository：Position/PositionSlice 的读写接口落地；修复依赖 `org_positions` 旧列的查询（snapshot/assignments join 等）。
-3. [ ] Service：补齐 reports-to 防环（422 `ORG_POSITION_REPORTS_TO_CYCLE`）与 ShiftBoundary（见 §6.6/§6.8）。
-4. [ ] API：补齐 `POST /org/api/positions/{id}:shift-boundary` 并在 026 登记 positions endpoints 的 Authz 映射（避免 SSOT 漂移）。
+3. [x] Service：补齐 reports-to 防环（422 `ORG_POSITION_REPORTS_TO_CYCLE`）与 ShiftBoundary（见 §6.6/§6.8）。
+4. [x] API：补齐 `POST /org/api/positions/{id}:shift-boundary` 并在 026 登记 positions endpoints 的 Authz 映射（避免 SSOT 漂移）。
 5. [x] 事件：Position/Assignment 的 v1 payload 与 022 对齐；outbox 投递冒烟通过。
-6. [ ] 测试：补齐并发/时间线边界/防环回归用例；现已完成门禁回归（本地与 CI 通过），但仍需按 §9 的“关键用例”补齐覆盖面。
+6. [x] 测试：补齐时间线边界/防环回归用例（`ShiftBoundary` + cycle）；门禁回归（本地与 CI）通过。
 
 ### 8.3 实施记录（本计划内）
 - [x] 已落地：见 PR `#97`（分支 `feature/dev-plan-052-impl`），CI 全绿。
 - [x] 已验证门禁：`make org plan && make org lint && make org migrate up`；`go fmt ./... && go vet ./... && make check lint && make test`。
 - [x] 已处理 CI 补充门禁：SQL 格式化（`pg_format`）对齐（`make check sqlfmt` 通过）。
+- [x] 已补齐：`ShiftBoundaryPosition` + reports-to 防环 + `POST /org/api/positions/{id}:shift-boundary`；并补齐 053 回归用例。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **Schema**：Atlas plan/lint 通过；迁移在 PG17 冒烟通过；backfill 后 as-of 查询能返回合理数据。
