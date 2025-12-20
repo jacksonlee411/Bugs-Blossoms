@@ -375,101 +375,106 @@ CREATE INDEX org_position_slices_tenant_position_effective_idx ON org_position_s
 
 CREATE INDEX org_position_slices_tenant_node_effective_idx ON org_position_slices (tenant_id, org_node_id, effective_date);
 
-	CREATE INDEX org_position_slices_tenant_reports_to_effective_idx ON org_position_slices (tenant_id, reports_to_position_id, effective_date);
+CREATE INDEX org_position_slices_tenant_reports_to_effective_idx ON org_position_slices (tenant_id, reports_to_position_id, effective_date);
 
-	-- DEV-PLAN-056: Job Catalog / Job Profile (master data).
-	CREATE TABLE org_job_family_groups (
-	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-	    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-	    code varchar(64) NOT NULL,
-	    name text NOT NULL,
-	    is_active boolean NOT NULL DEFAULT TRUE,
-	    created_at timestamptz NOT NULL DEFAULT now(),
-	    updated_at timestamptz NOT NULL DEFAULT now(),
-	    CONSTRAINT org_job_family_groups_tenant_id_id_key UNIQUE (tenant_id, id),
-	    CONSTRAINT org_job_family_groups_tenant_id_code_key UNIQUE (tenant_id, code)
-	);
-	CREATE INDEX org_job_family_groups_tenant_active_code_idx ON org_job_family_groups (tenant_id, is_active, code);
+-- DEV-PLAN-056: Job Catalog / Job Profile (master data).
+CREATE TABLE org_job_family_groups (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    code varchar(64) NOT NULL,
+    name text NOT NULL,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_family_groups_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_family_groups_tenant_id_code_key UNIQUE (tenant_id, code)
+);
 
-	CREATE TABLE org_job_families (
-	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-	    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-	    job_family_group_id uuid NOT NULL,
-	    code varchar(64) NOT NULL,
-	    name text NOT NULL,
-	    is_active boolean NOT NULL DEFAULT TRUE,
-	    created_at timestamptz NOT NULL DEFAULT now(),
-	    updated_at timestamptz NOT NULL DEFAULT now(),
-	    CONSTRAINT org_job_families_tenant_id_id_key UNIQUE (tenant_id, id),
-	    CONSTRAINT org_job_families_family_group_fk FOREIGN KEY (tenant_id, job_family_group_id) REFERENCES org_job_family_groups (tenant_id, id) ON DELETE RESTRICT,
-	    CONSTRAINT org_job_families_tenant_id_group_code_key UNIQUE (tenant_id, job_family_group_id, code)
-	);
-	CREATE INDEX org_job_families_tenant_group_active_code_idx ON org_job_families (tenant_id, job_family_group_id, is_active, code);
+CREATE INDEX org_job_family_groups_tenant_active_code_idx ON org_job_family_groups (tenant_id, is_active, code);
 
-	CREATE TABLE org_job_roles (
-	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-	    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-	    job_family_id uuid NOT NULL,
-	    code varchar(64) NOT NULL,
-	    name text NOT NULL,
-	    is_active boolean NOT NULL DEFAULT TRUE,
-	    created_at timestamptz NOT NULL DEFAULT now(),
-	    updated_at timestamptz NOT NULL DEFAULT now(),
-	    CONSTRAINT org_job_roles_tenant_id_id_key UNIQUE (tenant_id, id),
-	    CONSTRAINT org_job_roles_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
-	    CONSTRAINT org_job_roles_tenant_id_family_code_key UNIQUE (tenant_id, job_family_id, code)
-	);
-	CREATE INDEX org_job_roles_tenant_family_active_code_idx ON org_job_roles (tenant_id, job_family_id, is_active, code);
+CREATE TABLE org_job_families (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    job_family_group_id uuid NOT NULL,
+    code varchar(64) NOT NULL,
+    name text NOT NULL,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_families_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_families_family_group_fk FOREIGN KEY (tenant_id, job_family_group_id) REFERENCES org_job_family_groups (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_job_families_tenant_id_group_code_key UNIQUE (tenant_id, job_family_group_id, code)
+);
 
-	CREATE TABLE org_job_levels (
-	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-	    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-	    job_role_id uuid NOT NULL,
-	    code varchar(64) NOT NULL,
-	    name text NOT NULL,
-	    display_order int NOT NULL DEFAULT 0,
-	    is_active boolean NOT NULL DEFAULT TRUE,
-	    created_at timestamptz NOT NULL DEFAULT now(),
-	    updated_at timestamptz NOT NULL DEFAULT now(),
-	    CONSTRAINT org_job_levels_tenant_id_id_key UNIQUE (tenant_id, id),
-	    CONSTRAINT org_job_levels_display_order_check CHECK (display_order >= 0),
-	    CONSTRAINT org_job_levels_role_fk FOREIGN KEY (tenant_id, job_role_id) REFERENCES org_job_roles (tenant_id, id) ON DELETE RESTRICT,
-	    CONSTRAINT org_job_levels_tenant_id_role_code_key UNIQUE (tenant_id, job_role_id, code)
-	);
-	CREATE INDEX org_job_levels_tenant_role_active_order_code_idx ON org_job_levels (tenant_id, job_role_id, is_active, display_order, code);
+CREATE INDEX org_job_families_tenant_group_active_code_idx ON org_job_families (tenant_id, job_family_group_id, is_active, code);
 
-	CREATE TABLE org_job_profiles (
-	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-	    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-	    code varchar(64) NOT NULL,
-	    name text NOT NULL,
-	    description text NULL,
-	    job_role_id uuid NOT NULL,
-	    is_active boolean NOT NULL DEFAULT TRUE,
-	    external_refs jsonb NOT NULL DEFAULT '{}' ::jsonb,
-	    created_at timestamptz NOT NULL DEFAULT now(),
-	    updated_at timestamptz NOT NULL DEFAULT now(),
-	    CONSTRAINT org_job_profiles_tenant_id_id_key UNIQUE (tenant_id, id),
-	    CONSTRAINT org_job_profiles_external_refs_is_object_check CHECK (jsonb_typeof(external_refs) = 'object'),
-	    CONSTRAINT org_job_profiles_role_fk FOREIGN KEY (tenant_id, job_role_id) REFERENCES org_job_roles (tenant_id, id) ON DELETE RESTRICT,
-	    CONSTRAINT org_job_profiles_tenant_id_code_key UNIQUE (tenant_id, code)
-	);
-	CREATE INDEX org_job_profiles_tenant_role_active_code_idx ON org_job_profiles (tenant_id, job_role_id, is_active, code);
+CREATE TABLE org_job_roles (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    job_family_id uuid NOT NULL,
+    code varchar(64) NOT NULL,
+    name text NOT NULL,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_roles_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_roles_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_job_roles_tenant_id_family_code_key UNIQUE (tenant_id, job_family_id, code)
+);
 
-	CREATE TABLE org_job_profile_allowed_job_levels (
-	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-	    job_profile_id uuid NOT NULL,
-	    job_level_id uuid NOT NULL,
-	    created_at timestamptz NOT NULL DEFAULT now(),
-	    CONSTRAINT org_job_profile_allowed_job_levels_pkey PRIMARY KEY (tenant_id, job_profile_id, job_level_id),
-	    CONSTRAINT org_job_profile_allowed_job_levels_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE CASCADE,
-	    CONSTRAINT org_job_profile_allowed_job_levels_level_fk FOREIGN KEY (tenant_id, job_level_id) REFERENCES org_job_levels (tenant_id, id) ON DELETE RESTRICT
-	);
+CREATE INDEX org_job_roles_tenant_family_active_code_idx ON org_job_roles (tenant_id, job_family_id, is_active, code);
 
-	CREATE TABLE org_assignments (
-	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-	    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-	    position_id uuid NOT NULL,
+CREATE TABLE org_job_levels (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    job_role_id uuid NOT NULL,
+    code varchar(64) NOT NULL,
+    name text NOT NULL,
+    display_order int NOT NULL DEFAULT 0,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_levels_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_levels_display_order_check CHECK (display_order >= 0),
+    CONSTRAINT org_job_levels_role_fk FOREIGN KEY (tenant_id, job_role_id) REFERENCES org_job_roles (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_job_levels_tenant_id_role_code_key UNIQUE (tenant_id, job_role_id, code)
+);
+
+CREATE INDEX org_job_levels_tenant_role_active_order_code_idx ON org_job_levels (tenant_id, job_role_id, is_active, display_order, code);
+
+CREATE TABLE org_job_profiles (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    code varchar(64) NOT NULL,
+    name text NOT NULL,
+    description text NULL,
+    job_role_id uuid NOT NULL,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    external_refs jsonb NOT NULL DEFAULT '{}' ::jsonb,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_profiles_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_profiles_external_refs_is_object_check CHECK (jsonb_typeof(external_refs) = 'object'),
+    CONSTRAINT org_job_profiles_role_fk FOREIGN KEY (tenant_id, job_role_id) REFERENCES org_job_roles (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_job_profiles_tenant_id_code_key UNIQUE (tenant_id, code)
+);
+
+CREATE INDEX org_job_profiles_tenant_role_active_code_idx ON org_job_profiles (tenant_id, job_role_id, is_active, code);
+
+CREATE TABLE org_job_profile_allowed_job_levels (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    job_profile_id uuid NOT NULL,
+    job_level_id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_profile_allowed_job_levels_pkey PRIMARY KEY (tenant_id, job_profile_id, job_level_id),
+    CONSTRAINT org_job_profile_allowed_job_levels_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE CASCADE,
+    CONSTRAINT org_job_profile_allowed_job_levels_level_fk FOREIGN KEY (tenant_id, job_level_id) REFERENCES org_job_levels (tenant_id, id) ON DELETE RESTRICT
+);
+
+CREATE TABLE org_assignments (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    position_id uuid NOT NULL,
     subject_type text NOT NULL DEFAULT 'person',
     subject_id uuid NOT NULL,
     pernr text NOT NULL,
@@ -583,20 +588,20 @@ CREATE TABLE org_change_requests (
 
 CREATE INDEX org_change_requests_tenant_requester_status_updated_idx ON org_change_requests (tenant_id, requester_id, status, updated_at DESC);
 
-	-- DEV-PLAN-025: org_settings + org_audit_logs (schema SSOT; migrations/org applies the same DDL).
-	CREATE TABLE org_settings (
-	    tenant_id uuid PRIMARY KEY REFERENCES tenants (id) ON DELETE CASCADE,
-	    freeze_mode text NOT NULL DEFAULT 'enforce',
-	    freeze_grace_days int NOT NULL DEFAULT 3,
-	    position_catalog_validation_mode text NOT NULL DEFAULT 'shadow',
-	    position_restrictions_validation_mode text NOT NULL DEFAULT 'shadow',
-	    created_at timestamptz NOT NULL DEFAULT now(),
-	    updated_at timestamptz NOT NULL DEFAULT now(),
-	    CONSTRAINT org_settings_freeze_mode_check CHECK (freeze_mode IN ('disabled', 'shadow', 'enforce')),
-	    CONSTRAINT org_settings_freeze_grace_days_check CHECK (freeze_grace_days >= 0 AND freeze_grace_days <= 31),
-	    CONSTRAINT org_settings_position_catalog_validation_mode_check CHECK (position_catalog_validation_mode IN ('disabled', 'shadow', 'enforce')),
-	    CONSTRAINT org_settings_position_restrictions_validation_mode_check CHECK (position_restrictions_validation_mode IN ('disabled', 'shadow', 'enforce'))
-	);
+-- DEV-PLAN-025: org_settings + org_audit_logs (schema SSOT; migrations/org applies the same DDL).
+CREATE TABLE org_settings (
+    tenant_id uuid PRIMARY KEY REFERENCES tenants (id) ON DELETE CASCADE,
+    freeze_mode text NOT NULL DEFAULT 'enforce',
+    freeze_grace_days int NOT NULL DEFAULT 3,
+    position_catalog_validation_mode text NOT NULL DEFAULT 'shadow',
+    position_restrictions_validation_mode text NOT NULL DEFAULT 'shadow',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_settings_freeze_mode_check CHECK (freeze_mode IN ('disabled', 'shadow', 'enforce')),
+    CONSTRAINT org_settings_freeze_grace_days_check CHECK (freeze_grace_days >= 0 AND freeze_grace_days <= 31),
+    CONSTRAINT org_settings_position_catalog_validation_mode_check CHECK (position_catalog_validation_mode IN ('disabled', 'shadow', 'enforce')),
+    CONSTRAINT org_settings_position_restrictions_validation_mode_check CHECK (position_restrictions_validation_mode IN ('disabled', 'shadow', 'enforce'))
+);
 
 CREATE TABLE org_audit_logs (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
