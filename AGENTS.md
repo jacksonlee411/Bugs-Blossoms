@@ -158,5 +158,15 @@ modules/{module}/
 - Org UI IA 与侧栏集成（DEV-PLAN-035A）：`docs/dev-plans/035A-org-ui-ia-and-sidebar-integration.md`
 - 移除 finance/billing/crm/projects 模块（DEV-PLAN-040）：`docs/dev-plans/040-remove-finance-billing-crm.md`
 - 移除 warehouse（仓库）模块（DEV-PLAN-041）：`docs/dev-plans/041-remove-warehouse-module.md`
+- 职位管理业务需求（DEV-PLAN-050）：`docs/dev-plans/050-position-management-business-requirements.md`
+- 职位管理实施蓝图（DEV-PLAN-051）：`docs/dev-plans/051-position-management-implementation-blueprint.md`
+- 职位管理子计划：契约冻结（DEV-PLAN-052）：`docs/dev-plans/052-position-contract-freeze-and-decisions.md`
+- 职位管理子计划：Position Core（DEV-PLAN-053）：`docs/dev-plans/053-position-core-schema-service-api.md`
+- 职位管理子计划：Authz（DEV-PLAN-054）：`docs/dev-plans/054-position-authz-policy-and-gates.md`
+- 职位管理子计划：UI（DEV-PLAN-055）：`docs/dev-plans/055-position-ui-org-integration.md`
+- 职位管理子计划：主数据与限制（DEV-PLAN-056）：`docs/dev-plans/056-job-catalog-profile-and-position-restrictions.md`
+- 职位管理子计划：报表与运营（DEV-PLAN-057）：`docs/dev-plans/057-position-reporting-and-operations.md`
+- 职位管理子计划：任职管理增强（DEV-PLAN-058）：`docs/dev-plans/058-assignment-management-enhancements.md`
+- 职位管理子计划：收口与上线（DEV-PLAN-059）：`docs/dev-plans/059-position-rollout-readiness-and-observability.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
