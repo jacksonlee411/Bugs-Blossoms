@@ -32,6 +32,13 @@ func mapPgErrorToServiceError(err error) error {
 			return newServiceError(http.StatusConflict, "ORG_CODE_CONFLICT", "code already exists", err)
 		case "org_positions_tenant_id_code_key":
 			return newServiceError(http.StatusConflict, "ORG_POSITION_CODE_CONFLICT", "position code already exists", err)
+		case "org_job_family_groups_tenant_id_code_key",
+			"org_job_families_tenant_id_group_code_key",
+			"org_job_roles_tenant_id_family_code_key",
+			"org_job_levels_tenant_id_role_code_key":
+			return newServiceError(http.StatusConflict, "ORG_JOB_CATALOG_CODE_CONFLICT", "job catalog code already exists", err)
+		case "org_job_profiles_tenant_id_code_key":
+			return newServiceError(http.StatusConflict, "ORG_JOB_PROFILE_CODE_CONFLICT", "job profile code already exists", err)
 		case "org_nodes_tenant_root_unique":
 			return newServiceError(http.StatusConflict, "ORG_OVERLAP", "root already exists", err)
 		default:
@@ -45,7 +52,15 @@ func mapPgErrorToServiceError(err error) error {
 		return newServiceError(http.StatusConflict, "ORG_OVERLAP", "time window overlap", err)
 	case "23503": // foreign_key_violation
 		recordWriteConflict("foreign_key")
-		return newServiceError(http.StatusUnprocessableEntity, "ORG_PARENT_NOT_FOUND", "foreign key violation", err)
+		switch pgErr.ConstraintName {
+		case "org_job_families_family_group_fk",
+			"org_job_roles_family_fk",
+			"org_job_levels_role_fk",
+			"org_job_profiles_role_fk":
+			return newServiceError(http.StatusUnprocessableEntity, "ORG_JOB_CATALOG_PARENT_NOT_FOUND", "job catalog parent not found", err)
+		default:
+			return newServiceError(http.StatusUnprocessableEntity, "ORG_PARENT_NOT_FOUND", "foreign key violation", err)
+		}
 	case "23000": // integrity_constraint_violation (e.g. cycle detected trigger)
 		recordWriteConflict("overlap")
 		return newServiceError(http.StatusConflict, "ORG_OVERLAP", "integrity constraint violated", err)

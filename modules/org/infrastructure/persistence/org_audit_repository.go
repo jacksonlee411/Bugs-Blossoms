@@ -19,18 +19,34 @@ func (r *OrgRepository) GetOrgSettings(ctx context.Context, tenantID uuid.UUID) 
 
 	var mode string
 	var graceDays int
+	var catalogMode string
+	var restrictionsMode string
 	err = tx.QueryRow(ctx, `
-SELECT freeze_mode, freeze_grace_days
-FROM org_settings
-WHERE tenant_id=$1
-`, pgUUID(tenantID)).Scan(&mode, &graceDays)
+	SELECT
+		freeze_mode,
+		freeze_grace_days,
+		position_catalog_validation_mode,
+		position_restrictions_validation_mode
+	FROM org_settings
+	WHERE tenant_id=$1
+	`, pgUUID(tenantID)).Scan(&mode, &graceDays, &catalogMode, &restrictionsMode)
 	if err == pgx.ErrNoRows {
-		return services.OrgSettings{FreezeMode: "enforce", FreezeGraceDays: 3}, nil
+		return services.OrgSettings{
+			FreezeMode:                         "enforce",
+			FreezeGraceDays:                    3,
+			PositionCatalogValidationMode:      "shadow",
+			PositionRestrictionsValidationMode: "shadow",
+		}, nil
 	}
 	if err != nil {
 		return services.OrgSettings{}, err
 	}
-	return services.OrgSettings{FreezeMode: mode, FreezeGraceDays: graceDays}, nil
+	return services.OrgSettings{
+		FreezeMode:                         mode,
+		FreezeGraceDays:                    graceDays,
+		PositionCatalogValidationMode:      catalogMode,
+		PositionRestrictionsValidationMode: restrictionsMode,
+	}, nil
 }
 
 func (r *OrgRepository) InsertAuditLog(ctx context.Context, tenantID uuid.UUID, log services.AuditLogInsert) (uuid.UUID, error) {

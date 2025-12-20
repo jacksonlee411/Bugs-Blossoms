@@ -30,6 +30,19 @@
   legacy: false
   note: staffing viewer cannot write positions
 
+- subject: role:org.staffing.viewer
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.job_catalog
+  action: read
+  legacy: true
+  note: staffing viewer can read job catalog
+- subject: role:org.staffing.viewer
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.job_catalog
+  action: admin
+  legacy: false
+  note: staffing viewer cannot admin job catalog
+
 - subject: role:org.staffing.editor
   domain: 00000000-0000-0000-0000-000000000054
   object: org.assignments
@@ -49,6 +62,19 @@
   action: admin
   legacy: true
   note: staffing admin can do strong governance operations
+
+- subject: role:org.staffing.masterdata.admin
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.job_profiles
+  action: admin
+  legacy: true
+  note: staffing masterdata admin can admin job profiles
+- subject: role:org.staffing.masterdata.admin
+  domain: 00000000-0000-0000-0000-000000000054
+  object: org.position_restrictions
+  action: admin
+  legacy: true
+  note: staffing masterdata admin can admin position restrictions
 
 - subject: role:org.staffing.reports
   domain: 00000000-0000-0000-0000-000000000054

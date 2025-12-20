@@ -79,6 +79,29 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/positions/{id}:correct", c.instrumentAPI("positions.correct", c.CorrectPosition)).Methods(http.MethodPost)
 	api.HandleFunc("/positions/{id}:rescind", c.instrumentAPI("positions.rescind", c.RescindPosition)).Methods(http.MethodPost)
 	api.HandleFunc("/positions/{id}:shift-boundary", c.instrumentAPI("positions.shift_boundary", c.ShiftBoundaryPosition)).Methods(http.MethodPost)
+	api.HandleFunc("/positions/{id}/restrictions", c.instrumentAPI("positions.restrictions.get", c.GetPositionRestrictions)).Methods(http.MethodGet)
+	api.HandleFunc("/positions/{id}:set-restrictions", c.instrumentAPI("positions.restrictions.set", c.SetPositionRestrictions)).Methods(http.MethodPost)
+
+	api.HandleFunc("/job-catalog/family-groups", c.instrumentAPI("job_catalog.family_groups.list", c.ListJobFamilyGroups)).Methods(http.MethodGet)
+	api.HandleFunc("/job-catalog/family-groups", c.instrumentAPI("job_catalog.family_groups.create", c.CreateJobFamilyGroup)).Methods(http.MethodPost)
+	api.HandleFunc("/job-catalog/family-groups/{id}", c.instrumentAPI("job_catalog.family_groups.update", c.UpdateJobFamilyGroup)).Methods(http.MethodPatch)
+
+	api.HandleFunc("/job-catalog/families", c.instrumentAPI("job_catalog.families.list", c.ListJobFamilies)).Methods(http.MethodGet)
+	api.HandleFunc("/job-catalog/families", c.instrumentAPI("job_catalog.families.create", c.CreateJobFamily)).Methods(http.MethodPost)
+	api.HandleFunc("/job-catalog/families/{id}", c.instrumentAPI("job_catalog.families.update", c.UpdateJobFamily)).Methods(http.MethodPatch)
+
+	api.HandleFunc("/job-catalog/roles", c.instrumentAPI("job_catalog.roles.list", c.ListJobRoles)).Methods(http.MethodGet)
+	api.HandleFunc("/job-catalog/roles", c.instrumentAPI("job_catalog.roles.create", c.CreateJobRole)).Methods(http.MethodPost)
+	api.HandleFunc("/job-catalog/roles/{id}", c.instrumentAPI("job_catalog.roles.update", c.UpdateJobRole)).Methods(http.MethodPatch)
+
+	api.HandleFunc("/job-catalog/levels", c.instrumentAPI("job_catalog.levels.list", c.ListJobLevels)).Methods(http.MethodGet)
+	api.HandleFunc("/job-catalog/levels", c.instrumentAPI("job_catalog.levels.create", c.CreateJobLevel)).Methods(http.MethodPost)
+	api.HandleFunc("/job-catalog/levels/{id}", c.instrumentAPI("job_catalog.levels.update", c.UpdateJobLevel)).Methods(http.MethodPatch)
+
+	api.HandleFunc("/job-profiles", c.instrumentAPI("job_profiles.list", c.ListJobProfiles)).Methods(http.MethodGet)
+	api.HandleFunc("/job-profiles", c.instrumentAPI("job_profiles.create", c.CreateJobProfile)).Methods(http.MethodPost)
+	api.HandleFunc("/job-profiles/{id}", c.instrumentAPI("job_profiles.update", c.UpdateJobProfile)).Methods(http.MethodPatch)
+	api.HandleFunc("/job-profiles/{id}:set-allowed-levels", c.instrumentAPI("job_profiles.allowed_levels.set", c.SetJobProfileAllowedLevels)).Methods(http.MethodPost)
 
 	api.HandleFunc("/assignments", c.instrumentAPI("assignments.list", c.GetAssignments)).Methods(http.MethodGet)
 	api.HandleFunc("/assignments", c.instrumentAPI("assignments.create", c.CreateAssignment)).Methods(http.MethodPost)
@@ -2020,15 +2043,24 @@ func (c *OrgAPIController) GetPositions(w http.ResponseWriter, r *http.Request) 
 }
 
 type createPositionRequest struct {
-	Code            string     `json:"code"`
-	OrgNodeID       uuid.UUID  `json:"org_node_id"`
-	EffectiveDate   string     `json:"effective_date"`
-	Title           *string    `json:"title"`
-	LifecycleStatus string     `json:"lifecycle_status"`
-	CapacityFTE     *float64   `json:"capacity_fte"`
-	ReportsToID     *uuid.UUID `json:"reports_to_position_id"`
-	ReasonCode      string     `json:"reason_code"`
-	ReasonNote      *string    `json:"reason_note"`
+	Code               string          `json:"code"`
+	OrgNodeID          uuid.UUID       `json:"org_node_id"`
+	EffectiveDate      string          `json:"effective_date"`
+	Title              *string         `json:"title"`
+	LifecycleStatus    string          `json:"lifecycle_status"`
+	PositionType       string          `json:"position_type"`
+	EmploymentType     string          `json:"employment_type"`
+	CapacityFTE        *float64        `json:"capacity_fte"`
+	ReportsToID        *uuid.UUID      `json:"reports_to_position_id"`
+	JobFamilyGroupCode string          `json:"job_family_group_code"`
+	JobFamilyCode      string          `json:"job_family_code"`
+	JobRoleCode        string          `json:"job_role_code"`
+	JobLevelCode       string          `json:"job_level_code"`
+	JobProfileID       *uuid.UUID      `json:"job_profile_id"`
+	CostCenterCode     *string         `json:"cost_center_code"`
+	Profile            json.RawMessage `json:"profile"`
+	ReasonCode         string          `json:"reason_code"`
+	ReasonNote         *string         `json:"reason_note"`
 }
 
 func (c *OrgAPIController) CreatePosition(w http.ResponseWriter, r *http.Request) {
@@ -2057,15 +2089,24 @@ func (c *OrgAPIController) CreatePosition(w http.ResponseWriter, r *http.Request
 
 	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	res, err := c.org.CreatePosition(r.Context(), tenantID, requestID, initiatorID, services.CreatePositionInput{
-		Code:            req.Code,
-		OrgNodeID:       req.OrgNodeID,
-		EffectiveDate:   effectiveDate,
-		Title:           req.Title,
-		LifecycleStatus: req.LifecycleStatus,
-		CapacityFTE:     capacityFTE,
-		ReportsToID:     req.ReportsToID,
-		ReasonCode:      req.ReasonCode,
-		ReasonNote:      req.ReasonNote,
+		Code:               req.Code,
+		OrgNodeID:          req.OrgNodeID,
+		EffectiveDate:      effectiveDate,
+		Title:              req.Title,
+		LifecycleStatus:    req.LifecycleStatus,
+		PositionType:       req.PositionType,
+		EmploymentType:     req.EmploymentType,
+		CapacityFTE:        capacityFTE,
+		ReportsToID:        req.ReportsToID,
+		JobFamilyGroupCode: req.JobFamilyGroupCode,
+		JobFamilyCode:      req.JobFamilyCode,
+		JobRoleCode:        req.JobRoleCode,
+		JobLevelCode:       req.JobLevelCode,
+		JobProfileID:       req.JobProfileID,
+		CostCenterCode:     req.CostCenterCode,
+		Profile:            req.Profile,
+		ReasonCode:         req.ReasonCode,
+		ReasonNote:         req.ReasonNote,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -2165,14 +2206,23 @@ func (c *OrgAPIController) GetPositionTimeline(w http.ResponseWriter, r *http.Re
 }
 
 type updatePositionRequest struct {
-	EffectiveDate   string     `json:"effective_date"`
-	ReasonCode      string     `json:"reason_code"`
-	ReasonNote      *string    `json:"reason_note"`
-	OrgNodeID       *uuid.UUID `json:"org_node_id"`
-	Title           *string    `json:"title"`
-	LifecycleStatus *string    `json:"lifecycle_status"`
-	CapacityFTE     *float64   `json:"capacity_fte"`
-	ReportsToID     *uuid.UUID `json:"reports_to_position_id"`
+	EffectiveDate      string          `json:"effective_date"`
+	ReasonCode         string          `json:"reason_code"`
+	ReasonNote         *string         `json:"reason_note"`
+	OrgNodeID          *uuid.UUID      `json:"org_node_id"`
+	Title              *string         `json:"title"`
+	LifecycleStatus    *string         `json:"lifecycle_status"`
+	PositionType       *string         `json:"position_type"`
+	EmploymentType     *string         `json:"employment_type"`
+	CapacityFTE        *float64        `json:"capacity_fte"`
+	ReportsToID        *uuid.UUID      `json:"reports_to_position_id"`
+	JobFamilyGroupCode *string         `json:"job_family_group_code"`
+	JobFamilyCode      *string         `json:"job_family_code"`
+	JobRoleCode        *string         `json:"job_role_code"`
+	JobLevelCode       *string         `json:"job_level_code"`
+	JobProfileID       *uuid.UUID      `json:"job_profile_id"`
+	CostCenterCode     *string         `json:"cost_center_code"`
+	Profile            json.RawMessage `json:"profile"`
 }
 
 func (c *OrgAPIController) UpdatePosition(w http.ResponseWriter, r *http.Request) {
@@ -2202,16 +2252,30 @@ func (c *OrgAPIController) UpdatePosition(w http.ResponseWriter, r *http.Request
 	}
 
 	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	var profile *json.RawMessage
+	if req.Profile != nil {
+		tmp := req.Profile
+		profile = &tmp
+	}
 	res, err := c.org.UpdatePosition(r.Context(), tenantID, requestID, initiatorID, services.UpdatePositionInput{
-		PositionID:      positionID,
-		EffectiveDate:   effectiveDate,
-		ReasonCode:      req.ReasonCode,
-		ReasonNote:      req.ReasonNote,
-		OrgNodeID:       req.OrgNodeID,
-		Title:           req.Title,
-		LifecycleStatus: req.LifecycleStatus,
-		CapacityFTE:     req.CapacityFTE,
-		ReportsToID:     req.ReportsToID,
+		PositionID:         positionID,
+		EffectiveDate:      effectiveDate,
+		ReasonCode:         req.ReasonCode,
+		ReasonNote:         req.ReasonNote,
+		OrgNodeID:          req.OrgNodeID,
+		Title:              req.Title,
+		LifecycleStatus:    req.LifecycleStatus,
+		PositionType:       req.PositionType,
+		EmploymentType:     req.EmploymentType,
+		CapacityFTE:        req.CapacityFTE,
+		ReportsToID:        req.ReportsToID,
+		JobFamilyGroupCode: req.JobFamilyGroupCode,
+		JobFamilyCode:      req.JobFamilyCode,
+		JobRoleCode:        req.JobRoleCode,
+		JobLevelCode:       req.JobLevelCode,
+		JobProfileID:       req.JobProfileID,
+		CostCenterCode:     req.CostCenterCode,
+		Profile:            profile,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -2234,14 +2298,23 @@ func (c *OrgAPIController) UpdatePosition(w http.ResponseWriter, r *http.Request
 }
 
 type correctPositionRequest struct {
-	EffectiveDate   string     `json:"effective_date"`
-	ReasonCode      string     `json:"reason_code"`
-	ReasonNote      *string    `json:"reason_note"`
-	OrgNodeID       *uuid.UUID `json:"org_node_id"`
-	Title           *string    `json:"title"`
-	LifecycleStatus *string    `json:"lifecycle_status"`
-	CapacityFTE     *float64   `json:"capacity_fte"`
-	ReportsToID     *uuid.UUID `json:"reports_to_position_id"`
+	EffectiveDate      string          `json:"effective_date"`
+	ReasonCode         string          `json:"reason_code"`
+	ReasonNote         *string         `json:"reason_note"`
+	OrgNodeID          *uuid.UUID      `json:"org_node_id"`
+	Title              *string         `json:"title"`
+	LifecycleStatus    *string         `json:"lifecycle_status"`
+	PositionType       *string         `json:"position_type"`
+	EmploymentType     *string         `json:"employment_type"`
+	CapacityFTE        *float64        `json:"capacity_fte"`
+	ReportsToID        *uuid.UUID      `json:"reports_to_position_id"`
+	JobFamilyGroupCode *string         `json:"job_family_group_code"`
+	JobFamilyCode      *string         `json:"job_family_code"`
+	JobRoleCode        *string         `json:"job_role_code"`
+	JobLevelCode       *string         `json:"job_level_code"`
+	JobProfileID       *uuid.UUID      `json:"job_profile_id"`
+	CostCenterCode     *string         `json:"cost_center_code"`
+	Profile            json.RawMessage `json:"profile"`
 }
 
 func (c *OrgAPIController) CorrectPosition(w http.ResponseWriter, r *http.Request) {
@@ -2271,16 +2344,30 @@ func (c *OrgAPIController) CorrectPosition(w http.ResponseWriter, r *http.Reques
 	}
 
 	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	var profile *json.RawMessage
+	if req.Profile != nil {
+		tmp := req.Profile
+		profile = &tmp
+	}
 	res, err := c.org.CorrectPosition(r.Context(), tenantID, requestID, initiatorID, services.CorrectPositionInput{
-		PositionID:  positionID,
-		AsOf:        effectiveDate,
-		ReasonCode:  req.ReasonCode,
-		ReasonNote:  req.ReasonNote,
-		OrgNodeID:   req.OrgNodeID,
-		Title:       req.Title,
-		Lifecycle:   req.LifecycleStatus,
-		CapacityFTE: req.CapacityFTE,
-		ReportsToID: req.ReportsToID,
+		PositionID:         positionID,
+		AsOf:               effectiveDate,
+		ReasonCode:         req.ReasonCode,
+		ReasonNote:         req.ReasonNote,
+		OrgNodeID:          req.OrgNodeID,
+		Title:              req.Title,
+		Lifecycle:          req.LifecycleStatus,
+		PositionType:       req.PositionType,
+		EmploymentType:     req.EmploymentType,
+		CapacityFTE:        req.CapacityFTE,
+		ReportsToID:        req.ReportsToID,
+		JobFamilyGroupCode: req.JobFamilyGroupCode,
+		JobFamilyCode:      req.JobFamilyCode,
+		JobRoleCode:        req.JobRoleCode,
+		JobLevelCode:       req.JobLevelCode,
+		JobProfileID:       req.JobProfileID,
+		CostCenterCode:     req.CostCenterCode,
+		Profile:            profile,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)

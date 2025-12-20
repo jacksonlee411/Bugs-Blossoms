@@ -15,19 +15,31 @@ func TestOrg057StaffingSummary_ComputesTotalsAndBreakdown(t *testing.T) {
 
 	initiatorID := uuid.New()
 	p1, err := svc.CreatePosition(ctx, tenantID, "req-057-p1", initiatorID, orgsvc.CreatePositionInput{
-		Code:          "P-001",
-		OrgNodeID:     rootNodeID,
-		EffectiveDate: asOf,
-		CapacityFTE:   1.0,
-		ReasonCode:    "create",
+		Code:               "P-001",
+		OrgNodeID:          rootNodeID,
+		EffectiveDate:      asOf,
+		PositionType:       "regular",
+		EmploymentType:     "full_time",
+		JobFamilyGroupCode: "TST",
+		JobFamilyCode:      "TST-FAMILY",
+		JobRoleCode:        "TST-ROLE",
+		JobLevelCode:       "L1",
+		CapacityFTE:        1.0,
+		ReasonCode:         "create",
 	})
 	require.NoError(t, err)
 	p2, err := svc.CreatePosition(ctx, tenantID, "req-057-p2", initiatorID, orgsvc.CreatePositionInput{
-		Code:          "P-002",
-		OrgNodeID:     rootNodeID,
-		EffectiveDate: asOf,
-		CapacityFTE:   2.0,
-		ReasonCode:    "create",
+		Code:               "P-002",
+		OrgNodeID:          rootNodeID,
+		EffectiveDate:      asOf,
+		PositionType:       "regular",
+		EmploymentType:     "full_time",
+		JobFamilyGroupCode: "TST",
+		JobFamilyCode:      "TST-FAMILY",
+		JobRoleCode:        "TST-ROLE",
+		JobLevelCode:       "L1",
+		CapacityFTE:        2.0,
+		ReasonCode:         "create",
 	})
 	require.NoError(t, err)
 
@@ -71,11 +83,17 @@ func TestOrg057StaffingVacancies_ComputesVacancySince(t *testing.T) {
 
 	initiatorID := uuid.New()
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-057-vac", initiatorID, orgsvc.CreatePositionInput{
-		Code:          "P-VAC",
-		OrgNodeID:     rootNodeID,
-		EffectiveDate: asOf,
-		CapacityFTE:   1.0,
-		ReasonCode:    "create",
+		Code:               "P-VAC",
+		OrgNodeID:          rootNodeID,
+		EffectiveDate:      asOf,
+		PositionType:       "regular",
+		EmploymentType:     "full_time",
+		JobFamilyGroupCode: "TST",
+		JobFamilyCode:      "TST-FAMILY",
+		JobRoleCode:        "TST-ROLE",
+		JobLevelCode:       "L1",
+		CapacityFTE:        1.0,
+		ReasonCode:         "create",
 	})
 	require.NoError(t, err)
 	_, err = pool.Exec(ctx, `UPDATE org_position_slices SET position_type='regular' WHERE tenant_id=$1 AND position_id=$2`, tenantID, pos.PositionID)
@@ -112,11 +130,17 @@ func TestOrg057StaffingTimeToFill_ComputesSummaryAndBreakdown(t *testing.T) {
 
 	initiatorID := uuid.New()
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-057-ttf", initiatorID, orgsvc.CreatePositionInput{
-		Code:          "P-TTF",
-		OrgNodeID:     rootNodeID,
-		EffectiveDate: asOf,
-		CapacityFTE:   1.0,
-		ReasonCode:    "create",
+		Code:               "P-TTF",
+		OrgNodeID:          rootNodeID,
+		EffectiveDate:      asOf,
+		PositionType:       "regular",
+		EmploymentType:     "full_time",
+		JobFamilyGroupCode: "TST",
+		JobFamilyCode:      "TST-FAMILY",
+		JobRoleCode:        "TST-ROLE",
+		JobLevelCode:       "L1",
+		CapacityFTE:        1.0,
+		ReasonCode:         "create",
 	})
 	require.NoError(t, err)
 	_, err = pool.Exec(ctx, `UPDATE org_position_slices SET position_type='regular' WHERE tenant_id=$1 AND position_id=$2`, tenantID, pos.PositionID)

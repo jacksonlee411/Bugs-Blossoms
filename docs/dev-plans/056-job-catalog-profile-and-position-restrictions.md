@@ -1,6 +1,6 @@
 # DEV-PLAN-056：Job Catalog / Job Profile 与 Position Restrictions（对齐 051 阶段 D）
 
-**状态**: 草拟中（2025-12-20 03:57 UTC）
+**状态**: 已完成（2025-12-20 17:31 UTC）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
@@ -17,11 +17,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **Job Catalog 主数据可用**：四级分类（Job Family Group → Job Family → Job Role → Job Level）具备 code/name/启停与层级自洽约束；查询与维护入口可用。
-- [ ] **Job Profile 主数据可用**：Profile 必须绑定 Job Role，可选配置“允许的 Job Level 集合”，并作为“Profile→Catalog 冲突拒绝”的 SSOT（对齐 050 §3.1/§7.1）。
-- [ ] **Position 写入口强校验**：对 Managed Position 强制校验 Job Catalog 四级必填 + 启用状态 + 层级自洽；若选择 Job Profile，则必须通过映射校验，否则冲突拒绝（对齐 050 §7.1）。
-- [ ] **Position Restrictions 可配置且可校验**：限制条件可被维护；对 Position/Assignment 写入口执行强校验，并提供稳定的拒绝原因（可观测、可审计追溯）（对齐 050 §7.7）。
-- [ ] **兼容与灰度**：对 System Position（auto-created）保持兼容；对 Managed Position 优先启用强校验；强校验支持 `disabled/shadow/enforce` 三态灰度，收口策略与 `docs/dev-plans/059-position-rollout-readiness-and-observability.md` 对齐。
+- [X] **Job Catalog 主数据可用**：四级分类（Job Family Group → Job Family → Job Role → Job Level）具备 code/name/启停与层级自洽约束；查询与维护入口可用。
+- [X] **Job Profile 主数据可用**：Profile 必须绑定 Job Role，可选配置“允许的 Job Level 集合”，并作为“Profile→Catalog 冲突拒绝”的 SSOT（对齐 050 §3.1/§7.1）。
+- [X] **Position 写入口强校验**：对 Managed Position 强制校验 Job Catalog 四级必填 + 启用状态 + 层级自洽；若选择 Job Profile，则必须通过映射校验，否则冲突拒绝（对齐 050 §7.1）。
+- [X] **Position Restrictions 可配置且可校验**：限制条件可被维护；对 Position/Assignment 写入口执行强校验，并提供稳定的拒绝原因（可观测、可审计追溯）（对齐 050 §7.7）。
+- [X] **兼容与灰度**：对 System Position（auto-created）保持兼容；对 Managed Position 优先启用强校验；强校验支持 `disabled/shadow/enforce` 三态灰度，收口策略与 `docs/dev-plans/059-position-rollout-readiness-and-observability.md` 对齐。
 
 ### 2.2 非目标（Out of Scope）
 - 不实现招聘全链路（Job Requisition/Offer/Hire）与外部 ATS 对接（见 051 §2.2）。
@@ -397,11 +397,11 @@ flowchart TD
 - `docs/dev-plans/055-position-ui-org-integration.md`：若将 Restrictions 摘要/入口集成到 Position 详情页。
 
 ### 8.2 里程碑（建议按 D0/D1/D2 对齐 051）
-1. [ ] D0：模型与契约冻结（本文件）—— 数据模型、API 面、错误码与校验语义评审通过。
-2. [ ] D1：Schema + 迁移落地（Org Atlas+Goose）—— 新表/新列/约束/索引可通过 `plan/lint/migrate` 门禁；回滚策略明确。
-3. [ ] D1：主数据维护入口最小闭环（API + 可选 UI）—— 可创建/启停/查询 Job Catalog/Profile。
-4. [ ] D2：写入口强校验接入（Position/Assignment）—— Managed 强校验启用；System 兼容；shadow/enforce 灰度可切换。
-5. [ ] D2：测试与门禁记录 —— 单元/集成/越权用例覆盖最小集，readiness 记录可复现（对齐 059）。
+1. [X] D0：模型与契约冻结（本文件）—— 数据模型、API 面、错误码与校验语义评审通过。
+2. [X] D1：Schema + 迁移落地（Org Atlas+Goose）—— 新表/新列/约束/索引可通过 `plan/lint/migrate` 门禁；回滚策略明确。
+3. [X] D1：主数据维护入口最小闭环（API + 可选 UI）—— 可创建/启停/查询 Job Catalog/Profile。
+4. [X] D2：写入口强校验接入（Position/Assignment）—— Managed 强校验启用；System 兼容；shadow/enforce 灰度可切换。
+5. [X] D2：测试与门禁记录 —— 单元/集成/越权用例覆盖最小集，readiness 记录可复现（对齐 059）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **数据一致性**：
@@ -418,13 +418,13 @@ flowchart TD
 - **审计**：shadow 模式的“本应拒绝但放行”必须落审计 meta，便于阶段 059 收口定位与回放。
 
 ## 11. 实施步骤（执行清单）
-1. [ ] 数据模型与契约评审（对齐 050/051/052）
-2. [ ] Schema 与迁移（Org Atlas+Goose）
-3. [ ] 主数据维护入口（API；可选 UI）
-4. [ ] Position Catalog/Profile 强校验接入（对齐 053 的 `job_*_code/job_profile_id` 字段）
-5. [ ] Position Restrictions 接入（落在 `org_position_slices.profile.position_restrictions`，包含 shadow/enforce）
-6. [ ] Authz 补齐（如新增 object/action）+ 测试门禁
-7. [ ] 验收与 readiness 记录（对齐 059）
+1. [X] 数据模型与契约评审（对齐 050/051/052）
+2. [X] Schema 与迁移（Org Atlas+Goose）
+3. [X] 主数据维护入口（API；可选 UI）
+4. [X] Position Catalog/Profile 强校验接入（对齐 053 的 `job_*_code/job_profile_id` 字段）
+5. [X] Position Restrictions 接入（落在 `org_position_slices.profile.position_restrictions`，包含 shadow/enforce）
+6. [X] Authz 补齐（如新增 object/action）+ 测试门禁
+7. [X] 验收与 readiness 记录（对齐 059）——（2025-12-20 17:31 UTC）已通过：`go fmt ./... && go vet ./... && make check lint && make test && make org plan && make org lint && make org migrate up && make authz-pack && make authz-test && make authz-lint && make check doc`
 
 ## 12. 交付物
 - Job Catalog（四级）与 Job Profile 主数据（含启停、唯一性、层级自洽）与最小维护入口。

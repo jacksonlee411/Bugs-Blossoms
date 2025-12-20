@@ -1,10 +1,14 @@
 p, role:org.staffing.viewer, org.positions, read, *, allow
 p, role:org.staffing.viewer, org.assignments, read, *, allow
+p, role:org.staffing.viewer, org.job_catalog, read, *, allow
+p, role:org.staffing.viewer, org.job_profiles, read, *, allow
 
 p, role:org.staffing.editor, org.positions, read, *, allow
 p, role:org.staffing.editor, org.positions, write, *, allow
 p, role:org.staffing.editor, org.assignments, read, *, allow
 p, role:org.staffing.editor, org.assignments, assign, *, allow
+p, role:org.staffing.editor, org.job_catalog, read, *, allow
+p, role:org.staffing.editor, org.job_profiles, read, *, allow
 
 p, role:org.staffing.admin, org.positions, read, *, allow
 p, role:org.staffing.admin, org.positions, write, *, allow
@@ -12,5 +16,14 @@ p, role:org.staffing.admin, org.positions, admin, *, allow
 p, role:org.staffing.admin, org.assignments, read, *, allow
 p, role:org.staffing.admin, org.assignments, assign, *, allow
 p, role:org.staffing.admin, org.assignments, admin, *, allow
+p, role:org.staffing.admin, org.job_catalog, read, *, allow
+p, role:org.staffing.admin, org.job_profiles, read, *, allow
 
 p, role:org.staffing.reports, org.position_reports, read, *, allow
+
+p, role:org.staffing.masterdata.admin, org.job_catalog, read, *, allow
+p, role:org.staffing.masterdata.admin, org.job_catalog, admin, *, allow
+p, role:org.staffing.masterdata.admin, org.job_profiles, read, *, allow
+p, role:org.staffing.masterdata.admin, org.job_profiles, admin, *, allow
+p, role:org.staffing.masterdata.admin, org.position_restrictions, read, *, allow
+p, role:org.staffing.masterdata.admin, org.position_restrictions, admin, *, allow
