@@ -227,6 +227,88 @@ func TestOrgAPIController_CorrectAssignment_RequiresAdminEvenWithAssign(t *testi
 	require.Equal(t, "admin", payload.MissingPolicies[0].Action)
 }
 
+func TestOrgAPIController_StaffingReports_RequirePositionReportsRead(t *testing.T) {
+	setAuthzEnv(t)
+	testhelpers.WithAuthzMode(t, authz.ModeEnforce)
+
+	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000054")
+	withOrgRolloutEnabled(t, tenantID)
+
+	u := coreuser.New(
+		"Viewer",
+		"User",
+		internet.MustParseEmail("viewer@example.com"),
+		coreuser.UILanguageEN,
+		coreuser.WithID(10),
+		coreuser.WithTenantID(tenantID),
+	)
+
+	withAuthzPolicy(t, []string{
+		"p, role:org.staffing.viewer, org.positions, read, *, allow",
+		"g, " + authzutil.SubjectForUser(tenantID, u) + ", role:org.staffing.viewer, " + authz.DomainFromTenant(tenantID),
+	})
+
+	cases := []struct {
+		name string
+		fn   func(rr *httptest.ResponseRecorder, req *http.Request)
+		url  string
+	}{
+		{
+			name: "summary",
+			fn: func(rr *httptest.ResponseRecorder, req *http.Request) {
+				c := &OrgAPIController{}
+				c.GetStaffingSummary(rr, req)
+			},
+			url: "/org/api/reports/staffing:summary",
+		},
+		{
+			name: "vacancies",
+			fn: func(rr *httptest.ResponseRecorder, req *http.Request) {
+				c := &OrgAPIController{}
+				c.GetStaffingVacancies(rr, req)
+			},
+			url: "/org/api/reports/staffing:vacancies",
+		},
+		{
+			name: "time_to_fill",
+			fn: func(rr *httptest.ResponseRecorder, req *http.Request) {
+				c := &OrgAPIController{}
+				c.GetStaffingTimeToFill(rr, req)
+			},
+			url: "/org/api/reports/staffing:time-to-fill?from=2025-01-01&to=2025-02-01",
+		},
+		{
+			name: "export",
+			fn: func(rr *httptest.ResponseRecorder, req *http.Request) {
+				c := &OrgAPIController{}
+				c.ExportStaffingReport(rr, req)
+			},
+			url: "/org/api/reports/staffing:export?kind=summary&format=csv",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := newOrgAPIRequest(t, http.MethodGet, tc.url, tenantID, u)
+			req.Header.Set("X-Request-ID", "req-org-reports-deny-"+tc.name)
+
+			rr := httptest.NewRecorder()
+			tc.fn(rr, req)
+
+			require.Equal(t, http.StatusForbidden, rr.Code)
+
+			var payload authzutil.ForbiddenPayload
+			require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &payload))
+			require.Equal(t, orgPositionReportsAuthzObject, payload.Object)
+			require.Equal(t, "read", payload.Action)
+			require.Equal(t, "req-org-reports-deny-"+tc.name, payload.RequestID)
+			require.NotEmpty(t, payload.MissingPolicies)
+			require.Equal(t, orgPositionReportsAuthzObject, payload.MissingPolicies[0].Object)
+			require.Equal(t, "read", payload.MissingPolicies[0].Action)
+		})
+	}
+}
+
 func setAuthzEnv(t *testing.T) {
 	t.Helper()
 

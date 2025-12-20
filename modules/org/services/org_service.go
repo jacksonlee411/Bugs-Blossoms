@@ -66,6 +66,12 @@ type OrgRepository interface {
 	// DEV-PLAN-033: BI reporting snapshot build (consumes active snapshot build from 029).
 	BuildOrgReportingNodes(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOfDate time.Time, includeSecurityGroups bool, includeLinks bool, apply bool, sourceRequestID string) (OrgReportingBuildResult, error)
 
+	// DEV-PLAN-057: staffing reports (summary/vacancies/time-to-fill).
+	GetActiveSnapshotBuildID(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) (uuid.UUID, error)
+	GetStaffingSummaryReport(ctx context.Context, tenantID uuid.UUID, asOf time.Time, orgNodeIDs []uuid.UUID, lifecycleStatuses []string, includeSystem bool, groupBy StaffingGroupBy) (StaffingSummaryDBResult, error)
+	ListStaffingVacanciesReport(ctx context.Context, tenantID uuid.UUID, asOf time.Time, orgNodeIDs []uuid.UUID, lifecycleStatuses []string, includeSystem bool, limit int, cursor *uuid.UUID) (StaffingVacanciesDBResult, error)
+	GetStaffingTimeToFillReport(ctx context.Context, tenantID uuid.UUID, from time.Time, to time.Time, orgNodeIDs []uuid.UUID, lifecycleStatuses []string, includeSystem bool, groupBy StaffingGroupBy) (StaffingTimeToFillDBResult, error)
+
 	GetOrgSettings(ctx context.Context, tenantID uuid.UUID) (OrgSettings, error)
 	InsertAuditLog(ctx context.Context, tenantID uuid.UUID, log AuditLogInsert) (uuid.UUID, error)
 

@@ -17,6 +17,7 @@ var (
 	orgNodesAuthzObject                = authz.ObjectName("org", "nodes")
 	orgEdgesAuthzObject                = authz.ObjectName("org", "edges")
 	orgPositionsAuthzObject            = authz.ObjectName("org", "positions")
+	orgPositionReportsAuthzObject      = authz.ObjectName("org", "position_reports")
 	orgAssignmentsAuthzObject          = authz.ObjectName("org", "assignments")
 	orgJobCatalogAuthzObject           = authz.ObjectName("org", "job_catalog")
 	orgJobProfilesAuthzObject          = authz.ObjectName("org", "job_profiles")
