@@ -308,6 +308,28 @@ org-closure-prune:
 	  --hierarchy "$$HIERARCHY_TYPE" \
 	  --keep "$$KEEP"
 
+.PHONY: org-reporting-build
+org-reporting-build:
+	@set -eu; \
+	TENANT_ID="$${TENANT_ID:?TENANT_ID is required}"; \
+	HIERARCHY_TYPE="$${HIERARCHY_TYPE:-OrgUnit}"; \
+	AS_OF_DATE="$${AS_OF_DATE:-$$(date -u +%F)}"; \
+	REQ_ID="$${REQUEST_ID:-}"; \
+	APPLY_FLAG=""; \
+	if [ "$${APPLY:-0}" = "1" ]; then APPLY_FLAG="--apply"; fi; \
+	INCLUDE_SG=""; \
+	INCLUDE_LINKS=""; \
+	if [ "$${INCLUDE_SECURITY_GROUPS:-0}" = "1" ]; then INCLUDE_SG="--include-security-groups"; fi; \
+	if [ "$${INCLUDE_LINKS:-0}" = "1" ]; then INCLUDE_LINKS="--include-links"; fi; \
+	go run ./cmd/org-reporting build \
+	  --tenant "$$TENANT_ID" \
+	  --hierarchy "$$HIERARCHY_TYPE" \
+	  --as-of-date "$$AS_OF_DATE" \
+	  $$INCLUDE_SG \
+	  $$INCLUDE_LINKS \
+	  $$APPLY_FLAG \
+	  $${REQ_ID:+--request-id "$$REQ_ID"}
+
 # Run tests with optional subcommands (test, watch, coverage, verbose, package, docker)
 test:
 	@if [ "$(word 1,$(MAKECMDGOALS))" != "test" ]; then \

@@ -59,9 +59,11 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/ops/health", c.instrumentAPI("ops.health.get", c.GetOpsHealth)).Methods(http.MethodGet)
 
 	api.HandleFunc("/hierarchies", c.instrumentAPI("hierarchies.get", c.GetHierarchies)).Methods(http.MethodGet)
+	api.HandleFunc("/hierarchies:export", c.instrumentAPI("hierarchies.export.get", c.ExportHierarchies)).Methods(http.MethodGet)
 
 	api.HandleFunc("/nodes", c.instrumentAPI("nodes.create", c.CreateNode)).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}", c.instrumentAPI("nodes.update", c.UpdateNode)).Methods(http.MethodPatch)
+	api.HandleFunc("/nodes/{id}:path", c.instrumentAPI("nodes.path.get", c.GetNodePath)).Methods(http.MethodGet)
 	api.HandleFunc("/nodes/{id}:resolved-attributes", c.instrumentAPI("nodes.resolved_attributes.get", c.GetNodeResolvedAttributes)).Methods(http.MethodGet)
 	api.HandleFunc("/nodes/{id}:move", c.instrumentAPI("nodes.move", c.MoveNode)).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}:correct", c.instrumentAPI("nodes.correct", c.CorrectNode)).Methods(http.MethodPost)
@@ -90,6 +92,7 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 
 	api.HandleFunc("/snapshot", c.instrumentAPI("snapshot.get", c.GetSnapshot)).Methods(http.MethodGet)
 	api.HandleFunc("/batch", c.instrumentAPI("batch.post", c.Batch)).Methods(http.MethodPost)
+	api.HandleFunc("/reports/person-path", c.instrumentAPI("reports.person_path.get", c.GetPersonPath)).Methods(http.MethodGet)
 
 	api.HandleFunc("/change-requests", c.instrumentAPI("change_requests.create", c.CreateChangeRequest)).Methods(http.MethodPost)
 	api.HandleFunc("/change-requests", c.instrumentAPI("change_requests.list", c.ListChangeRequests)).Methods(http.MethodGet)
@@ -190,6 +193,336 @@ func (c *OrgAPIController) GetHierarchies(w http.ResponseWriter, r *http.Request
 		EffectiveDate: effectiveDate.UTC().Format(time.RFC3339),
 		Nodes:         nodes,
 	})
+}
+
+func (c *OrgAPIController) ExportHierarchies(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgHierarchiesAuthzObject, "read") {
+		return
+	}
+
+	hType := r.URL.Query().Get("type")
+	if strings.TrimSpace(hType) == "" {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "type is required")
+		return
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+
+	var rootNodeID *uuid.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("root_node_id")); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "root_node_id is invalid")
+			return
+		}
+		rootNodeID = &id
+	}
+
+	var maxDepth *int
+	if raw := strings.TrimSpace(r.URL.Query().Get("max_depth")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "max_depth is invalid")
+			return
+		}
+		maxDepth = &n
+	}
+
+	includeEdges := false
+	includeSecurityGroups := false
+	includeLinks := false
+	if raw := strings.TrimSpace(r.URL.Query().Get("include")); raw != "" {
+		for _, part := range strings.Split(raw, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			switch part {
+			case "nodes":
+			case "edges":
+				includeEdges = true
+			case "security_groups":
+				includeSecurityGroups = true
+			case "links":
+				includeLinks = true
+			default:
+				writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "include is invalid")
+				return
+			}
+		}
+	}
+
+	if includeSecurityGroups && !requireOrgSecurityGroupMappingsEnabled(w, requestID) {
+		return
+	}
+	if includeLinks && !requireOrgLinksEnabled(w, requestID) {
+		return
+	}
+
+	limit := 2000
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "limit is invalid")
+			return
+		}
+		limit = n
+	}
+
+	afterID, afterOK, err := parseIDCursor(r.URL.Query().Get("cursor"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "cursor is invalid")
+		return
+	}
+	var afterPtr *uuid.UUID
+	if afterOK {
+		afterPtr = &afterID
+	}
+
+	res, err := c.org.ExportHierarchy(
+		r.Context(),
+		tenantID,
+		hType,
+		asOf,
+		rootNodeID,
+		maxDepth,
+		includeEdges,
+		includeSecurityGroups,
+		includeLinks,
+		limit,
+		afterPtr,
+	)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type exportNode struct {
+		ID                string                    `json:"id"`
+		ParentID          *string                   `json:"parent_id"`
+		Code              string                    `json:"code"`
+		Name              string                    `json:"name"`
+		Depth             int                       `json:"depth"`
+		Status            string                    `json:"status"`
+		SecurityGroupKeys []string                  `json:"security_group_keys,omitempty"`
+		Links             []services.OrgLinkSummary `json:"links,omitempty"`
+	}
+	nodes := make([]exportNode, 0, len(res.Nodes))
+	for _, n := range res.Nodes {
+		var pid *string
+		if n.ParentID != nil && *n.ParentID != uuid.Nil {
+			v := n.ParentID.String()
+			pid = &v
+		}
+		nodes = append(nodes, exportNode{
+			ID:                n.ID.String(),
+			ParentID:          pid,
+			Code:              n.Code,
+			Name:              n.Name,
+			Depth:             n.Depth,
+			Status:            n.Status,
+			SecurityGroupKeys: n.SecurityGroupKeys,
+			Links:             n.Links,
+		})
+	}
+
+	type exportEdge struct {
+		ChildNodeID  string  `json:"child_node_id"`
+		ParentNodeID *string `json:"parent_node_id"`
+	}
+	edges := []exportEdge(nil)
+	if includeEdges {
+		edges = make([]exportEdge, 0, len(nodes))
+		for _, n := range nodes {
+			edges = append(edges, exportEdge{ChildNodeID: n.ID, ParentNodeID: n.ParentID})
+		}
+	}
+
+	var nextCursor *string
+	if res.NextCursorID != nil && *res.NextCursorID != uuid.Nil {
+		v := "id:" + res.NextCursorID.String()
+		nextCursor = &v
+	}
+
+	type exportResponse struct {
+		TenantID      string       `json:"tenant_id"`
+		HierarchyType string       `json:"hierarchy_type"`
+		EffectiveDate string       `json:"effective_date"`
+		RootNodeID    string       `json:"root_node_id"`
+		Includes      []string     `json:"includes"`
+		Limit         int          `json:"limit"`
+		Nodes         []exportNode `json:"nodes"`
+		Edges         []exportEdge `json:"edges,omitempty"`
+		NextCursor    *string      `json:"next_cursor"`
+	}
+	writeJSON(w, http.StatusOK, exportResponse{
+		TenantID:      res.TenantID.String(),
+		HierarchyType: res.HierarchyType,
+		EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+		RootNodeID:    res.RootNodeID.String(),
+		Includes:      res.Includes,
+		Limit:         res.Limit,
+		Nodes:         nodes,
+		Edges:         edges,
+		NextCursor:    nextCursor,
+	})
+}
+
+func (c *OrgAPIController) GetNodePath(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgHierarchiesAuthzObject, "read") {
+		return
+	}
+
+	idRaw := mux.Vars(r)["id"]
+	orgNodeID, err := uuid.Parse(idRaw)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "id is invalid")
+		return
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+
+	format := strings.TrimSpace(r.URL.Query().Get("format"))
+	if format == "" {
+		format = "nodes"
+	}
+	if format != "nodes" && format != "nodes_with_sources" {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "format is invalid")
+		return
+	}
+
+	res, err := c.org.GetNodePath(r.Context(), tenantID, orgNodeID, asOf)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type nodePathNode struct {
+		ID    string `json:"id"`
+		Code  string `json:"code"`
+		Name  string `json:"name"`
+		Depth int    `json:"depth"`
+	}
+	type nodePathSource struct {
+		DeepReadBackend string `json:"deep_read_backend"`
+		AsOfDate        string `json:"as_of_date"`
+	}
+	type nodePathResponse struct {
+		TenantID      string `json:"tenant_id"`
+		OrgNodeID     string `json:"org_node_id"`
+		EffectiveDate string `json:"effective_date"`
+		Path          struct {
+			Nodes []nodePathNode `json:"nodes"`
+		} `json:"path"`
+		Source *nodePathSource `json:"source,omitempty"`
+	}
+
+	nodes := make([]nodePathNode, 0, len(res.Path))
+	for _, n := range res.Path {
+		nodes = append(nodes, nodePathNode{
+			ID:    n.ID.String(),
+			Code:  n.Code,
+			Name:  n.Name,
+			Depth: n.Depth,
+		})
+	}
+
+	var out nodePathResponse
+	out.TenantID = res.TenantID.String()
+	out.OrgNodeID = res.OrgNodeID.String()
+	out.EffectiveDate = res.EffectiveDate.UTC().Format(time.RFC3339)
+	out.Path.Nodes = nodes
+	if format == "nodes_with_sources" {
+		out.Source = &nodePathSource{
+			DeepReadBackend: string(res.Source.DeepReadBackend),
+			AsOfDate:        res.Source.AsOfDate,
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (c *OrgAPIController) GetPersonPath(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "read") {
+		return
+	}
+
+	subject := strings.TrimSpace(r.URL.Query().Get("subject"))
+	if subject == "" {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "subject is required")
+		return
+	}
+
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+		return
+	}
+
+	res, err := c.org.GetPersonPath(r.Context(), tenantID, subject, asOf)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type personPathNode struct {
+		ID    string `json:"id"`
+		Code  string `json:"code"`
+		Name  string `json:"name"`
+		Depth int    `json:"depth"`
+	}
+	type personPathResponse struct {
+		TenantID      string `json:"tenant_id"`
+		Subject       string `json:"subject"`
+		EffectiveDate string `json:"effective_date"`
+		Assignment    struct {
+			AssignmentID string `json:"assignment_id"`
+			PositionID   string `json:"position_id"`
+			OrgNodeID    string `json:"org_node_id"`
+		} `json:"assignment"`
+		Path struct {
+			Nodes []personPathNode `json:"nodes"`
+		} `json:"path"`
+	}
+	nodes := make([]personPathNode, 0, len(res.Path))
+	for _, n := range res.Path {
+		nodes = append(nodes, personPathNode{
+			ID:    n.ID.String(),
+			Code:  n.Code,
+			Name:  n.Name,
+			Depth: n.Depth,
+		})
+	}
+
+	var out personPathResponse
+	out.TenantID = res.TenantID.String()
+	out.Subject = res.Subject
+	out.EffectiveDate = res.EffectiveDate.UTC().Format(time.RFC3339)
+	out.Assignment.AssignmentID = res.Assignment.AssignmentID.String()
+	out.Assignment.PositionID = res.Assignment.PositionID.String()
+	out.Assignment.OrgNodeID = res.Assignment.OrgNodeID.String()
+	out.Path.Nodes = nodes
+
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (c *OrgAPIController) GetNodeResolvedAttributes(w http.ResponseWriter, r *http.Request) {
@@ -3619,6 +3952,25 @@ func parseEffectiveIDCursor(raw string) (*time.Time, *uuid.UUID, error) {
 	}
 	at = at.UTC()
 	return &at, &id, nil
+}
+
+func parseIDCursor(raw string) (uuid.UUID, bool, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return uuid.Nil, false, nil
+	}
+	if !strings.HasPrefix(raw, "id:") {
+		return uuid.Nil, false, fmt.Errorf("invalid cursor")
+	}
+	idStr := strings.TrimSpace(strings.TrimPrefix(raw, "id:"))
+	if idStr == "" {
+		return uuid.Nil, false, fmt.Errorf("invalid cursor")
+	}
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return uuid.Nil, false, err
+	}
+	return id, true, nil
 }
 
 func writePreflightCommandError(w http.ResponseWriter, requestID string, index int, cmdType string, status int, code string, message string) {
