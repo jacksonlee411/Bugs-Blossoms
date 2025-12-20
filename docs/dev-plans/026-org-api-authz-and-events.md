@@ -172,6 +172,12 @@ CREATE INDEX org_outbox_tenant_published
 | `POST /org/api/positions/{id}:correct`（053） | `org.positions` | `admin` |
 | `POST /org/api/positions/{id}:rescind`（053） | `org.positions` | `admin` |
 | `POST /org/api/positions/{id}:shift-boundary`（053） | `org.positions` | `admin` |
+| `GET /org/api/positions/{id}/restrictions`（056） | `org.position_restrictions` | `read` |
+| `POST /org/api/positions/{id}:set-restrictions`（056） | `org.position_restrictions` | `admin` |
+| `GET /org/api/job-catalog/*`（056） | `org.job_catalog` | `read` |
+| `POST/PATCH /org/api/job-catalog/*`（056） | `org.job_catalog` | `admin` |
+| `GET /org/api/job-profiles`（056） | `org.job_profiles` | `read` |
+| `POST/PATCH /org/api/job-profiles*`（056） | `org.job_profiles` | `admin` |
 | `GET /org/api/assignments`（024） | `org.assignments` | `read` |
 | `POST /org/api/assignments`（024） | `org.assignments` | `assign` |
 | `PATCH /org/api/assignments/{id}`（024） | `org.assignments` | `assign` |
@@ -339,7 +345,7 @@ CREATE INDEX org_outbox_tenant_published
 
 ## 7. 安全与鉴权 (Security & Authz)
 ### 7.1 Casbin object/action（SSOT）
-- object：`org.hierarchies|org.nodes|org.edges|org.positions|org.assignments|org.snapshot|org.batch`
+- object：`org.hierarchies|org.nodes|org.edges|org.positions|org.assignments|org.position_restrictions|org.job_catalog|org.job_profiles|org.snapshot|org.batch`
 - action：`read|write|assign|admin`（见 §5.3 映射表）
 
 ### 7.2 403 Payload（SSOT）

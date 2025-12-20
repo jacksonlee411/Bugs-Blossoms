@@ -164,6 +164,7 @@ modules/{module}/
 - DEV-PLAN-051 Readiness：`docs/dev-records/DEV-PLAN-051-READINESS.md`
 - 职位管理子计划：契约冻结（DEV-PLAN-052）：`docs/dev-plans/052-position-contract-freeze-and-decisions.md`
 - 职位管理子计划：Position Core（DEV-PLAN-053）：`docs/dev-plans/053-position-core-schema-service-api.md`
+- 职位管理子计划：Position 合同字段贯通（DEV-PLAN-053A）：`docs/dev-plans/053A-position-contract-fields-pass-through.md`
 - 职位管理子计划：Authz（DEV-PLAN-054）：`docs/dev-plans/054-position-authz-policy-and-gates.md`
 - 职位管理子计划：UI（DEV-PLAN-055）：`docs/dev-plans/055-position-ui-org-integration.md`
 - 职位管理子计划：主数据与限制（DEV-PLAN-056）：`docs/dev-plans/056-job-catalog-profile-and-position-restrictions.md`

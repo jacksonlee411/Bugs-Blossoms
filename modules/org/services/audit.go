@@ -9,8 +9,10 @@ import (
 )
 
 type OrgSettings struct {
-	FreezeMode      string
-	FreezeGraceDays int
+	FreezeMode                         string
+	FreezeGraceDays                    int
+	PositionCatalogValidationMode      string
+	PositionRestrictionsValidationMode string
 }
 
 type AuditLogInsert struct {
