@@ -437,7 +437,7 @@ fix:
 		echo "  imports - Organize and format Go imports"; \
 	fi
 
-# Code quality checks with subcommands (lint, tr)
+# Code quality checks with subcommands (lint, tr, doc, routing, sqlfmt)
 check:
 	@if [ "$(word 2,$(MAKECMDGOALS))" = "lint" ]; then \
 		GOFLAGS="-buildvcs=false" golangci-lint run ./... && \
@@ -448,12 +448,33 @@ check:
 		bash ./scripts/docs/check.sh; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "routing" ]; then \
 		go test ./pkg/routing ./internal/routelint ./internal/routinggates; \
+	elif [ "$(word 2,$(MAKECMDGOALS))" = "sqlfmt" ]; then \
+		set -eu; \
+		if ! command -v pg_format >/dev/null 2>&1; then \
+			echo "Error: pg_format not found. Install pgformatter (e.g. apt-get install pgformatter) to run SQL formatting gate."; \
+			exit 1; \
+		fi; \
+		tmpdir="$$(mktemp -d -t sqlfmt_XXXXXX)"; \
+		trap 'rm -rf "$$tmpdir"' EXIT; \
+		find modules -name "*.sql" -type f > "$$tmpdir/files"; \
+		while IFS= read -r sqlfile; do \
+			[ -n "$$sqlfile" ] || continue; \
+			tmpfile="$$tmpdir/$$(basename "$$sqlfile")"; \
+			pg_format "$$sqlfile" > "$$tmpfile"; \
+			if ! diff -q "$$sqlfile" "$$tmpfile" > /dev/null; then \
+				echo "Error: $$sqlfile is not properly formatted"; \
+				diff "$$sqlfile" "$$tmpfile"; \
+				exit 1; \
+			fi; \
+		done < "$$tmpdir/files"; \
+		echo "All SQL files are properly formatted"; \
 	else \
-		echo "Usage: make check [lint|tr|doc]"; \
+		echo "Usage: make check [lint|tr|doc|routing|sqlfmt]"; \
 		echo "  lint - Run golangci-lint (checks for unused variables/functions)"; \
 		echo "  tr   - Check translations for completeness"; \
 		echo "  doc  - Check new-doc gate (paths/naming/AGENTS links)"; \
 		echo "  routing - Check routing quality gates (DEV-PLAN-018B)"; \
+		echo "  sqlfmt - Check SQL formatting (pg_format, aligned with CI)"; \
 	fi
 
 # sdk-tools CLI management
@@ -508,12 +529,12 @@ setup: deps css
 	make check lint
 
 # Prevents make from treating the argument as an undefined target
-watch coverage verbose docker score report linux docker-base docker-prod up down redo status restart logs local stop reset seed migrate plan lint rls-role install help imports doc routing:
+watch coverage verbose docker score report linux docker-base docker-prod up down redo status restart logs local stop reset seed migrate plan lint rls-role install help imports doc routing sqlfmt:
 	@:
 
 .PHONY: deps db org test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
         down restart logs local stop reset watch coverage verbose docker score report \
-        dev fmt lint tr doc routing dev-env linux docker-base docker-prod run server sdk-tools install help atlas-install goose-install plan
+        dev fmt lint tr doc routing sqlfmt dev-env linux docker-base docker-prod run server sdk-tools install help atlas-install goose-install plan
 # HRM sqlc generation
 sqlc-generate:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0 generate -f sqlc.yaml
