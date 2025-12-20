@@ -358,16 +358,16 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		await page.waitForURL((url) => url.searchParams.get('node_id') === hrIDValue);
 		expect(new URL(page.url()).searchParams.get('node_id')).toBe(hrIDValue);
 
-		await page.getByRole('button', { name: 'Create position' }).click();
-		await expect(page.getByText('Create position', { exact: true })).toBeVisible();
+			await page.getByRole('button', { name: 'Create position', exact: true }).click();
+			await expect(page.locator('#org-position-details').getByText('Create position', { exact: true })).toBeVisible();
 
 		await page.locator('input[name="code"]').fill('POS-001');
 		await page.locator('input[name="title"]').fill('HR Specialist');
 		const createResp = page.waitForResponse((resp) => {
 			return resp.request().method() === 'POST' && resp.url().includes('/org/positions');
 		});
-		await page.getByRole('button', { name: 'Create' }).click();
-		expect((await createResp).status()).toBe(200);
+			await page.locator('#org-position-details').getByRole('button', { name: 'Create', exact: true }).click();
+			expect((await createResp).status()).toBe(200);
 
 		await expect(page.locator('#org-position-details')).toContainText('POS-001');
 		await expect(page.locator('#org-positions-list')).toContainText('POS-001');
@@ -375,8 +375,8 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		const positionIDValue = new URL(page.url()).searchParams.get('position_id');
 		expect(positionIDValue).toBeTruthy();
 
-		await page.getByRole('button', { name: 'Edit' }).click();
-		await expect(page.getByText('Edit position', { exact: true })).toBeVisible();
+			await page.locator('#org-position-details').getByRole('button', { name: 'Edit', exact: true }).click();
+			await expect(page.getByText('Edit position', { exact: true })).toBeVisible();
 
 		const moveOrgNodeCombobox = page.locator('[data-testid="org-position-orgnode-combobox"]');
 		await setComboboxValue({
@@ -388,8 +388,8 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		const updateResp = page.waitForResponse((resp) => {
 			return resp.request().method() === 'PATCH' && resp.url().includes(`/org/positions/${positionIDValue}`);
 		});
-		await page.getByRole('button', { name: 'Save' }).click();
-		expect((await updateResp).status()).toBe(200);
+			await page.locator('#org-position-details').getByRole('button', { name: 'Save', exact: true }).click();
+			expect((await updateResp).status()).toBe(200);
 
 		await page.waitForURL(new RegExp(`node_id=${itIDValue}`));
 		await expect(page.locator('#org-positions-filters input[name="node_id"]')).toHaveValue(itIDValue!);
