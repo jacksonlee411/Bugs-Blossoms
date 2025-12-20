@@ -29,7 +29,7 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **统计口径冻结（E0）**：容量/占用/可用/填充率以 FTE 为主，支持 scope=`self|subtree`，并明确撤销/停用/未来生效/冻结席位（`capacity_fte=0`）的计算口径。
+- [ ] **统计口径冻结（E0）**：容量/占用/可用/填充率以 FTE 为主，支持 scope=`self|subtree`，并明确撤销/停用/未来生效的计算口径（v1 不支持 `capacity_fte=0` 作为“冻结席位”语义；如需引入需先同步更新 052/053 合同与迁移约束）。
 - [ ] **统计查询/导出闭环（E1）**：提供稳定 JSON API（必要时补 CSV 导出），支持：
   - org scope（仅本组织/包含下级）
   - as-of 视角（默认 `nowUTC`）
@@ -73,6 +73,23 @@
 - 059：readiness/灰度/可观测收口；057 的验证记录必须能被 059 汇总复跑。
 
 ## 3. 架构与关键决策 (Architecture & Decisions)
+### 3.0 架构图（Mermaid）
+```mermaid
+flowchart TD
+  Client[Client / BI / Export] --> API[Org API\n/org/api/reports/*]
+  API --> SVC[Org Reports Service]
+
+  SVC --> DeepRead[Deep-Read Repo\n(DEV-PLAN-029)]
+  SVC --> PosRepo[Positions Repo\n(DEV-PLAN-053)]
+  SVC --> AsgRepo[Assignments Repo\n(DEV-PLAN-053)]
+  SVC --> JobRepo[Job Catalog Repo\n(DEV-PLAN-056)]
+
+  DeepRead --> DB[(PostgreSQL 17)]
+  PosRepo --> DB
+  AsgRepo --> DB
+  JobRepo --> DB
+```
+
 ### 3.1 在线统计必须复用 deep-read 后端（选定）
 - org scope=`subtree` 的“包含下级组织”必须通过 029 的 `OrgDeepReadBackendForTenant` 选择后端（优先 snapshot），禁止递归 CTE。
 - API 响应必须包含 `source.deep_read_backend` 与（若为 snapshot）`source.snapshot_build_id`，便于对账与排障。
@@ -80,8 +97,9 @@
 ### 3.2 统计口径以“as-of 切片”作为 SSOT（选定）
 - 所有统计均以 as-of 时间点 `t` 计算：
   - Position as-of：`effective_date <= t < end_date` 且生命周期状态属于“可统计集合”（以 052 映射为准）。
-  - Assignment as-of：`effective_date <= t < end_date`（并按 v1 的 assignment_type 口径过滤）。
-- 统计输出默认聚焦 Managed Position；System Position 仅在兼容期按配置决定是否纳入（由 052/059 冻结策略决定）。
+  - v1 默认“可统计集合”= `planned,active`；`inactive` 仅在显式请求（`lifecycle_statuses`）时纳入；`rescinded` 不进入报表口径。
+  - Assignment as-of：`effective_date <= t < end_date`（并按 v1 的“计入占编”口径过滤；默认 `assignment_type='primary'`）。
+- 统计输出默认聚焦 Managed Position（`org_positions.is_auto_created=false`）；System Position 仅在兼容期按配置（`include_system`）决定是否纳入（由 052/059 冻结策略决定）。
 
 ### 3.3 vacancy/time-to-fill 先做“可解释的基础版”（选定）
 - vacancy aging：v1 以“当前 as-of 为空缺（occupied_fte=0 且 capacity_fte>0）”为入口，vacancy_since 采用可解释算法（见 §6.4）。
@@ -92,21 +110,31 @@
 
 ### 4.1 统计所需字段（依赖 053/056，作为 SSOT 输入）
 以下字段名以“接口层契约”为准；若 053/056 采用不同命名，应以 053/056 的最终契约为 SSOT 并在此处同步更新：
-- `org_positions`（as-of 切片）：
-  - `tenant_id, id, code, org_node_id, status, is_auto_created, effective_date, end_date`
-  - `capacity_fte`（numeric/decimal；允许 0..N）
-  - `position_type`（用于按类型拆分；如无则返回 `unknown`）
-  - `job_level_id`（来自 056 的 Job Catalog；如无则返回 `unknown`）
-- `org_assignments`（as-of 切片）：
+- `org_positions`（稳定实体；053 SSOT）：
+  - `tenant_id, id(position_id), code, is_auto_created`
+- `org_position_slices`（as-of 切片；053 SSOT）：
+  - `tenant_id, id(slice_id), position_id, org_node_id, lifecycle_status, position_type, capacity_fte, effective_date, end_date`
+  - Job Catalog codes（来自 053/056 的契约输入）：`job_family_group_code/job_family_code/job_role_code/job_level_code`
+- `org_assignments`（as-of 切片；053 SSOT）：
   - `tenant_id, id, position_id, assignment_type, effective_date, end_date`
-  - `fte`（numeric/decimal；默认为 1.0，允许 0.5 等）
+  - `allocated_fte`（numeric/decimal；默认 1.0，允许 0.5 等；占编口径以 053/052 为准）
+
+**Job Level 维度（报告侧派生）**：
+- v1 报表维度 key 使用 `job_level_id`（uuid）以避免 code 复用导致歧义。
+- `job_level_id` 的解析规则（对齐 056 的层级约束）：
+  1. `org_job_family_groups`：`(tenant_id, code=job_family_group_code)`
+  2. `org_job_families`：`(tenant_id, job_family_group_id, code=job_family_code)`
+  3. `org_job_roles`：`(tenant_id, job_family_id, code=job_role_code)`
+  4. `org_job_levels`：`(tenant_id, job_role_id, code=job_level_code)` → `job_level_id`
+- 任一步骤无法解析（或字段缺失）则视为 `unknown`（用于 breakdown 分组与 items 展示）。
 
 ### 4.2 推荐索引（如性能基准不达标再落地）
-- `org_positions`：
-  - `btree (tenant_id, org_node_id, effective_date)`（已存在）
-  - （可选）`gist (tenant_id, org_node_id, tstzrange(effective_date,end_date,'[)'))`（加速 as-of 范围过滤）
+- `org_position_slices`（对齐 053）：
+  - `btree (tenant_id, position_id, effective_date)`
+  - `btree (tenant_id, org_node_id, effective_date)`
+  - （可选）对 scope 查询热点补充 covering index（需先用 034 的 load runner 证明收益）
 - `org_assignments`：
-  - `btree (tenant_id, position_id, effective_date)`（已存在）
+  - `btree (tenant_id, position_id, effective_date)`
   - （可选）`gist (tenant_id, position_id, tstzrange(effective_date,end_date,'[)'))`
 
 ## 5. 接口契约 (API Contracts)
@@ -118,6 +146,7 @@
 - `effective_date`：可选（缺省 `nowUTC`）
 - `scope`：可选，`self|subtree`（默认 `subtree`）
 - `group_by`：可选，`none|job_level|position_type`（默认 `none`）
+- `lifecycle_statuses`：可选（逗号分隔），默认 `planned,active`；允许 `planned|active|inactive`（`rescinded` 不允许进入报表口径）
 - `include_system`：可选，默认 `false`（System Position 是否纳入；以 052/059 冻结策略为准）
 
 **Response 200（v1）**
@@ -129,13 +158,13 @@
   "scope": "subtree",
   "totals": {
     "positions_total": 120,
-    "capacity_fte": "120.0",
-    "occupied_fte": "87.5",
-    "available_fte": "32.5",
+    "capacity_fte": 120.0,
+    "occupied_fte": 87.5,
+    "available_fte": 32.5,
     "fill_rate": 0.7292
   },
   "breakdown": [
-    { "key": "unknown", "positions_total": 10, "capacity_fte": "10.0", "occupied_fte": "5.0", "available_fte": "5.0", "fill_rate": 0.5 }
+    { "key": "unknown", "positions_total": 10, "capacity_fte": 10.0, "occupied_fte": 5.0, "available_fte": 5.0, "fill_rate": 0.5 }
   ],
   "source": { "deep_read_backend": "snapshot", "snapshot_build_id": "uuid" }
 }
@@ -143,7 +172,7 @@
 
 **Errors（稳定错误码）**
 - 400 `ORG_INVALID_QUERY`
-- 404 `ORG_NODE_NOT_FOUND_AT_DATE`
+- 422 `ORG_NODE_NOT_FOUND_AT_DATE`（对齐 052 §6.3）
 - 422 `ORG_REPORT_GROUP_BY_INVALID`
 - 422 `ORG_REPORT_TOO_LARGE`（scope 子树规模超上限）
 - 401/403：同 026
@@ -153,6 +182,7 @@
 - `org_node_id`：可选（缺省租户 root）
 - `effective_date`：可选（缺省 `nowUTC`）
 - `scope`：可选，`self|subtree`（默认 `subtree`）
+- `lifecycle_statuses`：可选（逗号分隔），默认 `planned,active`
 - `limit`：可选（默认 200，最大 2000）
 - `cursor`：可选（基于 `position_id` 或 `position_code` 的游标）
 
@@ -168,8 +198,8 @@
       "position_id": "uuid",
       "position_code": "P-001",
       "org_node_id": "uuid",
-      "capacity_fte": "1.0",
-      "occupied_fte": "0.0",
+      "capacity_fte": 1.0,
+      "occupied_fte": 0.0,
       "vacancy_since": "2025-02-10T00:00:00Z",
       "vacancy_age_days": 20,
       "job_level_id": "uuid|null",
@@ -194,6 +224,7 @@
 - `from`：必填（YYYY-MM-DD，统计窗口起点）
 - `to`：必填（YYYY-MM-DD，统计窗口终点）
 - `group_by`：可选，`none|job_level|position_type`（默认 `none`）
+- `lifecycle_statuses`：可选（逗号分隔），默认 `planned,active`
 
 **Response 200（v1）**
 ```json
@@ -233,27 +264,28 @@
 
 ### 6.2 occupied_fte 计算（as-of）
 对每个 Position slice：
-- `occupied_fte = SUM(assignments.fte)` where assignment as-of 且 `assignment.position_id = position.id`。
+- `occupied_fte = SUM(assignments.allocated_fte)` where assignment as-of 且 `assignment.position_id = position.position_id`，并满足 v1 计入占编口径（默认 `assignment_type='primary'`，对齐 052/053）。
 - `available_fte = GREATEST(capacity_fte - occupied_fte, 0)`。
-- `fill_rate = occupied_fte / capacity_fte`（若 `capacity_fte=0`，返回 `null`）。
+- `fill_rate = occupied_fte / capacity_fte`（v1 `capacity_fte > 0`；若遇到历史脏数据可返回 `null` 并纳入质量报告）。
 
 ### 6.3 汇总与拆分（group_by）
 对 scope 内 positions 聚合：
 - totals：sum capacity/occupied/available、count positions。
 - group_by：
-  - `job_level`：按 `job_level_id` 分组（null → `unknown`）。
+  - `job_level`：按派生的 `job_level_id` 分组（解析失败 → `unknown`）。
   - `position_type`：按 `position_type` 分组（空串/NULL → `unknown`）。
 
 ### 6.4 vacancy_since（基础口径，v1）
 对“当前 vacant”（`capacity_fte>0` 且 `occupied_fte=0`）的 Position：
-- `vacancy_since = COALESCE(last_assignment_end, position.effective_date)`
-- `last_assignment_end` 定义为：同一 `position_code` 在 `t` 之前（`end_date <= t`）的最后一次任职结束时间（取 `MAX(end_date)`）。
-  - 说明：v1 使用 `position_code` 作为跨时间片的稳定标识（对齐 021 的 code 唯一-in-time 约束）；如 053/052 最终选定其他稳定键，应同步调整。
+- `vacancy_since = COALESCE(last_primary_assignment_end, position_inception_date)`
+- `last_primary_assignment_end` 定义为：同一 `position_id` 在 `t` 之前（`end_date <= t`）的最后一次“计入占编”的任职结束时间（取 `MAX(end_date)`；默认 `assignment_type='primary'`）。
+- `position_inception_date` 定义为：该 `position_id` 的首个切片生效日（`MIN(org_position_slices.effective_date)`）。
+  - 说明：使用 `position_id`（稳定实体）避免 Update 插入新切片导致 vacancy_since 被错误重置为当前切片 effective_date。
 
 ### 6.5 time-to-fill（基础版，v1）
 统计窗口 `[from,to)` 内的“填补事件”：
 - 仅统计 `capacity_fte=1` 的 Position。
-- “填补事件”定义：某次 Assignment 的 `effective_date` 落在窗口内，且该 Position 在此之前存在 vacancy（`last_assignment_end` 存在且 `< effective_date`，或 Position 创建后首次任职）。
+- “填补事件”定义：某次“计入占编”的 Assignment 的 `effective_date` 落在窗口内，且该 Position 在此之前存在 vacancy（`last_primary_assignment_end` 存在且 `< effective_date`，或 Position 创建后首次任职）。
 - `time_to_fill_days = effective_date - vacancy_since`（按天取整/向上取整需冻结，v1 选定：按 UTC date 差值）。
 
 ## 7. 安全与鉴权 (Security & Authz)
@@ -261,14 +293,15 @@
 
 | Endpoint | Object | Action |
 | --- | --- | --- |
-| `GET /org/api/reports/staffing:summary` | `org.reports.staffing` | `read` |
-| `GET /org/api/reports/staffing:vacancies` | `org.reports.staffing` | `read` |
-| `GET /org/api/reports/staffing:time-to-fill` | `org.reports.staffing` | `read` |
+| `GET /org/api/reports/staffing:summary` | `org.position_reports` | `read` |
+| `GET /org/api/reports/staffing:vacancies` | `org.position_reports` | `read` |
+| `GET /org/api/reports/staffing:time-to-fill` | `org.position_reports` | `read` |
+| `GET /org/api/reports/staffing:export` | `org.position_reports` | `read` |
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 - **依赖**：
   - 052：口径冻结与 System/Managed 策略。
-  - 053：FTE/容量/assignment fte 字段与稳定错误码。
+  - 053：FTE/容量/assignment `allocated_fte` 字段与稳定错误码。
   - 029：deep-read 后端可用（至少 edges；推荐 snapshot）。
   - 034：metrics/health 基线可复用（用于观测与压测）。
 - **里程碑（对齐 051 阶段 E）**：
