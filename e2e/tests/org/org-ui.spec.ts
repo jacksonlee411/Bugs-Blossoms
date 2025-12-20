@@ -369,11 +369,24 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 			await page.locator('#org-position-details').getByRole('button', { name: 'Create', exact: true }).click();
 			expect((await createResp).status()).toBe(200);
 
-		await expect(page.locator('#org-position-details')).toContainText('POS-001');
-		await expect(page.locator('#org-positions-list')).toContainText('POS-001');
-		await page.waitForURL(/position_id=/);
-		const positionIDValue = new URL(page.url()).searchParams.get('position_id');
-		expect(positionIDValue).toBeTruthy();
+			await expect(page.locator('#org-position-details')).toContainText('POS-001');
+			await expect(page.locator('#org-positions-list')).toContainText('POS-001');
+			await page.waitForURL(/position_id=/);
+			const positionIDValue = new URL(page.url()).searchParams.get('position_id');
+			expect(positionIDValue).toBeTruthy();
+
+			const positionsBaseEffectiveDateStr = await page.locator('#effective-date').inputValue();
+			expect(positionsBaseEffectiveDateStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			const positionsFuture = addUTCDays(parseUTCDateString(positionsBaseEffectiveDateStr), 1);
+			const positionsFutureStr = formatUTCDate(positionsFuture);
+			await page.goto(
+				`/org/positions?effective_date=${positionsFutureStr}&node_id=${hrIDValue}&position_id=${positionIDValue}`,
+				{
+					waitUntil: 'domcontentloaded',
+				}
+			);
+			await page.waitForFunction(() => typeof (window as any).htmx !== 'undefined', { timeout: 10_000 });
+			await expect(page.locator('#org-position-details')).toContainText('POS-001');
 
 			await page.locator('#org-position-details').getByRole('button', { name: 'Edit', exact: true }).click();
 			await expect(page.getByText('Edit position', { exact: true })).toBeVisible();
