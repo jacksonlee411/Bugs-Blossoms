@@ -31,7 +31,7 @@
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
 - [ ] **readiness 可复现**：关键门禁命令、结果与时间戳有记录，reviewer 可复跑（对齐 CI 门禁口径）。
-- [ ] **灰度与回滚可执行**：关键写入口与强校验具备灰度/禁写/只读等最小回退路径，并明确不可逆点（优先“开关回滚”，避免依赖 destructive down）。
+- [ ] **灰度与回滚可执行**：关键写入口与强校验具备灰度/开关回滚/校验降级等最小回退路径，并明确不可逆点（优先“开关回滚”，避免依赖 destructive down）。
 - [ ] **兼容性回归**：System/Managed 策略不破坏存量链路；口径映射在 UI/API/统计中一致（对齐 052 冻结）。
 - [ ] **可观测可排障**：Correct/Rescind/冻结窗口拒绝/超编阻断/冲突拒绝等关键路径可通过结构化日志 + 审计 + outbox 追溯定位。
 - [ ] **最小冒烟闭环可演示**：在单租户环境完成“创建/变更/更正/撤销/查询/统计/空缺”最小链路，并把请求/结果写入 readiness 记录。
@@ -64,7 +64,7 @@
 ### 3.1 收口分层：模块开关 / 能力开关 / 校验模式（选定）
 - **模块级灰度（已存在，复用 027）**：按租户 allowlist 启用 Org（含 Position）：
   - `ORG_ROLLOUT_MODE` + `ORG_ROLLOUT_TENANTS`（一键下线与逐租户灰度）。
-- **能力级灰度（建议）**：Position/Assignment/Reports 的高风险能力（Correct/历史改动/限制强校验/扩展任职类型/转任职）必须可单独开关。
+- **能力级灰度（建议）**：Position/Assignment/Reports 的高风险能力（Correct/历史改动/限制强校验/扩展任职类型/计划任职与调岗：复用 `assignment.update` Insert slice）必须可单独开关。
 - **校验模式三态（选定）**：所有强校验统一采用 `disabled/shadow/enforce`：
   - `disabled`：不校验（仅用于紧急止血/回滚）
   - `shadow`：不阻断，但必须写审计/日志（用于观察与评估误伤）
@@ -75,6 +75,7 @@
 - 记录要求：
   - 必须包含：环境要素（Go/PG 版本、DB、tenant）、开关配置、关键门禁命令与结果、最小冒烟步骤与响应摘要。
   - 禁止“只写结论不写命令”；reviewer 必须能按记录复跑得到一致结论。
+- 文档可发现性：readiness 记录必须在 `AGENTS.md` 的 Doc Map 中有入口链接（避免“文件存在但不可发现”）。
 
 ### 3.3 可观测链路：request_id → audit → outbox（选定）
 ```mermaid
@@ -90,22 +91,69 @@ flowchart LR
 - `request_id` 必须贯穿：API 响应、日志、审计（`org_audit_logs.request_id`）、事件（outbox payload/headers）。
 - 任何“拒绝/阻断”必须可定位到：错误码 + 关键字段（tenant、entity、effective_date、change_type、mode）。
 
-## 4. Readiness 记录与最小冒烟（Contract）
-### 4.1 Readiness 记录模板（v1）
+**最小追溯 SQL（示例）**
+```sql
+-- 审计：按 request_id 串起“写入/拒绝”的上下文
+SELECT
+  transaction_time, change_type, entity_type, entity_id, effective_date, end_date, meta
+FROM org_audit_logs
+WHERE tenant_id = $1 AND request_id = $2
+ORDER BY transaction_time ASC;
+
+-- Outbox：按 request_id 找到对应事件（payload 形状以 026/022 为 SSOT）
+SELECT
+  created_at, topic, event_id, published_at, attempts, last_error
+FROM org_outbox
+WHERE tenant_id = $1 AND payload->>'request_id' = $2
+ORDER BY created_at ASC;
+```
+
+## 4. 配置模型与约束 (Data Model & Constraints)
+> 本节冻结“上线/灰度/回滚”依赖的最小配置合同，避免在收口阶段临时发明开关导致 drift。
+
+### 4.1 开关与模式清单（v1，SSOT 对齐）
+| 层级 | 开关/字段 | 位置 | 允许值 | 默认 | 说明（SSOT） |
+| --- | --- | --- | --- | --- | --- |
+| 模块级灰度 | `ORG_ROLLOUT_MODE` | env | `disabled|enabled` | `disabled` | 一键下线与 allowlist 灰度（027） |
+| 模块级灰度 | `ORG_ROLLOUT_TENANTS` | env | `<uuid,uuid,...>` | 空 | `enabled` 时生效；空表示不启用任何租户（027） |
+| 能力开关 | `ENABLE_ORG_AUTO_POSITIONS` | env | `true|false` | `true` | auto position 链路兼容（053/058） |
+| 能力开关 | `ENABLE_ORG_EXTENDED_ASSIGNMENT_TYPES` | env | `true|false` | `false` | 任职类型写入（`matrix/dotted`）灰度（058） |
+| 校验模式 | `org_settings.freeze_mode` | DB（tenant） | `disabled|shadow|enforce` | `enforce` | 冻结窗口模式（025） |
+| 校验模式 | `org_settings.freeze_grace_days` | DB（tenant） | `0..31` | `3` | 冻结宽限（025） |
+| 校验模式 | `org_settings.position_catalog_validation_mode` | DB（tenant） | `disabled|shadow|enforce` | `shadow` | Job Catalog/Profile 校验灰度（056） |
+| 校验模式 | `org_settings.position_restrictions_validation_mode` | DB（tenant） | `disabled|shadow|enforce` | `shadow` | Position Restrictions 校验灰度（056） |
+| 校验模式 | `org_settings.reason_code_mode` | DB（tenant） | `disabled|shadow|enforce` | `shadow` | reason_code 兼容期→加严收口（052；落地由 059 收口冻结） |
+
+### 4.2 优先级与回退原则（选定）
+- **优先级**：
+  1) 模块级灰度（`ORG_ROLLOUT_MODE/ORG_ROLLOUT_TENANTS`）优先于一切能力/校验开关：未启用租户直接返回 404 `ORG_ROLLOUT_DISABLED`（现状实现）。
+  2) 能力开关（env）用于全局 kill-switch；校验模式（tenant `org_settings`）用于逐租户灰度与回退。
+- **System/Managed 兼容**（对齐 052）：
+  - System/auto-created 链路优先保证“不中断”；强校验默认只对 Managed 生效，System 至多进入 `shadow` 并写审计/日志。
+- **`disabled/shadow/enforce` 语义统一**：
+  - `disabled`：跳过该校验（仅紧急止血）
+  - `shadow`：允许写入，但必须在审计 `meta` 与结构化日志中标记命中（用于评估误伤）
+  - `enforce`：阻断写入并返回稳定错误码（错误码口径以 052/053/056/058 为 SSOT）
+- **reason_code 收口（对齐 052）**：
+  - `shadow`：若缺失 `reason_code`，后端可填充 `legacy` 以保持审计链路不断，并在审计/日志标记“缺失被填充”。
+  - `enforce`：缺失 `reason_code` 返回 400 `ORG_INVALID_BODY`（不再隐式填充）。
+
+## 5. Readiness 记录与最小冒烟（Contract）
+### 5.1 Readiness 记录模板（v1）
 `docs/dev-records/DEV-PLAN-051-READINESS.md` 至少包含：
 1. 本次交付范围（涉及哪些子计划：053/054/055/056/057/058）
 2. 开关与配置（env + 租户级 settings；含 `disabled/shadow/enforce` 的模式）
 3. 本地门禁命令（按 `AGENTS.md` 触发器矩阵；记录命令/结果/时间戳）
-4. 最小冒烟闭环（见 §4.2）：请求/响应摘要 + 关联 request_id
-5. 回滚演练：至少一次“开关回滚”或“禁写回退”演练记录
+4. 最小冒烟闭环（见 §5.2）：请求/响应摘要 + 关联 request_id
+5. 回滚演练：至少一次“开关回滚”或“能力/校验降级回退”演练记录
 
-### 4.2 最小冒烟闭环（v1，执行时填写）
+### 5.2 最小冒烟闭环（v1，执行时填写）
 > 目标：覆盖 050 的关键治理链路，并对齐 051 的“可演示/可回滚/可观测”门槛；具体 API 以 053/057/058 的最终合同为准。
 
 - Position：
   - 创建（Managed）→ Update（新版本）→ Correct（原位更正）→ Rescind（撤销/截断）
 - Assignment：
-  - 占用/释放（FTE）→ 计划任职（未来生效，若 058 落地）→ 转任职（若落地）
+  - 占用/释放（`allocated_fte`）→ 调岗/计划任职（复用 `PATCH /org/api/assignments/{id}` 的 Insert slice；对齐 058）→（可选）非 primary 写入（`matrix/dotted`，受 `ENABLE_ORG_EXTENDED_ASSIGNMENT_TYPES` 控制）
 - 查询：
   - as-of 查询（Position/Assignment）→ 时间线查询（Position/Assignment）
 - 报表（若 057 落地）：
@@ -113,28 +161,28 @@ flowchart LR
 - 可观测：
   - 对任一 Correct/Rescind/拒绝路径：能从 response/request_id 找到对应审计与 outbox 事件（或 shadow 记录）。
 
-## 5. 回滚与灰度（Rollout & Rollback）
-### 5.1 回滚优先级（选定）
+## 6. 回滚与灰度（Rollout & Rollback）
+### 6.1 回滚优先级（选定）
 1. **开关回滚（优先）**：从 `ORG_ROLLOUT_TENANTS` 移除租户或切 `ORG_ROLLOUT_MODE=disabled`。
-2. **校验降级**：把高风险校验从 `enforce` 切回 `shadow`/`disabled`（保留审计告警）。
-3. **禁写/只读**：对 Position/Assignment 写入口启用只读（如实现）；保留查询与审计。
+2. **能力开关回滚**：关闭高风险能力（例如 `ENABLE_ORG_EXTENDED_ASSIGNMENT_TYPES=false`），优先让写入口恢复到 v1 安全口径（对齐 058/052）。
+3. **校验降级**：把高风险校验从 `enforce` 切回 `shadow`/`disabled`（保留审计/日志；对齐 §4.2）。
 4. **数据回滚（最后手段）**：仅在有 manifest/明确范围时执行（对齐 023/031 的“默认 dry-run + 可回滚”口径）。
 
-### 5.2 不可逆点清单（必须明确）
+### 6.2 不可逆点清单（必须明确）
 - schema 破坏性变更（drop/rename/类型缩窄）在生产环境不可依赖 down 回滚；必须以兼容期/双写/开关回滚替代。
 - audit/outbox 属于可追溯链路：历史审计不删除；回滚只能通过新事件/新更正补偿。
 
-## 6. 可观测性（Observability）
+## 7. 可观测性（Observability）
 - **结构化日志（最低字段）**：
   - `request_id`, `tenant_id`, `initiator_id`, `change_type`, `entity_type`, `entity_id`, `effective_date`, `mode`, `error_code`
-- **关键指标（建议纳入 034 Prometheus）**：
-  - `org_position_write_total{op,result}`、`org_assignment_write_total{op,result}`
-  - `org_position_validation_shadow_total{kind}`（shadow 模式命中计数）
-  - `outbox_pending{table=\"public.org_outbox\"}`（复用 017/034）
+- **关键指标（建议纳入 034 Prometheus；先复用现有指标，避免新增高基数 label）**：
+  - API：`org_api_requests_total{endpoint,result}`、`org_api_latency_seconds{endpoint,result}`（现状已有）
+  - 写冲突：`org_write_conflicts_total{kind}`（现状已有）
+  - Outbox：`outbox_pending{table=\"public.org_outbox\"}`、`outbox_dispatch_total{table,topic,result}`、`outbox_dead_total{table,topic}`（017/034）
 - **审计追溯**：
   - 必须能按 `request_id` 查询 `org_audit_logs`，并从 `meta` 看见 `freeze_mode/freeze_violation`、限制冲突等关键上下文（对齐 025/056/057/058）。
 
-## 7. 依赖与里程碑 (Dependencies & Milestones)
+## 8. 依赖与里程碑 (Dependencies & Milestones)
 - **依赖**：`DEV-PLAN-053/054/055/056/057/058` 的核心交付完成（或明确 scope 缩减）；并对齐 025/026 的冻结窗口、审计与 outbox。
 - **里程碑**：
   1. [ ] readiness 记录落盘：创建 `docs/dev-records/DEV-PLAN-051-READINESS.md` 并补齐模板项
@@ -142,12 +190,13 @@ flowchart LR
   3. [ ] 可观测收口：日志字段/指标/审计链路可追溯
   4. [ ] 最小冒烟跑通并记录（含 request_id 追溯）
 
-## 8. 测试与验收标准 (Acceptance Criteria)
+## 9. 测试与验收标准 (Acceptance Criteria)
 - readiness 记录可复现：关键门禁与冒烟步骤可按记录复跑。
 - 强校验具备回退路径：从 `enforce → shadow/disabled` 可在不回滚代码/不改库的情况下止血。
 - 关键拒绝可定位：任一拒绝/冻结窗口阻断/冲突拒绝能在日志+审计中定位原因与影响范围。
 
-## 9. 交付物
+## 10. 交付物
 - `docs/dev-records/DEV-PLAN-051-READINESS.md`（收口记录，含门禁/冒烟/回滚演练）。
+- `AGENTS.md` Doc Map：确保 readiness 记录入口链接可发现（文档可发现性）。
 - 回滚/灰度/兼容策略清单（含不可逆点说明与回退优先级）。
 - 可观测性清单与落地要求（日志字段/指标/outbox 排障入口）。

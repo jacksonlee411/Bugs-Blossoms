@@ -60,9 +60,11 @@
 - Profile 必须绑定一个 Job Role；可选配置允许的 Job Level 集合：
   - 若允许集合为空：表示“允许该 Role 下所有 Level”（默认）。
   - 若允许集合非空：表示“只允许集合中的 Level”。
-- Position 写入时：
-  - Job Catalog 四级必填（对 Managed Position）。
-  - 如选择 Job Profile：必须满足 `profile.role_id == position.job_role_id`，且 `position.job_level_id` 在允许集合内（若配置了集合），否则冲突拒绝。
+- Position 写入时（对齐 052/053 的字段命名）：
+  - Managed Position 的 `job_family_group_code/job_family_code/job_role_code/job_level_code` 必填（053 v1 先做“非空字符串”校验；本计划补齐“主数据存在/启用/层级自洽”校验）。
+  - 若 `job_profile_id` 非空：
+    - 先用上述四级 code 解析出 `resolved_job_role_id/resolved_job_level_id`（通过 Job Catalog 表 lookup）。
+    - 要求 `org_job_profiles.job_role_id == resolved_job_role_id`；且（若配置 allowed-levels）`resolved_job_level_id` 在 allowlist 中；不满足返回 `ORG_JOB_PROFILE_CONFLICT`（422，对齐 052 §6.3）。
 
 ### 3.4 Restrictions 语义与灰度策略（对齐 050 §7.7）
 - Restrictions 是“对某个 Position 时间片的 staffing/占用/变更 的限制条件”，v1 聚焦于可落地且能被写入口强校验的维度：
@@ -76,11 +78,11 @@ flowchart TD
   UI[Admin UI / HTMX] --> API[Org API]
   API --> SVC[Org Services]
   SVC --> MD[(Job Catalog/Profile Tables)]
-  SVC --> POS[(org_positions)]
+  SVC --> POS[(org_position_slices)]
   SVC --> ASN[(org_assignments)]
   SVC --> AUD[Audit/Outbox]
-  POS -->|FK/校验| MD
-  ASN -->|校验引用 Position| POS
+  POS -->|lookup/校验: code→主数据| MD
+  ASN -->|校验: restrictions| POS
 ```
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
@@ -194,18 +196,18 @@ flowchart TD
 - `fk (tenant_id, job_level_id) -> org_job_levels (tenant_id, id) on delete restrict`
 - 额外一致性（level 必须属于 profile 的 role）由应用层强校验保证（写入口可复现错误码）。
 
-### 4.3 Position 扩展字段（对齐 050 §4.1/§7.1/§7.7）
-> 位置：`org_positions`（时间片）。为兼容 System Position，字段允许为 `null`；对 Managed Position 由服务层强制必填。
+### 4.3 Position（对齐 052/053：以 `org_position_slices` 为 SSOT）
+> 本计划不引入 `job_*_id` 外键列；Position 侧保持 052/053 已冻结的 `job_*_code` + `job_profile_id`，主数据校验由服务层根据 `org_settings.position_catalog_validation_mode` 执行（支持 shadow/enforce）。
 
-- `job_family_group_id uuid null`（FK → `org_job_family_groups`）
-- `job_family_id uuid null`（FK → `org_job_families`）
-- `job_role_id uuid null`（FK → `org_job_roles`）
-- `job_level_id uuid null`（FK → `org_job_levels`）
-- `job_profile_id uuid null`（FK → `org_job_profiles`）
-- `restrictions jsonb not null default '{}'::jsonb`（Position Restrictions）
-  - `check (jsonb_typeof(restrictions) = 'object')`
+**字段（已在 052/053 冻结，由 053 迁移落地）**：
+- `job_family_group_code varchar(64) null`
+- `job_family_code varchar(64) null`
+- `job_role_code varchar(64) null`
+- `job_level_code varchar(64) null`
+- `job_profile_id uuid null`
+- `profile jsonb not null default '{}'::jsonb`（扩展字段；本计划在其中定义 `position_restrictions` 结构）
 
-**restrictions v1 建议结构（可扩展）**：
+**`profile.position_restrictions`（JSON object，缺省 `{}`；可扩展）**：
 ```json
 {
   "allowed_employment_types": ["full_time", "part_time", "contract", "intern"],
@@ -216,7 +218,7 @@ flowchart TD
 }
 ```
 
-> 说明：`allowed_employment_types` 等跨域字段需要 HRM/subject attributes 的 SSOT 支撑；v1 仅持久化，不作为 Position/Assignment 写入口的强制校验前置。
+> 说明：`allowed_employment_types` 等跨域字段需要 HRM/subject attributes 的 SSOT 支撑；v1 仅持久化，不作为 Assignment 写入口的强制校验前置。
 
 ### 4.4 租户级灰度开关（建议落在 `org_settings`）
 > 复用 025 已落地的 `org_settings`（per-tenant）作为“策略/灰度开关”的承载处；避免把策略嵌入业务数据导致难以运维。
@@ -231,9 +233,9 @@ flowchart TD
 ### 4.5 迁移策略（Up/Down，最小可回退）
 - **Up**：
   1. 新增 Job Catalog/Profile 表与索引/约束。
-  2. 扩展 `org_positions`：增加分类/Profile/`restrictions` 字段（先允许 `null`，避免阻断 System Position）。
-  3. 扩展 `org_settings`：增加上述灰度开关列（默认 `shadow`）。
-  4. 应用层上线后，再逐步将 Managed Position 的强校验从 `shadow` 切到 `enforce`。
+  2. 扩展 `org_settings`：增加上述灰度开关列（默认 `shadow`）。
+  3. （不新增 Position 列）Position 字段以 052/053 已冻结的 `job_*_code/job_profile_id/profile` 为准；Restrictions 落在 `org_position_slices.profile.position_restrictions`。
+  4. 应用层上线后，再逐步将租户的校验模式从 `shadow` 切到 `enforce`。
 - **Down（本地/非生产）**：
   - 移除新增列/表（需评估数据丢失风险）；生产环境通常不建议破坏性 down，以 059 的回滚策略为准。
 
@@ -242,38 +244,86 @@ flowchart TD
 
 ### 5.1 JSON API（主数据维护）
 #### 5.1.1 Job Catalog
-- `GET /org/api/job-catalog/family-groups`
-- `POST /org/api/job-catalog/family-groups`
-- `GET /org/api/job-catalog/families?group_id=...`
-- `POST /org/api/job-catalog/families`
-- `GET /org/api/job-catalog/roles?family_id=...`
-- `POST /org/api/job-catalog/roles`
-- `GET /org/api/job-catalog/levels?role_id=...`
-- `POST /org/api/job-catalog/levels`
+> 说明：本节以“最小可用维护入口”为准；如需批量导入/层级移动等高级能力，建议另立 dev-plan，避免扩大本计划范围。
+
+**Family Groups**
+- `GET /org/api/job-catalog/family-groups`（List）
+- `POST /org/api/job-catalog/family-groups`（Create）
+  - Request（最小集）：
+    ```json
+    { "code": "FIN", "name": "Finance", "is_active": true }
+    ```
+  - Response（201）：
+    ```json
+    { "id": "uuid", "code": "FIN", "name": "Finance", "is_active": true }
+    ```
+- `PATCH /org/api/job-catalog/family-groups/{id}`（Update：`name/is_active`）
+
+**Families**
+- `GET /org/api/job-catalog/families?job_family_group_id=...`（List）
+- `POST /org/api/job-catalog/families`（Create）
+  - Request：
+    ```json
+    { "job_family_group_id": "uuid", "code": "FIN-ACCOUNTING", "name": "Accounting", "is_active": true }
+    ```
+  - Response（201）：`{ "id": "uuid", ... }`
+- `PATCH /org/api/job-catalog/families/{id}`（Update：`name/is_active`）
+
+**Roles**
+- `GET /org/api/job-catalog/roles?job_family_id=...`（List）
+- `POST /org/api/job-catalog/roles`（Create）
+  - Request：`{ "job_family_id": "uuid", "code": "FIN-MGR", "name": "Manager", "is_active": true }`
+  - Response（201）：`{ "id": "uuid", ... }`
+- `PATCH /org/api/job-catalog/roles/{id}`（Update：`name/is_active`）
+
+**Levels**
+- `GET /org/api/job-catalog/levels?job_role_id=...`（List）
+- `POST /org/api/job-catalog/levels`（Create）
+  - Request：`{ "job_role_id": "uuid", "code": "L5", "name": "Level 5", "display_order": 0, "is_active": true }`
+  - Response（201）：`{ "id": "uuid", ... }`
+- `PATCH /org/api/job-catalog/levels/{id}`（Update：`name/is_active/display_order`）
 
 **错误码（最小集）**：
-- `409 CONFLICT`：`JOB_CATALOG_CODE_CONFLICT`
-- `404 NOT FOUND`：`JOB_CATALOG_PARENT_NOT_FOUND`
-- `422 UNPROCESSABLE ENTITY`：`JOB_CATALOG_INVALID_HIERARCHY`
+- `409 CONFLICT`：`ORG_JOB_CATALOG_CODE_CONFLICT`
+- `422 UNPROCESSABLE ENTITY`：`ORG_JOB_CATALOG_PARENT_NOT_FOUND`
 
 #### 5.1.2 Job Profile
-- `GET /org/api/job-profiles?role_id=...`
-- `POST /org/api/job-profiles`
-- `PATCH /org/api/job-profiles/{id}`（启停/字段更新）
+**Profiles**
+- `GET /org/api/job-profiles?job_role_id=...`（List；可选按 Role 过滤）
+- `POST /org/api/job-profiles`（Create）
+  - Request（最小集）：
+    ```json
+    { "code": "FIN-MGR-PROFILE", "name": "Finance Manager", "description": "optional", "job_role_id": "uuid", "is_active": true }
+    ```
+  - Response（201）：`{ "id": "uuid", ... }`
+- `PATCH /org/api/job-profiles/{id}`（Update：`name/description/is_active`）
 - `POST /org/api/job-profiles/{id}:set-allowed-levels`（全量设置允许集合）
+  - Request：
+    ```json
+    { "job_level_ids": ["uuid", "uuid"] }
+    ```
+  - 语义：空数组表示“清空显式 allowlist（= 允许该 Role 下所有 Level）”。
 
 **错误码（最小集）**：
-- `409 CONFLICT`：`JOB_PROFILE_CODE_CONFLICT`
-- `422 UNPROCESSABLE ENTITY`：`JOB_PROFILE_LEVEL_NOT_UNDER_ROLE`
+- `409 CONFLICT`：`ORG_JOB_PROFILE_CODE_CONFLICT`
+- `422 UNPROCESSABLE ENTITY`：`ORG_JOB_PROFILE_LEVEL_NOT_UNDER_ROLE`
 
-### 5.2 Position/Assignment API 合同扩展点（对齐 053）
-> 053 的 Position 写入口需要扩展以承载分类/Profile/Restrictions 字段；Assignment 写入口需要接入 restrictions 校验与稳定错误码。
+### 5.2 Position/Assignment API 合同扩展点（对齐 052/053）
+> 053 已冻结 Position/Assignment 的写入口与字段命名；本计划不改 053 的主干端点，只补齐“主数据校验语义 + restrictions payload”。
 
-- Position Create/Update/Correct 请求体新增（Managed 强制，System 可空）：
-  - `job_family_group_id/job_family_id/job_role_id/job_level_id`
+- Position Create/Update/Correct（053 已包含；Managed 强制，System 可空）：
+  - `job_family_group_code/job_family_code/job_role_code/job_level_code`
   - `job_profile_id`（可选）
-  - `restrictions`（可选，默认为 `{}`）
-- Assignment 占用/释放：若命中 restrictions，则返回稳定错误码并可观测拒绝原因（见 §6）。
+  - `profile.position_restrictions`（可选；缺省 `{}`）
+- 建议新增独立端点（便于对齐 054 的 `org.position_restrictions` object，并减少“编辑 restrictions 需要 positions write”的耦合）：
+  - `GET /org/api/positions/{id}/restrictions?effective_date=...`
+  - `POST /org/api/positions/{id}:set-restrictions`
+    - Request：
+      ```json
+      { "effective_date": "2025-01-01", "position_restrictions": {}, "reason_code": "restrictions_update" }
+      ```
+    - 语义：按 053 的 Update 语义插入新切片，仅变更 `profile.position_restrictions`。
+- Assignment 占用/释放：若命中 restrictions，则返回稳定错误码并可观测拒绝原因（见 §6.3）。
 
 ### 5.3 HTMX UI（维护入口，最小可用）
 - 入口建议挂在 Org UI 的“设置/主数据”区：
@@ -283,41 +333,53 @@ flowchart TD
 
 ## 6. 核心逻辑与校验 (Business Logic & Validation)
 ### 6.1 Job Catalog 层级自洽校验（写入口）
-- 创建/更新 Family 时：必须存在且可访问的 Family Group；否则 `JOB_CATALOG_PARENT_NOT_FOUND`。
-- 创建/更新 Role 时：必须存在且可访问的 Family；否则 `JOB_CATALOG_PARENT_NOT_FOUND`。
-- 创建/更新 Level 时：必须存在且可访问的 Role；否则 `JOB_CATALOG_PARENT_NOT_FOUND`。
+- 创建/更新 Family 时：必须存在且可访问的 Family Group；否则 `ORG_JOB_CATALOG_PARENT_NOT_FOUND`。
+- 创建/更新 Role 时：必须存在且可访问的 Family；否则 `ORG_JOB_CATALOG_PARENT_NOT_FOUND`。
+- 创建/更新 Level 时：必须存在且可访问的 Role；否则 `ORG_JOB_CATALOG_PARENT_NOT_FOUND`。
 
 ### 6.2 Position 分类/Profile 冲突拒绝（对齐 050 §3.1/§7.1）
 在 Position Create/Update/Correct 时执行：
-1. 若为 Managed Position：Job Catalog 四级必须非空且全部为 `is_active=true`；否则 `JOB_CATALOG_INACTIVE_OR_MISSING`（422）。
-2. 层级关系必须自洽（Family 属于 Group、Role 属于 Family、Level 属于 Role）；否则 `JOB_CATALOG_INVALID_HIERARCHY`（422）。
+0. 读取租户级 `org_settings.position_catalog_validation_mode`：
+   - `disabled`：跳过本节“主数据存在/启用/层级/冲突”校验（仅保留 053 v1 的必填/类型校验）。
+   - `shadow/enforce`：执行以下校验；`shadow` 仅审计/结构化日志不阻断；`enforce` 阻断并返回错误码。
+1.（Managed Position）四级 code 必须可解析到 Job Catalog 且全部为 active；否则 `ORG_JOB_CATALOG_INACTIVE_OR_MISSING`（422）。
+2. 层级关系必须自洽（Family 属于 Group、Role 属于 Family、Level 属于 Role）；否则 `ORG_JOB_CATALOG_INVALID_HIERARCHY`（422）。
 3. 若 `job_profile_id` 非空：
-   - Profile 必须为 active；否则 `JOB_PROFILE_INACTIVE`（422）。
-   - `profile.job_role_id == position.job_role_id`；否则 `JOB_PROFILE_ROLE_CONFLICT`（409）。
-   - 若 Profile 配置了 allowed-levels：`position.job_level_id` 必须在集合内；否则 `JOB_PROFILE_LEVEL_CONFLICT`（409）。
+   - Profile 必须存在且 active；否则 `ORG_JOB_PROFILE_NOT_FOUND` / `ORG_JOB_PROFILE_INACTIVE`（422）。
+   - Profile→Catalog 映射必须满足 052 的冻结口径（role 一致 + allowed-levels 覆盖 level）；不满足返回 `ORG_JOB_PROFILE_CONFLICT`（422，对齐 052 §6.3）。
 
 ### 6.3 Restrictions 校验（对齐 050 §7.7）
 #### 6.3.1 Position 写入校验（设置/变更 restrictions 时）
-- `restrictions` 必须为 JSON object；若字段形状非法（非 array/uuid 列表等），返回 `RESTRICTIONS_PAYLOAD_INVALID`（422）。
+- `profile.position_restrictions` 必须为 JSON object；若字段形状非法（非 array/uuid 列表等），返回 `ORG_POSITION_RESTRICTIONS_PAYLOAD_INVALID`（422）。
 - 若配置 `allowed_job_profile_ids`：
-  - Position 必须设置 `job_profile_id` 且在 allowlist 中；否则 `POSITION_RESTRICTED_PROFILE_MISMATCH`（409）。
+  - Position 必须设置 `job_profile_id` 且在 allowlist 中；否则 `ORG_POSITION_RESTRICTIONS_PROFILE_MISMATCH`（422）。
 - 若配置 `allowed_job_role_ids` / `allowed_job_level_ids`：
-  - Position 的 `job_role_id/job_level_id` 必须在 allowlist 中；否则 `POSITION_RESTRICTED_CATALOG_MISMATCH`（409）。
+  - Position 的（解析后的）`job_role_id/job_level_id` 必须在 allowlist 中；否则 `ORG_POSITION_RESTRICTIONS_CATALOG_MISMATCH`（422）。
 
 #### 6.3.2 Assignment 写入校验（占用/释放）
 - 读取租户级 `org_settings.position_restrictions_validation_mode`：
   - `disabled`：不校验。
-  - `shadow/enforce`：按 Position 当前时间片的 restrictions 进行校验：
+  - `shadow/enforce`：按 Position 当前时间片的 `profile.position_restrictions` 进行校验：
   - `shadow`：允许写入，但必须写审计（meta 标记）并输出结构化日志；
   - `enforce`：拒绝并返回与 §6.3.1 对齐的稳定错误码。
 
 > 说明：v1 暂不引入“雇佣类型/地点/成本中心”等跨域限制的强校验；这些维度保留在 restrictions 结构中作为扩展点，后续以独立计划补齐落地与门禁。
 
 ## 7. 安全与鉴权 (Security & Authz)
-- Authz SSOT：以 `docs/dev-plans/054-position-authz-policy-and-gates.md` 的 object/action 为准；本计划若新增资源（如 `org.job_catalog.*`、`org.job_profiles.*`、`org.position_restrictions.*`），需同步更新 054 的矩阵并按 `docs/runbooks/AUTHZ-BOT.md` 流程生成聚合产物。
+- Authz SSOT：以 `docs/dev-plans/054-position-authz-policy-and-gates.md` 的 object/action 为准；本计划新增端点需与 054 的映射表对齐，并按 `docs/runbooks/AUTHZ-BOT.md` 流程生成聚合产物（不要手改聚合文件）。
 - 最小权限拆分建议：
   - 只读：可查询 Job Catalog/Profile（用于选择与过滤）。
   - 管理：可创建/启停/编辑 Job Catalog/Profile；可编辑 Position Restrictions（高风险，建议仅 admin）。
+
+### 7.1 Endpoint → object/action 映射（对齐 054）
+| Endpoint | Object | Action | 备注 |
+| --- | --- | --- | --- |
+| `GET /org/api/job-catalog/*` | `org.job_catalog` | `read` | 主数据读取 |
+| `POST/PATCH /org/api/job-catalog/*` | `org.job_catalog` | `admin` | 主数据治理（启停/编辑） |
+| `GET /org/api/job-profiles` | `org.job_profiles` | `read` | |
+| `POST/PATCH /org/api/job-profiles*` | `org.job_profiles` | `admin` | 含 `:set-allowed-levels` |
+| `GET /org/api/positions/{id}/restrictions` | `org.position_restrictions` | `read` | 如落地独立端点 |
+| `POST /org/api/positions/{id}:set-restrictions` | `org.position_restrictions` | `admin` | 如落地独立端点 |
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 ### 8.1 依赖
@@ -344,19 +406,19 @@ flowchart TD
 
 ## 10. 运维与可观测性 (Ops & Monitoring)
 - **灰度开关**：建议通过租户级 `org_settings` 提供（`disabled/shadow/enforce`），并确保“切换不绕过审计”；回滚优先通过切回 `shadow/disabled` 实现（对齐 059）。
-- **结构化日志**：冲突拒绝/限制拒绝需包含 `tenant_id`、`position_code`/`position_id`、`job_profile_id`、`job_role_id/job_level_id`、`mode` 与错误码。
+- **结构化日志**：冲突拒绝/限制拒绝需包含 `tenant_id`、`position_code`/`position_id`、`job_profile_id`、`job_family_group_code/job_family_code/job_role_code/job_level_code`、`mode` 与错误码（可选带出解析后的 role_id/level_id 便于排障）。
 - **审计**：shadow 模式的“本应拒绝但放行”必须落审计 meta，便于阶段 059 收口定位与回放。
 
 ## 11. 实施步骤（执行清单）
 1. [ ] 数据模型与契约评审（对齐 050/051/052）
 2. [ ] Schema 与迁移（Org Atlas+Goose）
 3. [ ] 主数据维护入口（API；可选 UI）
-4. [ ] Position 分类/Profile 字段接入与强校验
-5. [ ] Position Restrictions 接入（包含 shadow/enforce）
+4. [ ] Position Catalog/Profile 强校验接入（对齐 053 的 `job_*_code/job_profile_id` 字段）
+5. [ ] Position Restrictions 接入（落在 `org_position_slices.profile.position_restrictions`，包含 shadow/enforce）
 6. [ ] Authz 补齐（如新增 object/action）+ 测试门禁
 7. [ ] 验收与 readiness 记录（对齐 059）
 
 ## 12. 交付物
 - Job Catalog（四级）与 Job Profile 主数据（含启停、唯一性、层级自洽）与最小维护入口。
-- Position 分类/Profile/Restrictions 的 schema 扩展与写入口强校验（含灰度与可观测拒绝原因）。
+- Position Catalog/Profile/Restrictions 的写入口强校验（含灰度与可观测拒绝原因；Restrictions 落在 `org_position_slices.profile`）。
 - 与 054/059 对齐的权限门禁与 readiness 记录（可复现）。
