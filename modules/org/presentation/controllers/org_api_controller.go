@@ -102,6 +102,10 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/snapshot", c.instrumentAPI("snapshot.get", c.GetSnapshot)).Methods(http.MethodGet)
 	api.HandleFunc("/batch", c.instrumentAPI("batch.post", c.Batch)).Methods(http.MethodPost)
 	api.HandleFunc("/reports/person-path", c.instrumentAPI("reports.person_path.get", c.GetPersonPath)).Methods(http.MethodGet)
+	api.HandleFunc("/reports/staffing:summary", c.instrumentAPI("reports.staffing_summary.get", c.GetStaffingSummary)).Methods(http.MethodGet)
+	api.HandleFunc("/reports/staffing:vacancies", c.instrumentAPI("reports.staffing_vacancies.get", c.GetStaffingVacancies)).Methods(http.MethodGet)
+	api.HandleFunc("/reports/staffing:time-to-fill", c.instrumentAPI("reports.staffing_time_to_fill.get", c.GetStaffingTimeToFill)).Methods(http.MethodGet)
+	api.HandleFunc("/reports/staffing:export", c.instrumentAPI("reports.staffing_export.get", c.ExportStaffingReport)).Methods(http.MethodGet)
 
 	api.HandleFunc("/change-requests", c.instrumentAPI("change_requests.create", c.CreateChangeRequest)).Methods(http.MethodPost)
 	api.HandleFunc("/change-requests", c.instrumentAPI("change_requests.list", c.ListChangeRequests)).Methods(http.MethodGet)

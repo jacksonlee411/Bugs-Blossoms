@@ -4,7 +4,7 @@
 
 ## 变更摘要
 - `org-data quality`：`check/plan/apply/rollback`（默认 dry-run；`--apply --yes` 才允许写入/回滚）
-- 质量规则 v1：`ORG_Q_001`~`ORG_Q_008`（详见 `docs/dev-plans/031-org-data-quality-and-fixes.md` §6.2）
+- 质量规则 v1：`ORG_Q_001`~`ORG_Q_009`（详见 `docs/dev-plans/031-org-data-quality-and-fixes.md` §6.2）
 - 配置（安全网）：
   - `ORG_DATA_QUALITY_ENABLED`（默认 `false`；关闭时禁止 `quality apply/rollback`）
   - `ORG_DATA_FIXES_MAX_COMMANDS`（默认 `100`）

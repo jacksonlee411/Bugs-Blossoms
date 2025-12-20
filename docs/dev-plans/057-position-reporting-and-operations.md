@@ -1,6 +1,6 @@
 # DEV-PLAN-057：Position 报表与运营（统计/空缺分析/质量守护）（对齐 051 阶段 E）
 
-**状态**: 草拟中（2025-12-20 04:29 UTC）
+**状态**: 已完成（2025-12-21）
 
 ## 0. 进度速记
 - 本计划对齐 050 §8.3/§8.4 的报表需求与 051 阶段 E（E0/E1/E2）：先冻结口径，再交付可查询/可导出的稳定 API；最后补齐质量守护与性能预算，确保“可重复对账、可回归”。
@@ -29,15 +29,15 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] **统计口径冻结（E0）**：容量/占用/可用/填充率以 FTE 为主，支持 scope=`self|subtree`，并明确撤销/停用/未来生效的计算口径（v1 不支持 `capacity_fte=0` 作为“冻结席位”语义；如需引入需先同步更新 052/053 合同与迁移约束）。
-- [ ] **统计查询/导出闭环（E1）**：提供稳定 JSON API（必要时补 CSV 导出），支持：
+- [x] **统计口径冻结（E0）**：容量/占用/可用/填充率以 FTE 为主，支持 scope=`self|subtree`，并明确撤销/停用/未来生效的计算口径（v1 不支持 `capacity_fte=0` 作为“冻结席位”语义；如需引入需先同步更新 052/053 合同与迁移约束）。
+- [x] **统计查询/导出闭环（E1）**：提供稳定 JSON API（必要时补 CSV 导出），支持：
   - org scope（仅本组织/包含下级）
   - as-of 视角（默认 `nowUTC`）
   - 维度拆分（至少：按 `job_level`、按 `position_type`；若缺失则返回 `unknown` 组）
-- [ ] **空缺分析可用（E2）**：
+- [x] **空缺分析可用（E2）**：
   - vacancy aging：可按 org scope 输出“当前空缺列表/汇总”，并给出 vacancy_since/age（基础口径可解释、可回归）。
   - time-to-fill（基础版）：以“任职开始 = 填补”作为 SSOT 事件，输出指定时间窗内的 TTF 分布/均值（先聚焦 `capacity_fte=1` 的 Position，避免多席位歧义）。
-- [ ] **数据质量与性能守护**：扩展质量规则与最小性能预算：
+- [x] **数据质量与性能守护**：扩展质量规则与最小性能预算：
   - 质量：超编、无效分类引用、限制冲突、异常 vacancy（例如 active 但长期 capacity=0）等。
   - 性能：禁止递归；为关键查询提供 query budget/分页上限/结果规模上限与稳定错误码。
 
@@ -313,11 +313,11 @@ flowchart TD
   - 029：deep-read 后端可用（至少 edges；推荐 snapshot）。
   - 034：metrics/health 基线可复用（用于观测与压测）。
 - **里程碑（对齐 051 阶段 E）**：
-  1. [ ] E0：统计口径冻结（本文件评审通过；与 052/053/056 对齐）。
-  2. [ ] E1：`staffing:summary` API + 最小性能预算（含 query budget 测试）。
-  3. [ ] E2：`staffing:vacancies` + 基础 vacancy aging；`staffing:time-to-fill`（基础版）。
-  4. [ ] 质量守护：扩展 `org-data quality` 规则（复用 031 契约）并提供可复现报告。
-  5. [ ] Readiness：在 059 指定的记录中登记门禁/冒烟/性能摘要（命令/结果/时间戳）。
+  1. [x] E0：统计口径冻结（本文件评审通过；与 052/053/056 对齐）。
+  2. [x] E1：`staffing:summary` API + 最小性能预算（含 query budget 测试）。
+  3. [x] E2：`staffing:vacancies` + 基础 vacancy aging；`staffing:time-to-fill`（基础版）。
+  4. [x] 质量守护：扩展 `org-data quality` 规则（复用 031 契约）并提供可复现报告。
+  5. [x] Readiness：在 059 指定的记录中登记门禁/冒烟/性能摘要（命令/结果/时间戳）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **正确性**：
