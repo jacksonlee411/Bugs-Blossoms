@@ -17,6 +17,7 @@ type OrgAssignment struct {
 	Pernr          string             `json:"pernr"`
 	AssignmentType string             `json:"assignment_type"`
 	IsPrimary      bool               `json:"is_primary"`
+	AllocatedFte   pgtype.Numeric     `json:"allocated_fte"`
 	EffectiveDate  pgtype.Timestamptz `json:"effective_date"`
 	EndDate        pgtype.Timestamptz `json:"end_date"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
@@ -124,6 +125,20 @@ type OrgHierarchySnapshotBuild struct {
 	Notes           *string            `json:"notes"`
 }
 
+type OrgLink struct {
+	TenantID      pgtype.UUID        `json:"tenant_id"`
+	ID            pgtype.UUID        `json:"id"`
+	OrgNodeID     pgtype.UUID        `json:"org_node_id"`
+	ObjectType    string             `json:"object_type"`
+	ObjectKey     string             `json:"object_key"`
+	LinkType      string             `json:"link_type"`
+	Metadata      []byte             `json:"metadata"`
+	EffectiveDate pgtype.Timestamptz `json:"effective_date"`
+	EndDate       pgtype.Timestamptz `json:"end_date"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OrgNode struct {
 	TenantID  pgtype.UUID        `json:"tenant_id"`
 	ID        pgtype.UUID        `json:"id"`
@@ -182,6 +197,71 @@ type OrgPosition struct {
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
+type OrgPositionSlice struct {
+	TenantID            pgtype.UUID        `json:"tenant_id"`
+	ID                  pgtype.UUID        `json:"id"`
+	PositionID          pgtype.UUID        `json:"position_id"`
+	OrgNodeID           pgtype.UUID        `json:"org_node_id"`
+	Title               *string            `json:"title"`
+	LifecycleStatus     string             `json:"lifecycle_status"`
+	PositionType        *string            `json:"position_type"`
+	EmploymentType      *string            `json:"employment_type"`
+	CapacityFte         pgtype.Numeric     `json:"capacity_fte"`
+	CapacityHeadcount   *int32             `json:"capacity_headcount"`
+	ReportsToPositionID pgtype.UUID        `json:"reports_to_position_id"`
+	JobFamilyGroupCode  *string            `json:"job_family_group_code"`
+	JobFamilyCode       *string            `json:"job_family_code"`
+	JobRoleCode         *string            `json:"job_role_code"`
+	JobLevelCode        *string            `json:"job_level_code"`
+	JobProfileID        pgtype.UUID        `json:"job_profile_id"`
+	CostCenterCode      *string            `json:"cost_center_code"`
+	Profile             []byte             `json:"profile"`
+	EffectiveDate       pgtype.Timestamptz `json:"effective_date"`
+	EndDate             pgtype.Timestamptz `json:"end_date"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgReporting struct {
+	TenantID          pgtype.UUID        `json:"tenant_id"`
+	HierarchyType     string             `json:"hierarchy_type"`
+	AsOfDate          pgtype.Date        `json:"as_of_date"`
+	BuildID           pgtype.UUID        `json:"build_id"`
+	OrgNodeID         pgtype.UUID        `json:"org_node_id"`
+	Code              string             `json:"code"`
+	Name              string             `json:"name"`
+	Status            string             `json:"status"`
+	ParentNodeID      pgtype.UUID        `json:"parent_node_id"`
+	Depth             int32              `json:"depth"`
+	PathNodeIds       []pgtype.UUID      `json:"path_node_ids"`
+	PathCodes         []string           `json:"path_codes"`
+	PathNames         []string           `json:"path_names"`
+	Attributes        []byte             `json:"attributes"`
+	SecurityGroupKeys []string           `json:"security_group_keys"`
+	Links             []byte             `json:"links"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
+type OrgReportingNode struct {
+	TenantID          pgtype.UUID        `json:"tenant_id"`
+	HierarchyType     string             `json:"hierarchy_type"`
+	AsOfDate          pgtype.Date        `json:"as_of_date"`
+	BuildID           pgtype.UUID        `json:"build_id"`
+	OrgNodeID         pgtype.UUID        `json:"org_node_id"`
+	Code              string             `json:"code"`
+	Name              string             `json:"name"`
+	Status            string             `json:"status"`
+	ParentNodeID      pgtype.UUID        `json:"parent_node_id"`
+	Depth             int32              `json:"depth"`
+	PathNodeIds       []pgtype.UUID      `json:"path_node_ids"`
+	PathCodes         []string           `json:"path_codes"`
+	PathNames         []string           `json:"path_names"`
+	Attributes        []byte             `json:"attributes"`
+	SecurityGroupKeys []string           `json:"security_group_keys"`
+	Links             []byte             `json:"links"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+}
+
 type OrgRole struct {
 	TenantID    pgtype.UUID        `json:"tenant_id"`
 	ID          pgtype.UUID        `json:"id"`
@@ -204,6 +284,18 @@ type OrgRoleAssignment struct {
 	EndDate       pgtype.Timestamptz `json:"end_date"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgSecurityGroupMapping struct {
+	TenantID         pgtype.UUID        `json:"tenant_id"`
+	ID               pgtype.UUID        `json:"id"`
+	OrgNodeID        pgtype.UUID        `json:"org_node_id"`
+	SecurityGroupKey string             `json:"security_group_key"`
+	AppliesToSubtree bool               `json:"applies_to_subtree"`
+	EffectiveDate    pgtype.Timestamptz `json:"effective_date"`
+	EndDate          pgtype.Timestamptz `json:"end_date"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrgSetting struct {

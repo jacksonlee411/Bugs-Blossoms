@@ -12,6 +12,13 @@ type TreeProps struct {
 	Tree          *viewmodels.OrgTree
 	EffectiveDate string
 	SwapOOB       bool
+
+	NodeGetURL  func(nodeID, effectiveDate string) string
+	NodePushURL func(nodeID, effectiveDate string) string
+	Target      string
+	Swap        string
+	Include     string
+	PushURL     string
 }
 
 func indentClass(depth int) string {
@@ -31,26 +38,54 @@ templ TreeContent(props TreeProps) {
 		<div class="p-3 text-sm text-300">
 			{ pageCtx.T("Org.UI.Tree.Empty") }
 		</div>
-	} else {
-		<ul class="space-y-1 p-2">
-			for _, n := range props.Tree.Nodes {
-				<li style={ indentClass(n.Depth) }>
-					<button
-						type="button"
-						class={
-							"w-full text-left rounded-md px-2 py-1.5 text-sm flex items-center justify-between gap-2",
-							templ.KV("bg-surface-100 text-100", n.Selected),
-							templ.KV("hover:bg-surface-200 text-200", !n.Selected),
+		} else {
+			<ul class="space-y-1 p-2">
+				for _, n := range props.Tree.Nodes {
+					{{ nodeID := n.ID.String() }}
+					{{ getURL := "" }}
+					if props.NodeGetURL != nil {
+						{{ getURL = props.NodeGetURL(nodeID, props.EffectiveDate) }}
+					} else {
+						{{ getURL = fmt.Sprintf("/org/nodes/%s?effective_date=%s", nodeID, props.EffectiveDate) }}
+					}
+
+					{{ pushURL := props.PushURL }}
+					if pushURL == "" {
+						if props.NodePushURL != nil {
+							{{ pushURL = props.NodePushURL(nodeID, props.EffectiveDate) }}
+						} else {
+							{{ pushURL = fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", props.EffectiveDate, nodeID) }}
 						}
-						hx-get={ fmt.Sprintf("/org/nodes/%s?effective_date=%s", n.ID.String(), props.EffectiveDate) }
-						hx-target="#org-node-panel"
-						hx-swap="innerHTML"
-						hx-push-url={ fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", props.EffectiveDate, n.ID.String()) }
-					>
-						<span class="truncate">
-							<span class="font-medium">{ strings.TrimSpace(n.Name) }</span>
-							if strings.TrimSpace(n.Code) != "" {
-								<span class="ml-2 text-xs text-400">{ n.Code }</span>
+					}
+
+					{{ target := props.Target }}
+					if target == "" {
+						{{ target = "#org-node-panel" }}
+					}
+					{{ swap := props.Swap }}
+					if swap == "" {
+						{{ swap = "innerHTML" }}
+					}
+					<li style={ indentClass(n.Depth) }>
+						<button
+							type="button"
+							class={
+								"w-full text-left rounded-md px-2 py-1.5 text-sm flex items-center justify-between gap-2",
+								templ.KV("bg-surface-100 text-100", n.Selected),
+								templ.KV("hover:bg-surface-200 text-200", !n.Selected),
+							}
+							hx-get={ getURL }
+							hx-target={ target }
+							hx-swap={ swap }
+							if props.Include != "" {
+								hx-include={ props.Include }
+							}
+							hx-push-url={ pushURL }
+						>
+							<span class="truncate">
+								<span class="font-medium">{ strings.TrimSpace(n.Name) }</span>
+								if strings.TrimSpace(n.Code) != "" {
+									<span class="ml-2 text-xs text-400">{ n.Code }</span>
 							}
 						</span>
 						<span class="text-[11px] text-400">{ n.Status }</span>

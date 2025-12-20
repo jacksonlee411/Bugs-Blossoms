@@ -3,31 +3,30 @@ package org
 import (
 	"fmt"
 
-	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/templates/components/orgui"
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
-type NodesPageProps struct {
+type PositionsPageProps struct {
 	EffectiveDate string
-	SelectedNode  *viewmodels.OrgNodeDetails
 	Tree          *viewmodels.OrgTree
+	Panel         orgui.PositionsPanelProps
 	Errors        []string
 }
 
-templ NodesPage(props NodesPageProps) {
+templ PositionsPage(props PositionsPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	@layouts.Authenticated(layouts.AuthenticatedProps{
 		BaseProps: layouts.BaseProps{
-			Title: pageCtx.T("Org.UI.Nodes.MetaTitle"),
+			Title: pageCtx.T("Org.UI.Positions.MetaTitle"),
 		},
 	}) {
-		<div id="org-nodes-page" class="p-6 space-y-4">
+		<div id="org-positions-page" class="p-6 space-y-4">
 			<div class="flex items-center justify-between gap-4 flex-wrap">
 				<div class="flex items-center gap-3">
-					<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.Nodes.Title") }</h1>
+					<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.Positions.Title") }</h1>
 					<span class="text-xs text-300">{ pageCtx.T("Org.UI.Shared.AsOf") }: { props.EffectiveDate }</span>
 				</div>
 				<div class="flex items-center gap-2">
@@ -38,21 +37,21 @@ templ NodesPage(props NodesPageProps) {
 						name="effective_date"
 						value={ props.EffectiveDate }
 						class="rounded-md border border-surface-400 bg-surface-200 px-3 py-2 text-sm text-100"
-						hx-get="/org/nodes"
+						hx-get="/org/positions"
 						hx-trigger="change"
-						hx-target="#org-nodes-page"
+						hx-target="#org-positions-page"
 						hx-swap="outerHTML"
 						hx-push-url="true"
-						hx-include="[name='effective_date']"
+						hx-include="#org-positions-filters, [name='effective_date']"
 					/>
 				</div>
 			</div>
-				@orgui.Subnav(orgui.SubnavProps{
-					EffectiveDate:  props.EffectiveDate,
-					Active:         "nodes",
-					CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
-					CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
-				})
+			@orgui.Subnav(orgui.SubnavProps{
+				EffectiveDate:  props.EffectiveDate,
+				Active:         "positions",
+				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
+				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
+			})
 			if len(props.Errors) > 0 {
 				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
 					<ul class="list-disc pl-5 space-y-1">
@@ -67,50 +66,30 @@ templ NodesPage(props NodesPageProps) {
 					<div class="rounded-lg border border-surface-400 bg-surface-300">
 						<div class="flex items-center justify-between border-b border-surface-400 p-3">
 							<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Tree.Title") }</div>
-							if pageCtx.CanAuthz("org.nodes", "write") {
-								@button.Primary(button.Props{
-									Size:  button.SizeSM,
-									Class: "px-2 py-1",
-									Attrs: templ.Attributes{
-										"data-testid": "org-new-node",
-										"hx-get":      fmt.Sprintf("/org/nodes/new?effective_date=%s", props.EffectiveDate),
-										"hx-target":   "#org-node-panel",
-										"hx-swap":     "innerHTML",
-									},
-								}) {
-									{ pageCtx.T("Org.UI.Tree.NewNode") }
-								}
-							}
 						</div>
 						<div class="p-2">
 							@orgui.Tree(orgui.TreeProps{
 								Tree:          props.Tree,
 								EffectiveDate: props.EffectiveDate,
 								SwapOOB:       false,
+								NodeGetURL: func(nodeID, effectiveDate string) string {
+									return fmt.Sprintf("/org/positions/panel?node_id=%s", nodeID)
+								},
+								Target:  "#org-positions-panel",
+								Swap:    "innerHTML",
+								Include: "#org-positions-filters, [name='effective_date']",
+								PushURL: "true",
 							})
 						</div>
 					</div>
 				</div>
 				<div class="col-span-12 lg:col-span-8">
-					<div class="rounded-lg border border-surface-400 bg-surface-300 min-h-[280px]">
-						<div class="border-b border-surface-400 p-3">
-							<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.NodePanel.Title") }</div>
-						</div>
-						<div id="org-node-panel" class="p-4">
-							if props.SelectedNode == nil {
-								<div class="text-sm text-300">
-									{ pageCtx.T("Org.UI.NodePanel.Empty") }
-								</div>
-							} else {
-								@orgui.NodeDetails(orgui.NodeDetailsProps{
-									EffectiveDate: props.EffectiveDate,
-									Node:          props.SelectedNode,
-								})
-							}
-						</div>
+					<div id="org-positions-panel">
+						@orgui.PositionsPanel(props.Panel)
 					</div>
 				</div>
 			</div>
 		</div>
 	}
 }
+
