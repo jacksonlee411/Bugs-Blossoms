@@ -300,4 +300,126 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		await expect(page.getByRole('heading', { name: /Permission required/i, level: 2 })).toBeVisible();
 		await expect(page.locator('section[data-authz-container]')).toBeVisible();
 	});
+
+	test('管理员可创建 Position 并 Transfer 组织归属（DEV-PLAN-055）', async ({ page }) => {
+		await login(page, ADMIN.email, ADMIN.password);
+		await assertAuthenticated(page);
+
+		await page.goto('/org/nodes', { waitUntil: 'domcontentloaded' });
+		await expect(page).toHaveURL(/\/org\/nodes/);
+		await page.waitForFunction(() => typeof (window as any).htmx !== 'undefined', { timeout: 10_000 });
+
+		const newNodeBtn = page.locator('[data-testid="org-new-node"]');
+		await newNodeBtn.click();
+		await expect(page.getByText('Create node', { exact: true })).toBeVisible();
+
+		await page.locator('input[name="code"]').fill('ROOT');
+		await page.locator('input[name="name"]').fill('Company');
+		await page.getByRole('button', { name: 'Create' }).click();
+
+		const tree = page.locator('#org-tree');
+		await expect(tree.getByRole('button', { name: /Company/ })).toBeVisible();
+
+		await page.locator('[data-testid="org-new-child"]').click();
+		await expect(page.getByText('Create node', { exact: true })).toBeVisible();
+		await page.locator('input[name="code"]').fill('HR');
+		await page.locator('input[name="name"]').fill('HR Team');
+		await page.getByRole('button', { name: 'Create' }).click();
+		await expect(tree.getByRole('button', { name: /HR Team/ })).toBeVisible();
+
+		await tree.getByRole('button', { name: /Company/ }).click();
+		await page.locator('[data-testid="org-new-child"]').click();
+		await expect(page.getByText('Create node', { exact: true })).toBeVisible();
+		await page.locator('input[name="code"]').fill('IT');
+		await page.locator('input[name="name"]').fill('IT Team');
+		await page.getByRole('button', { name: 'Create' }).click();
+		await expect(tree.getByRole('button', { name: /IT Team/ })).toBeVisible();
+
+		const itHxGet = await tree.getByRole('button', { name: /IT Team/ }).getAttribute('hx-get');
+		expect(itHxGet).toBeTruthy();
+		const itIDValue = new URL(itHxGet!, 'http://local').pathname.split('/').pop();
+		expect(itIDValue).toBeTruthy();
+
+		const hrHxGet = await tree.getByRole('button', { name: /HR Team/ }).getAttribute('hx-get');
+		expect(hrHxGet).toBeTruthy();
+		const hrIDValue = new URL(hrHxGet!, 'http://local').pathname.split('/').pop();
+		expect(hrIDValue).toBeTruthy();
+
+		await page.getByRole('link', { name: 'Positions' }).click();
+		await expect(page).toHaveURL(/\/org\/positions/);
+
+		const positionsTree = page.locator('#org-tree');
+		const panelResp = page.waitForResponse((resp) => {
+			return resp.request().method() === 'GET' && resp.url().includes('/org/positions/panel');
+		});
+		await positionsTree.getByRole('button', { name: /HR Team/ }).click();
+		expect((await panelResp).status()).toBe(200);
+		await expect(page.locator('#org-positions-filters input[name="node_id"]')).toHaveValue(hrIDValue!);
+		await page.waitForURL((url) => url.searchParams.get('node_id') === hrIDValue);
+		expect(new URL(page.url()).searchParams.get('node_id')).toBe(hrIDValue);
+
+			await page.getByRole('button', { name: 'Create position', exact: true }).click();
+			await expect(page.locator('#org-position-details').getByText('Create position', { exact: true })).toBeVisible();
+
+		await page.locator('input[name="code"]').fill('POS-001');
+		await page.locator('input[name="title"]').fill('HR Specialist');
+		const createResp = page.waitForResponse((resp) => {
+			return resp.request().method() === 'POST' && resp.url().includes('/org/positions');
+		});
+			await page.locator('#org-position-details').getByRole('button', { name: 'Create', exact: true }).click();
+			expect((await createResp).status()).toBe(200);
+
+			await expect(page.locator('#org-position-details')).toContainText('POS-001');
+			await expect(page.locator('#org-positions-list')).toContainText('POS-001');
+			await page.waitForURL(/position_id=/);
+			const positionIDValue = new URL(page.url()).searchParams.get('position_id');
+			expect(positionIDValue).toBeTruthy();
+
+			const positionsBaseEffectiveDateStr = await page.locator('#effective-date').inputValue();
+			expect(positionsBaseEffectiveDateStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			const positionsFuture = addUTCDays(parseUTCDateString(positionsBaseEffectiveDateStr), 1);
+			const positionsFutureStr = formatUTCDate(positionsFuture);
+			await page.goto(
+				`/org/positions?effective_date=${positionsFutureStr}&node_id=${hrIDValue}&position_id=${positionIDValue}`,
+				{
+					waitUntil: 'domcontentloaded',
+				}
+			);
+			await page.waitForFunction(() => typeof (window as any).htmx !== 'undefined', { timeout: 10_000 });
+			await expect(page.locator('#org-position-details')).toContainText('POS-001');
+
+			await page.locator('#org-position-details').getByRole('button', { name: 'Edit', exact: true }).click();
+			await expect(page.getByText('Edit position', { exact: true })).toBeVisible();
+
+		const moveOrgNodeCombobox = page.locator('[data-testid="org-position-orgnode-combobox"]');
+		await setComboboxValue({
+			combobox: moveOrgNodeCombobox,
+			query: 'IT Team',
+			value: itIDValue!,
+		});
+
+		const updateResp = page.waitForResponse((resp) => {
+			return resp.request().method() === 'PATCH' && resp.url().includes(`/org/positions/${positionIDValue}`);
+		});
+			await page.locator('#org-position-details').getByRole('button', { name: 'Save', exact: true }).click();
+			expect((await updateResp).status()).toBe(200);
+
+		await page.waitForURL(new RegExp(`node_id=${itIDValue}`));
+		await expect(page.locator('#org-positions-filters input[name="node_id"]')).toHaveValue(itIDValue!);
+		await expect(page.locator('#org-position-details')).toContainText('POS-001');
+	});
+
+	test('无 Org 权限账号访问 /org/positions 返回 Unauthorized（DEV-PLAN-055）', async ({ page }) => {
+		await login(page, READONLY.email, READONLY.password);
+		await assertAuthenticated(page);
+
+		await page.goto('/org/positions', { waitUntil: 'domcontentloaded' });
+		const response = await page.request.get('/org/positions', {
+			headers: { Accept: 'application/json', 'X-Request-ID': 'e2e-org-positions-deny' },
+		});
+		expect([401, 403]).toContain(response.status());
+
+		await expect(page.getByRole('heading', { name: /Permission required/i, level: 2 })).toBeVisible();
+		await expect(page.locator('section[data-authz-container]')).toBeVisible();
+	});
 });

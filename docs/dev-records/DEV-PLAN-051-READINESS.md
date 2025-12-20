@@ -5,6 +5,7 @@
 ## 1. 范围
 - 本 readiness 覆盖 [DEV-PLAN-051](../dev-plans/051-position-management-implementation-blueprint.md) 的：
   - 阶段 C-Authz：子计划 [DEV-PLAN-054](../dev-plans/054-position-authz-policy-and-gates.md)
+  - 阶段 C-UI：子计划 [DEV-PLAN-055](../dev-plans/055-position-ui-org-integration.md)
   - 阶段 E-Reporting：子计划 [DEV-PLAN-057](../dev-plans/057-position-reporting-and-operations.md)
 
 ## 2. 前置条件（未执行前 checklist）
@@ -37,7 +38,13 @@
 - [X] `make check lint` ——（2025-12-20）结果：通过
 - [X] `make test` ——（2025-12-20）结果：通过
 
-### 3.3 057（阶段 E-Reporting）门禁 + 冒烟 + 性能摘要
+### 3.3 UI 门禁（DEV-PLAN-055）
+- [X] `make generate && make css` ——（2025-12-20）结果：通过
+- [X] `make check tr` ——（2025-12-20）结果：通过
+- [X] `make check routing` ——（2025-12-20）结果：通过
+- [X] E2E 用例补齐：`e2e/tests/org/org-ui.spec.ts` ——（2025-12-20）结果：已新增（未在此记录中运行）
+
+### 3.4 057（阶段 E-Reporting）门禁 + 冒烟 + 性能摘要
 - [X] `go fmt ./... && go vet ./...` ——（2025-12-21）结果：通过
 - [X] `make check lint` ——（2025-12-21）结果：通过
 - [X] `make test` ——（2025-12-21）结果：通过

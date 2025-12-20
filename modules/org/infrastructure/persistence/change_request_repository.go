@@ -22,6 +22,10 @@ func pgUUID(id uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: id, Valid: true}
 }
 
+func pgUUIDArray(ids []uuid.UUID) pgtype.FlatArray[uuid.UUID] {
+	return pgtype.FlatArray[uuid.UUID](ids)
+}
+
 func asUUID(v pgtype.UUID) uuid.UUID {
 	if !v.Valid {
 		return uuid.Nil
