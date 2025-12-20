@@ -47,6 +47,14 @@
   - Org 工具链：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
   - 事件契约与 Outbox：`docs/dev-plans/022-org-placeholders-and-event-contracts.md`、`docs/dev-plans/026-org-api-authz-and-events.md`、`docs/dev-plans/017-transactional-outbox.md`
 
+## 2.4 并行实施说明（与 057/058）
+- 本计划与 `docs/dev-plans/057-position-reporting-and-operations.md`、`docs/dev-plans/058-assignment-management-enhancements.md` 采用并行实施；最终灰度/回滚/Readiness 由 `docs/dev-plans/059-position-rollout-readiness-and-observability.md` 统一收口。
+- **注意事项**：
+  - **口径/字段 SSOT**：Job 维度与 Restrictions 的字段名/落点如需调整，必须同步更新 056/057/058，并确保不破坏 052/053 已冻结的 v1 合同与错误码口径。
+  - **灰度默认**：所有强校验必须先 `shadow`（租户级 `org_settings.*_validation_mode`），避免直接 `enforce` 误伤 System/auto-created 链路；`enforce` 的启用与回退按 059 执行。
+  - **并行冲突面**：`modules/org/services/**`、`modules/org/infrastructure/persistence/**`、`modules/org/presentation/**`、`config/access/**`、`migrations/org/**` 易产生 merge 冲突；建议拆分 PR 并约定文件 ownership 与迁移时间戳。
+  - **中间态兼容**：在 056 未完全落地前，057 的维度统计应能降级为 `unknown`；058 的 Restrictions 校验在缺失配置/数据时应保持“默认放行”（或仅记录 shadow 审计），避免阻断写链路。
+
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.1 SSOT 与边界（对齐 051/052）
 - Job Catalog / Job Profile / Restrictions 作为 Position/Assignment 写入口的强校验依据，主干落在 Org BC（`modules/org`），避免在 HRM 侧另起一套主数据与规则（对齐 051 §1、052 §5.1）。

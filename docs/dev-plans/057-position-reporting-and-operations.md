@@ -72,6 +72,14 @@
 - 034：指标/health/压测 SSOT；057 只追加报表指标与必要的压测 profile，不另起一套 ops 暴露面。
 - 059：readiness/灰度/可观测收口；057 的验证记录必须能被 059 汇总复跑。
 
+### 2.5 并行实施说明（与 056/058）
+- 本计划与 `docs/dev-plans/056-job-catalog-profile-and-position-restrictions.md`、`docs/dev-plans/058-assignment-management-enhancements.md` 采用并行实施；057 作为**只读报表层**，应对“上游能力尚未合并”的中间态保持兼容。
+- **注意事项**：
+  - **口径冻结优先**：统计/空缺/TTF 口径以 052/053/057 的冻结为 SSOT，尤其是占编 `occupied_fte` 仍仅统计 `assignment_type='primary'`；即便 058 放开 `matrix/dotted` 写入，057 默认也不得将其计入占编（如需变更必须回到 052/057 重新冻结并评审）。
+  - **维度缺失降级**：当 056 的 Job Catalog/Profile 尚未完全落地或数据不齐时，维度拆分必须能降级为 `unknown`（或等价组），不得因维度表缺失/空值导致报表不可用。
+  - **迁移/索引协同**：057 若需要补索引/视图，必须与 056 的 `migrations/org/**` 变更协同排序（避免时间戳冲突），并按 021A 工具链执行与回滚说明。
+  - **能力开关与收口**：任何“include_system/性能后端选择/导出规模限制”等行为应可观测并可回退，最终由 059 的 readiness 记录统一验证与留痕。
+
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.0 架构图（Mermaid）
 ```mermaid

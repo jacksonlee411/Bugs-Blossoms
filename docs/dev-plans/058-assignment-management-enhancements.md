@@ -57,6 +57,14 @@
   - Authz 工作流：`docs/runbooks/AUTHZ-BOT.md`
   - Org 迁移工具链：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
 
+### 2.4 并行实施说明（与 056/057）
+- 本计划与 `docs/dev-plans/056-job-catalog-profile-and-position-restrictions.md`、`docs/dev-plans/057-position-reporting-and-operations.md` 采用并行实施；本计划的写入口增量必须以 feature flag/灰度模式保护，避免阻断 053（v1）主链上线。
+- **注意事项**：
+  - **占编口径不可漂移**：v2 放开 `matrix/dotted` 仅改变“可表达的任职类型”，不改变 v1 的占编/容量/报表口径：`occupied_fte` 仍仅统计 `assignment_type='primary'`（对齐 052/057）。任何变更必须回到 052/057 重新冻结并评审。
+  - **与 056 的校验协同**：若 056 在 Assignment 写入口引入 Restrictions 强校验，必须统一复用同一套 `disabled/shadow/enforce` 语义与稳定错误码；并确保缺失主数据/限制配置时不误伤写链路（shadow 记录优先）。
+  - **迁移与开关协同**：本计划默认不改 schema；若并行期间确需 schema/约束调整，必须与 056 的迁移排序协同，并提供 059 要求的回滚演练路径（优先开关回滚）。
+  - **reason_code 收口归口 059**：不得在 058 中提前把 reason_code 从兼容态直接加严到 enforce；收口策略以 052/059 为准。
+
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.1 任职以“时间片 + 审计/outbox”作为 SSOT（选定）
 - 任职仍使用 Org 的 valid-time 时间片模型（`effective_date/end_date`），并复用 025 的冻结窗口与审计落盘；禁止绕过 service 直接写表（否则无法保证审计/outbox/冻结窗口一致）。
