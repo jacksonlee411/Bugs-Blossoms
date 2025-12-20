@@ -47,12 +47,12 @@ templ NodesPage(props NodesPageProps) {
 					/>
 				</div>
 			</div>
-				@orgui.Subnav(orgui.SubnavProps{
-					EffectiveDate:  props.EffectiveDate,
-					Active:         "nodes",
-					CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
-					CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
-				})
+			@orgui.Subnav(orgui.SubnavProps{
+				EffectiveDate:  props.EffectiveDate,
+				Active:         "nodes",
+				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
+				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
+			})
 			if len(props.Errors) > 0 {
 				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
 					<ul class="list-disc pl-5 space-y-1">

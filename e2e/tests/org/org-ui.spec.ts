@@ -335,13 +335,15 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		await page.getByRole('button', { name: 'Create' }).click();
 		await expect(tree.getByRole('button', { name: /IT Team/ })).toBeVisible();
 
+		const beforeSelectITNodeID = new URL(page.url()).searchParams.get('node_id');
 		await tree.getByRole('button', { name: /IT Team/ }).click();
-		await page.waitForURL(/node_id=/);
+		await page.waitForURL((url) => url.searchParams.get('node_id') !== beforeSelectITNodeID);
 		const itIDValue = new URL(page.url()).searchParams.get('node_id');
 		expect(itIDValue).toBeTruthy();
 
+		const beforeSelectHRNodeID = itIDValue;
 		await tree.getByRole('button', { name: /HR Team/ }).click();
-		await page.waitForURL(/node_id=/);
+		await page.waitForURL((url) => url.searchParams.get('node_id') !== beforeSelectHRNodeID);
 		const hrIDValue = new URL(page.url()).searchParams.get('node_id');
 		expect(hrIDValue).toBeTruthy();
 
@@ -354,7 +356,7 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		});
 		await positionsTree.getByRole('button', { name: /HR Team/ }).click();
 		expect((await panelResp).status()).toBe(200);
-		await page.waitForURL(/node_id=/);
+		await page.waitForURL((url) => url.searchParams.get('node_id') === hrIDValue);
 		expect(new URL(page.url()).searchParams.get('node_id')).toBe(hrIDValue);
 
 		await page.getByRole('button', { name: 'Create position' }).click();

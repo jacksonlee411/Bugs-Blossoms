@@ -24,10 +24,10 @@ type PositionsPanelProps struct {
 	Page               int
 	Limit              int
 
-	Positions           []viewmodels.OrgPositionRow
-	SelectedPositionID  string
-	SelectedPosition    *viewmodels.OrgPositionDetails
-	Timeline            []viewmodels.OrgPositionTimelineItem
+	Positions          []viewmodels.OrgPositionRow
+	SelectedPositionID string
+	SelectedPosition   *viewmodels.OrgPositionDetails
+	Timeline           []viewmodels.OrgPositionTimelineItem
 }
 
 templ PositionsPanel(props PositionsPanelProps) {
@@ -37,7 +37,6 @@ templ PositionsPanel(props PositionsPanelProps) {
 			<input type="hidden" name="node_id" value={ props.NodeID }/>
 			<input type="hidden" name="page" value={ fmt.Sprintf("%d", maxInt(props.Page, 1)) }/>
 			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", clampInt(props.Limit, 1, 200)) }/>
-
 			<div class="flex-1 min-w-[220px]">
 				@input.Text(&input.Props{
 					Label: pageCtx.T("Org.UI.Positions.Filters.Query"),
@@ -54,7 +53,6 @@ templ PositionsPanel(props PositionsPanelProps) {
 					},
 				})
 			</div>
-
 			<div class="min-w-[160px]">
 				@base.Select(&base.SelectProps{
 					Label: pageCtx.T("Org.UI.Positions.Filters.Lifecycle"),
@@ -75,7 +73,6 @@ templ PositionsPanel(props PositionsPanelProps) {
 					<option value="rescinded" selected?={ props.LifecycleStatus == "rescinded" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Rescinded") }</option>
 				}
 			</div>
-
 			<div class="min-w-[170px]">
 				@base.Select(&base.SelectProps{
 					Label: pageCtx.T("Org.UI.Positions.Filters.StaffingState"),
@@ -95,7 +92,6 @@ templ PositionsPanel(props PositionsPanelProps) {
 					<option value="filled" selected?={ props.StaffingState == "filled" }>{ pageCtx.T("Org.UI.Positions.Staffing.Filled") }</option>
 				}
 			</div>
-
 			<div class="min-w-[150px]">
 				@base.Select(&base.SelectProps{
 					Label: pageCtx.T("Org.UI.Positions.Filters.IncludeDescendants"),
@@ -113,7 +109,6 @@ templ PositionsPanel(props PositionsPanelProps) {
 					<option value="0" selected?={ !props.IncludeDescendants }>{ pageCtx.T("Org.UI.Positions.Filters.IncludeDescendantsNo") }</option>
 				}
 			</div>
-
 			<div class="min-w-[140px]">
 				@base.Select(&base.SelectProps{
 					Label: pageCtx.T("Org.UI.Positions.Filters.ShowSystem"),
@@ -132,7 +127,6 @@ templ PositionsPanel(props PositionsPanelProps) {
 				}
 			</div>
 		</form>
-
 		<div class="grid grid-cols-12 gap-4">
 			<div class="col-span-12 xl:col-span-6">
 				<div class="rounded-lg border border-surface-400 bg-surface-300">
@@ -155,11 +149,11 @@ templ PositionsPanel(props PositionsPanelProps) {
 					</div>
 					<div id="org-positions-list" class="p-3">
 						@PositionsList(PositionsListProps{
-							EffectiveDate:     props.EffectiveDate,
-							Positions:         props.Positions,
+							EffectiveDate:      props.EffectiveDate,
+							Positions:          props.Positions,
 							SelectedPositionID: props.SelectedPositionID,
-							Limit:             props.Limit,
-							Page:              props.Page,
+							Limit:              props.Limit,
+							Page:               props.Page,
 						})
 					</div>
 				</div>
@@ -393,15 +387,15 @@ type PositionFormProps struct {
 	PositionID    string
 
 	Code            string
-	OrgNodeID        string
-	OrgNodeLabel     string
-	Title            string
-	LifecycleStatus  string
-	CapacityFTE      string
-	ReportsToID      string
-	ReportsToLabel   string
-	ReasonCode       string
-	ReasonNote       string
+	OrgNodeID       string
+	OrgNodeLabel    string
+	Title           string
+	LifecycleStatus string
+	CapacityFTE     string
+	ReportsToID     string
+	ReportsToLabel  string
+	ReasonCode      string
+	ReasonNote      string
 
 	Errors    map[string]string
 	FormError string
@@ -431,10 +425,11 @@ templ PositionForm(props PositionFormProps) {
 			{{ cancelGet = fmt.Sprintf("/org/positions/%s?effective_date=%s", props.PositionID, props.EffectiveDate) }}
 			{{ cancelTarget = "#org-position-details" }}
 	}
-	{{ codeAttrs := templ.Attributes{
-		"name":  "code",
-		"value": props.Code,
-	} }}
+	{{codeAttrs := templ.Attributes{
+	"name":  "code",
+	"value": props.Code,
+}
+	}}
 	if props.Mode == PositionFormEdit {
 		{{ codeAttrs["readonly"] = true }}
 	}
