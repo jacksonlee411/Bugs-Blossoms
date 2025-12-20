@@ -1,6 +1,6 @@
 # DEV-PLAN-053：Position Core（Schema + Service + API 最小闭环）（对齐 050/051/052）
 
-**状态**: 草拟中（2025-12-20 05:05 UTC）
+**状态**: 进行中（核心闭环已落地；见 §8.3 实施记录）（2025-12-20 17:45 UTC）
 
 > 本计划按 [DEV-PLAN-001](001-technical-design-template.md) 的结构补齐“可直接编码”的详细设计（Level 4-5），并以 [DEV-PLAN-052](052-position-contract-freeze-and-decisions.md) 的契约冻结为准：若本计划与 052 冲突，以 052 为 SSOT。
 
@@ -14,12 +14,12 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] **Schema**：实现 052 §5 v1 合同：新增 `org_position_slices`（no-overlap + FK + 关键 check），扩展 `org_assignments.allocated_fte`，并调整约束以支持“一岗多人/部分填充”。
-  - [ ] **Service**：实现 Position v1 写语义：Create / Update（Insert 新切片）/ Correct / Rescind / ShiftBoundary；并支持 Transfer（更新 `org_node_id`）与 reports-to；复用 025 的冻结窗口与审计口径（`org_audit_logs.meta.reason_code`）。
-  - [ ] **API**：新增 `/org/api/positions*`（JSON-only）；扩展 `/org/api/assignments*` 支持 `allocated_fte`（默认 1.0）与占编校验；错误码口径以 052 §6.3 为准。
-  - [ ] **占编口径**：按 as-of 派生 `occupied_fte=sum(allocated_fte)` 与 `staffing_state`（052 §4.2.2/§8.1），并在 Assignment 写入与 Position 容量下调时阻断 `occupied_fte > capacity_fte`（`ORG_POSITION_OVER_CAPACITY`）。
-  - [ ] **事件与 outbox**：Position/Assignment 变更必须通过 026 outbox enqueue，并对齐 022 的 v1 Topic 与 payload 形状（必要时先更新 022/026 契约文档）。
-  - [ ] **兼容性**：不破坏既有 auto position 写链路（`ENABLE_ORG_AUTO_POSITIONS`）与既有 `/org/api/snapshot` / `/org/api/assignments` 行为；迁移采用“两阶段（backfill + 读链路切换）”降低破坏性。
+  - [x] **Schema（已完成）**：新增 `org_position_slices`（no-overlap + FK + 关键 check），扩展 `org_assignments.allocated_fte`，并调整约束以支持“一岗多人/部分填充”。
+  - [ ] **Service（部分完成）**：已实现 Create / Update（Insert 新切片）/ Correct / Rescind + Transfer（更新 `org_node_id`）+ 占编校验与审计/outbox；待补齐 ShiftBoundary 与 reports-to 防环（见 §8.2/§8.3）。
+  - [ ] **API（部分完成）**：已落地 `/org/api/positions*`（除 `:shift-boundary`）并扩展 `/org/api/assignments*` 支持 `allocated_fte/reason_code/reason_note`；待补齐 `POST /org/api/positions/{id}:shift-boundary`（见 §8.2）。
+  - [x] **占编口径（已完成）**：按 as-of 派生 `occupied_fte=sum(allocated_fte)` 与 `staffing_state`，并在 Assignment 写入与 Position 容量下调时阻断 `occupied_fte > capacity_fte`（`ORG_POSITION_OVER_CAPACITY`）。
+  - [x] **事件与 outbox（已完成）**：Position 复用 `org.changed.v1`（`entity_type=org_position`），Assignment v1 payload 增量带出 `allocated_fte`；写路径事务内 enqueue。
+  - [x] **兼容性（已完成）**：保留既有 auto position 口径并完成 backfill；`/org/api/snapshot` 的 Position payload 已切换为 slice 口径且保持可用。
 - **非目标（Out of Scope）**：
   - [ ] Job Catalog/Profile 主数据与冲突校验 SSOT（由 [DEV-PLAN-056](056-job-catalog-profile-and-position-restrictions.md) 承接；本计划只预留字段并提供校验 hook）。
   - [ ] Position Restrictions（056 承接）。
@@ -443,13 +443,18 @@ CREATE INDEX org_position_slices_tenant_org_node_effective_idx
 - 路由治理：`docs/dev-plans/018-routing-strategy.md`
 
 ### 8.2 里程碑（建议拆分）
-0. [ ] Contract First：更新 022（Position 事件扩展）、026（positions endpoints 的 Authz 映射）以及 024/025（assignments 增量字段），并通过 `make check doc`。
-1. [ ] Schema 迁移：新增 `org_position_slices`、扩展 `org_assignments`、约束调整与 backfill。
-2. [ ] Repository：Position/PositionSlice 的读写接口落地；修复依赖 `org_positions` 旧列的查询（snapshot/assignments join 等）。
-3. [ ] Service：Position 写语义 + 占编校验 + 防环校验 + 审计/outbox enqueue。
-4. [ ] API：`/org/api/positions*` 落地，并扩展 assignments 支持 `allocated_fte`；对齐错误码。
-5. [ ] 事件：Position/Assignment 的 v1 payload 与 022 对齐；outbox 投递冒烟通过。
-6. [ ] 测试：覆盖容量校验/并发/时间线边界/约束变更回归。
+0. [x] Contract First：更新 022（Position 事件扩展）与 024/025（assignments 增量字段），并通过 `make check doc`。
+1. [x] Schema 迁移：新增 `org_position_slices`、扩展 `org_assignments`、约束调整与 backfill。
+2. [x] Repository：Position/PositionSlice 的读写接口落地；修复依赖 `org_positions` 旧列的查询（snapshot/assignments join 等）。
+3. [ ] Service：补齐 reports-to 防环（422 `ORG_POSITION_REPORTS_TO_CYCLE`）与 ShiftBoundary（见 §6.6/§6.8）。
+4. [ ] API：补齐 `POST /org/api/positions/{id}:shift-boundary` 并在 026 登记 positions endpoints 的 Authz 映射（避免 SSOT 漂移）。
+5. [x] 事件：Position/Assignment 的 v1 payload 与 022 对齐；outbox 投递冒烟通过。
+6. [ ] 测试：补齐并发/时间线边界/防环回归用例；现已完成门禁回归（本地与 CI 通过），但仍需按 §9 的“关键用例”补齐覆盖面。
+
+### 8.3 实施记录（本计划内）
+- [x] 已落地：见 PR `#97`（分支 `feature/dev-plan-052-impl`），CI 全绿。
+- [x] 已验证门禁：`make org plan && make org lint && make org migrate up`；`go fmt ./... && go vet ./... && make check lint && make test`。
+- [x] 已处理 CI 补充门禁：SQL 格式化（`pg_format`）对齐（`make check sqlfmt` 通过）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **Schema**：Atlas plan/lint 通过；迁移在 PG17 冒烟通过；backfill 后 as-of 查询能返回合理数据。
