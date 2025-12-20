@@ -31,6 +31,7 @@ const (
 	ruleEdgeParentNullNonRoot    = "ORG_Q_006_EDGE_PARENT_NULL_FOR_NON_ROOT"
 	ruleLeafRequiresPositionAsOf = "ORG_Q_007_LEAF_REQUIRES_POSITION_ASOF"
 	ruleAssignmentSubjectMapping = "ORG_Q_008_ASSIGNMENT_SUBJECT_MAPPING"
+	rulePositionOverCapacity     = "ORG_Q_009_POSITION_OVER_CAPACITY"
 )
 
 const (
