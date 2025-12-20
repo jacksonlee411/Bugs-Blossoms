@@ -214,6 +214,7 @@ flowchart TD
 **Request**
 ```json
 {
+  "reason_code": "correct",
   "pernr": "000123",
   "position_id": "uuid",
   "subject_id": "uuid"
@@ -223,6 +224,7 @@ flowchart TD
 **Rules**
 - 不允许修改 `effective_date/end_date`。
 - `subject_id` 必须与 026 SSOT 映射一致，否则 422 `ORG_SUBJECT_MISMATCH`。
+- `reason_code` 必填：写入 `org_audit_logs.meta.reason_code`（对齐 052）；兼容期允许后端填充 `legacy`，进入强制后缺失则 400 `ORG_INVALID_BODY`。
 
 **Response 200**
 ```json
@@ -242,12 +244,13 @@ flowchart TD
 
 **Request**
 ```json
-{ "effective_date": "2025-03-01", "reason": "mistake" }
+{ "effective_date": "2025-03-01", "reason_code": "rescind", "reason_note": "mistake" }
 ```
 
 **Rules**
 - `effective_date` 必须满足 `assignment.effective_date < effective_date < assignment.end_date`，否则 422 `ORG_INVALID_RESCIND_DATE`。
 - 实现为：更新该 assignment 的 `end_date = effective_date`（时间线收口），并写审计/事件 `assignment.rescinded`。
+- `reason_code` 必填：写入 `org_audit_logs.meta.reason_code`（对齐 052）；兼容期允许后端填充 `legacy`，进入强制后缺失则 400 `ORG_INVALID_BODY`。
 
 **Response 200**
 ```json

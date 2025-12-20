@@ -1,6 +1,6 @@
 # DEV-PLAN-052：职位管理（Position）契约冻结与关键决策（对齐 050/051）
 
-**状态**: 草拟中（2025-12-20 04:33 UTC）
+**状态**: 已冻结（2025-12-20）
 
 > 本计划是 051 的“阶段 A（Contract First）”可执行化版本；内容结构参考 [DEV-PLAN-001](001-technical-design-template.md) 的技术设计模板，但仅冻结**契约与决策**，不展开到具体代码实现细节（实现由 053+ 承接）。
 
@@ -16,11 +16,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] 冻结“Position 与 Org 的关系与 SSOT”：Position/Assignment 以 Org BC（`modules/org`）为主干；HRM 仅消费只读映射，避免双 SSOT。
-  - [ ] 冻结核心口径：生命周期状态、填充状态（EMPTY/PARTIALLY_FILLED/FILLED）、VACANT 语义、容量/占用（FTE 为主）与 as-of 计算口径。
-  - [ ] 冻结 v1 数据模型合同：字段清单、字段类型、空值/默认值、关键约束（时间窗、无重叠、唯一性、占编基础不变量）。
-  - [ ] 冻结 v1 最小稳定 API 面（Position/Assignment/统计）与错误码口径，避免 UI/API 各自演进。
-  - [ ] 冻结事件契约的演进方式：复用 022/026 的 Topic/字段规则，先改契约文档再进入实现（053+）。
+  - [x] 冻结“Position 与 Org 的关系与 SSOT”：Position/Assignment 以 Org BC（`modules/org`）为主干；HRM 仅消费只读映射，避免双 SSOT。
+  - [x] 冻结核心口径：生命周期状态、填充状态（EMPTY/PARTIALLY_FILLED/FILLED）、VACANT 语义、容量/占用（FTE 为主）与 as-of 计算口径。
+  - [x] 冻结 v1 数据模型合同：字段清单、字段类型、空值/默认值、关键约束（时间窗、无重叠、唯一性、占编基础不变量）。
+  - [x] 冻结 v1 最小稳定 API 面（Position/Assignment/统计）与错误码口径，避免 UI/API 各自演进。
+  - [x] 冻结事件契约的演进方式：复用 022/026 的 Topic/字段规则，先改契约文档再进入实现（053+）。
 - **非目标（Out of Scope）**：
   - [ ] 不在 052 实施任何 Go/DB/UI 变更（实现由 053+ 承接）。
   - [ ] 不在 052 引入招聘流程（Job Requisition/Offer/Hire）与外部 ATS 集成（050 明确非范围）。
@@ -368,11 +368,11 @@ flowchart LR
 - API/Authz/Outbox 门禁：026
 
 ### 10.2 里程碑（本计划完成条件）
-1. [ ] 冻结决策清单：ADR 结论与影响面明确（§3.2 + §4-§7）。
-2. [ ] 冻结 v1 数据模型合同（§5），并与 053 的 schema 落地范围一致。
-3. [ ] 冻结 v1 API 合同与错误码（§6），并同步给 055（UI）与 054（Authz）作为输入。
-4. [ ] 形成对 022 的变更提案清单（§7.2），并按 contract-first 流程在实施前完成评审。
-5. [ ] 文档门禁通过（执行时记录）：`make check doc`。
+1. [x] 冻结决策清单：ADR 结论与影响面明确（§3.2 + §4-§7）。
+2. [x] 冻结 v1 数据模型合同（§5），并与 053 的 schema 落地范围一致。
+3. [x] 冻结 v1 API 合同与错误码（§6），并同步给 055（UI）与 054（Authz）作为输入。
+4. [x] 形成对 022 的变更提案清单（§7.2），并已同步更新 022/024/025 文档以对齐 SSOT（本次变更）。
+5. [x] 文档门禁通过（执行记录：2025-12-20）：`make check doc`（`docs gate: no new files detected`）。
 
 ## 11. 交付物（Deliverables）
 - 冻结决策清单（SSOT、System/Managed、HRM legacy positions 处置、状态/口径、停用策略、reason code 口径）。

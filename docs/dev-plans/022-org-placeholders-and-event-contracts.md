@@ -178,7 +178,7 @@ flowchart LR
 | `transaction_time` | `rfc3339` | 是 | 事务提交时间（transaction time） |
 | `initiator_id` | `uuid` | 是 | 发起人用户 id（脚本/系统任务需指定 system user） |
 | `change_type` | `string` | 是 | 见 5.4 |
-| `entity_type` | `string` | 是 | 见 5.5/5.6（`org_node/org_edge/org_assignment`） |
+| `entity_type` | `string` | 是 | 见 5.5/5.6（`org_node/org_edge/org_position/org_assignment`） |
 | `entity_id` | `uuid` | 是 | 变更实体 id（与 `entity_type` 搭配） |
 | `entity_version` | `int64` | 是 | 占位；M1 可恒为 `0`，后续如引入强版本需发布 v2 |
 | `effective_window` | `object` | 是 | 见 5.3 |
@@ -205,6 +205,10 @@ flowchart LR
   - `edge.created`
   - `edge.updated`（Move/ShiftBoundary 等导致边有效期变化）
   - `edge.rescinded`
+  - `position.created`
+  - `position.updated`
+  - `position.corrected`
+  - `position.rescinded`
 - 对 `org.assignment.changed.v1`：
   - `assignment.created`
   - `assignment.updated`
@@ -214,7 +218,7 @@ flowchart LR
 ### 5.5 `org.changed.v1` 的 `new_values` 结构（选定）
 > v1 以“最小可用快照”为准：下游若需要完整时间线与路径，走 026 的 `/org/api/snapshot` 纠偏。
 
-`entity_type` 取值必须为 `org_node` 或 `org_edge`。
+`entity_type` 取值必须为 `org_node`、`org_edge` 或 `org_position`。
 
 当 `entity_type=org_node` 时，`new_values` 必须包含：
 - `org_node_id`（同 `entity_id`）
@@ -231,6 +235,15 @@ flowchart LR
 可选但推荐：
 - `path`（string，ltree）
 - `depth`（int）
+
+当 `entity_type=org_position` 时，`new_values` 必须包含：
+- `position_id`（uuid，同 `entity_id`）
+- `code`（string）
+- `org_node_id`（uuid）
+- `lifecycle_status`（string，Position 生命周期状态）
+- `is_auto_created`（bool）
+- `capacity_fte`（number）
+- `effective_date/end_date`（与 `effective_window` 一致）
 
 ### 5.6 `org.assignment.changed.v1` 的 `new_values` 结构（选定）
 `entity_type` 固定为 `org_assignment`。
@@ -265,6 +278,26 @@ flowchart LR
     "name": "HR Department",
     "status": "active",
     "parent_node_id": null,
+    "effective_date": "2025-01-01T00:00:00Z",
+    "end_date": "9999-12-31T00:00:00Z"
+  }
+}
+```
+
+**职位新增（`org.changed.v1`）**
+```json
+{
+  "change_type": "position.created",
+  "entity_type": "org_position",
+  "entity_id": "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d",
+  "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" },
+  "new_values": {
+    "position_id": "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d",
+    "code": "POS-0001",
+    "org_node_id": "00000000-0000-0000-0000-000000000000",
+    "lifecycle_status": "active",
+    "is_auto_created": false,
+    "capacity_fte": 1.0,
     "effective_date": "2025-01-01T00:00:00Z",
     "end_date": "9999-12-31T00:00:00Z"
   }

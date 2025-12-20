@@ -318,6 +318,7 @@ CREATE TABLE org_positions (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_positions_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_positions_tenant_id_code_key UNIQUE (tenant_id, code),
     CONSTRAINT org_positions_status_check CHECK (status IN ('active', 'retired', 'rescinded')),
     CONSTRAINT org_positions_effective_check CHECK (effective_date < end_date),
     CONSTRAINT org_positions_org_node_fk FOREIGN KEY (tenant_id, org_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT
@@ -331,6 +332,51 @@ CREATE INDEX org_positions_tenant_node_effective_idx ON org_positions (tenant_id
 
 CREATE INDEX org_positions_tenant_code_effective_idx ON org_positions (tenant_id, code, effective_date);
 
+CREATE TABLE org_position_slices (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    position_id uuid NOT NULL,
+    org_node_id uuid NOT NULL,
+    title text NULL,
+    lifecycle_status text NOT NULL DEFAULT 'active',
+    position_type text NULL,
+    employment_type text NULL,
+    capacity_fte numeric(9, 2) NOT NULL DEFAULT 1.0,
+    capacity_headcount int NULL,
+    reports_to_position_id uuid NULL,
+    job_family_group_code varchar(64) NULL,
+    job_family_code varchar(64) NULL,
+    job_role_code varchar(64) NULL,
+    job_level_code varchar(64) NULL,
+    job_profile_id uuid NULL,
+    cost_center_code varchar(64) NULL,
+    profile jsonb NOT NULL DEFAULT '{}'::jsonb,
+    effective_date timestamptz NOT NULL,
+    end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_position_slices_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_position_slices_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_position_slices_lifecycle_status_check CHECK (lifecycle_status IN ('planned', 'active', 'inactive', 'rescinded')),
+    CONSTRAINT org_position_slices_capacity_fte_check CHECK (capacity_fte > 0),
+    CONSTRAINT org_position_slices_capacity_headcount_check CHECK (capacity_headcount IS NULL OR capacity_headcount >= 0),
+    CONSTRAINT org_position_slices_reports_to_self_check CHECK (reports_to_position_id IS NULL OR reports_to_position_id <> position_id),
+    CONSTRAINT org_position_slices_profile_is_object_check CHECK (jsonb_typeof(profile) = 'object'),
+    CONSTRAINT org_position_slices_position_fk FOREIGN KEY (tenant_id, position_id) REFERENCES org_positions (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_position_slices_org_node_fk FOREIGN KEY (tenant_id, org_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_position_slices_reports_to_fk FOREIGN KEY (tenant_id, reports_to_position_id) REFERENCES org_positions (tenant_id, id) ON DELETE RESTRICT
+);
+
+ALTER TABLE org_position_slices
+    ADD CONSTRAINT org_position_slices_no_overlap
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, position_id gist_uuid_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+
+CREATE INDEX org_position_slices_tenant_position_effective_idx ON org_position_slices (tenant_id, position_id, effective_date);
+
+CREATE INDEX org_position_slices_tenant_node_effective_idx ON org_position_slices (tenant_id, org_node_id, effective_date);
+
+CREATE INDEX org_position_slices_tenant_reports_to_effective_idx ON org_position_slices (tenant_id, reports_to_position_id, effective_date);
+
 CREATE TABLE org_assignments (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -340,6 +386,7 @@ CREATE TABLE org_assignments (
     pernr text NOT NULL,
     assignment_type text NOT NULL DEFAULT 'primary',
     is_primary boolean NOT NULL DEFAULT TRUE,
+    allocated_fte numeric(9, 2) NOT NULL DEFAULT 1.0,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -348,6 +395,7 @@ CREATE TABLE org_assignments (
     CONSTRAINT org_assignments_subject_type_check CHECK (subject_type IN ('person')),
     CONSTRAINT org_assignments_assignment_type_check CHECK (assignment_type IN ('primary', 'matrix', 'dotted')),
     CONSTRAINT org_assignments_primary_check CHECK ((assignment_type = 'primary') = is_primary),
+    CONSTRAINT org_assignments_allocated_fte_check CHECK (allocated_fte > 0),
     CONSTRAINT org_assignments_position_fk FOREIGN KEY (tenant_id, position_id) REFERENCES org_positions (tenant_id, id) ON DELETE RESTRICT
 );
 
@@ -357,8 +405,15 @@ ALTER TABLE org_assignments
 WHERE (assignment_type = 'primary');
 
 ALTER TABLE org_assignments
-    ADD CONSTRAINT org_assignments_position_unique_in_time
-    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, position_id gist_uuid_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+    ADD CONSTRAINT org_assignments_subject_position_unique_in_time
+    EXCLUDE USING gist (
+        tenant_id gist_uuid_ops WITH =,
+        position_id gist_uuid_ops WITH =,
+        subject_type gist_text_ops WITH =,
+        subject_id gist_uuid_ops WITH =,
+        assignment_type gist_text_ops WITH =,
+        tstzrange(effective_date, end_date, '[)') WITH &&
+    );
 
 CREATE INDEX org_assignments_tenant_subject_effective_idx ON org_assignments (tenant_id, subject_id, effective_date);
 

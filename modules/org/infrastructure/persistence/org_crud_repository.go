@@ -402,12 +402,12 @@ func (r *OrgRepository) PositionExistsAt(ctx context.Context, tenantID uuid.UUID
 	}
 	var exists bool
 	if err := tx.QueryRow(ctx, `
-SELECT EXISTS(
-	SELECT 1
-	FROM org_positions
-	WHERE tenant_id=$1 AND id=$2 AND effective_date <= $3 AND end_date > $3
-)
-`, pgUUID(tenantID), pgUUID(positionID), asOf).Scan(&exists); err != nil {
+	SELECT EXISTS(
+		SELECT 1
+		FROM org_position_slices
+		WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date > $3
+	)
+	`, pgUUID(tenantID), pgUUID(positionID), asOf).Scan(&exists); err != nil {
 		return false, err
 	}
 	return exists, nil
@@ -420,19 +420,40 @@ func (r *OrgRepository) InsertAutoPosition(ctx context.Context, tenantID uuid.UU
 	}
 
 	_, err = tx.Exec(ctx, `
-INSERT INTO org_positions (
-	tenant_id,
-	id,
-	org_node_id,
-	code,
-	status,
-	is_auto_created,
-	effective_date,
-	end_date
-)
-VALUES ($1,$2,$3,$4,'active',true,$5,$6)
-ON CONFLICT (id) DO NOTHING
-`, pgUUID(tenantID), pgUUID(positionID), pgUUID(orgNodeID), code, effectiveDate, time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
+	INSERT INTO org_positions (
+		tenant_id,
+		id,
+		org_node_id,
+		code,
+		status,
+		is_auto_created,
+		effective_date,
+		end_date
+	)
+	VALUES ($1,$2,$3,$4,'active',true,$5,$6)
+	ON CONFLICT (id) DO NOTHING
+	`, pgUUID(tenantID), pgUUID(positionID), pgUUID(orgNodeID), code, effectiveDate, time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(ctx, `
+	INSERT INTO org_position_slices (
+		tenant_id,
+		position_id,
+		org_node_id,
+		lifecycle_status,
+		capacity_fte,
+		effective_date,
+		end_date
+	)
+	SELECT $1,$2,$3,'active',1.0,$4,$5
+	WHERE NOT EXISTS (
+		SELECT 1
+		FROM org_position_slices s
+		WHERE s.tenant_id=$1 AND s.position_id=$2 AND s.effective_date=$4 AND s.end_date=$5
+	)
+	`, pgUUID(tenantID), pgUUID(positionID), pgUUID(orgNodeID), effectiveDate, time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
 	return err
 }
 
@@ -443,15 +464,80 @@ func (r *OrgRepository) GetPositionOrgNodeAt(ctx context.Context, tenantID uuid.
 	}
 	var orgNodeID uuid.UUID
 	if err := tx.QueryRow(ctx, `
-SELECT org_node_id
-FROM org_positions
-WHERE tenant_id=$1 AND id=$2 AND effective_date <= $3 AND end_date > $3
-ORDER BY effective_date DESC
-LIMIT 1
-`, pgUUID(tenantID), pgUUID(positionID), asOf).Scan(&orgNodeID); err != nil {
+	SELECT org_node_id
+	FROM org_position_slices
+	WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date > $3
+	ORDER BY effective_date DESC
+	LIMIT 1
+	`, pgUUID(tenantID), pgUUID(positionID), asOf).Scan(&orgNodeID); err != nil {
 		return uuid.Nil, err
 	}
 	return orgNodeID, nil
+}
+
+func (r *OrgRepository) LockPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (services.PositionSliceRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return services.PositionSliceRow{}, err
+	}
+
+	row := tx.QueryRow(ctx, `
+	SELECT
+		id,
+		position_id,
+		org_node_id,
+		title,
+		lifecycle_status,
+		capacity_fte,
+		reports_to_position_id,
+		effective_date,
+		end_date
+	FROM org_position_slices
+	WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date > $3
+	ORDER BY effective_date DESC
+	LIMIT 1
+	FOR UPDATE
+	`, pgUUID(tenantID), pgUUID(positionID), asOf)
+
+	var out services.PositionSliceRow
+	var title pgtype.Text
+	var reportsTo pgtype.UUID
+	if err := row.Scan(
+		&out.ID,
+		&out.PositionID,
+		&out.OrgNodeID,
+		&title,
+		&out.LifecycleStatus,
+		&out.CapacityFTE,
+		&reportsTo,
+		&out.EffectiveDate,
+		&out.EndDate,
+	); err != nil {
+		return services.PositionSliceRow{}, err
+	}
+	out.Title = nullableText(title)
+	out.ReportsToPositionID = nullableUUID(reportsTo)
+	return out, nil
+}
+
+func (r *OrgRepository) SumAllocatedFTEAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (float64, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return 0, err
+	}
+	var sum float64
+	if err := tx.QueryRow(ctx, `
+	SELECT COALESCE(SUM(allocated_fte), 0)
+	FROM org_assignments
+	WHERE tenant_id=$1
+	  AND position_id=$2
+	  AND assignment_type='primary'
+	  AND effective_date <= $3
+	  AND end_date > $3
+	`, pgUUID(tenantID), pgUUID(positionID), asOf).Scan(&sum); err != nil {
+		return 0, err
+	}
+	return sum, nil
 }
 
 func (r *OrgRepository) LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (services.AssignmentRow, error) {
@@ -460,20 +546,21 @@ func (r *OrgRepository) LockAssignmentAt(ctx context.Context, tenantID uuid.UUID
 		return services.AssignmentRow{}, err
 	}
 	row := tx.QueryRow(ctx, `
-SELECT
-	id,
-	position_id,
-	subject_type,
-	subject_id,
-	pernr,
-	assignment_type,
-	is_primary,
-	effective_date,
-	end_date
-FROM org_assignments
-WHERE tenant_id=$1 AND id=$2 AND effective_date <= $3 AND end_date > $3
-FOR UPDATE
-`, pgUUID(tenantID), pgUUID(assignmentID), asOf)
+	SELECT
+		id,
+		position_id,
+		subject_type,
+		subject_id,
+		pernr,
+		assignment_type,
+		is_primary,
+		allocated_fte,
+		effective_date,
+		end_date
+	FROM org_assignments
+	WHERE tenant_id=$1 AND id=$2 AND effective_date <= $3 AND end_date > $3
+	FOR UPDATE
+	`, pgUUID(tenantID), pgUUID(assignmentID), asOf)
 	var out services.AssignmentRow
 	if err := row.Scan(
 		&out.ID,
@@ -483,6 +570,7 @@ FOR UPDATE
 		&out.Pernr,
 		&out.AssignmentType,
 		&out.IsPrimary,
+		&out.AllocatedFTE,
 		&out.EffectiveDate,
 		&out.EndDate,
 	); err != nil {
@@ -529,20 +617,21 @@ func (r *OrgRepository) InsertAssignment(ctx context.Context, tenantID uuid.UUID
 	}
 	var id uuid.UUID
 	if err := tx.QueryRow(ctx, `
-INSERT INTO org_assignments (
-	tenant_id,
-	position_id,
-	subject_type,
-	subject_id,
-	pernr,
-	assignment_type,
-	is_primary,
-	effective_date,
-	end_date
-)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-RETURNING id
-`, pgUUID(tenantID), pgUUID(assignment.PositionID), assignment.SubjectType, pgUUID(assignment.SubjectID), assignment.Pernr, assignment.AssignmentType, assignment.IsPrimary, assignment.EffectiveDate, assignment.EndDate).Scan(&id); err != nil {
+	INSERT INTO org_assignments (
+		tenant_id,
+		position_id,
+		subject_type,
+		subject_id,
+		pernr,
+		assignment_type,
+		is_primary,
+		allocated_fte,
+		effective_date,
+		end_date
+	)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+	RETURNING id
+	`, pgUUID(tenantID), pgUUID(assignment.PositionID), assignment.SubjectType, pgUUID(assignment.SubjectID), assignment.Pernr, assignment.AssignmentType, assignment.IsPrimary, assignment.AllocatedFTE, assignment.EffectiveDate, assignment.EndDate).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	return id, nil
@@ -555,23 +644,24 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 	}
 
 	rows, err := tx.Query(ctx, `
-SELECT
-	a.id,
-	a.position_id,
-	p.org_node_id,
-	a.assignment_type,
-	a.is_primary,
-	a.effective_date,
-	a.end_date
-FROM org_assignments a
-JOIN org_positions p
-	ON p.tenant_id=a.tenant_id
-	AND p.id=a.position_id
-	AND p.effective_date <= a.effective_date
-	AND p.end_date > a.effective_date
-WHERE a.tenant_id=$1 AND a.subject_id=$2
-ORDER BY a.effective_date ASC
-`, pgUUID(tenantID), pgUUID(subjectID))
+	SELECT
+		a.id,
+		a.position_id,
+		s.org_node_id,
+		a.assignment_type,
+		a.is_primary,
+		a.allocated_fte,
+		a.effective_date,
+		a.end_date
+	FROM org_assignments a
+	JOIN org_position_slices s
+		ON s.tenant_id=a.tenant_id
+		AND s.position_id=a.position_id
+		AND s.effective_date <= a.effective_date
+		AND s.end_date > a.effective_date
+	WHERE a.tenant_id=$1 AND a.subject_id=$2
+	ORDER BY a.effective_date ASC
+	`, pgUUID(tenantID), pgUUID(subjectID))
 	if err != nil {
 		return nil, err
 	}
@@ -580,7 +670,7 @@ ORDER BY a.effective_date ASC
 	out := make([]services.AssignmentViewRow, 0, 16)
 	for rows.Next() {
 		var v services.AssignmentViewRow
-		if err := rows.Scan(&v.ID, &v.PositionID, &v.OrgNodeID, &v.AssignmentType, &v.IsPrimary, &v.EffectiveDate, &v.EndDate); err != nil {
+		if err := rows.Scan(&v.ID, &v.PositionID, &v.OrgNodeID, &v.AssignmentType, &v.IsPrimary, &v.AllocatedFTE, &v.EffectiveDate, &v.EndDate); err != nil {
 			return nil, err
 		}
 		out = append(out, v)
@@ -595,23 +685,24 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 	}
 
 	rows, err := tx.Query(ctx, `
-SELECT
-	a.id,
-	a.position_id,
-	p.org_node_id,
-	a.assignment_type,
-	a.is_primary,
-	a.effective_date,
-	a.end_date
-FROM org_assignments a
-JOIN org_positions p
-	ON p.tenant_id=a.tenant_id
-	AND p.id=a.position_id
-	AND p.effective_date <= $3
-	AND p.end_date > $3
-WHERE a.tenant_id=$1 AND a.subject_id=$2 AND a.effective_date <= $3 AND a.end_date > $3
-ORDER BY a.effective_date DESC
-`, pgUUID(tenantID), pgUUID(subjectID), asOf)
+	SELECT
+		a.id,
+		a.position_id,
+		s.org_node_id,
+		a.assignment_type,
+		a.is_primary,
+		a.allocated_fte,
+		a.effective_date,
+		a.end_date
+	FROM org_assignments a
+	JOIN org_position_slices s
+		ON s.tenant_id=a.tenant_id
+		AND s.position_id=a.position_id
+		AND s.effective_date <= $3
+		AND s.end_date > $3
+	WHERE a.tenant_id=$1 AND a.subject_id=$2 AND a.effective_date <= $3 AND a.end_date > $3
+	ORDER BY a.effective_date DESC
+	`, pgUUID(tenantID), pgUUID(subjectID), asOf)
 	if err != nil {
 		return nil, err
 	}
@@ -620,7 +711,7 @@ ORDER BY a.effective_date DESC
 	out := make([]services.AssignmentViewRow, 0, 16)
 	for rows.Next() {
 		var v services.AssignmentViewRow
-		if err := rows.Scan(&v.ID, &v.PositionID, &v.OrgNodeID, &v.AssignmentType, &v.IsPrimary, &v.EffectiveDate, &v.EndDate); err != nil {
+		if err := rows.Scan(&v.ID, &v.PositionID, &v.OrgNodeID, &v.AssignmentType, &v.IsPrimary, &v.AllocatedFTE, &v.EffectiveDate, &v.EndDate); err != nil {
 			return nil, err
 		}
 		out = append(out, v)

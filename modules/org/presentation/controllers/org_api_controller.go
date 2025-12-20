@@ -71,6 +71,14 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/nodes/{id}:shift-boundary", c.instrumentAPI("nodes.shift_boundary", c.ShiftBoundaryNode)).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}:correct-move", c.instrumentAPI("nodes.correct_move", c.CorrectMoveNode)).Methods(http.MethodPost)
 
+	api.HandleFunc("/positions", c.instrumentAPI("positions.list", c.GetPositions)).Methods(http.MethodGet)
+	api.HandleFunc("/positions", c.instrumentAPI("positions.create", c.CreatePosition)).Methods(http.MethodPost)
+	api.HandleFunc("/positions/{id}", c.instrumentAPI("positions.get", c.GetPosition)).Methods(http.MethodGet)
+	api.HandleFunc("/positions/{id}/timeline", c.instrumentAPI("positions.timeline", c.GetPositionTimeline)).Methods(http.MethodGet)
+	api.HandleFunc("/positions/{id}", c.instrumentAPI("positions.update", c.UpdatePosition)).Methods(http.MethodPatch)
+	api.HandleFunc("/positions/{id}:correct", c.instrumentAPI("positions.correct", c.CorrectPosition)).Methods(http.MethodPost)
+	api.HandleFunc("/positions/{id}:rescind", c.instrumentAPI("positions.rescind", c.RescindPosition)).Methods(http.MethodPost)
+
 	api.HandleFunc("/assignments", c.instrumentAPI("assignments.list", c.GetAssignments)).Methods(http.MethodGet)
 	api.HandleFunc("/assignments", c.instrumentAPI("assignments.create", c.CreateAssignment)).Methods(http.MethodPost)
 	api.HandleFunc("/assignments/{id}", c.instrumentAPI("assignments.update", c.UpdateAssignment)).Methods(http.MethodPatch)
@@ -1906,6 +1914,444 @@ func (c *OrgAPIController) CorrectMoveNode(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+func (c *OrgAPIController) GetPositions(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "read") {
+		return
+	}
+
+	asOfRaw := strings.TrimSpace(r.URL.Query().Get("effective_date"))
+	var asOf *time.Time
+	if asOfRaw != "" {
+		t, err := parseEffectiveDate(asOfRaw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+			return
+		}
+		asOf = &t
+	}
+
+	var orgNodeID *uuid.UUID
+	if raw := strings.TrimSpace(r.URL.Query().Get("org_node_id")); raw != "" {
+		id, err := uuid.Parse(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "org_node_id is invalid")
+			return
+		}
+		orgNodeID = &id
+	}
+
+	var q *string
+	if raw := strings.TrimSpace(r.URL.Query().Get("q")); raw != "" {
+		q = &raw
+	}
+
+	var lifecycleStatus *string
+	if raw := strings.TrimSpace(r.URL.Query().Get("lifecycle_status")); raw != "" {
+		lifecycleStatus = &raw
+	}
+
+	var isAutoCreated *bool
+	if raw := strings.TrimSpace(r.URL.Query().Get("is_auto_created")); raw != "" {
+		v, err := strconv.ParseBool(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "is_auto_created is invalid")
+			return
+		}
+		isAutoCreated = &v
+	}
+
+	limit := 25
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		v, err := strconv.Atoi(raw)
+		if err != nil || v <= 0 {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "limit is invalid")
+			return
+		}
+		limit = v
+	}
+	page := 1
+	if raw := strings.TrimSpace(r.URL.Query().Get("page")); raw != "" {
+		v, err := strconv.Atoi(raw)
+		if err != nil || v <= 0 {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "page is invalid")
+			return
+		}
+		page = v
+	}
+	offset := (page - 1) * limit
+
+	rows, effectiveDate, err := c.org.GetPositions(r.Context(), tenantID, services.GetPositionsInput{
+		AsOf:            asOf,
+		OrgNodeID:       orgNodeID,
+		Q:               q,
+		LifecycleStatus: lifecycleStatus,
+		IsAutoCreated:   isAutoCreated,
+		Limit:           limit,
+		Offset:          offset,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type getPositionsResponse struct {
+		TenantID  string                     `json:"tenant_id"`
+		AsOf      string                     `json:"as_of"`
+		Page      int                        `json:"page"`
+		Limit     int                        `json:"limit"`
+		Positions []services.PositionViewRow `json:"positions"`
+	}
+	writeJSON(w, http.StatusOK, getPositionsResponse{
+		TenantID:  tenantID.String(),
+		AsOf:      effectiveDate.UTC().Format(time.RFC3339),
+		Page:      page,
+		Limit:     limit,
+		Positions: rows,
+	})
+}
+
+type createPositionRequest struct {
+	Code            string     `json:"code"`
+	OrgNodeID       uuid.UUID  `json:"org_node_id"`
+	EffectiveDate   string     `json:"effective_date"`
+	Title           *string    `json:"title"`
+	LifecycleStatus string     `json:"lifecycle_status"`
+	CapacityFTE     *float64   `json:"capacity_fte"`
+	ReportsToID     *uuid.UUID `json:"reports_to_position_id"`
+	ReasonCode      string     `json:"reason_code"`
+	ReasonNote      *string    `json:"reason_note"`
+}
+
+func (c *OrgAPIController) CreatePosition(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "write") {
+		return
+	}
+
+	var req createPositionRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+	capacityFTE := 1.0
+	if req.CapacityFTE != nil {
+		capacityFTE = *req.CapacityFTE
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.CreatePosition(r.Context(), tenantID, requestID, initiatorID, services.CreatePositionInput{
+		Code:            req.Code,
+		OrgNodeID:       req.OrgNodeID,
+		EffectiveDate:   effectiveDate,
+		Title:           req.Title,
+		LifecycleStatus: req.LifecycleStatus,
+		CapacityFTE:     capacityFTE,
+		ReportsToID:     req.ReportsToID,
+		ReasonCode:      req.ReasonCode,
+		ReasonNote:      req.ReasonNote,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type createPositionResponse struct {
+		PositionID      string                  `json:"position_id"`
+		SliceID         string                  `json:"slice_id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusCreated, createPositionResponse{
+		PositionID: res.PositionID.String(),
+		SliceID:    res.SliceID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+func (c *OrgAPIController) GetPosition(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "read") {
+		return
+	}
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	asOfRaw := strings.TrimSpace(r.URL.Query().Get("effective_date"))
+	var asOf *time.Time
+	if asOfRaw != "" {
+		t, err := parseEffectiveDate(asOfRaw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "effective_date is invalid")
+			return
+		}
+		asOf = &t
+	}
+
+	row, effectiveDate, err := c.org.GetPosition(r.Context(), tenantID, positionID, asOf)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type getPositionResponse struct {
+		TenantID string                   `json:"tenant_id"`
+		AsOf     string                   `json:"as_of"`
+		Position services.PositionViewRow `json:"position"`
+	}
+	writeJSON(w, http.StatusOK, getPositionResponse{
+		TenantID: tenantID.String(),
+		AsOf:     effectiveDate.UTC().Format(time.RFC3339),
+		Position: row,
+	})
+}
+
+func (c *OrgAPIController) GetPositionTimeline(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "read") {
+		return
+	}
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	rows, err := c.org.GetPositionTimeline(r.Context(), tenantID, positionID)
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type getPositionTimelineResponse struct {
+		TenantID   string                      `json:"tenant_id"`
+		PositionID string                      `json:"position_id"`
+		Slices     []services.PositionSliceRow `json:"slices"`
+	}
+	writeJSON(w, http.StatusOK, getPositionTimelineResponse{
+		TenantID:   tenantID.String(),
+		PositionID: positionID.String(),
+		Slices:     rows,
+	})
+}
+
+type updatePositionRequest struct {
+	EffectiveDate   string     `json:"effective_date"`
+	ReasonCode      string     `json:"reason_code"`
+	ReasonNote      *string    `json:"reason_note"`
+	OrgNodeID       *uuid.UUID `json:"org_node_id"`
+	Title           *string    `json:"title"`
+	LifecycleStatus *string    `json:"lifecycle_status"`
+	CapacityFTE     *float64   `json:"capacity_fte"`
+	ReportsToID     *uuid.UUID `json:"reports_to_position_id"`
+}
+
+func (c *OrgAPIController) UpdatePosition(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "write") {
+		return
+	}
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req updatePositionRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.UpdatePosition(r.Context(), tenantID, requestID, initiatorID, services.UpdatePositionInput{
+		PositionID:      positionID,
+		EffectiveDate:   effectiveDate,
+		ReasonCode:      req.ReasonCode,
+		ReasonNote:      req.ReasonNote,
+		OrgNodeID:       req.OrgNodeID,
+		Title:           req.Title,
+		LifecycleStatus: req.LifecycleStatus,
+		CapacityFTE:     req.CapacityFTE,
+		ReportsToID:     req.ReportsToID,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type updatePositionResponse struct {
+		PositionID      string                  `json:"position_id"`
+		SliceID         string                  `json:"slice_id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, updatePositionResponse{
+		PositionID: res.PositionID.String(),
+		SliceID:    res.SliceID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type correctPositionRequest struct {
+	EffectiveDate   string     `json:"effective_date"`
+	ReasonCode      string     `json:"reason_code"`
+	ReasonNote      *string    `json:"reason_note"`
+	OrgNodeID       *uuid.UUID `json:"org_node_id"`
+	Title           *string    `json:"title"`
+	LifecycleStatus *string    `json:"lifecycle_status"`
+	CapacityFTE     *float64   `json:"capacity_fte"`
+	ReportsToID     *uuid.UUID `json:"reports_to_position_id"`
+}
+
+func (c *OrgAPIController) CorrectPosition(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "admin") {
+		return
+	}
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req correctPositionRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.CorrectPosition(r.Context(), tenantID, requestID, initiatorID, services.CorrectPositionInput{
+		PositionID:  positionID,
+		AsOf:        effectiveDate,
+		ReasonCode:  req.ReasonCode,
+		ReasonNote:  req.ReasonNote,
+		OrgNodeID:   req.OrgNodeID,
+		Title:       req.Title,
+		Lifecycle:   req.LifecycleStatus,
+		CapacityFTE: req.CapacityFTE,
+		ReportsToID: req.ReportsToID,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type correctPositionResponse struct {
+		PositionID      string                  `json:"position_id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, correctPositionResponse{
+		PositionID: res.PositionID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
+type rescindPositionRequest struct {
+	EffectiveDate string  `json:"effective_date"`
+	ReasonCode    string  `json:"reason_code"`
+	ReasonNote    *string `json:"reason_note"`
+}
+
+func (c *OrgAPIController) RescindPosition(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "admin") {
+		return
+	}
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req rescindPositionRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.RescindPosition(r.Context(), tenantID, requestID, initiatorID, services.RescindPositionInput{
+		PositionID:    positionID,
+		EffectiveDate: effectiveDate,
+		ReasonCode:    req.ReasonCode,
+		ReasonNote:    req.ReasonNote,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type rescindPositionResponse struct {
+		PositionID      string                  `json:"position_id"`
+		EffectiveWindow effectiveWindowResponse `json:"effective_window"`
+	}
+	writeJSON(w, http.StatusOK, rescindPositionResponse{
+		PositionID: res.PositionID.String(),
+		EffectiveWindow: effectiveWindowResponse{
+			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+		},
+	})
+}
+
 func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request) {
 	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
 	if !ok {
@@ -1962,7 +2408,10 @@ func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request
 type createAssignmentRequest struct {
 	Pernr          string     `json:"pernr"`
 	EffectiveDate  string     `json:"effective_date"`
+	ReasonCode     string     `json:"reason_code"`
+	ReasonNote     *string    `json:"reason_note"`
 	AssignmentType string     `json:"assignment_type"`
+	AllocatedFTE   *float64   `json:"allocated_fte"`
 	PositionID     *uuid.UUID `json:"position_id"`
 	OrgNodeID      *uuid.UUID `json:"org_node_id"`
 	SubjectID      *uuid.UUID `json:"subject_id"`
@@ -1992,10 +2441,18 @@ func (c *OrgAPIController) CreateAssignment(w http.ResponseWriter, r *http.Reque
 	res, err := c.org.CreateAssignment(r.Context(), tenantID, requestID, initiatorID, services.CreateAssignmentInput{
 		Pernr:          req.Pernr,
 		EffectiveDate:  effectiveDate,
+		ReasonCode:     req.ReasonCode,
+		ReasonNote:     req.ReasonNote,
 		AssignmentType: req.AssignmentType,
-		PositionID:     req.PositionID,
-		OrgNodeID:      req.OrgNodeID,
-		SubjectID:      req.SubjectID,
+		AllocatedFTE: func() float64 {
+			if req.AllocatedFTE == nil {
+				return 0
+			}
+			return *req.AllocatedFTE
+		}(),
+		PositionID: req.PositionID,
+		OrgNodeID:  req.OrgNodeID,
+		SubjectID:  req.SubjectID,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -2021,9 +2478,12 @@ func (c *OrgAPIController) CreateAssignment(w http.ResponseWriter, r *http.Reque
 
 type updateAssignmentRequest struct {
 	EffectiveDate string       `json:"effective_date"`
+	ReasonCode    string       `json:"reason_code"`
+	ReasonNote    *string      `json:"reason_note"`
 	EndDate       *string      `json:"end_date"`
 	PositionID    optionalUUID `json:"position_id"`
 	OrgNodeID     optionalUUID `json:"org_node_id"`
+	AllocatedFTE  *float64     `json:"allocated_fte"`
 }
 
 func (c *OrgAPIController) UpdateAssignment(w http.ResponseWriter, r *http.Request) {
@@ -2070,6 +2530,9 @@ func (c *OrgAPIController) UpdateAssignment(w http.ResponseWriter, r *http.Reque
 	res, err := c.org.UpdateAssignment(r.Context(), tenantID, requestID, initiatorID, services.UpdateAssignmentInput{
 		AssignmentID:  assignmentID,
 		EffectiveDate: effectiveDate,
+		ReasonCode:    req.ReasonCode,
+		ReasonNote:    req.ReasonNote,
+		AllocatedFTE:  req.AllocatedFTE,
 		PositionID:    positionID,
 		OrgNodeID:     orgNodeID,
 	})
@@ -2094,6 +2557,8 @@ func (c *OrgAPIController) UpdateAssignment(w http.ResponseWriter, r *http.Reque
 }
 
 type correctAssignmentRequest struct {
+	ReasonCode string     `json:"reason_code"`
+	ReasonNote *string    `json:"reason_note"`
 	Pernr      *string    `json:"pernr"`
 	PositionID *uuid.UUID `json:"position_id"`
 	SubjectID  *uuid.UUID `json:"subject_id"`
@@ -2121,6 +2586,8 @@ func (c *OrgAPIController) CorrectAssignment(w http.ResponseWriter, r *http.Requ
 	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	res, err := c.org.CorrectAssignment(r.Context(), tenantID, requestID, initiatorID, services.CorrectAssignmentInput{
 		AssignmentID: assignmentID,
+		ReasonCode:   req.ReasonCode,
+		ReasonNote:   req.ReasonNote,
 		Pernr:        req.Pernr,
 		PositionID:   req.PositionID,
 		SubjectID:    req.SubjectID,
@@ -2144,8 +2611,10 @@ func (c *OrgAPIController) CorrectAssignment(w http.ResponseWriter, r *http.Requ
 }
 
 type rescindAssignmentRequest struct {
-	EffectiveDate string `json:"effective_date"`
-	Reason        string `json:"reason"`
+	EffectiveDate string  `json:"effective_date"`
+	ReasonCode    string  `json:"reason_code"`
+	ReasonNote    *string `json:"reason_note"`
+	Reason        string  `json:"reason"`
 }
 
 func (c *OrgAPIController) RescindAssignment(w http.ResponseWriter, r *http.Request) {
@@ -2175,6 +2644,8 @@ func (c *OrgAPIController) RescindAssignment(w http.ResponseWriter, r *http.Requ
 	res, err := c.org.RescindAssignment(r.Context(), tenantID, requestID, initiatorID, services.RescindAssignmentInput{
 		AssignmentID:  assignmentID,
 		EffectiveDate: effectiveDate,
+		ReasonCode:    req.ReasonCode,
+		ReasonNote:    req.ReasonNote,
 		Reason:        req.Reason,
 	})
 	if err != nil {
