@@ -335,16 +335,14 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		await page.getByRole('button', { name: 'Create' }).click();
 		await expect(tree.getByRole('button', { name: /IT Team/ })).toBeVisible();
 
-		const beforeSelectITNodeID = new URL(page.url()).searchParams.get('node_id');
-		await tree.getByRole('button', { name: /IT Team/ }).click();
-		await page.waitForURL((url) => url.searchParams.get('node_id') !== beforeSelectITNodeID);
-		const itIDValue = new URL(page.url()).searchParams.get('node_id');
+		const itHxGet = await tree.getByRole('button', { name: /IT Team/ }).getAttribute('hx-get');
+		expect(itHxGet).toBeTruthy();
+		const itIDValue = new URL(itHxGet!, 'http://local').pathname.split('/').pop();
 		expect(itIDValue).toBeTruthy();
 
-		const beforeSelectHRNodeID = itIDValue;
-		await tree.getByRole('button', { name: /HR Team/ }).click();
-		await page.waitForURL((url) => url.searchParams.get('node_id') !== beforeSelectHRNodeID);
-		const hrIDValue = new URL(page.url()).searchParams.get('node_id');
+		const hrHxGet = await tree.getByRole('button', { name: /HR Team/ }).getAttribute('hx-get');
+		expect(hrHxGet).toBeTruthy();
+		const hrIDValue = new URL(hrHxGet!, 'http://local').pathname.split('/').pop();
 		expect(hrIDValue).toBeTruthy();
 
 		await page.getByRole('link', { name: 'Positions' }).click();
@@ -356,6 +354,7 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		});
 		await positionsTree.getByRole('button', { name: /HR Team/ }).click();
 		expect((await panelResp).status()).toBe(200);
+		await expect(page.locator('#org-positions-filters input[name="node_id"]')).toHaveValue(hrIDValue!);
 		await page.waitForURL((url) => url.searchParams.get('node_id') === hrIDValue);
 		expect(new URL(page.url()).searchParams.get('node_id')).toBe(hrIDValue);
 
