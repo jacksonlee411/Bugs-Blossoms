@@ -350,7 +350,7 @@ CREATE TABLE org_position_slices (
     job_level_code varchar(64) NULL,
     job_profile_id uuid NULL,
     cost_center_code varchar(64) NULL,
-    profile jsonb NOT NULL DEFAULT '{}'::jsonb,
+    profile jsonb NOT NULL DEFAULT '{}' ::jsonb,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -406,14 +406,7 @@ WHERE (assignment_type = 'primary');
 
 ALTER TABLE org_assignments
     ADD CONSTRAINT org_assignments_subject_position_unique_in_time
-    EXCLUDE USING gist (
-        tenant_id gist_uuid_ops WITH =,
-        position_id gist_uuid_ops WITH =,
-        subject_type gist_text_ops WITH =,
-        subject_id gist_uuid_ops WITH =,
-        assignment_type gist_text_ops WITH =,
-        tstzrange(effective_date, end_date, '[)') WITH &&
-    );
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, position_id gist_uuid_ops WITH =, subject_type gist_text_ops WITH =, subject_id gist_uuid_ops WITH =, assignment_type gist_text_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
 
 CREATE INDEX org_assignments_tenant_subject_effective_idx ON org_assignments (tenant_id, subject_id, effective_date);
 
