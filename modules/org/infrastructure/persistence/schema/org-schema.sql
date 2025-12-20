@@ -293,12 +293,14 @@ CREATE INDEX org_reporting_nodes_lookup_idx ON org_reporting_nodes (tenant_id, h
 CREATE INDEX org_reporting_nodes_code_idx ON org_reporting_nodes (tenant_id, hierarchy_type, as_of_date, code);
 
 CREATE OR REPLACE VIEW org_reporting AS
-SELECT r.*
-FROM org_reporting_nodes r
+SELECT
+    r.*
+FROM
+    org_reporting_nodes r
     JOIN org_hierarchy_snapshot_builds b ON b.tenant_id = r.tenant_id
-    AND b.hierarchy_type = r.hierarchy_type
-    AND b.as_of_date = r.as_of_date
-    AND b.build_id = r.build_id
+        AND b.hierarchy_type = r.hierarchy_type
+        AND b.as_of_date = r.as_of_date
+        AND b.build_id = r.build_id
 WHERE
     b.is_active = TRUE
     AND b.status = 'ready';
