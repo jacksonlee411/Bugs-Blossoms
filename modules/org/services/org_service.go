@@ -1057,27 +1057,27 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		return nil, newServiceError(422, "ORG_SUBJECT_MISMATCH", "subject_id does not match SSOT mapping", nil)
 	}
 
-		written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CreateAssignmentResult, error) {
-			settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
-			if err != nil {
-				return nil, err
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CreateAssignmentResult, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
+		if err != nil {
+			var svcErr *ServiceError
+			if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
+				logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
+					"tenant_id":       tenantID.String(),
+					"pernr":           in.Pernr,
+					"subject_id":      derivedSubjectID.String(),
+					"assignment_type": assignmentType,
+					"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
+					"error_code":      svcErr.Code,
+					"operation":       "Create",
+				})
 			}
-			freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
-			if err != nil {
-				var svcErr *ServiceError
-				if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
-					logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
-						"tenant_id":       tenantID.String(),
-						"pernr":           in.Pernr,
-						"subject_id":      derivedSubjectID.String(),
-						"assignment_type": assignmentType,
-						"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
-						"error_code":      svcErr.Code,
-						"operation":       "Create",
-					})
-				}
-				return nil, err
-			}
+			return nil, err
+		}
 
 		var positionID uuid.UUID
 		if in.PositionID != nil {
@@ -1111,28 +1111,28 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			code := autoPositionCode(positionID)
 			if err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, in.EffectiveDate); err != nil {
 				return nil, mapPgError(err)
-				}
 			}
+		}
 
-			var posSlice PositionSliceRow
-			if isPrimary {
-				posSlice, err = s.repo.LockPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
-			} else {
-				posSlice, err = s.repo.GetPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
-			}
+		var posSlice PositionSliceRow
+		if isPrimary {
+			posSlice, err = s.repo.LockPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
+		} else {
+			posSlice, err = s.repo.GetPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
+		}
+		if err != nil {
+			return nil, mapPgError(err)
+		}
+
+		if isPrimary {
+			occupied, err := s.repo.SumAllocatedFTEAt(txCtx, tenantID, positionID, in.EffectiveDate)
 			if err != nil {
-				return nil, mapPgError(err)
+				return nil, err
 			}
-
-			if isPrimary {
-				occupied, err := s.repo.SumAllocatedFTEAt(txCtx, tenantID, positionID, in.EffectiveDate)
-				if err != nil {
-					return nil, err
-				}
-				if occupied+allocatedFTE > posSlice.CapacityFTE {
-					return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
-				}
+			if occupied+allocatedFTE > posSlice.CapacityFTE {
+				return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
 			}
+		}
 
 		restrictionsMode := normalizeValidationMode(settings.PositionRestrictionsValidationMode)
 		var restrictionsShadowErr *ServiceError
@@ -1303,18 +1303,18 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		reasonCode = "legacy"
 	}
 
-		written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdateAssignmentResult, error) {
-			settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
-			if err != nil {
-				return nil, err
-			}
-			restrictionsMode := normalizeValidationMode(settings.PositionRestrictionsValidationMode)
-			var restrictionsShadowErr *ServiceError
+	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdateAssignmentResult, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+		restrictionsMode := normalizeValidationMode(settings.PositionRestrictionsValidationMode)
+		var restrictionsShadowErr *ServiceError
 
-			current, err := s.repo.LockAssignmentAt(txCtx, tenantID, in.AssignmentID, in.EffectiveDate)
-			if err != nil {
-				return nil, mapPgError(err)
-			}
+		current, err := s.repo.LockAssignmentAt(txCtx, tenantID, in.AssignmentID, in.EffectiveDate)
+		if err != nil {
+			return nil, mapPgError(err)
+		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
 			var svcErr *ServiceError
@@ -1380,26 +1380,26 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		}
 
 		newAllocatedFTE := current.AllocatedFTE
-			if in.AllocatedFTE != nil {
-				if *in.AllocatedFTE <= 0 {
-					return nil, newServiceError(400, "ORG_INVALID_BODY", "allocated_fte must be > 0", nil)
-				}
-				newAllocatedFTE = *in.AllocatedFTE
+		if in.AllocatedFTE != nil {
+			if *in.AllocatedFTE <= 0 {
+				return nil, newServiceError(400, "ORG_INVALID_BODY", "allocated_fte must be > 0", nil)
 			}
+			newAllocatedFTE = *in.AllocatedFTE
+		}
 
-			var newPosSlice PositionSliceRow
-			if current.IsPrimary {
-				idsToLock := []uuid.UUID{current.PositionID, positionID}
-				if current.PositionID == positionID {
-					idsToLock = []uuid.UUID{positionID}
-				} else if strings.Compare(current.PositionID.String(), positionID.String()) > 0 {
-					idsToLock[0], idsToLock[1] = idsToLock[1], idsToLock[0]
+		var newPosSlice PositionSliceRow
+		if current.IsPrimary {
+			idsToLock := []uuid.UUID{current.PositionID, positionID}
+			if current.PositionID == positionID {
+				idsToLock = []uuid.UUID{positionID}
+			} else if strings.Compare(current.PositionID.String(), positionID.String()) > 0 {
+				idsToLock[0], idsToLock[1] = idsToLock[1], idsToLock[0]
+			}
+			for _, id := range idsToLock {
+				slice, err := s.repo.LockPositionSliceAt(txCtx, tenantID, id, in.EffectiveDate)
+				if err != nil {
+					return nil, mapPgError(err)
 				}
-				for _, id := range idsToLock {
-					slice, err := s.repo.LockPositionSliceAt(txCtx, tenantID, id, in.EffectiveDate)
-					if err != nil {
-						return nil, mapPgError(err)
-					}
 				if id == positionID {
 					newPosSlice = slice
 				}
@@ -1414,19 +1414,19 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 					occupiedNew = 0
 				}
 			}
-				if occupiedNew+newAllocatedFTE > newPosSlice.CapacityFTE {
-					return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
-				}
-			} else if restrictionsMode != "disabled" {
-				newPosSlice, err = s.repo.GetPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
-				if err != nil {
-					return nil, mapPgError(err)
-				}
+			if occupiedNew+newAllocatedFTE > newPosSlice.CapacityFTE {
+				return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
 			}
+		} else if restrictionsMode != "disabled" {
+			newPosSlice, err = s.repo.GetPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+		}
 
-			if restrictionsMode != "disabled" {
-				isAutoCreated, err := s.repo.GetPositionIsAutoCreated(txCtx, tenantID, positionID)
-				if err != nil {
+		if restrictionsMode != "disabled" {
+			isAutoCreated, err := s.repo.GetPositionIsAutoCreated(txCtx, tenantID, positionID)
+			if err != nil {
 				return nil, mapPgError(err)
 			}
 			restrictionsJSON, err := extractRestrictionsFromProfile(newPosSlice.Profile)
