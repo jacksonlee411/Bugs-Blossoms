@@ -1,11 +1,12 @@
 # DEV-PLAN-059A：Position 收口补齐（`reason_code_mode` + Readiness 冒烟/回滚/追溯）
 
-**状态**: 实施中（核心能力与门禁已落地；线上 rollout 演练待执行，2025-12-21）
+**状态**: 实施中（代码已合并；线上 rollout 演练待执行，2025-12-21）
 
 ## 0. 进度速记
 - 本计划是 [DEV-PLAN-059](059-position-rollout-readiness-and-observability.md) 的补齐子计划：落地 `org_settings.reason_code_mode`（三态灰度）并把 Readiness 记录补齐到“可复跑冒烟 + 可回滚演练 + 可追溯证据”的门槛。
 - 约束：遵循 Contract First；工具链与命令入口以 SSOT 为准（见 §2.3）。
 - 当前进度：已完成 schema+服务层落地+审计 meta 统一、补齐 059A 集成冒烟测试与 `scripts/org/059A_smoke.sh`；并完成 Org 工具链 plan/lint/migrate up/down（隔离 DB）回填。
+- 实现已合并：PR #107 https://github.com/jacksonlee411/Bugs-Blossoms/pull/107（merged 2025-12-21，merge commit `7ff68853e29fb59cf0fbc867a8a9e3201d7dc939`）
 
 ## 1. 背景与上下文 (Context)
 - 上游依赖（已完成）：

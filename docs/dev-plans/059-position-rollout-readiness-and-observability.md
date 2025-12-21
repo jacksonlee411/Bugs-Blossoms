@@ -1,10 +1,13 @@
 # DEV-PLAN-059：Position 交付收口（Readiness / 回滚 / 可观测性）（对齐 051 收口）
 
-**状态**: 草拟中（2025-12-20 05:30 UTC）
+**状态**: 实施中（最小冒烟/追溯闭环已落地并合并；兼容性回归与更全面可观测仍待收口，2025-12-21）
 
 ## 0. 进度速记
 - 本计划负责把 052-058 的交付收口成“可上线、可回滚、可观测、可复现”的整体：readiness 记录 + 灰度/回滚开关 + 最小冒烟/演示闭环 + 关键指标与审计追溯。
 - 收口原则：**先口径冻结、再灰度启用、最后 enforce**；任何强校验/强治理能力必须具备 `disabled/shadow/enforce` 的回退路径（对齐 025 的冻结窗口模式）。
+- 实现已合并：
+  - PR #108（DEV-PLAN-059 补齐）：https://github.com/jacksonlee411/Bugs-Blossoms/pull/108（merged 2025-12-21，merge commit `094b4156e13508fc49428365e4120443cd9b5164`）
+  - PR #107（DEV-PLAN-059A）：https://github.com/jacksonlee411/Bugs-Blossoms/pull/107（merged 2025-12-21，merge commit `7ff68853e29fb59cf0fbc867a8a9e3201d7dc939`）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
@@ -197,10 +200,10 @@ ORDER BY created_at ASC;
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 - **依赖**：`DEV-PLAN-053/054/055/056/057/058` 的核心交付完成（或明确 scope 缩减）；并对齐 025/026 的冻结窗口、审计与 outbox。
 - **里程碑**：
-  1. [ ] readiness 记录落盘：补齐 `docs/dev-records/DEV-PLAN-051-READINESS.md` 并覆盖模板项
+  1. [X] readiness 记录落盘：补齐 `docs/dev-records/DEV-PLAN-051-READINESS.md` 并覆盖模板项（已回填 051 readiness §3.5，2025-12-21）
   2. [ ] 灰度/回滚开关到位：至少包含模块开关 + 关键校验模式切换
   3. [ ] 可观测收口：日志字段/指标/审计链路可追溯
-  4. [ ] 最小冒烟跑通并记录（含 request_id 追溯）
+  4. [X] 最小冒烟跑通并记录（含 request_id 追溯）（`scripts/org/059_smoke.sh` + 051 readiness §3.5，2025-12-21）
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - readiness 记录可复现：关键门禁与冒烟步骤可按记录复跑。
@@ -212,3 +215,4 @@ ORDER BY created_at ASC;
 - `AGENTS.md` Doc Map：确保 readiness 记录入口链接可发现（文档可发现性）。
 - 回滚/灰度/兼容策略清单（含不可逆点说明与回退优先级）。
 - 可观测性清单与落地要求（日志字段/指标/outbox 排障入口）。
+- 059 最小冒烟入口：`scripts/org/059_smoke.sh` + `modules/org/services/org_059_rollout_smoke_integration_test.go`。
