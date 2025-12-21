@@ -102,6 +102,7 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "position.created", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
@@ -358,6 +359,7 @@ func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UU
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "position.shifted", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 
@@ -650,6 +652,7 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "position.updated", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
@@ -1009,6 +1012,7 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "position.corrected", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
@@ -1368,6 +1372,7 @@ func (s *OrgService) RescindPosition(ctx context.Context, tenantID uuid.UUID, re
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "position.rescinded", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)

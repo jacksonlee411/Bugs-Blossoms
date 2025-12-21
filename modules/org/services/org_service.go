@@ -1060,6 +1060,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "assignment.created", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
@@ -1307,6 +1308,7 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "assignment.updated", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 		restrictionsMode := normalizeValidationMode(settings.PositionRestrictionsValidationMode)
