@@ -696,15 +696,15 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 	if in.AssignmentID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "id is required", nil)
 	}
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CorrectAssignmentResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 
 		current, err := s.repo.LockAssignmentByID(txCtx, tenantID, in.AssignmentID)
@@ -807,10 +807,14 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 			EndDate:         updated.EndDate,
 			OldValues:       oldValues,
 			NewValues:       newValues,
-			Meta: map[string]any{
-				"reason_code": reasonCode,
-				"reason_note": in.ReasonNote,
-			},
+			Meta: func() map[string]any {
+				meta := map[string]any{
+					"reason_code": reasonCode,
+					"reason_note": in.ReasonNote,
+				}
+				addReasonCodeMeta(meta, reasonInfo)
+				return meta
+			}(),
 			Operation:       "Correct",
 			FreezeMode:      freeze.Mode,
 			FreezeViolation: freeze.Violation,
@@ -870,10 +874,6 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 	if in.AssignmentID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "id/effective_date are required", nil)
 	}
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
 	reasonNote := in.ReasonNote
 	if reasonNote == nil {
 		legacy := strings.TrimSpace(in.Reason)
@@ -886,6 +886,10 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 
 		current, err := s.repo.LockAssignmentByID(txCtx, tenantID, in.AssignmentID)
@@ -946,10 +950,14 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 			OldValues:       oldValues,
 			NewValues:       newValues,
 			Operation:       "Rescind",
-			Meta: map[string]any{
-				"reason_code": reasonCode,
-				"reason_note": reasonNote,
-			},
+			Meta: func() map[string]any {
+				meta := map[string]any{
+					"reason_code": reasonCode,
+					"reason_note": reasonNote,
+				}
+				addReasonCodeMeta(meta, reasonInfo)
+				return meta
+			}(),
 			FreezeMode:      freeze.Mode,
 			FreezeViolation: freeze.Violation,
 			FreezeCutoffUTC: freeze.CutoffUTC,

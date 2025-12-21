@@ -65,10 +65,6 @@ func (s *OrgService) SetPositionRestrictions(ctx context.Context, tenantID uuid.
 	if in.PositionID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_id/effective_date are required", nil)
 	}
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
 
 	normalizedRestrictions, err := normalizeJSONObject(in.PositionRestrictions)
 	if err != nil {
@@ -83,6 +79,10 @@ func (s *OrgService) SetPositionRestrictions(ctx context.Context, tenantID uuid.
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
@@ -164,10 +164,14 @@ func (s *OrgService) SetPositionRestrictions(ctx context.Context, tenantID uuid.
 				"effective_date": in.EffectiveDate.UTC().Format(time.RFC3339),
 				"end_date":       newEnd.UTC().Format(time.RFC3339),
 			},
-			Meta: map[string]any{
-				"reason_code": reasonCode,
-				"reason_note": in.ReasonNote,
-			},
+			Meta: func() map[string]any {
+				meta := map[string]any{
+					"reason_code": reasonCode,
+					"reason_note": in.ReasonNote,
+				}
+				addReasonCodeMeta(meta, reasonInfo)
+				return meta
+			}(),
 			Operation:       "Update",
 			FreezeMode:      freeze.Mode,
 			FreezeViolation: freeze.Violation,

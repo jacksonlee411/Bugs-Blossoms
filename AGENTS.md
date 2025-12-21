@@ -171,5 +171,6 @@ modules/{module}/
 - 职位管理子计划：报表与运营（DEV-PLAN-057）：`docs/dev-plans/057-position-reporting-and-operations.md`
 - 职位管理子计划：任职管理增强（DEV-PLAN-058）：`docs/dev-plans/058-assignment-management-enhancements.md`
 - 职位管理子计划：收口与上线（DEV-PLAN-059）：`docs/dev-plans/059-position-rollout-readiness-and-observability.md`
+- 职位管理子计划：收口补齐（DEV-PLAN-059A）：`docs/dev-plans/059A-position-rollout-reason-code-mode-and-readiness-smoke.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`

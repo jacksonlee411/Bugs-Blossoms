@@ -25,6 +25,7 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 		"00001_org_baseline.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
+		"20251221090000_org_reason_code_mode.sql",
 		"20251218150000_org_outbox.sql",
 		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
 		"20251219195000_org_security_group_mappings_and_links.sql",

@@ -21,21 +21,24 @@ func (r *OrgRepository) GetOrgSettings(ctx context.Context, tenantID uuid.UUID) 
 	var graceDays int
 	var catalogMode string
 	var restrictionsMode string
+	var reasonCodeMode string
 	err = tx.QueryRow(ctx, `
 	SELECT
 		freeze_mode,
 		freeze_grace_days,
 		position_catalog_validation_mode,
-		position_restrictions_validation_mode
+		position_restrictions_validation_mode,
+		reason_code_mode
 	FROM org_settings
 	WHERE tenant_id=$1
-	`, pgUUID(tenantID)).Scan(&mode, &graceDays, &catalogMode, &restrictionsMode)
+	`, pgUUID(tenantID)).Scan(&mode, &graceDays, &catalogMode, &restrictionsMode, &reasonCodeMode)
 	if err == pgx.ErrNoRows {
 		return services.OrgSettings{
 			FreezeMode:                         "enforce",
 			FreezeGraceDays:                    3,
 			PositionCatalogValidationMode:      "shadow",
 			PositionRestrictionsValidationMode: "shadow",
+			ReasonCodeMode:                     "shadow",
 		}, nil
 	}
 	if err != nil {
@@ -46,6 +49,7 @@ func (r *OrgRepository) GetOrgSettings(ctx context.Context, tenantID uuid.UUID) 
 		FreezeGraceDays:                    graceDays,
 		PositionCatalogValidationMode:      catalogMode,
 		PositionRestrictionsValidationMode: restrictionsMode,
+		ReasonCodeMode:                     reasonCodeMode,
 	}, nil
 }
 

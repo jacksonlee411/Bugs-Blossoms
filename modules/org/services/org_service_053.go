@@ -95,15 +95,14 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "invalid lifecycle_status", nil)
 	}
 
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
-
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CreatePositionResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
@@ -223,6 +222,7 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			"reason_code": reasonCode,
 			"reason_note": in.ReasonNote,
 		}
+		addReasonCodeMeta(meta, reasonInfo)
 		if catalogShadowErr != nil {
 			meta["position_catalog_validation_mode"] = catalogMode
 			meta["position_catalog_validation_error_code"] = catalogShadowErr.Code
@@ -351,15 +351,14 @@ func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UU
 		return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date is invalid", nil)
 	}
 
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
-
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*ShiftBoundaryPositionResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 
 		target, err := s.repo.LockPositionSliceStartingAt(txCtx, tenantID, in.PositionID, in.TargetEffectiveDate)
@@ -440,6 +439,7 @@ func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UU
 			"reason_code": reasonCode,
 			"reason_note": in.ReasonNote,
 		}
+		addReasonCodeMeta(meta, reasonInfo)
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
 			RequestID:        requestID,
@@ -642,15 +642,15 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 	if in.PositionID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_id/effective_date are required", nil)
 	}
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdatePositionResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
@@ -903,6 +903,7 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 					"reason_code": reasonCode,
 					"reason_note": in.ReasonNote,
 				}
+				addReasonCodeMeta(meta, reasonInfo)
 				if catalogShadowErr != nil {
 					meta["position_catalog_validation_mode"] = catalogMode
 					meta["position_catalog_validation_error_code"] = catalogShadowErr.Code
@@ -1000,15 +1001,15 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 	if in.PositionID == uuid.Nil || in.AsOf.IsZero() {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_id/effective_date are required", nil)
 	}
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CorrectPositionResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
 
@@ -1276,6 +1277,7 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 					"reason_code": reasonCode,
 					"reason_note": in.ReasonNote,
 				}
+				addReasonCodeMeta(meta, reasonInfo)
 				if catalogShadowErr != nil {
 					meta["position_catalog_validation_mode"] = catalogMode
 					meta["position_catalog_validation_error_code"] = catalogShadowErr.Code
@@ -1358,15 +1360,15 @@ func (s *OrgService) RescindPosition(ctx context.Context, tenantID uuid.UUID, re
 	if in.PositionID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_id/effective_date are required", nil)
 	}
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*RescindPositionResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
@@ -1456,10 +1458,14 @@ func (s *OrgService) RescindPosition(ctx context.Context, tenantID uuid.UUID, re
 			EndDate:         endOfTime,
 			OldValues:       oldValues,
 			NewValues:       newValues,
-			Meta: map[string]any{
-				"reason_code": reasonCode,
-				"reason_note": in.ReasonNote,
-			},
+			Meta: func() map[string]any {
+				meta := map[string]any{
+					"reason_code": reasonCode,
+					"reason_note": in.ReasonNote,
+				}
+				addReasonCodeMeta(meta, reasonInfo)
+				return meta
+			}(),
 			Operation:       "Rescind",
 			FreezeMode:      freeze.Mode,
 			FreezeViolation: freeze.Violation,

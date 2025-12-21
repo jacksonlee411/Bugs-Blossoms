@@ -595,12 +595,14 @@ CREATE TABLE org_settings (
     freeze_grace_days int NOT NULL DEFAULT 3,
     position_catalog_validation_mode text NOT NULL DEFAULT 'shadow',
     position_restrictions_validation_mode text NOT NULL DEFAULT 'shadow',
+    reason_code_mode text NOT NULL DEFAULT 'shadow',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_settings_freeze_mode_check CHECK (freeze_mode IN ('disabled', 'shadow', 'enforce')),
     CONSTRAINT org_settings_freeze_grace_days_check CHECK (freeze_grace_days >= 0 AND freeze_grace_days <= 31),
     CONSTRAINT org_settings_position_catalog_validation_mode_check CHECK (position_catalog_validation_mode IN ('disabled', 'shadow', 'enforce')),
-    CONSTRAINT org_settings_position_restrictions_validation_mode_check CHECK (position_restrictions_validation_mode IN ('disabled', 'shadow', 'enforce'))
+    CONSTRAINT org_settings_position_restrictions_validation_mode_check CHECK (position_restrictions_validation_mode IN ('disabled', 'shadow', 'enforce')),
+    CONSTRAINT org_settings_reason_code_mode_check CHECK (reason_code_mode IN ('disabled', 'shadow', 'enforce'))
 );
 
 CREATE TABLE org_audit_logs (

@@ -129,27 +129,36 @@ templ PositionsPanel(props PositionsPanelProps) {
 		</form>
 		<div class="grid grid-cols-12 gap-4">
 			<div class="col-span-12 xl:col-span-6">
-				<div class="rounded-lg border border-surface-400 bg-surface-300">
-					<div class="flex items-center justify-between border-b border-surface-400 p-3">
-						<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Positions.ListTitle") }</div>
-						if strings.TrimSpace(props.NodeID) != "" && pageCtx.CanAuthz("org.positions", "write") {
-							@button.Primary(button.Props{
-								Size:  button.SizeSM,
-								Class: "px-2 py-1",
-								Attrs: templ.Attributes{
-									"type":      "button",
-									"hx-get":    fmt.Sprintf("/org/positions/new?effective_date=%s&node_id=%s", props.EffectiveDate, props.NodeID),
-									"hx-target": "#org-position-details",
-									"hx-swap":   "innerHTML",
-								},
-							}) {
-								{ pageCtx.T("Org.UI.Positions.Actions.Create") }
+					<div class="rounded-lg border border-surface-400 bg-surface-300">
+						<div class="flex items-center justify-between border-b border-surface-400 p-3">
+							<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Positions.ListTitle") }</div>
+							if pageCtx.CanAuthz("org.positions", "write") {
+								{{
+									disabled := strings.TrimSpace(props.NodeID) == ""
+									attrs := templ.Attributes{
+										"type": "button",
+									}
+									if disabled {
+										attrs["title"] = pageCtx.T("Org.UI.Positions.Empty")
+									} else {
+										attrs["hx-get"] = fmt.Sprintf("/org/positions/new?effective_date=%s&node_id=%s", props.EffectiveDate, props.NodeID)
+										attrs["hx-target"] = "#org-position-details"
+										attrs["hx-swap"] = "innerHTML"
+									}
+								}}
+								@button.Primary(button.Props{
+									Size:     button.SizeSM,
+									Class:    "px-2 py-1",
+									Disabled: disabled,
+									Attrs:    attrs,
+								}) {
+									{ pageCtx.T("Org.UI.Positions.Actions.Create") }
+								}
 							}
-						}
-					</div>
-					<div id="org-positions-list" class="p-3">
-						@PositionsList(PositionsListProps{
-							EffectiveDate:      props.EffectiveDate,
+						</div>
+						<div id="org-positions-list" class="p-3">
+							@PositionsList(PositionsListProps{
+								EffectiveDate:      props.EffectiveDate,
 							Positions:          props.Positions,
 							SelectedPositionID: props.SelectedPositionID,
 							Limit:              props.Limit,

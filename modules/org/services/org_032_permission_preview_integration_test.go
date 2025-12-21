@@ -45,6 +45,10 @@ func setupOrg032DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, ti
 	_, err = pool.Exec(ctx, orgSettingsSQL)
 	require.NoError(tb, err)
 
+	reasonCodeModeSQL := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "20251221090000_org_reason_code_mode.sql")))
+	_, err = pool.Exec(ctx, reasonCodeModeSQL)
+	require.NoError(tb, err)
+
 	m056 := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "20251220200000_org_job_catalog_profiles_and_validation_modes.sql")))
 	_, err = pool.Exec(ctx, m056)
 	require.NoError(tb, err)

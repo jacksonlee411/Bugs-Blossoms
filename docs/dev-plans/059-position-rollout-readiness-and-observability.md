@@ -91,9 +91,19 @@ flowchart LR
 - `request_id` 必须贯穿：API 响应、日志、审计（`org_audit_logs.request_id`）、事件（outbox payload/headers）。
 - 任何“拒绝/阻断”必须可定位到：错误码 + 关键字段（tenant、entity、effective_date、change_type、mode）。
 
+**追溯口径（v1，冻结）**
+- **成功写入**：必须产生 `org_audit_logs` 与 `org_outbox`，可按下述 SQL 追溯。
+- **outbox relay（是否要求 publish，v1，冻结）**：
+  - readiness 最低要求：验证 `org_outbox` **enqueue** 可追溯（存在记录即可）。
+  - 若环境启用了 relay（例如 `OUTBOX_RELAY_ENABLED=true` 且 `OUTBOX_RELAY_TABLES` 包含 `public.org_outbox`）：readiness 需要额外记录至少一条事件被 publish（`published_at IS NOT NULL`）的证据；否则在 readiness 中明确标注“未启用 relay，仅验证 enqueue”。
+- **拒绝/阻断（400/403/409/422 等）**：默认**不落审计/不写 outbox**；以结构化日志 + API 返回的 `meta.request_id` 为唯一追溯入口（最低字段见 §7）。
+- **日志字段命名（现状对齐）**：
+  - 语义上的 `request_id` 指同一值：HTTP header `X-Request-Id` / API error `meta.request_id` / OTel attribute `http.request_id`。
+  - 结构化日志字段名现状为 `request-id`（中间件）；本计划在文档中统一用“`request_id`（值）”描述，不强制日志 key 必须叫 `request_id`，但必须能通过该值检索。
+
 **最小追溯 SQL（示例）**
 ```sql
--- 审计：按 request_id 串起“写入/拒绝”的上下文
+-- 审计：按 request_id 串起“成功写入”的上下文（拒绝默认不落审计）
 SELECT
   transaction_time, change_type, entity_type, entity_id, effective_date, end_date, meta
 FROM org_audit_logs
@@ -122,7 +132,7 @@ ORDER BY created_at ASC;
 | 校验模式 | `org_settings.freeze_grace_days` | DB（tenant） | `0..31` | `3` | 冻结宽限（025） |
 | 校验模式 | `org_settings.position_catalog_validation_mode` | DB（tenant） | `disabled|shadow|enforce` | `shadow` | Job Catalog/Profile 校验灰度（056） |
 | 校验模式 | `org_settings.position_restrictions_validation_mode` | DB（tenant） | `disabled|shadow|enforce` | `shadow` | Position Restrictions 校验灰度（056） |
-| 校验模式 | `org_settings.reason_code_mode` | DB（tenant） | `disabled|shadow|enforce` | `shadow` | reason_code 兼容期→加严收口（052；落地由 059 收口冻结） |
+| 校验模式 | `org_settings.reason_code_mode` | DB（tenant） | `disabled|shadow|enforce` | `shadow` | reason_code 兼容期→加严收口（合同与实施 SSOT：DEV-PLAN-059A） |
 
 ### 4.2 优先级与回退原则（选定）
 - **优先级**：
@@ -159,7 +169,8 @@ ORDER BY created_at ASC;
 - 报表（若 057 落地）：
   - 编制汇总（FTE）→ vacancies 列表 → time-to-fill（基础）
 - 可观测：
-  - 对任一 Correct/Rescind/拒绝路径：能从 response/request_id 找到对应审计与 outbox 事件（或 shadow 记录）。
+  - 对任一 Correct/Rescind：能从 response/request_id 找到对应审计与 outbox 事件（或 shadow 记录）。
+  - 对任一拒绝/阻断：能从 response/request_id 在结构化日志中定位原因与上下文（拒绝默认不落审计/不写 outbox）。
 
 ## 6. 回滚与灰度（Rollout & Rollback）
 ### 6.1 回滚优先级（选定）
@@ -181,11 +192,12 @@ ORDER BY created_at ASC;
   - Outbox：`outbox_pending{table=\"public.org_outbox\"}`、`outbox_dispatch_total{table,topic,result}`、`outbox_dead_total{table,topic}`（017/034）
 - **审计追溯**：
   - 必须能按 `request_id` 查询 `org_audit_logs`，并从 `meta` 看见 `freeze_mode/freeze_violation`、限制冲突等关键上下文（对齐 025/056/057/058）。
+  - 拒绝/阻断默认不落审计：必须至少在日志中包含 `request_id`（值）与 `error_code`，并能关联到 tenant 与操作类型（对齐 §3.3 的“追溯口径”）。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 - **依赖**：`DEV-PLAN-053/054/055/056/057/058` 的核心交付完成（或明确 scope 缩减）；并对齐 025/026 的冻结窗口、审计与 outbox。
 - **里程碑**：
-  1. [ ] readiness 记录落盘：创建 `docs/dev-records/DEV-PLAN-051-READINESS.md` 并补齐模板项
+  1. [ ] readiness 记录落盘：补齐 `docs/dev-records/DEV-PLAN-051-READINESS.md` 并覆盖模板项
   2. [ ] 灰度/回滚开关到位：至少包含模块开关 + 关键校验模式切换
   3. [ ] 可观测收口：日志字段/指标/审计链路可追溯
   4. [ ] 最小冒烟跑通并记录（含 request_id 追溯）
@@ -193,7 +205,7 @@ ORDER BY created_at ASC;
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - readiness 记录可复现：关键门禁与冒烟步骤可按记录复跑。
 - 强校验具备回退路径：从 `enforce → shadow/disabled` 可在不回滚代码/不改库的情况下止血。
-- 关键拒绝可定位：任一拒绝/冻结窗口阻断/冲突拒绝能在日志+审计中定位原因与影响范围。
+- 关键拒绝可定位：拒绝/阻断能通过日志（按 `request_id` 值）定位原因；成功写入能通过日志+审计+outbox（按 `request_id`）追溯上下文与事件。
 
 ## 10. 交付物
 - `docs/dev-records/DEV-PLAN-051-READINESS.md`（收口记录，含门禁/冒烟/回滚演练）。
