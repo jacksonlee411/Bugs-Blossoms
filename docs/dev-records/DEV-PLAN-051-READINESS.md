@@ -68,3 +68,4 @@
   - `shadow`：`reason_code=legacy, reason_code_mode=shadow, original_missing=true, filled=true`；对应 outbox 条目数 `1`
   - `enforce`：缺失输入的 request_id（pos/assignment）在 `org_audit_logs/org_outbox` 计数均为 `0`
   - `disabled`：`reason_code=''（空）, reason_code_mode=disabled, original_missing=true, filled=false`
+- [X] 059 最小冒烟脚本（Position/Assignment/Reports/Vacancy）：`scripts/org/059_smoke.sh` ——（2025-12-21）结果：通过（脚本内含固定 request_id 与追溯 SQL）

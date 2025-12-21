@@ -1,11 +1,32 @@
 package services
 
-import "strings"
+import (
+	"context"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
+)
 
 type ReasonCodeInfo struct {
 	Mode            string
 	OriginalMissing bool
 	Filled          bool
+}
+
+func logReasonCodeRejected(ctx context.Context, tenantID uuid.UUID, requestID, operation string, info ReasonCodeInfo, svcErr *ServiceError) {
+	if svcErr == nil {
+		return
+	}
+	logWithFields(ctx, logrus.WarnLevel, "org.reason_code.rejected", logrus.Fields{
+		"tenant_id":                    tenantID.String(),
+		"request_id":                   requestID,
+		"operation":                    operation,
+		"error_code":                   svcErr.Code,
+		"reason_code_mode":             info.Mode,
+		"reason_code_original_missing": info.OriginalMissing,
+		"reason_code_filled":           info.Filled,
+	})
 }
 
 func addReasonCodeMeta(meta map[string]any, info ReasonCodeInfo) {

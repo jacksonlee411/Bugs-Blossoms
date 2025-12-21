@@ -704,6 +704,7 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "assignment.corrected", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 
@@ -889,6 +890,7 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "assignment.rescinded", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 

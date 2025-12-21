@@ -82,6 +82,7 @@ func (s *OrgService) SetPositionRestrictions(ctx context.Context, tenantID uuid.
 		}
 		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
 		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "position.restrictions.updated", reasonInfo, svcErr)
 			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
