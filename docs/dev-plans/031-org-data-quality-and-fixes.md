@@ -5,7 +5,7 @@
 ## 0. 进度速记
 - 本计划聚焦“数据质量规则/报告 + 可回滚的批量修复工具”，为 Org 进入长期运行提供最小治理闭环。
 - 修复工具默认 **dry-run**，任何写入必须显式 `--apply` + `--yes` 二次确认，并生成 manifest 以支持回滚。
-- 已落地：`org-data quality check/plan/apply/rollback`、质量规则 v1（`ORG_Q_001`~`ORG_Q_008`）、以及 `docs/dev-records/DEV-PLAN-031-READINESS.md`。
+- 已落地：`org-data quality check/plan/apply/rollback`、质量规则 v1（`ORG_Q_001`~`ORG_Q_009`）、以及 `docs/dev-records/DEV-PLAN-031-READINESS.md`。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：`docs/dev-plans/020-organization-lifecycle.md` **步骤 11：强化数据质量**。
@@ -290,6 +290,13 @@ flowchart TD
     - `subject_id = expected_subject_id`
     - `position_id` 复用当前行的 `position_id`
   - **限制**：仅当该 assignment slice 的 `assignment_type='primary'`（M1）且能读取到 `position_id` 时才生成；否则降级为 manual issue。
+
+#### ORG_Q_009_POSITION_OVER_CAPACITY（error，manual）
+- **定义**（as-of）：对每个 position：
+  - `capacity_fte` 以 `org_position_slices` 的 as-of 切片为准；
+  - `occupied_fte = sum(org_assignments.allocated_fte)`（as-of 且 `assignment_type='primary'`）；
+  - 若 `occupied_fte > capacity_fte`，则判定为超编（over capacity）。
+- **自动修复（v1）**：不支持（需要业务确认与写链路治理；修复可能涉及任职截断/容量调整/原因码审计）。
 
 ### 6.3 `quality plan`：生成 fix plan（v1）
 1. 读取并校验 `org_quality_report.v1`。

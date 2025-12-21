@@ -454,6 +454,62 @@ func runQualityCheckDB(ctx context.Context, pool *pgxpool.Pool, opts qualityChec
 			})
 		}
 
+		// ORG_Q_009
+		rows, err := tx.Query(txCtx, `
+SELECT
+	p.id,
+	p.code,
+	s.org_node_id,
+	s.capacity_fte::float8 AS capacity_fte,
+	COALESCE(SUM(a.allocated_fte), 0)::float8 AS occupied_fte
+FROM org_positions p
+JOIN org_position_slices s
+	ON s.tenant_id = p.tenant_id
+	AND s.position_id = p.id
+	AND s.effective_date <= $2
+	AND s.end_date > $2
+LEFT JOIN org_assignments a
+	ON a.tenant_id = p.tenant_id
+	AND a.position_id = p.id
+	AND a.assignment_type = 'primary'
+	AND a.effective_date <= $2
+	AND a.end_date > $2
+WHERE p.tenant_id = $1
+GROUP BY p.id, p.code, s.org_node_id, s.capacity_fte
+HAVING COALESCE(SUM(a.allocated_fte), 0) > s.capacity_fte
+ORDER BY p.id ASC
+`, opts.tenantID, opts.asOf)
+		if err != nil {
+			return withCode(exitDB, fmt.Errorf("query over capacity positions: %w", err))
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id uuid.UUID
+			var code string
+			var orgNodeID uuid.UUID
+			var capacity float64
+			var occupied float64
+			if err := rows.Scan(&id, &code, &orgNodeID, &capacity, &occupied); err != nil {
+				return withCode(exitDB, fmt.Errorf("scan over capacity positions: %w", err))
+			}
+			report.Issues = append(report.Issues, qualityIssue{
+				IssueID:  uuid.New(),
+				RuleID:   rulePositionOverCapacity,
+				Severity: severityError,
+				Entity:   qualityEntityRef{Type: "org_position", ID: id},
+				Message:  "position occupied_fte exceeds capacity_fte at as-of",
+				Details: map[string]any{
+					"code":         code,
+					"org_node_id":  orgNodeID.String(),
+					"capacity_fte": capacity,
+					"occupied_fte": occupied,
+				},
+			})
+		}
+		if rows.Err() != nil {
+			return withCode(exitDB, rows.Err())
+		}
+
 		return nil
 	})
 }
@@ -665,9 +721,12 @@ type snapshotEdgeValues struct {
 
 type snapshotPositionValues struct {
 	OrgPositionID uuid.UUID `json:"org_position_id"`
+	PositionID    uuid.UUID `json:"position_id"`
 	OrgNodeID     uuid.UUID `json:"org_node_id"`
 	Code          string    `json:"code"`
+	Lifecycle     string    `json:"lifecycle_status"`
 	Status        string    `json:"status"`
+	CapacityFTE   float64   `json:"capacity_fte"`
 	IsAutoCreated bool      `json:"is_auto_created"`
 	EffectiveDate time.Time `json:"effective_date"`
 	EndDate       time.Time `json:"end_date"`
@@ -680,6 +739,7 @@ type snapshotAssignmentValues struct {
 	SubjectID       uuid.UUID `json:"subject_id"`
 	Pernr           string    `json:"pernr"`
 	AssignmentType  string    `json:"assignment_type"`
+	AllocatedFTE    float64   `json:"allocated_fte"`
 	EffectiveDate   time.Time `json:"effective_date"`
 	EndDate         time.Time `json:"end_date"`
 }
@@ -716,6 +776,12 @@ func runQualityCheckAPI(ctx context.Context, client *orgAPIClient, opts qualityC
 			var v snapshotPositionValues
 			if err := json.Unmarshal(it.NewValues, &v); err != nil {
 				return withCode(exitDB, fmt.Errorf("snapshot decode org_position: %w", err))
+			}
+			if v.PositionID == uuid.Nil {
+				v.PositionID = v.OrgPositionID
+			}
+			if v.PositionID == uuid.Nil {
+				v.PositionID = it.EntityID
 			}
 			positions = append(positions, v)
 		case "org_assignment":
@@ -769,7 +835,7 @@ func runQualityCheckAPI(ctx context.Context, client *orgAPIClient, opts qualityC
 			IssueID:  uuid.New(),
 			RuleID:   rulePositionCodeFormat,
 			Severity: severityWarning,
-			Entity:   qualityEntityRef{Type: "org_position", ID: p.OrgPositionID},
+			Entity:   qualityEntityRef{Type: "org_position", ID: p.PositionID},
 			Message:  "position code does not match required format",
 			Details: map[string]any{
 				"code":            p.Code,
@@ -883,7 +949,11 @@ func runQualityCheckAPI(ctx context.Context, client *orgAPIClient, opts qualityC
 	// ORG_Q_007
 	activePositionsByNode := map[uuid.UUID]int{}
 	for _, p := range positions {
-		if strings.TrimSpace(p.Status) != "active" {
+		status := strings.TrimSpace(p.Lifecycle)
+		if status == "" {
+			status = strings.TrimSpace(p.Status)
+		}
+		if status != "active" {
 			continue
 		}
 		activePositionsByNode[p.OrgNodeID]++
@@ -959,6 +1029,37 @@ func runQualityCheckAPI(ctx context.Context, client *orgAPIClient, opts qualityC
 				"assignment_type":     a.AssignmentType,
 			},
 			Autofix: autofix,
+		})
+	}
+
+	// ORG_Q_009
+	occupiedByPosition := map[uuid.UUID]float64{}
+	for _, a := range assignments {
+		if strings.TrimSpace(a.AssignmentType) != "primary" {
+			continue
+		}
+		occupiedByPosition[a.PositionID] += a.AllocatedFTE
+	}
+	for _, p := range positions {
+		if p.CapacityFTE <= 0 {
+			continue
+		}
+		occupied := occupiedByPosition[p.PositionID]
+		if occupied <= p.CapacityFTE {
+			continue
+		}
+		report.Issues = append(report.Issues, qualityIssue{
+			IssueID:  uuid.New(),
+			RuleID:   rulePositionOverCapacity,
+			Severity: severityError,
+			Entity:   qualityEntityRef{Type: "org_position", ID: p.PositionID},
+			Message:  "position occupied_fte exceeds capacity_fte at as-of",
+			Details: map[string]any{
+				"code":         p.Code,
+				"org_node_id":  p.OrgNodeID.String(),
+				"capacity_fte": p.CapacityFTE,
+				"occupied_fte": occupied,
+			},
 		})
 	}
 

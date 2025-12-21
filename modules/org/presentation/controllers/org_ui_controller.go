@@ -727,15 +727,21 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	requestID := ensureRequestID(r)
 	res, err := c.org.CreatePosition(r.Context(), tenantID, requestID, initiatorID, services.CreatePositionInput{
-		Code:            code,
-		OrgNodeID:       orgNodeID,
-		EffectiveDate:   effectiveDate,
-		Title:           title,
-		LifecycleStatus: lifecycle,
-		CapacityFTE:     capacity,
-		ReportsToID:     reportsTo,
-		ReasonCode:      reasonCode,
-		ReasonNote:      reasonNote,
+		Code:               code,
+		OrgNodeID:          orgNodeID,
+		EffectiveDate:      effectiveDate,
+		Title:              title,
+		LifecycleStatus:    lifecycle,
+		PositionType:       "regular",
+		EmploymentType:     "full_time",
+		CapacityFTE:        capacity,
+		ReportsToID:        reportsTo,
+		JobFamilyGroupCode: "UNSPECIFIED",
+		JobFamilyCode:      "UNSPECIFIED",
+		JobRoleCode:        "UNSPECIFIED",
+		JobLevelCode:       "UNSPECIFIED",
+		ReasonCode:         reasonCode,
+		ReasonNote:         reasonNote,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)

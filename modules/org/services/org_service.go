@@ -67,6 +67,12 @@ type OrgRepository interface {
 	// DEV-PLAN-033: BI reporting snapshot build (consumes active snapshot build from 029).
 	BuildOrgReportingNodes(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOfDate time.Time, includeSecurityGroups bool, includeLinks bool, apply bool, sourceRequestID string) (OrgReportingBuildResult, error)
 
+	// DEV-PLAN-057: staffing reports (summary/vacancies/time-to-fill).
+	GetActiveSnapshotBuildID(ctx context.Context, tenantID uuid.UUID, hierarchyType string, asOf time.Time) (uuid.UUID, error)
+	GetStaffingSummaryReport(ctx context.Context, tenantID uuid.UUID, asOf time.Time, orgNodeIDs []uuid.UUID, lifecycleStatuses []string, includeSystem bool, groupBy StaffingGroupBy) (StaffingSummaryDBResult, error)
+	ListStaffingVacanciesReport(ctx context.Context, tenantID uuid.UUID, asOf time.Time, orgNodeIDs []uuid.UUID, lifecycleStatuses []string, includeSystem bool, limit int, cursor *uuid.UUID) (StaffingVacanciesDBResult, error)
+	GetStaffingTimeToFillReport(ctx context.Context, tenantID uuid.UUID, from time.Time, to time.Time, orgNodeIDs []uuid.UUID, lifecycleStatuses []string, includeSystem bool, groupBy StaffingGroupBy) (StaffingTimeToFillDBResult, error)
+
 	GetOrgSettings(ctx context.Context, tenantID uuid.UUID) (OrgSettings, error)
 	InsertAuditLog(ctx context.Context, tenantID uuid.UUID, log AuditLogInsert) (uuid.UUID, error)
 
@@ -101,6 +107,7 @@ type OrgRepository interface {
 	LockPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionSliceRow, error)
 	SumAllocatedFTEAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (float64, error)
 	InsertPosition(ctx context.Context, tenantID uuid.UUID, in PositionInsert) (uuid.UUID, error)
+	GetPositionIsAutoCreated(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID) (bool, error)
 	InsertPositionSlice(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, in PositionSliceInsert) (uuid.UUID, error)
 	GetPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionSliceRow, error)
 	LockPositionSliceStartingAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, effectiveDate time.Time) (PositionSliceRow, error)
@@ -115,6 +122,32 @@ type OrgRepository interface {
 	DeletePositionSlicesFrom(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, from time.Time) error
 	UpdatePositionSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch PositionSliceInPlacePatch) error
 	HasPositionSubordinatesAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (bool, error)
+
+	ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID) ([]JobFamilyGroupRow, error)
+	CreateJobFamilyGroup(ctx context.Context, tenantID uuid.UUID, in JobFamilyGroupCreate) (JobFamilyGroupRow, error)
+	UpdateJobFamilyGroup(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobFamilyGroupUpdate) (JobFamilyGroupRow, error)
+
+	ListJobFamilies(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID) ([]JobFamilyRow, error)
+	CreateJobFamily(ctx context.Context, tenantID uuid.UUID, in JobFamilyCreate) (JobFamilyRow, error)
+	UpdateJobFamily(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobFamilyUpdate) (JobFamilyRow, error)
+
+	ListJobRoles(ctx context.Context, tenantID uuid.UUID, jobFamilyID uuid.UUID) ([]JobRoleRow, error)
+	CreateJobRole(ctx context.Context, tenantID uuid.UUID, in JobRoleCreate) (JobRoleRow, error)
+	UpdateJobRole(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobRoleUpdate) (JobRoleRow, error)
+
+	ListJobLevels(ctx context.Context, tenantID uuid.UUID, jobRoleID uuid.UUID) ([]JobLevelRow, error)
+	CreateJobLevel(ctx context.Context, tenantID uuid.UUID, in JobLevelCreate) (JobLevelRow, error)
+	UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobLevelUpdate) (JobLevelRow, error)
+
+	ListJobProfiles(ctx context.Context, tenantID uuid.UUID, jobRoleID *uuid.UUID) ([]JobProfileRow, error)
+	CreateJobProfile(ctx context.Context, tenantID uuid.UUID, in JobProfileCreate) (JobProfileRow, error)
+	UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobProfileUpdate) (JobProfileRow, error)
+	SetJobProfileAllowedLevels(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileAllowedLevelsSet) error
+	GetJobProfileRef(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) (JobProfileRef, error)
+	ResolveJobCatalogPathByCodes(ctx context.Context, tenantID uuid.UUID, codes JobCatalogCodes) (JobCatalogResolvedPath, error)
+	JobProfileAllowsLevel(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, jobLevelID uuid.UUID) (bool, bool, error)
+	JobLevelExistsUnderRole(ctx context.Context, tenantID uuid.UUID, jobRoleID uuid.UUID, jobLevelID uuid.UUID) (bool, error)
+	ListJobProfileAllowedLevels(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]uuid.UUID, error)
 
 	LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (AssignmentRow, error)
 	TruncateAssignment(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, endDate time.Time) error
@@ -1024,15 +1057,27 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		return nil, newServiceError(422, "ORG_SUBJECT_MISMATCH", "subject_id does not match SSOT mapping", nil)
 	}
 
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CreateAssignmentResult, error) {
-		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
-		if err != nil {
-			return nil, err
-		}
-		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
-		if err != nil {
-			return nil, err
-		}
+		written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CreateAssignmentResult, error) {
+			settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+			if err != nil {
+				return nil, err
+			}
+			freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
+			if err != nil {
+				var svcErr *ServiceError
+				if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
+					logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
+						"tenant_id":       tenantID.String(),
+						"pernr":           in.Pernr,
+						"subject_id":      derivedSubjectID.String(),
+						"assignment_type": assignmentType,
+						"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
+						"error_code":      svcErr.Code,
+						"operation":       "Create",
+					})
+				}
+				return nil, err
+			}
 
 		var positionID uuid.UUID
 		if in.PositionID != nil {
@@ -1066,20 +1111,67 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			code := autoPositionCode(positionID)
 			if err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, in.EffectiveDate); err != nil {
 				return nil, mapPgError(err)
+				}
 			}
-		}
 
-		if isPrimary {
-			posSlice, err := s.repo.LockPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
+			var posSlice PositionSliceRow
+			if isPrimary {
+				posSlice, err = s.repo.LockPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
+			} else {
+				posSlice, err = s.repo.GetPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
+			}
 			if err != nil {
 				return nil, mapPgError(err)
 			}
-			occupied, err := s.repo.SumAllocatedFTEAt(txCtx, tenantID, positionID, in.EffectiveDate)
-			if err != nil {
-				return nil, err
+
+			if isPrimary {
+				occupied, err := s.repo.SumAllocatedFTEAt(txCtx, tenantID, positionID, in.EffectiveDate)
+				if err != nil {
+					return nil, err
+				}
+				if occupied+allocatedFTE > posSlice.CapacityFTE {
+					return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
+				}
 			}
-			if occupied+allocatedFTE > posSlice.CapacityFTE {
-				return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
+
+		restrictionsMode := normalizeValidationMode(settings.PositionRestrictionsValidationMode)
+		var restrictionsShadowErr *ServiceError
+		if restrictionsMode != "disabled" {
+			isAutoCreated, err := s.repo.GetPositionIsAutoCreated(txCtx, tenantID, positionID)
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+			restrictionsJSON, err := extractRestrictionsFromProfile(posSlice.Profile)
+			if err != nil {
+				if restrictionsMode == "enforce" {
+					return nil, err
+				}
+				var svcErr *ServiceError
+				if !errors.As(err, &svcErr) {
+					return nil, err
+				}
+				restrictionsShadowErr = svcErr
+			} else {
+				parsedRestrictions, err := parsePositionRestrictions(restrictionsJSON)
+				if err != nil {
+					if restrictionsMode == "enforce" {
+						return nil, err
+					}
+					var svcErr *ServiceError
+					if !errors.As(err, &svcErr) {
+						return nil, err
+					}
+					restrictionsShadowErr = svcErr
+				} else if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, isAutoCreated, posSlice, parsedRestrictions); err != nil {
+					if restrictionsMode == "enforce" {
+						return nil, err
+					}
+					var svcErr *ServiceError
+					if !errors.As(err, &svcErr) {
+						return nil, err
+					}
+					restrictionsShadowErr = svcErr
+				}
 			}
 		}
 
@@ -1131,10 +1223,17 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
 				"end_date":        endOfTime.UTC().Format(time.RFC3339),
 			},
-			Meta: map[string]any{
-				"reason_code": reasonCode,
-				"reason_note": in.ReasonNote,
-			},
+			Meta: func() map[string]any {
+				meta := map[string]any{
+					"reason_code": reasonCode,
+					"reason_note": in.ReasonNote,
+				}
+				if restrictionsShadowErr != nil {
+					meta["position_restrictions_validation_mode"] = restrictionsMode
+					meta["position_restrictions_validation_error_code"] = restrictionsShadowErr.Code
+				}
+				return meta
+			}(),
 			Operation:       "Create",
 			FreezeMode:      freeze.Mode,
 			FreezeViolation: freeze.Violation,
@@ -1204,16 +1303,18 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		reasonCode = "legacy"
 	}
 
-	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdateAssignmentResult, error) {
-		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
-		if err != nil {
-			return nil, err
-		}
+		written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdateAssignmentResult, error) {
+			settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+			if err != nil {
+				return nil, err
+			}
+			restrictionsMode := normalizeValidationMode(settings.PositionRestrictionsValidationMode)
+			var restrictionsShadowErr *ServiceError
 
-		current, err := s.repo.LockAssignmentAt(txCtx, tenantID, in.AssignmentID, in.EffectiveDate)
-		if err != nil {
-			return nil, mapPgError(err)
-		}
+			current, err := s.repo.LockAssignmentAt(txCtx, tenantID, in.AssignmentID, in.EffectiveDate)
+			if err != nil {
+				return nil, mapPgError(err)
+			}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
 			var svcErr *ServiceError
@@ -1279,26 +1380,26 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		}
 
 		newAllocatedFTE := current.AllocatedFTE
-		if in.AllocatedFTE != nil {
-			if *in.AllocatedFTE <= 0 {
-				return nil, newServiceError(400, "ORG_INVALID_BODY", "allocated_fte must be > 0", nil)
-			}
-			newAllocatedFTE = *in.AllocatedFTE
-		}
-
-		if current.IsPrimary {
-			idsToLock := []uuid.UUID{current.PositionID, positionID}
-			if current.PositionID == positionID {
-				idsToLock = []uuid.UUID{positionID}
-			} else if strings.Compare(current.PositionID.String(), positionID.String()) > 0 {
-				idsToLock[0], idsToLock[1] = idsToLock[1], idsToLock[0]
-			}
-			var newPosSlice PositionSliceRow
-			for _, id := range idsToLock {
-				slice, err := s.repo.LockPositionSliceAt(txCtx, tenantID, id, in.EffectiveDate)
-				if err != nil {
-					return nil, mapPgError(err)
+			if in.AllocatedFTE != nil {
+				if *in.AllocatedFTE <= 0 {
+					return nil, newServiceError(400, "ORG_INVALID_BODY", "allocated_fte must be > 0", nil)
 				}
+				newAllocatedFTE = *in.AllocatedFTE
+			}
+
+			var newPosSlice PositionSliceRow
+			if current.IsPrimary {
+				idsToLock := []uuid.UUID{current.PositionID, positionID}
+				if current.PositionID == positionID {
+					idsToLock = []uuid.UUID{positionID}
+				} else if strings.Compare(current.PositionID.String(), positionID.String()) > 0 {
+					idsToLock[0], idsToLock[1] = idsToLock[1], idsToLock[0]
+				}
+				for _, id := range idsToLock {
+					slice, err := s.repo.LockPositionSliceAt(txCtx, tenantID, id, in.EffectiveDate)
+					if err != nil {
+						return nil, mapPgError(err)
+					}
 				if id == positionID {
 					newPosSlice = slice
 				}
@@ -1313,8 +1414,52 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 					occupiedNew = 0
 				}
 			}
-			if occupiedNew+newAllocatedFTE > newPosSlice.CapacityFTE {
-				return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
+				if occupiedNew+newAllocatedFTE > newPosSlice.CapacityFTE {
+					return nil, newServiceError(422, "ORG_POSITION_OVER_CAPACITY", "position capacity exceeded", nil)
+				}
+			} else if restrictionsMode != "disabled" {
+				newPosSlice, err = s.repo.GetPositionSliceAt(txCtx, tenantID, positionID, in.EffectiveDate)
+				if err != nil {
+					return nil, mapPgError(err)
+				}
+			}
+
+			if restrictionsMode != "disabled" {
+				isAutoCreated, err := s.repo.GetPositionIsAutoCreated(txCtx, tenantID, positionID)
+				if err != nil {
+				return nil, mapPgError(err)
+			}
+			restrictionsJSON, err := extractRestrictionsFromProfile(newPosSlice.Profile)
+			if err != nil {
+				if restrictionsMode == "enforce" {
+					return nil, err
+				}
+				var svcErr *ServiceError
+				if !errors.As(err, &svcErr) {
+					return nil, err
+				}
+				restrictionsShadowErr = svcErr
+			} else {
+				parsedRestrictions, err := parsePositionRestrictions(restrictionsJSON)
+				if err != nil {
+					if restrictionsMode == "enforce" {
+						return nil, err
+					}
+					var svcErr *ServiceError
+					if !errors.As(err, &svcErr) {
+						return nil, err
+					}
+					restrictionsShadowErr = svcErr
+				} else if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, isAutoCreated, newPosSlice, parsedRestrictions); err != nil {
+					if restrictionsMode == "enforce" {
+						return nil, err
+					}
+					var svcErr *ServiceError
+					if !errors.As(err, &svcErr) {
+						return nil, err
+					}
+					restrictionsShadowErr = svcErr
+				}
 			}
 		}
 
@@ -1394,10 +1539,17 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
 				"end_date":        newEnd.UTC().Format(time.RFC3339),
 			},
-			Meta: map[string]any{
-				"reason_code": reasonCode,
-				"reason_note": in.ReasonNote,
-			},
+			Meta: func() map[string]any {
+				meta := map[string]any{
+					"reason_code": reasonCode,
+					"reason_note": in.ReasonNote,
+				}
+				if restrictionsShadowErr != nil {
+					meta["position_restrictions_validation_mode"] = restrictionsMode
+					meta["position_restrictions_validation_error_code"] = restrictionsShadowErr.Code
+				}
+				return meta
+			}(),
 			Operation:       "Update",
 			FreezeMode:      freeze.Mode,
 			FreezeViolation: freeze.Violation,

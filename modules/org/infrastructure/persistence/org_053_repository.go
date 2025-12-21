@@ -50,10 +50,30 @@ func (r *OrgRepository) InsertPosition(ctx context.Context, tenantID uuid.UUID, 
 	return id, nil
 }
 
+func (r *OrgRepository) GetPositionIsAutoCreated(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID) (bool, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return false, err
+	}
+	var isAutoCreated bool
+	if err := tx.QueryRow(ctx, `
+	SELECT is_auto_created
+	FROM org_positions
+	WHERE tenant_id=$1 AND id=$2
+	`, pgUUID(tenantID), pgUUID(positionID)).Scan(&isAutoCreated); err != nil {
+		return false, err
+	}
+	return isAutoCreated, nil
+}
+
 func (r *OrgRepository) InsertPositionSlice(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, in services.PositionSliceInsert) (uuid.UUID, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return uuid.Nil, err
+	}
+	profile := "{}"
+	if len(in.Profile) != 0 {
+		profile = string(in.Profile)
 	}
 	var id uuid.UUID
 	if err := tx.QueryRow(ctx, `
@@ -63,12 +83,21 @@ func (r *OrgRepository) InsertPositionSlice(ctx context.Context, tenantID uuid.U
 		org_node_id,
 		title,
 		lifecycle_status,
+		position_type,
+		employment_type,
 		capacity_fte,
 		reports_to_position_id,
+		job_family_group_code,
+		job_family_code,
+		job_role_code,
+		job_level_code,
+		job_profile_id,
+		cost_center_code,
+		profile,
 		effective_date,
 		end_date
 	)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18)
 	RETURNING id
 	`,
 		pgUUID(tenantID),
@@ -76,8 +105,17 @@ func (r *OrgRepository) InsertPositionSlice(ctx context.Context, tenantID uuid.U
 		pgUUID(in.OrgNodeID),
 		pgNullableText(in.Title),
 		strings.TrimSpace(in.LifecycleStatus),
+		pgNullableText(in.PositionType),
+		pgNullableText(in.EmploymentType),
 		in.CapacityFTE,
 		pgNullableUUID(in.ReportsToPositionID),
+		pgNullableText(in.JobFamilyGroupCode),
+		pgNullableText(in.JobFamilyCode),
+		pgNullableText(in.JobRoleCode),
+		pgNullableText(in.JobLevelCode),
+		pgNullableUUID(in.JobProfileID),
+		pgNullableText(in.CostCenterCode),
+		profile,
 		in.EffectiveDate.UTC(),
 		in.EndDate.UTC(),
 	).Scan(&id); err != nil {
@@ -99,8 +137,17 @@ func (r *OrgRepository) GetPositionSliceAt(ctx context.Context, tenantID uuid.UU
 		org_node_id,
 		title,
 		lifecycle_status,
+		position_type,
+		employment_type,
 		capacity_fte,
 		reports_to_position_id,
+		job_family_group_code,
+		job_family_code,
+		job_role_code,
+		job_level_code,
+		job_profile_id,
+		cost_center_code,
+		profile,
 		effective_date,
 		end_date
 	FROM org_position_slices
@@ -112,14 +159,32 @@ func (r *OrgRepository) GetPositionSliceAt(ctx context.Context, tenantID uuid.UU
 	var out services.PositionSliceRow
 	var title pgtype.Text
 	var reportsTo pgtype.UUID
+	var positionType pgtype.Text
+	var employmentType pgtype.Text
+	var jobFamilyGroupCode pgtype.Text
+	var jobFamilyCode pgtype.Text
+	var jobRoleCode pgtype.Text
+	var jobLevelCode pgtype.Text
+	var jobProfileID pgtype.UUID
+	var costCenterCode pgtype.Text
+	var profile []byte
 	if err := row.Scan(
 		&out.ID,
 		&out.PositionID,
 		&out.OrgNodeID,
 		&title,
 		&out.LifecycleStatus,
+		&positionType,
+		&employmentType,
 		&out.CapacityFTE,
 		&reportsTo,
+		&jobFamilyGroupCode,
+		&jobFamilyCode,
+		&jobRoleCode,
+		&jobLevelCode,
+		&jobProfileID,
+		&costCenterCode,
+		&profile,
 		&out.EffectiveDate,
 		&out.EndDate,
 	); err != nil {
@@ -127,6 +192,15 @@ func (r *OrgRepository) GetPositionSliceAt(ctx context.Context, tenantID uuid.UU
 	}
 	out.Title = nullableText(title)
 	out.ReportsToPositionID = nullableUUID(reportsTo)
+	out.PositionType = nullableText(positionType)
+	out.EmploymentType = nullableText(employmentType)
+	out.JobFamilyGroupCode = nullableText(jobFamilyGroupCode)
+	out.JobFamilyCode = nullableText(jobFamilyCode)
+	out.JobRoleCode = nullableText(jobRoleCode)
+	out.JobLevelCode = nullableText(jobLevelCode)
+	out.JobProfileID = nullableUUID(jobProfileID)
+	out.CostCenterCode = nullableText(costCenterCode)
+	out.Profile = profile
 	return out, nil
 }
 
@@ -143,8 +217,17 @@ func (r *OrgRepository) LockPositionSliceStartingAt(ctx context.Context, tenantI
 		org_node_id,
 		title,
 		lifecycle_status,
+		position_type,
+		employment_type,
 		capacity_fte,
 		reports_to_position_id,
+		job_family_group_code,
+		job_family_code,
+		job_role_code,
+		job_level_code,
+		job_profile_id,
+		cost_center_code,
+		profile,
 		effective_date,
 		end_date
 	FROM org_position_slices
@@ -156,14 +239,32 @@ func (r *OrgRepository) LockPositionSliceStartingAt(ctx context.Context, tenantI
 	var out services.PositionSliceRow
 	var title pgtype.Text
 	var reportsTo pgtype.UUID
+	var positionType pgtype.Text
+	var employmentType pgtype.Text
+	var jobFamilyGroupCode pgtype.Text
+	var jobFamilyCode pgtype.Text
+	var jobRoleCode pgtype.Text
+	var jobLevelCode pgtype.Text
+	var jobProfileID pgtype.UUID
+	var costCenterCode pgtype.Text
+	var profile []byte
 	if err := row.Scan(
 		&out.ID,
 		&out.PositionID,
 		&out.OrgNodeID,
 		&title,
 		&out.LifecycleStatus,
+		&positionType,
+		&employmentType,
 		&out.CapacityFTE,
 		&reportsTo,
+		&jobFamilyGroupCode,
+		&jobFamilyCode,
+		&jobRoleCode,
+		&jobLevelCode,
+		&jobProfileID,
+		&costCenterCode,
+		&profile,
 		&out.EffectiveDate,
 		&out.EndDate,
 	); err != nil {
@@ -171,6 +272,15 @@ func (r *OrgRepository) LockPositionSliceStartingAt(ctx context.Context, tenantI
 	}
 	out.Title = nullableText(title)
 	out.ReportsToPositionID = nullableUUID(reportsTo)
+	out.PositionType = nullableText(positionType)
+	out.EmploymentType = nullableText(employmentType)
+	out.JobFamilyGroupCode = nullableText(jobFamilyGroupCode)
+	out.JobFamilyCode = nullableText(jobFamilyCode)
+	out.JobRoleCode = nullableText(jobRoleCode)
+	out.JobLevelCode = nullableText(jobLevelCode)
+	out.JobProfileID = nullableUUID(jobProfileID)
+	out.CostCenterCode = nullableText(costCenterCode)
+	out.Profile = profile
 	return out, nil
 }
 
@@ -187,8 +297,17 @@ func (r *OrgRepository) LockPositionSliceEndingAt(ctx context.Context, tenantID 
 		org_node_id,
 		title,
 		lifecycle_status,
+		position_type,
+		employment_type,
 		capacity_fte,
 		reports_to_position_id,
+		job_family_group_code,
+		job_family_code,
+		job_role_code,
+		job_level_code,
+		job_profile_id,
+		cost_center_code,
+		profile,
 		effective_date,
 		end_date
 	FROM org_position_slices
@@ -200,14 +319,32 @@ func (r *OrgRepository) LockPositionSliceEndingAt(ctx context.Context, tenantID 
 	var out services.PositionSliceRow
 	var title pgtype.Text
 	var reportsTo pgtype.UUID
+	var positionType pgtype.Text
+	var employmentType pgtype.Text
+	var jobFamilyGroupCode pgtype.Text
+	var jobFamilyCode pgtype.Text
+	var jobRoleCode pgtype.Text
+	var jobLevelCode pgtype.Text
+	var jobProfileID pgtype.UUID
+	var costCenterCode pgtype.Text
+	var profile []byte
 	if err := row.Scan(
 		&out.ID,
 		&out.PositionID,
 		&out.OrgNodeID,
 		&title,
 		&out.LifecycleStatus,
+		&positionType,
+		&employmentType,
 		&out.CapacityFTE,
 		&reportsTo,
+		&jobFamilyGroupCode,
+		&jobFamilyCode,
+		&jobRoleCode,
+		&jobLevelCode,
+		&jobProfileID,
+		&costCenterCode,
+		&profile,
 		&out.EffectiveDate,
 		&out.EndDate,
 	); err != nil {
@@ -215,6 +352,15 @@ func (r *OrgRepository) LockPositionSliceEndingAt(ctx context.Context, tenantID 
 	}
 	out.Title = nullableText(title)
 	out.ReportsToPositionID = nullableUUID(reportsTo)
+	out.PositionType = nullableText(positionType)
+	out.EmploymentType = nullableText(employmentType)
+	out.JobFamilyGroupCode = nullableText(jobFamilyGroupCode)
+	out.JobFamilyCode = nullableText(jobFamilyCode)
+	out.JobRoleCode = nullableText(jobRoleCode)
+	out.JobLevelCode = nullableText(jobLevelCode)
+	out.JobProfileID = nullableUUID(jobProfileID)
+	out.CostCenterCode = nullableText(costCenterCode)
+	out.Profile = profile
 	return out, nil
 }
 
@@ -274,8 +420,17 @@ func (r *OrgRepository) ListPositionSlicesTimeline(ctx context.Context, tenantID
 		org_node_id,
 		title,
 		lifecycle_status,
+		position_type,
+		employment_type,
 		capacity_fte,
 		reports_to_position_id,
+		job_family_group_code,
+		job_family_code,
+		job_role_code,
+		job_level_code,
+		job_profile_id,
+		cost_center_code,
+		profile,
 		effective_date,
 		end_date
 	FROM org_position_slices
@@ -292,14 +447,32 @@ func (r *OrgRepository) ListPositionSlicesTimeline(ctx context.Context, tenantID
 		var row services.PositionSliceRow
 		var title pgtype.Text
 		var reportsTo pgtype.UUID
+		var positionType pgtype.Text
+		var employmentType pgtype.Text
+		var jobFamilyGroupCode pgtype.Text
+		var jobFamilyCode pgtype.Text
+		var jobRoleCode pgtype.Text
+		var jobLevelCode pgtype.Text
+		var jobProfileID pgtype.UUID
+		var costCenterCode pgtype.Text
+		var profile []byte
 		if err := rows.Scan(
 			&row.ID,
 			&row.PositionID,
 			&row.OrgNodeID,
 			&title,
 			&row.LifecycleStatus,
+			&positionType,
+			&employmentType,
 			&row.CapacityFTE,
 			&reportsTo,
+			&jobFamilyGroupCode,
+			&jobFamilyCode,
+			&jobRoleCode,
+			&jobLevelCode,
+			&jobProfileID,
+			&costCenterCode,
+			&profile,
 			&row.EffectiveDate,
 			&row.EndDate,
 		); err != nil {
@@ -307,6 +480,15 @@ func (r *OrgRepository) ListPositionSlicesTimeline(ctx context.Context, tenantID
 		}
 		row.Title = nullableText(title)
 		row.ReportsToPositionID = nullableUUID(reportsTo)
+		row.PositionType = nullableText(positionType)
+		row.EmploymentType = nullableText(employmentType)
+		row.JobFamilyGroupCode = nullableText(jobFamilyGroupCode)
+		row.JobFamilyCode = nullableText(jobFamilyCode)
+		row.JobRoleCode = nullableText(jobRoleCode)
+		row.JobLevelCode = nullableText(jobLevelCode)
+		row.JobProfileID = nullableUUID(jobProfileID)
+		row.CostCenterCode = nullableText(costCenterCode)
+		row.Profile = profile
 		out = append(out, row)
 	}
 	return out, rows.Err()
@@ -486,6 +668,16 @@ func (r *OrgRepository) GetPositionAsOf(ctx context.Context, tenantID uuid.UUID,
 			WHEN COALESCE(SUM(a.allocated_fte), 0) < s.capacity_fte THEN 'partially_filled'
 			ELSE 'filled'
 		END AS staffing_state,
+		s.position_type,
+		s.employment_type,
+		s.reports_to_position_id,
+		s.job_family_group_code,
+		s.job_family_code,
+		s.job_role_code,
+		s.job_level_code,
+		s.job_profile_id,
+		s.cost_center_code,
+		s.profile,
 		s.effective_date,
 		s.end_date
 	FROM org_positions p
@@ -509,12 +701,32 @@ func (r *OrgRepository) GetPositionAsOf(ctx context.Context, tenantID uuid.UUID,
 		s.lifecycle_status,
 		p.is_auto_created,
 		s.capacity_fte,
+		s.position_type,
+		s.employment_type,
+		s.reports_to_position_id,
+		s.job_family_group_code,
+		s.job_family_code,
+		s.job_role_code,
+		s.job_level_code,
+		s.job_profile_id,
+		s.cost_center_code,
+		s.profile,
 		s.effective_date,
 		s.end_date
 	`, pgUUID(tenantID), pgUUID(positionID), asOf)
 
 	var out services.PositionViewRow
 	var title pgtype.Text
+	var positionType pgtype.Text
+	var employmentType pgtype.Text
+	var reportsTo pgtype.UUID
+	var jobFamilyGroupCode pgtype.Text
+	var jobFamilyCode pgtype.Text
+	var jobRoleCode pgtype.Text
+	var jobLevelCode pgtype.Text
+	var jobProfileID pgtype.UUID
+	var costCenterCode pgtype.Text
+	var profile []byte
 	if err := row.Scan(
 		&out.PositionID,
 		&out.Code,
@@ -525,12 +737,32 @@ func (r *OrgRepository) GetPositionAsOf(ctx context.Context, tenantID uuid.UUID,
 		&out.CapacityFTE,
 		&out.OccupiedFTE,
 		&out.StaffingState,
+		&positionType,
+		&employmentType,
+		&reportsTo,
+		&jobFamilyGroupCode,
+		&jobFamilyCode,
+		&jobRoleCode,
+		&jobLevelCode,
+		&jobProfileID,
+		&costCenterCode,
+		&profile,
 		&out.EffectiveDate,
 		&out.EndDate,
 	); err != nil {
 		return services.PositionViewRow{}, err
 	}
 	out.Title = nullableText(title)
+	out.PositionType = nullableText(positionType)
+	out.EmploymentType = nullableText(employmentType)
+	out.ReportsToPositionID = nullableUUID(reportsTo)
+	out.JobFamilyGroupCode = nullableText(jobFamilyGroupCode)
+	out.JobFamilyCode = nullableText(jobFamilyCode)
+	out.JobRoleCode = nullableText(jobRoleCode)
+	out.JobLevelCode = nullableText(jobLevelCode)
+	out.JobProfileID = nullableUUID(jobProfileID)
+	out.CostCenterCode = nullableText(costCenterCode)
+	out.Profile = profile
 	return out, nil
 }
 
@@ -551,20 +783,46 @@ func (r *OrgRepository) UpdatePositionSliceInPlace(ctx context.Context, tenantID
 	setOrgNode := patch.OrgNodeID != nil
 	setTitle := patch.Title != nil
 	setLifecycle := patch.LifecycleStatus != nil
+	setPositionType := patch.PositionType != nil
+	setEmploymentType := patch.EmploymentType != nil
 	setCapacity := patch.CapacityFTE != nil
 	setReportsTo := patch.ReportsToPositionID != nil
+	setJobFamilyGroupCode := patch.JobFamilyGroupCode != nil
+	setJobFamilyCode := patch.JobFamilyCode != nil
+	setJobRoleCode := patch.JobRoleCode != nil
+	setJobLevelCode := patch.JobLevelCode != nil
+	setJobProfileID := patch.JobProfileID != nil
+	setCostCenterCode := patch.CostCenterCode != nil
+	setProfile := patch.Profile != nil
+
+	profile := "{}"
+	if setProfile {
+		raw := *patch.Profile
+		if len(raw) != 0 {
+			profile = string(raw)
+		}
+	}
 
 	_, err = tx.Exec(ctx, `
-	UPDATE org_position_slices
-	SET
-		org_node_id = CASE WHEN $3 THEN $4 ELSE org_node_id END,
-		title = CASE WHEN $5 THEN $6 ELSE title END,
-		lifecycle_status = CASE WHEN $7 THEN $8 ELSE lifecycle_status END,
-		capacity_fte = CASE WHEN $9 THEN $10 ELSE capacity_fte END,
-		reports_to_position_id = CASE WHEN $11 THEN $12 ELSE reports_to_position_id END,
-		updated_at = now()
-	WHERE tenant_id=$1 AND id=$2
-	`,
+		UPDATE org_position_slices
+		SET
+			org_node_id = CASE WHEN $3 THEN $4 ELSE org_node_id END,
+			title = CASE WHEN $5 THEN $6 ELSE title END,
+			lifecycle_status = CASE WHEN $7 THEN $8 ELSE lifecycle_status END,
+			position_type = CASE WHEN $9 THEN $10 ELSE position_type END,
+			employment_type = CASE WHEN $11 THEN $12 ELSE employment_type END,
+			capacity_fte = CASE WHEN $13 THEN $14 ELSE capacity_fte END,
+			reports_to_position_id = CASE WHEN $15 THEN $16 ELSE reports_to_position_id END,
+			job_family_group_code = CASE WHEN $17 THEN $18 ELSE job_family_group_code END,
+			job_family_code = CASE WHEN $19 THEN $20 ELSE job_family_code END,
+			job_role_code = CASE WHEN $21 THEN $22 ELSE job_role_code END,
+			job_level_code = CASE WHEN $23 THEN $24 ELSE job_level_code END,
+			job_profile_id = CASE WHEN $25 THEN $26 ELSE job_profile_id END,
+			cost_center_code = CASE WHEN $27 THEN $28 ELSE cost_center_code END,
+			profile = CASE WHEN $29 THEN $30::jsonb ELSE profile END,
+			updated_at = now()
+		WHERE tenant_id=$1 AND id=$2
+		`,
 		pgUUID(tenantID),
 		pgUUID(sliceID),
 		setOrgNode,
@@ -573,10 +831,28 @@ func (r *OrgRepository) UpdatePositionSliceInPlace(ctx context.Context, tenantID
 		pgNullableText(patch.Title),
 		setLifecycle,
 		derefString(patch.LifecycleStatus),
+		setPositionType,
+		pgNullableText(patch.PositionType),
+		setEmploymentType,
+		pgNullableText(patch.EmploymentType),
 		setCapacity,
 		derefFloat64(patch.CapacityFTE),
 		setReportsTo,
 		pgNullableUUID(patch.ReportsToPositionID),
+		setJobFamilyGroupCode,
+		pgNullableText(patch.JobFamilyGroupCode),
+		setJobFamilyCode,
+		pgNullableText(patch.JobFamilyCode),
+		setJobRoleCode,
+		pgNullableText(patch.JobRoleCode),
+		setJobLevelCode,
+		pgNullableText(patch.JobLevelCode),
+		setJobProfileID,
+		pgNullableUUID(patch.JobProfileID),
+		setCostCenterCode,
+		pgNullableText(patch.CostCenterCode),
+		setProfile,
+		profile,
 	)
 	return err
 }
