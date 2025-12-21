@@ -55,6 +55,7 @@
 ### 3.5 059/059A（收口与上线）门禁 + 冒烟 + 追溯闭环
 - [X] 实现合并：PR #107（059A）https://github.com/jacksonlee411/Bugs-Blossoms/pull/107 ——（2025-12-21）merge commit：`7ff68853e29fb59cf0fbc867a8a9e3201d7dc939`
 - [X] 实现合并：PR #108（059 补齐）https://github.com/jacksonlee411/Bugs-Blossoms/pull/108 ——（2025-12-21）merge commit：`094b4156e13508fc49428365e4120443cd9b5164`
+- [X] 实现合并：PR #110（059 可观测补齐：治理拒绝结构化日志）https://github.com/jacksonlee411/Bugs-Blossoms/pull/110 ——（2025-12-21）merge commit：`36154960`
 - [X] `go fmt ./... && go vet ./...` ——（2025-12-21）结果：通过
 - [X] `make generate && make css` ——（2025-12-21）结果：通过
 - [X] `make check lint` ——（2025-12-21）结果：通过

@@ -8,6 +8,7 @@
 - 实现已合并：
   - PR #108（DEV-PLAN-059 补齐）：https://github.com/jacksonlee411/Bugs-Blossoms/pull/108（merged 2025-12-21，merge commit `094b4156e13508fc49428365e4120443cd9b5164`）
   - PR #107（DEV-PLAN-059A）：https://github.com/jacksonlee411/Bugs-Blossoms/pull/107（merged 2025-12-21，merge commit `7ff68853e29fb59cf0fbc867a8a9e3201d7dc939`）
+  - PR #110（059 可观测补齐：治理拒绝结构化日志）：https://github.com/jacksonlee411/Bugs-Blossoms/pull/110（merged 2025-12-21，merge commit `36154960`）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
