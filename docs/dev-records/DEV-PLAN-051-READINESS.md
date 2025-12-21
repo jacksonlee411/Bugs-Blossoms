@@ -71,3 +71,11 @@
   - `enforce`：缺失输入的 request_id（pos/assignment）在 `org_audit_logs/org_outbox` 计数均为 `0`
   - `disabled`：`reason_code=''（空）, reason_code_mode=disabled, original_missing=true, filled=false`
 - [X] 059 最小冒烟脚本（Position/Assignment/Reports/Vacancy）：`scripts/org/059_smoke.sh` ——（2025-12-21）结果：通过（脚本内含固定 request_id 与追溯 SQL）
+
+#### 3.5.1 059/059A 线上 rollout 演练（待执行，执行后回填）
+- [ ] 选择环境与租户：记录 `env`（staging/prod）、`tenant_id`、操作者、时间窗。
+- [ ] 灰度开关：记录 `ORG_ROLLOUT_MODE` / `ORG_ROLLOUT_TENANTS`（以及任何相关 enable flags）。
+- [ ] `reason_code_mode=enforce` 拒绝演练：缺失 `reason_code` 的写入应返回 400 `ORG_INVALID_BODY`，日志按 `request_id` 可检索到 `org.reason_code.rejected`。
+- [ ] `freeze_mode=enforce` 拒绝演练：受冻结窗口影响的写入应返回 409 `ORG_FROZEN_WINDOW`，日志按 `request_id` 可检索到 `org.frozen_window.rejected`。
+- [ ] 校验 enforce 拒绝演练（至少一项）：`org.position_catalog.rejected` 或 `org.position_restrictions.rejected` 能按 `request_id` 检索到（并记录对应 `error_code`）。
+- [ ] 回滚演练：将租户从 `ORG_ROLLOUT_TENANTS` 移除或切 `ORG_ROLLOUT_MODE=disabled`，并将 `reason_code_mode` 降级回 `shadow/disabled`（记录生效时间）。

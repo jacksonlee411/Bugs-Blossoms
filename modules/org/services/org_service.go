@@ -1065,18 +1065,12 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			var svcErr *ServiceError
-			if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
-				logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
-					"tenant_id":       tenantID.String(),
-					"pernr":           in.Pernr,
-					"subject_id":      derivedSubjectID.String(),
-					"assignment_type": assignmentType,
-					"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
-					"error_code":      svcErr.Code,
-					"operation":       "Create",
-				})
-			}
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "assignment.created", "org_assignment", uuid.Nil, in.EffectiveDate, freeze, err, logrus.Fields{
+				"pernr":           in.Pernr,
+				"subject_id":      derivedSubjectID.String(),
+				"assignment_type": assignmentType,
+				"operation":       "Create",
+			})
 			return nil, err
 		}
 
@@ -1145,6 +1139,10 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			restrictionsJSON, err := extractRestrictionsFromProfile(posSlice.Profile)
 			if err != nil {
 				if restrictionsMode == "enforce" {
+					maybeLogModeRejected(txCtx, "org.position_restrictions.rejected", tenantID, requestID, initiatorID, "assignment.created", "org_assignment", uuid.Nil, in.EffectiveDate, restrictionsMode, err, logrus.Fields{
+						"position_id": positionID.String(),
+						"operation":   "Create",
+					})
 					return nil, err
 				}
 				var svcErr *ServiceError
@@ -1156,6 +1154,10 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				parsedRestrictions, err := parsePositionRestrictions(restrictionsJSON)
 				if err != nil {
 					if restrictionsMode == "enforce" {
+						maybeLogModeRejected(txCtx, "org.position_restrictions.rejected", tenantID, requestID, initiatorID, "assignment.created", "org_assignment", uuid.Nil, in.EffectiveDate, restrictionsMode, err, logrus.Fields{
+							"position_id": positionID.String(),
+							"operation":   "Create",
+						})
 						return nil, err
 					}
 					var svcErr *ServiceError
@@ -1165,6 +1167,10 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 					restrictionsShadowErr = svcErr
 				} else if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, isAutoCreated, posSlice, parsedRestrictions); err != nil {
 					if restrictionsMode == "enforce" {
+						maybeLogModeRejected(txCtx, "org.position_restrictions.rejected", tenantID, requestID, initiatorID, "assignment.created", "org_assignment", uuid.Nil, in.EffectiveDate, restrictionsMode, err, logrus.Fields{
+							"position_id": positionID.String(),
+							"operation":   "Create",
+						})
 						return nil, err
 					}
 					var svcErr *ServiceError
@@ -1320,18 +1326,14 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			var svcErr *ServiceError
-			if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
-				logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
-					"tenant_id":       tenantID.String(),
-					"pernr":           current.Pernr,
-					"subject_id":      current.SubjectID.String(),
-					"assignment_type": current.AssignmentType,
-					"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
-					"error_code":      svcErr.Code,
-					"operation":       "Update",
-				})
-			}
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "assignment.updated", "org_assignment", current.ID, in.EffectiveDate, freeze, err, logrus.Fields{
+				"assignment_id":   current.ID.String(),
+				"position_id":     current.PositionID.String(),
+				"pernr":           current.Pernr,
+				"subject_id":      current.SubjectID.String(),
+				"assignment_type": current.AssignmentType,
+				"operation":       "Update",
+			})
 			return nil, err
 		}
 		if current.EffectiveDate.Equal(in.EffectiveDate) {
@@ -1435,6 +1437,11 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			restrictionsJSON, err := extractRestrictionsFromProfile(newPosSlice.Profile)
 			if err != nil {
 				if restrictionsMode == "enforce" {
+					maybeLogModeRejected(txCtx, "org.position_restrictions.rejected", tenantID, requestID, initiatorID, "assignment.updated", "org_assignment", current.ID, in.EffectiveDate, restrictionsMode, err, logrus.Fields{
+						"assignment_id": current.ID.String(),
+						"position_id":   positionID.String(),
+						"operation":     "Update",
+					})
 					return nil, err
 				}
 				var svcErr *ServiceError
@@ -1446,6 +1453,11 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				parsedRestrictions, err := parsePositionRestrictions(restrictionsJSON)
 				if err != nil {
 					if restrictionsMode == "enforce" {
+						maybeLogModeRejected(txCtx, "org.position_restrictions.rejected", tenantID, requestID, initiatorID, "assignment.updated", "org_assignment", current.ID, in.EffectiveDate, restrictionsMode, err, logrus.Fields{
+							"assignment_id": current.ID.String(),
+							"position_id":   positionID.String(),
+							"operation":     "Update",
+						})
 						return nil, err
 					}
 					var svcErr *ServiceError
@@ -1455,6 +1467,11 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 					restrictionsShadowErr = svcErr
 				} else if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, isAutoCreated, newPosSlice, parsedRestrictions); err != nil {
 					if restrictionsMode == "enforce" {
+						maybeLogModeRejected(txCtx, "org.position_restrictions.rejected", tenantID, requestID, initiatorID, "assignment.updated", "org_assignment", current.ID, in.EffectiveDate, restrictionsMode, err, logrus.Fields{
+							"assignment_id": current.ID.String(),
+							"position_id":   positionID.String(),
+							"operation":     "Update",
+						})
 						return nil, err
 					}
 					var svcErr *ServiceError

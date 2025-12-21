@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/sirupsen/logrus"
 
 	"github.com/iota-uz/iota-sdk/modules/org/domain/events"
 )
@@ -107,6 +108,10 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "position.created", "org_position", uuid.Nil, in.EffectiveDate, freeze, err, logrus.Fields{
+				"org_node_id": in.OrgNodeID.String(),
+				"operation":   "Create",
+			})
 			return nil, err
 		}
 		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
@@ -130,6 +135,15 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			}, jobProfileID)
 			if err != nil {
 				if catalogMode == "enforce" {
+					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.created", "org_position", uuid.Nil, in.EffectiveDate, catalogMode, err, logrus.Fields{
+						"org_node_id":           in.OrgNodeID.String(),
+						"job_family_group_code": jobFamilyGroupCode,
+						"job_family_code":       jobFamilyCode,
+						"job_role_code":         jobRoleCode,
+						"job_level_code":        jobLevelCode,
+						"job_profile_id":        jobProfileID,
+						"operation":             "Create",
+					})
 					return nil, err
 				}
 				var svcErr *ServiceError
@@ -388,6 +402,10 @@ func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UU
 		}
 		freeze, err := s.freezeCheck(settings, txTime, affectedAt)
 		if err != nil {
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "position.shifted", "org_position", in.PositionID, affectedAt, freeze, err, logrus.Fields{
+				"position_id": in.PositionID.String(),
+				"operation":   "ShiftBoundary",
+			})
 			return nil, err
 		}
 
@@ -657,6 +675,10 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "position.updated", "org_position", in.PositionID, in.EffectiveDate, freeze, err, logrus.Fields{
+				"position_id": in.PositionID.String(),
+				"operation":   "Update",
+			})
 			return nil, err
 		}
 		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
@@ -801,6 +823,16 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 			}, jobProfileID)
 			if err != nil {
 				if catalogMode == "enforce" {
+					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.updated", "org_position", current.ID, in.EffectiveDate, catalogMode, err, logrus.Fields{
+						"position_id":           current.ID.String(),
+						"is_auto_created":       isAutoCreated,
+						"job_family_group_code": derefString(jobFamilyGroupCode),
+						"job_family_code":       derefString(jobFamilyCode),
+						"job_role_code":         derefString(jobRoleCode),
+						"job_level_code":        derefString(jobLevelCode),
+						"job_profile_id":        jobProfileID,
+						"operation":             "Update",
+					})
 					return nil, err
 				}
 				var svcErr *ServiceError
@@ -1028,6 +1060,11 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 
 		freeze, err := s.freezeCheck(settings, txTime, target.EffectiveDate)
 		if err != nil {
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "position.corrected", "org_position", in.PositionID, target.EffectiveDate, freeze, err, logrus.Fields{
+				"position_id":     in.PositionID.String(),
+				"is_auto_created": isAutoCreated,
+				"operation":       "Correct",
+			})
 			return nil, err
 		}
 
@@ -1170,6 +1207,16 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			}, jobProfileID)
 			if err != nil {
 				if catalogMode == "enforce" {
+					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.corrected", "org_position", in.PositionID, target.EffectiveDate, catalogMode, err, logrus.Fields{
+						"position_id":           in.PositionID.String(),
+						"is_auto_created":       isAutoCreated,
+						"job_family_group_code": derefString(jobFamilyGroupCode),
+						"job_family_code":       derefString(jobFamilyCode),
+						"job_role_code":         derefString(jobRoleCode),
+						"job_level_code":        derefString(jobLevelCode),
+						"job_profile_id":        jobProfileID,
+						"operation":             "Correct",
+					})
 					return nil, err
 				}
 				var svcErr *ServiceError
@@ -1377,6 +1424,10 @@ func (s *OrgService) RescindPosition(ctx context.Context, tenantID uuid.UUID, re
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "position.rescinded", "org_position", in.PositionID, in.EffectiveDate, freeze, err, logrus.Fields{
+				"position_id": in.PositionID.String(),
+				"operation":   "Rescind",
+			})
 			return nil, err
 		}
 
