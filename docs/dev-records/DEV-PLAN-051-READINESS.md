@@ -1,6 +1,6 @@
 # DEV-PLAN-051-READINESS：Position Management（051）Readiness 记录
 
-**状态**: 阶段 E-Reporting（DEV-PLAN-057）已实现；059/059A（收口与上线）进行中（2025-12-21）
+**状态**: 阶段 E-Reporting（DEV-PLAN-057）已实现；059/059A（收口与上线）代码已合并（线上 rollout 演练待执行，2025-12-21）
 
 ## 1. 范围
 - 本 readiness 覆盖 [DEV-PLAN-051](../dev-plans/051-position-management-implementation-blueprint.md) 的：
@@ -53,6 +53,8 @@
 - [X] `go test ./modules/org/presentation/controllers -run TestOrgAPIController_StaffingReports_RequirePositionReportsRead -v` ——（2025-12-21）结果：通过
 
 ### 3.5 059/059A（收口与上线）门禁 + 冒烟 + 追溯闭环
+- [X] 实现合并：PR #107（059A）https://github.com/jacksonlee411/Bugs-Blossoms/pull/107 ——（2025-12-21）merge commit：`7ff68853e29fb59cf0fbc867a8a9e3201d7dc939`
+- [X] 实现合并：PR #108（059 补齐）https://github.com/jacksonlee411/Bugs-Blossoms/pull/108 ——（2025-12-21）merge commit：`094b4156e13508fc49428365e4120443cd9b5164`
 - [X] `go fmt ./... && go vet ./...` ——（2025-12-21）结果：通过
 - [X] `make generate && make css` ——（2025-12-21）结果：通过
 - [X] `make check lint` ——（2025-12-21）结果：通过
