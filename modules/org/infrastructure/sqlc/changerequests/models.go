@@ -125,6 +125,70 @@ type OrgHierarchySnapshotBuild struct {
 	Notes           *string            `json:"notes"`
 }
 
+type OrgJobFamily struct {
+	TenantID         pgtype.UUID        `json:"tenant_id"`
+	ID               pgtype.UUID        `json:"id"`
+	JobFamilyGroupID pgtype.UUID        `json:"job_family_group_id"`
+	Code             string             `json:"code"`
+	Name             string             `json:"name"`
+	IsActive         bool               `json:"is_active"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgJobFamilyGroup struct {
+	TenantID  pgtype.UUID        `json:"tenant_id"`
+	ID        pgtype.UUID        `json:"id"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgJobLevel struct {
+	TenantID     pgtype.UUID        `json:"tenant_id"`
+	ID           pgtype.UUID        `json:"id"`
+	JobRoleID    pgtype.UUID        `json:"job_role_id"`
+	Code         string             `json:"code"`
+	Name         string             `json:"name"`
+	DisplayOrder int32              `json:"display_order"`
+	IsActive     bool               `json:"is_active"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgJobProfile struct {
+	TenantID     pgtype.UUID        `json:"tenant_id"`
+	ID           pgtype.UUID        `json:"id"`
+	Code         string             `json:"code"`
+	Name         string             `json:"name"`
+	Description  *string            `json:"description"`
+	JobRoleID    pgtype.UUID        `json:"job_role_id"`
+	IsActive     bool               `json:"is_active"`
+	ExternalRefs []byte             `json:"external_refs"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgJobProfileAllowedJobLevel struct {
+	TenantID     pgtype.UUID        `json:"tenant_id"`
+	JobProfileID pgtype.UUID        `json:"job_profile_id"`
+	JobLevelID   pgtype.UUID        `json:"job_level_id"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
+type OrgJobRole struct {
+	TenantID    pgtype.UUID        `json:"tenant_id"`
+	ID          pgtype.UUID        `json:"id"`
+	JobFamilyID pgtype.UUID        `json:"job_family_id"`
+	Code        string             `json:"code"`
+	Name        string             `json:"name"`
+	IsActive    bool               `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OrgLink struct {
 	TenantID      pgtype.UUID        `json:"tenant_id"`
 	ID            pgtype.UUID        `json:"id"`
@@ -299,11 +363,14 @@ type OrgSecurityGroupMapping struct {
 }
 
 type OrgSetting struct {
-	TenantID        pgtype.UUID        `json:"tenant_id"`
-	FreezeMode      string             `json:"freeze_mode"`
-	FreezeGraceDays int32              `json:"freeze_grace_days"`
-	CreatedAt       pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	TenantID                           pgtype.UUID        `json:"tenant_id"`
+	FreezeMode                         string             `json:"freeze_mode"`
+	FreezeGraceDays                    int32              `json:"freeze_grace_days"`
+	PositionCatalogValidationMode      string             `json:"position_catalog_validation_mode"`
+	PositionRestrictionsValidationMode string             `json:"position_restrictions_validation_mode"`
+	ReasonCodeMode                     string             `json:"reason_code_mode"`
+	CreatedAt                          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt                          pgtype.Timestamptz `json:"updated_at"`
 }
 
 type Tenant struct {

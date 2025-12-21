@@ -1023,10 +1023,6 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	if in.Pernr == "" || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "pernr/effective_date are required", nil)
 	}
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
 	allocatedFTE := in.AllocatedFTE
 	if allocatedFTE < 0 {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "allocated_fte must be > 0", nil)
@@ -1061,6 +1057,10 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
@@ -1228,6 +1228,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 					"reason_code": reasonCode,
 					"reason_note": in.ReasonNote,
 				}
+				addReasonCodeMeta(meta, reasonInfo)
 				if restrictionsShadowErr != nil {
 					meta["position_restrictions_validation_mode"] = restrictionsMode
 					meta["position_restrictions_validation_error_code"] = restrictionsShadowErr.Code
@@ -1298,15 +1299,15 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	if in.AssignmentID == uuid.Nil || in.EffectiveDate.IsZero() {
 		return nil, newServiceError(400, "ORG_INVALID_BODY", "id/effective_date are required", nil)
 	}
-	reasonCode := strings.TrimSpace(in.ReasonCode)
-	if reasonCode == "" {
-		reasonCode = "legacy"
-	}
 
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*UpdateAssignmentResult, error) {
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			return nil, svcErr
 		}
 		restrictionsMode := normalizeValidationMode(settings.PositionRestrictionsValidationMode)
 		var restrictionsShadowErr *ServiceError
@@ -1544,6 +1545,7 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 					"reason_code": reasonCode,
 					"reason_note": in.ReasonNote,
 				}
+				addReasonCodeMeta(meta, reasonInfo)
 				if restrictionsShadowErr != nil {
 					meta["position_restrictions_validation_mode"] = restrictionsMode
 					meta["position_restrictions_validation_error_code"] = restrictionsShadowErr.Code

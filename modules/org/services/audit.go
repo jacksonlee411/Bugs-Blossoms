@@ -13,6 +13,7 @@ type OrgSettings struct {
 	FreezeGraceDays                    int
 	PositionCatalogValidationMode      string
 	PositionRestrictionsValidationMode string
+	ReasonCodeMode                     string
 }
 
 type AuditLogInsert struct {
