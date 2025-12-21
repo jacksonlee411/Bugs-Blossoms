@@ -189,6 +189,11 @@ ORDER BY created_at ASC;
 ## 7. 可观测性（Observability）
 - **结构化日志（最低字段）**：
   - `request_id`, `tenant_id`, `initiator_id`, `change_type`, `entity_type`, `entity_id`, `effective_date`, `mode`, `error_code`
+- **拒绝/阻断日志事件名（最低集，v1）**：
+  - `org.reason_code.rejected`（059A：reason_code_mode=enforce 拒绝）
+  - `org.frozen_window.rejected`（冻结窗口 enforce 拒绝，error_code=`ORG_FROZEN_WINDOW`）
+  - `org.position_catalog.rejected`（Job Catalog/Profile 校验 enforce 拒绝）
+  - `org.position_restrictions.rejected`（Position Restrictions 校验 enforce 拒绝）
 - **关键指标（建议纳入 034 Prometheus；先复用现有指标，避免新增高基数 label）**：
   - API：`org_api_requests_total{endpoint,result}`、`org_api_latency_seconds{endpoint,result}`（现状已有）
   - 写冲突：`org_write_conflicts_total{kind}`（现状已有）

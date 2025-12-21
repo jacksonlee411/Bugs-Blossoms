@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -715,19 +714,14 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 
 		freeze, err := s.freezeCheck(settings, txTime, current.EffectiveDate)
 		if err != nil {
-			var svcErr *ServiceError
-			if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
-				logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
-					"tenant_id":       tenantID.String(),
-					"assignment_id":   current.ID.String(),
-					"pernr":           current.Pernr,
-					"subject_id":      current.SubjectID.String(),
-					"assignment_type": current.AssignmentType,
-					"effective_date":  current.EffectiveDate.UTC().Format(time.RFC3339),
-					"error_code":      svcErr.Code,
-					"operation":       "Correct",
-				})
-			}
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "assignment.corrected", "org_assignment", current.ID, current.EffectiveDate, freeze, err, logrus.Fields{
+				"assignment_id":   current.ID.String(),
+				"position_id":     current.PositionID.String(),
+				"pernr":           current.Pernr,
+				"subject_id":      current.SubjectID.String(),
+				"assignment_type": current.AssignmentType,
+				"operation":       "Correct",
+			})
 			return nil, err
 		}
 
@@ -900,19 +894,14 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 		}
 		freeze, err := s.freezeCheck(settings, txTime, in.EffectiveDate)
 		if err != nil {
-			var svcErr *ServiceError
-			if errors.As(err, &svcErr) && svcErr.Code == "ORG_FROZEN_WINDOW" {
-				logWithFields(txCtx, logrus.WarnLevel, "org.assignment.frozen", logrus.Fields{
-					"tenant_id":       tenantID.String(),
-					"assignment_id":   current.ID.String(),
-					"pernr":           current.Pernr,
-					"subject_id":      current.SubjectID.String(),
-					"assignment_type": current.AssignmentType,
-					"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
-					"error_code":      svcErr.Code,
-					"operation":       "Rescind",
-				})
-			}
+			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "assignment.rescinded", "org_assignment", current.ID, in.EffectiveDate, freeze, err, logrus.Fields{
+				"assignment_id":   current.ID.String(),
+				"position_id":     current.PositionID.String(),
+				"pernr":           current.Pernr,
+				"subject_id":      current.SubjectID.String(),
+				"assignment_type": current.AssignmentType,
+				"operation":       "Rescind",
+			})
 			return nil, err
 		}
 		if !in.EffectiveDate.After(current.EffectiveDate) || !in.EffectiveDate.Before(current.EndDate) {
