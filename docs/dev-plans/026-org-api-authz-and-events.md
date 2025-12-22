@@ -351,21 +351,25 @@ CREATE INDEX org_outbox_tenant_published
 ### 7.2 403 Payload（SSOT）
 - 统一复用 `modules/core/authzutil.BuildForbiddenPayload`（见 §5.2）。
 
-### 7.3 Subject 标识与确定性映射（SSOT）
-> 本节是 `org_assignments.subject_id` 的单一事实源（SSOT）。UI/CLI/API 不得各自实现不同算法，避免漂移。
+### 7.3 Subject 标识与映射（SSOT）
+> 本节是 `org_assignments.subject_id` 的单一事实源（SSOT）。UI/CLI/API 不得各自实现不同映射规则，避免漂移。
+
+> ⚠️ 重要：本仓库已采纳 **方案 B**（`subject_id = person_uuid`）。历史版本的“确定性派生 subject_id（UUIDv5/sha1）”口径作废，不再作为 SSOT。
 
 - 术语：
   - `subject_type`：M1 固定为 `person`（DB 约束见 021）。
-  - `pernr`：人员可读标识（string），允许前导零；写入与映射前必须 `TrimSpace`，其余保持原样（区分大小写）。
-- 映射算法（Go，UUIDv5 = SHA1(namespace, name)）：
-  - `namespace = uuid.MustParse("ce7c5394-3959-40ff-9d92-a1c2684d94cc")`
-  - `payload = fmt.Sprintf("%s:%s:%s", tenantID, subjectType, pernr)`
-  - `subject_id = uuid.NewSHA1(namespace, []byte(payload))`
+  - `pernr`：人员可读标识（string），允许前导零；写入与解析前必须 `TrimSpace`，其余保持原样（区分大小写）。
+  - `subject_id`：**`person_uuid`**（UUID），来源于 Person SOR（`persons.person_uuid`）。
+- 映射规则（选定）：
+  - 写入任职记录时：服务端以 `tenant_id + pernr` 查询 Person SOR 得到 `person_uuid`，并将其写入 `org_assignments.subject_id`。
+  - 解析 SQL（示意）：
+    - `SELECT person_uuid FROM persons WHERE tenant_id=$1 AND pernr=$2`
 - 契约：
-  - 仅提供 `pernr` 时：服务端生成 `subject_id` 后落库。
-  - 同时提供 `subject_id` 与 `pernr`：必须校验一致，不一致返回 422 `ORG_SUBJECT_MISMATCH`（或 CLI validation error）。
-- 代码落点（必须复用）：
-  - `modules/org/domain/...`：`NormalizedSubjectID(tenantID uuid.UUID, subjectType, pernr string) (uuid.UUID, error)`
+  - 仅提供 `pernr` 时：服务端 resolve `person_uuid` 后落库（`subject_id=person_uuid`）。
+  - 同时提供 `subject_id` 与 `pernr`：必须校验 `subject_id == resolved(person_uuid)`，不一致返回 422 `ORG_SUBJECT_MISMATCH`。
+  - `pernr` 无法解析到 Person：返回 404 `ORG_PERSON_NOT_FOUND`（由 Org 服务层返回，保持 `/org/api/*` 错误码前缀一致）。
+- 代码落点（必须复用，避免跨模块 Go 依赖）：
+  - Org service 层不得直接依赖 `modules/person` 包；resolve 逻辑应落在 Org repo 接口中（例如 `ResolvePersonUUIDByPernr(ctx, tenantID, pernr)`），由 `modules/org/infrastructure/persistence` 通过 SQL 查询 `persons` 表实现。
 
 ### 7.4 租户隔离与 RLS
 - `/org/api/**` 必须强制 Session + tenant；当 `RLS_ENFORCE=enforce` 时事务内必须调用 `composables.ApplyTenantRLS`（对齐 019A）。

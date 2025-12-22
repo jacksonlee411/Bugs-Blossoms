@@ -4,6 +4,7 @@
 **对齐更新**：
 - 2025-12-16：对齐 DEV-PLAN-017/018/019 的工具链与门禁约束（outbox 闭环、routing gates、租户 fail-closed/RLS 注入口径）。
 - 2025-12-17：补齐 017/018/019/Casbin 的落点细节（API 示例前缀、Authz 门禁表述、outbox/relay/RLS 边界、集成图从“eventbus 直连”调整为 outbox 闭环）。
+- 2025-12-22：术语对齐 `person_uuid/pernr`（`person_id` 更名为 `person_uuid`，避免与工号语义混淆）。
 **评审结论**：M1 收敛为“单一 Organization Unit 树（原 Supervisory）+ 有效期校验 + 去重/无重叠 + 基础审计/查询性能”，暂不落地 workflow/BP 绑定、Authz 策略生成、并行版本、What-if/Impact UI 等高阶能力，统一挪到后续阶段或 backlog；M1 即交付最小权限集（Org.Read/Org.Write/Org.Assign/Org.Admin）及基础策略片段。
 
 ## 背景
@@ -20,7 +21,7 @@
 6. **事件一致性（outbox）**：关键变更通过 DEV-PLAN-017 的 outbox 闭环投递（业务写入 + outbox enqueue 同一事务提交；at-least-once；消费者按 `event_id` 幂等）。
 - **安全与最小权限**：M1 定义 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`（对齐 026：`org.*` + `read/write/assign/admin`），接口默认要求 Session+租户校验与对应权限；策略片段走 `make authz-pack`（生成）+ `make authz-test && make authz-lint`（门禁）。
 - **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；日期字段命名与 Workday 对齐：`effective_date`（开始），`end_date`/`inactive_date`（结束，半开区间）。
-- **人员标识**：采用 `person_id` 作为自然人主键（不可变）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户下同一 person 不变。
+- **人员标识**：采用 `person_uuid` 作为自然人内部主键（UUID，不可变且独立生成）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户内唯一。
 
 - **必需语境**：本模块文档、接口、评审交流均默认中文。
 
@@ -36,7 +37,7 @@
 - **时间维度**：节点/关系/分配的有效期字段与校验；只提供 `effective_date` 查询与基础 CRUD，不做 retro/并行版本。
 - **树一致性**：每租户仅一棵 Organization Unit 树，唯一根节点；禁止环、禁止双亲、禁止孤儿，`OrgEdge` 为父子真相，`OrgNode.parent_hint` 由边反查并在写入时强校验一致。
 - **主数据治理**：编码规则（唯一/长度/前缀）、命名规范、必填属性/字典校验、发布模式（API + 事件 + 批量导入）、冲突处理与审核责任写入文档；Org 为组织层级 SOR，Position 为人员隶属锚点（可自动生成空壳），编制留在 DEV-PLAN-021，Cost Center/Finance 仅消费事件/视图（冻结期不改 schema）。
-- **跨 SOR 协议**：`person_id/pernr` 写层不建 FK，通过 HRM 只读视图或缓存做软校验并周期性对账；`position_id` 在 M1 必填（可自动生成），`assignment_type` 默认 primary（matrix/dotted 为占位），`org_level` 等字段可空占位。
+- **跨 SOR 协议**：`person_uuid/pernr` 写层默认不建跨模块 FK，通过 Person 只读视图或缓存做软校验并周期性对账；`position_id` 在 M1 必填（可自动生成），`assignment_type` 默认 primary（matrix/dotted 为占位），`org_level` 等字段可空占位。
 - **后续可选（非 M1 交付）**：多层级/矩阵占位、workflow/BP 绑定、Authz 策略生成、并行版本、What-if/Impact UI 与安全域继承，待 M1 稳定后再立项。
 - **非目标**：不实现薪酬预算、绩效考核，不做编制/空岗管理，不调整 finance 模块 schema，仅通过事件/视图消费。
 
@@ -70,7 +71,7 @@
 - Correction vs Update：API 设计需显式区分“更正历史”（Correct，如 `POST /org/api/nodes/{id}:correct`，原地修改当前切片，需更高权限与审计标记）与“新增时间片”（Update，如 `PATCH /org/api/nodes/{id}`，截断旧片段再写新段），避免误用。
 
 ### 4. 组织层级 & 权限
-- **M1**：仅发布 DEV-PLAN-022 定义的 integration events（Topics `org.changed.v1`/`org.assignment.changed.v1`）供 Authz/HRM 等订阅，不做策略生成/继承计算。
+- **M1**：发布 DEV-PLAN-022 定义的 integration events（Topics `org.changed.v1`/`org.assignment.changed.v1`/`org.personnel_event.changed.v1`）供 Authz/Person 等订阅，不做策略生成/继承计算。
 - **后续（M3+）**：再评估 OrgSecurityDomain/Group 映射、继承计算与 policy 草稿出口，配合 `make authz-pack/test`。
 
 ## 技术方案
@@ -91,7 +92,7 @@
   - `org_nodes`（tenant_id, id, type, code, name, i18n_names jsonb, status, legal_entity_id/company_code, location_id, display_order int, effective_date, end_date, parent_hint, manager_user_id, created_at, updated_at）。
   - `org_edges`（tenant_id, id, hierarchy_id, parent_node_id, child_node_id, effective_date, end_date, depth, path ltree）。
   - `positions`（tenant_id, id, org_node_id, code, title, status, effective_date, end_date, is_auto_created bool, created_at, updated_at），M1 可自动为 Assignment 创建一对一空壳，通过 `is_auto_created` 标记以供后续治理。
-  - `org_assignments`（tenant_id, id, position_id, subject_type=person, subject_id=person_id, pernr, assignment_type=primary|matrix|dotted, effective_date, end_date, primary bool）。
+  - `org_assignments`（tenant_id, id, position_id, subject_type=person, subject_id=person_uuid, pernr, assignment_type=primary|matrix|dotted, effective_date, end_date, primary bool）。
   - 占位/可选表：`org_attribute_inheritance_rules`（属性继承策略配置）、`org_roles`（角色字典）、`org_role_assignments`（角色分配，带有效期）、`org_change_requests`（变更草稿/提交/审批/生效占位，M1 可仅存草稿+审计字段）、`org_matrix_links`（矩阵/虚线组织关联）、`org_security_group_mappings`（组织节点与安全组关联）、`org_links`（组织与项目/成本中心/预算科目等多对多关联，带有效期）。
   - 其他表（retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
   - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_date, end_date))` 用于时间冲突约束，`(tenant_id, parent_node_id, display_order)` 便于排序。
@@ -125,7 +126,7 @@
 
 ## 集成与依赖
 - **SOR 边界**：Org 模块为组织层级 SOR；Position 为人员隶属锚点（可自动生成空壳），编制/空岗在 DEV-PLAN-021；HRM 为人 SOR；Finance 为 Cost Center/Company 财务口径 SOR（冻结期间不改 schema）。
-- **HRM 员工**：提供 `OrgAssignments` 视图和分配 API，表单默认 `effective_date = hire_date`，按 SOR 边界执行回写/订阅；主体标识使用 `person_id`（不可变）+ `pernr`（工号，租户内唯一且不变），position_id 必填（可由系统自动生成）。
+- **人员（Person）**：提供 `OrgAssignments` 视图和分配 API，表单默认 `effective_date = hire_date`，按 SOR 边界执行回写/订阅；主体标识使用 `person_uuid`（不可变、独立生成）+ `pernr`（工号，租户内唯一），position_id 必填（可由系统自动生成）。
 - **Authz/Casbin**：M1 即接入 `pkg/authz` 对 `/org/*` 与 `/org/api/*` 做粗粒度鉴权（读/写/分配/管理），并提交 `config/access/policies/org/*.csv` 策略片段，通过 `make authz-test && make authz-lint`（必要时触发 `make authz-pack`）。组织节点级 OrgScope/继承/策略生成与草稿工作流放入后续阶段；事件与 snapshot（026）作为下游构建投影/纠偏的输入。
 - **Workflow**：M1 不引入审批引擎，事件中预留变更上下文字段（如 `change_type`, `initiator_id`）便于后续 route preview/绑定；change request 占位表可提前写入草稿。
 - **Position/Compensation**：M1 面向人员，Assignment 必须落在 Position 上，若未提供 position_id 则自动生成空壳 Position；编制/岗位/成本中心钩子留待 DEV-PLAN-021/M3+。
@@ -133,30 +134,30 @@
 - **缓存**：树结构在 Redis/内存缓存，Key 含层级类型 + effective date（按日）。变更事件触发缓存失效。
 - **Reporting/Analytics**：提供 `org_reporting` 视图供 BI 工具使用，支持任意时间点快照，与 Workday Custom Reporting 对齐；后续补组织图导出、路径查询、人员路径查询接口。
 - **事件契约**：以 DEV-PLAN-022 为 SSOT：Topics `org.changed.v1`/`org.assignment.changed.v1`（含 `event_id/tenant_id/request_id/transaction_time/effective_window` 等），通过 DEV-PLAN-017 的 outbox/relay 投递；下游若需全量纠偏走 DEV-PLAN-026 的 `/org/api/snapshot`。
-- **跨模块校验**：person/pernr 通过 HRM 只读视图或缓存软校验并周期性对账；position_id 必填且归属 OrgNode，HRM Position SOR 成熟后再启用更强校验。
+- **跨模块校验**：person/pernr 通过 Person 只读视图或缓存软校验并周期性对账；position_id 必填且归属 OrgNode，HRM Position SOR 成熟后再启用更强校验。
 
 ### 集成视图（简版）
 ```mermaid
 flowchart LR
   Org[modules/org<br/>组织层级 SOR]
-  HRM[modules/hrm<br/>Person SOR]
+  Person[modules/person<br/>Person SOR]
   Authz[pkg/authz<br/>Casbin/鉴权]
   Workflow[modules/workflow<br/>BP/审批（后续）]
   Finance[modules/finance<br/>冻结：只读消费]
   Other[采购/项目/其他模块<br/>只读消费]
   Outbox[(org_outbox<br/>Transactional Outbox)]
   Relay[pkg/outbox relay]
-  Consumers[下游订阅方<br/>Authz/HRM/Workflow/...]
+  Consumers[下游订阅方<br/>Authz/Person/Workflow/...]
   Cache[Redis/内存缓存<br/>树缓存]
   DB[(PostgreSQL 17)]
   BI[BI/Reporting<br/>org_reporting 视图]
 
-  HRM -->|只读视图/缓存：person_id、pernr 软校验| Org
+  Person -->|只读视图/缓存：person_uuid、pernr 软校验| Org
   Org -->|API 调用：Org.Read/Write/Assign/Admin| Authz
   Org <--> Cache
   Org --> DB
   Org -->|Tx enqueue| Outbox
-  HRM --> DB
+  Person --> DB
   Finance --> DB
   BI --> DB
 
@@ -358,7 +359,7 @@ flowchart LR
 | Effective Date / End Date（Inactive Date） | 生效/失效日期 | BEGDA / ENDDA | `effective_date` / `end_date` (`tstzrange` 半开) | 默认失效为开区间 `9999-12-31`。 |
 | As-of Date | 查询时点（Key Date） | Key Date（Stichtag） | `effective_date` 参数 | 未传则默认 `time.Now()`。 |
 | Primary Supervisory Org | 主属组织 | PA0001-ORGEH（主组织） | `org_assignments.primary` + `assignment_type=primary` | M1 支持主属；矩阵/虚线用 assignment_type=matrix/dotted 占位。 |
-| Worker（本项目术语 Person，工号 PERNR） | 员工/雇员 | PERNR | `subject_type=person` + `subject_id=person_id`（工号 `pernr` 不变） | 职位信息单独用 `position_id` 承载，不改主体标识。 |
+| Worker（本项目术语 Person，工号 PERNR） | 员工/雇员 | PERNR | `subject_type=person` + `subject_id=person_uuid`（工号 `pernr` 租户内唯一） | 职位信息单独用 `position_id` 承载，不改主体标识。 |
 | Position | 职位 | PLANS（Position） | `positions.id`，Assignment 必须 Person → Position → Org | M1 支持自动生成一对一空壳 Position；编制/空岗在 DEV-PLAN-021/M2+ 扩展。 |
 | Effective Status | 状态 | OBJSTAT（对象状态）/ STAT2（雇佣状态） | `status=Active/Retired` | 如需停用态可扩展 `Inactive`。 |
 | Org Level | 组织层级 | OTYPE+层级自定义（如 O 等级自定义字段） | （未落地）`org_level` 占位 | 便于报表/BP 路由。 |

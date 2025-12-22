@@ -282,14 +282,20 @@ flowchart TD
 #### ORG_Q_008_ASSIGNMENT_SUBJECT_MAPPING（error，autofix）
 - **定义**：对每条 `org_assignments`：
   - `pernr_trim = strings.TrimSpace(pernr)`
-  - `expected_subject_id = NormalizedSubjectID(tenant_id, subject_type, pernr_trim)`（SSOT：026）
-  - 要求：`subject_id == expected_subject_id` 且 `pernr == pernr_trim`
+  - `expected_subject_id = person_uuid`（SSOT：026 §7.3）
+    - resolve：`SELECT person_uuid FROM persons WHERE tenant_id=$1 AND pernr=$2`
+  - 要求：
+    - `pernr == pernr_trim`
+    - `subject_type == 'person'`
+    - `subject_id == expected_subject_id`
 - **自动修复**：
   - 生成 `assignment.correct`：
     - `pernr = pernr_trim`
     - `subject_id = expected_subject_id`
     - `position_id` 复用当前行的 `position_id`
-  - **限制**：仅当该 assignment slice 的 `assignment_type='primary'`（M1）且能读取到 `position_id` 时才生成；否则降级为 manual issue。
+  - **限制**：
+    - 仅当该 assignment slice 的 `assignment_type='primary'`（M1）且能读取到 `position_id` 时才生成；否则降级为 manual issue。
+    - 若无法从 `persons` 表 resolve `pernr -> person_uuid`（人员不存在或未具备 Person SOR），则降级为 manual issue（不做 autofix，避免写入错误的 `subject_id`）。
 
 #### ORG_Q_009_POSITION_OVER_CAPACITY（error，manual）
 - **定义**（as-of）：对每个 position：

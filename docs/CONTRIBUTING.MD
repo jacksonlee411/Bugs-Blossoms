@@ -183,32 +183,31 @@ All pushes to `main`/`dev` and every pull request run `.github/workflows/quality
 | `.templ`, `tailwind.config.js`, or `modules/**/presentation/assets/**` | `make generate`, `make css`, `git status --short` | `make generate && make css` then `git status --short` |
 | `modules/**/presentation/locales/**/*.json` | `make check tr` | `make check tr` |
 | `migrations/**` or `modules/**/infrastructure/persistence/schema/**` | PostgreSQL/Redis services + `make db migrate up/down` + `make db seed` (logs stored in `migrate.log`) | `make db migrate up && make db seed` (optionally `make db migrate down` to smoke test) |
-| `sqlc.yaml`, `modules/hrm/infrastructure/sqlc/**`, `modules/hrm/infrastructure/persistence/**/*.sql`, `scripts/db/export_hrm_schema.sh`, `docs/dev-records/hrm-sql-inventory.md` | `make sqlc-generate` + `git status --short` via `hrm-sqlc` filter | `scripts/db/export_hrm_schema.sh` + `make sqlc-generate` + `git status --short` |
+| `sqlc.yaml`, `modules/person/infrastructure/sqlc/**`, `modules/person/infrastructure/persistence/**/*.sql`, `scripts/db/export_person_schema.sh` | `make sqlc-generate` + `git status --short` via `person-sqlc` filter | `scripts/db/export_person_schema.sh` + `make sqlc-generate` + `git status --short` |
 
 > **说明**：历史冻结模块（billing/finance/crm/projects）已在 DEV-PLAN-040 中移除；门禁不再对其保留排除/豁免口径。
 
 Running the matching commands locally ensures your branch passes the `quality-gates` check before you open a PR.
 
-### HRM sqlc 变更
+### Person sqlc 变更
 
-- HRM 任何 SQL/迁移调整都必须先运行 `scripts/db/export_hrm_schema.sh` 更新 `modules/hrm/infrastructure/sqlc/schema.sql`，随后执行 `make sqlc-generate`（`make generate` 会自动调用），以便重建 `modules/hrm/infrastructure/sqlc/**`。
-- 生成步骤也会在 CI 中通过 `hrm-sqlc` 过滤器自动执行；若还有未提交的生成文件，工作流会失败。
-- 请同步维护 `docs/dev-records/hrm-sql-inventory.md`，让评审能快速定位 SQL 变动。
+- Person 任何 SQL/迁移调整都必须先运行 `scripts/db/export_person_schema.sh` 更新 `modules/person/infrastructure/sqlc/schema.sql`，随后执行 `make sqlc-generate`（`make generate` 会自动调用），以便重建 `modules/person/infrastructure/sqlc/**`。
+- 生成步骤也会在 CI 中通过 `person-sqlc` 过滤器自动执行；若还有未提交的生成文件，工作流会失败。
 
-### HRM Atlas + Goose
+### Person Atlas + Goose
 
 - Atlas 配置位于仓库根目录 `atlas.hcl`，schema source 使用 SQL：
-  - `modules/hrm/infrastructure/atlas/core_deps.sql`（HRM 外键依赖的最小 Core stub）
-  - `modules/hrm/infrastructure/persistence/schema/hrm-schema.sql`（HRM 目标结构）
-- 迁移目录为 `migrations/hrm/*.sql`（goose 格式，文件名前缀为数字版本号）。
-- Dry-run 计划：建议使用独立的 target/dev DB，执行 `DB_NAME=iota_erp_hrm_atlas ATLAS_DEV_DB_NAME=hrm_dev make db plan`（输出 SQL plan，不写入磁盘）。
-- 使用 `HRM_MIGRATIONS=1 make db migrate up` 触发 `scripts/db/run_goose.sh`，Goose 会对 `migrations/hrm/*.sql` 执行 apply/rollback。  
-  - 回滚：`GOOSE_STEPS=1 make db migrate down HRM_MIGRATIONS=1`  
-  - redo：`GOOSE_STEPS=1 make db migrate redo HRM_MIGRATIONS=1`  
-  - 状态：`make db migrate status HRM_MIGRATIONS=1`
-- 迁移执行完毕后必须运行 `scripts/db/export_hrm_schema.sh SKIP_MIGRATE=1 && make sqlc-generate`，保持 schema/sqlc 与数据库一致。
-- `make db lint` 会执行 `atlas migrate lint --env ci --git-base origin/main`（需要 `ATLAS_DEV_DB_NAME` 指向干净的隔离库），CI 通过 `hrm-atlas` 过滤器强制该步骤；任何缺失的迁移或 `atlas.sum` 漂移都会导致 PR 失败。
-- 所有 Atlas / Goose 演练请写入 `docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md`，确保有可追踪的“命令 → 结果”记录。
+  - `modules/person/infrastructure/atlas/core_deps.sql`（Person 外键依赖的最小 Core stub）
+  - `modules/person/infrastructure/persistence/schema/person-schema.sql`（Person 目标结构）
+- 迁移目录为 `migrations/person/*.sql`（goose 格式，文件名前缀为数字版本号）。
+- Dry-run 计划：建议使用独立的 target/dev DB，执行 `DB_NAME=iota_erp_person_atlas ATLAS_DEV_DB_NAME=person_dev make db plan`（输出 SQL plan，不写入磁盘）。
+- 使用 `PERSON_MIGRATIONS=1 make db migrate up` 触发 `scripts/db/run_goose.sh`，Goose 会对 `migrations/person/*.sql` 执行 apply/rollback。  
+  - 回滚：`GOOSE_STEPS=1 PERSON_MIGRATIONS=1 make db migrate down`  
+  - redo：`GOOSE_STEPS=1 PERSON_MIGRATIONS=1 make db migrate redo`  
+  - 状态：`PERSON_MIGRATIONS=1 make db migrate status`
+- 迁移执行完毕后必须运行 `scripts/db/export_person_schema.sh SKIP_MIGRATE=1 && make sqlc-generate`，保持 schema/sqlc 与数据库一致。
+- `make db lint` 会执行 `atlas migrate lint --env ci --git-base origin/main`（需要 `ATLAS_DEV_DB_NAME` 指向干净的隔离库），CI 通过 `person-atlas` 过滤器强制该步骤；任何缺失的迁移或 `atlas.sum` 漂移都会导致 PR 失败。
+- 所有 Atlas / Goose 演练请写入对应 Dev-Plan 的 readiness 记录，确保有可追踪的“命令 → 结果”记录。
 
 ## 🔐 Casbin 授权与策略草稿流程
 

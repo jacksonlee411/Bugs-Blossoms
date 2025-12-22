@@ -1,6 +1,6 @@
 # DEV-PLAN-023：Org 导入/回滚工具与 Readiness
 
-**状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-023-READINESS.md`）
+**状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-023-READINESS.md`；2025-12-22：`subject_id` SSOT 已修订为 `person_uuid`，实现需按 026/061 增量适配）
 
 ## 0. 进度速记
 - ✅ 交付形态：Go CLI `cmd/org-data`（默认 dry-run）。
@@ -51,8 +51,15 @@ flowchart TD
 4. **RLS 注入复用现有 helper（选定）**：
    - 在事务内使用 `pkg/composables.WithTenantID` 注入 tenant context；
    - 在 `BEGIN` 后第一条 SQL 前调用 `pkg/composables.ApplyTenantRLS(ctx, tx)`（对齐 019A）。
-5. **`subject_id` 映射 SSOT（选定）**：`org_assignments.subject_id` 的确定性映射以 [DEV-PLAN-026](026-org-api-authz-and-events.md) 的“Subject 标识与确定性映射（SSOT）”为唯一事实源；CLI 不允许自行实现漂移算法。
-   - **本计划落地要求（新增）**：在实现 `cmd/org-data` 之前，必须先在 `modules/org/domain/...` 落地可复用函数 `NormalizedSubjectID(tenantID uuid.UUID, subjectType, pernr string) (uuid.UUID, error)`，并用单测冻结输入/输出（对齐 026 §7.3 的 namespace/payload 口径）。
+5. **`subject_id` 映射 SSOT（选定）**：`org_assignments.subject_id` 的口径以 [DEV-PLAN-026](026-org-api-authz-and-events.md) 的“Subject 标识与映射（SSOT）”为唯一事实源；CLI 不允许自行引入“派生算法”等漂移规则。
+   - **选定（方案 B）**：`subject_id = person_uuid`（来自 Person SOR 的 `persons.person_uuid`），由 `tenant_id + pernr` 查询得到。
+   - **本计划落地要求（修订）**：`cmd/org-data` 在 DB dry-run/apply 阶段必须按 SSOT 执行 resolve：
+     - `pernr = TrimSpace(pernr)`；为空则校验错误（exit=2）。
+     - `SELECT person_uuid FROM persons WHERE tenant_id=$1 AND pernr=$2`：
+       - 无行：校验错误（exit=2），提示“人员不存在（pernr 未解析）”。
+       - 有行：得到 `expected_subject_id=person_uuid`。
+     - 若 CSV 提供 `subject_id`：必须等于 `expected_subject_id`，否则校验错误（exit=2）。
+     - 若 CSV 未提供 `subject_id`：使用 `expected_subject_id` 写入 `org_assignments.subject_id`。
 
 ## 4. 数据契约 (Data Contracts)
 > 本节定义 CSV/manifest 的合同；DB schema 合同以 [DEV-PLAN-021](021-org-schema-and-constraints.md) 为准。
@@ -115,7 +122,7 @@ flowchart TD
 | `position_code` | string | 是 |  | 引用 `positions.csv.code` |
 | `assignment_type` | enum | 否 | `primary` | `primary/matrix/dotted`（M1 仅允许写入 `primary`；其余返回校验错误） |
 | `pernr` | string | 是 |  | 人员编号（trim 后不可空；允许前导零） |
-| `subject_id` | uuid | 否 |  | 若提供则必须与 pernr 的映射一致；映射算法见 [DEV-PLAN-026](026-org-api-authz-and-events.md) |
+| `subject_id` | uuid | 否 |  | **`person_uuid`**（可选）：若提供则必须与 `tenant_id+pernr` 在 `persons` 表中解析结果一致（SSOT：026 §7.3）；未提供则由工具在 DB 阶段 resolve 并填充 |
 | `effective_date` | date/datetime | 是 |  |  |
 | `end_date` | date/datetime | 否 | 自动补齐 |  |
 
@@ -166,13 +173,10 @@ flowchart TD
    - `nodeCode -> nodeID`（seed 模式下 nodeID 由工具生成 uuid 并写入 DB）
    - `positionCode -> positionID`
 4. `subject_id`：
-   - 算法（SSOT）：以 [DEV-PLAN-026 §7.3](026-org-api-authz-and-events.md) 为准，**必须复用** `modules/org/domain/...` 的 `NormalizedSubjectID(...)`：
-     - `namespace = uuid.MustParse("ce7c5394-3959-40ff-9d92-a1c2684d94cc")`
-     - `payload = fmt.Sprintf("%s:%s:%s", tenantID, subjectType, pernr)`（`pernr` 必须 `TrimSpace`）
-     - `subject_id = uuid.NewSHA1(namespace, []byte(payload))`
+   - 口径（SSOT）：以 [DEV-PLAN-026 §7.3](026-org-api-authz-and-events.md) 为准，`subject_id = person_uuid`（来自 Person SOR）。
    - 规则：
-     - 若 CSV 未提供 `subject_id`：由工具按上述算法生成；
-     - 若提供：必须校验与算法一致，否则报错（CLI validation error / exit=2）。
+     - Parse 阶段仅负责：trim `pernr`、解析（可选）CSV 的 `subject_id` 为 UUID；
+     - resolve 与一致性校验在 DB 阶段执行（需要查询 `persons` 表），见 §3.2 决策 5。
 
 ### 6.2 Static Validate（不访问 DB）
 - 必填字段、枚举值、JSON shape（必须为 object）、`effective_date < end_date`。
@@ -210,7 +214,8 @@ flowchart TD
 - [DEV-PLAN-019A](019A-rls-tenant-isolation.md)：RLS 注入契约（通过 `pkg/composables` 落地）。
 
 ### 8.2 里程碑（按提交时间填充）
-0. [x] 先行落地 `NormalizedSubjectID(...)`（对齐 026 §7.3）+ 单测冻结（供 CLI/API 复用）
+0. [x] 先行落地 `NormalizedSubjectID(...)`（历史口径，现已废弃；见 026 §7.3 修订说明）
+0.1 [ ] 适配：按 `subject_id = person_uuid` 更新 resolve/校验（由 DEV-PLAN-061 承接）
 1. [x] CLI 骨架（cobra）+ 命令/flag/退出码契约固化
 2. [x] CSV Parse/Normalize + Static Validate（含 strict 环路检测）
 3. [x] DB Dry-Run + seed Apply + manifest
@@ -222,9 +227,7 @@ flowchart TD
 - 单测（`go test ./cmd/org-data/...`）至少覆盖：
   - CSV 解析错误行号/字段定位
   - 环路/重叠/非法日期/非法枚举/非法 JSON
-  - `subject_id` 映射一致性校验（对齐 026；必须复用 `NormalizedSubjectID(...)`）
-- 单测（`go test ./modules/org/domain/...`）至少覆盖：
-  - `NormalizedSubjectID(...)` 的 namespace/payload/Trim 规则（对齐 026 §7.3）
+  - `subject_id` 映射一致性校验（对齐 026：`subject_id = person_uuid`；需覆盖 pernr trim、person 不存在、CSV subject_id 不匹配）
 - 集成验收（本地 DB）至少覆盖：
   - seed 导入成功后，`org_edges` 的 root edge 与 child edge 均可写入（触发器 path/depth 生效）
   - `rollback --manifest --apply --yes` 能清理导入数据且无 FK 残留

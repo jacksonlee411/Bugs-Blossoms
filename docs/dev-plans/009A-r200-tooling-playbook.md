@@ -18,13 +18,13 @@
 
 | 领域 | 目的 | 入口与落点（SSOT/资产） | 状态 |
 | --- | --- | --- | --- |
-| 数据访问（sqlc） | SQL-first、编译期类型安全、避免 ORM 运行期开销 | `docs/dev-plans/010-sqlc-baseline.md`、`sqlc.yaml`、`modules/hrm/infrastructure/sqlc/**`、`scripts/db/export_hrm_schema.sh`、`make sqlc-generate` | ✅ HRM 已落地 |
-| Schema/迁移（Atlas + Goose） | schema drift 可见、迁移链路可 lint/plan、HRM 独立迁移闭环 | `docs/dev-plans/011A-atlas-goose-baseline-gapfix.md`、`atlas.hcl`、`migrations/hrm/**`、`scripts/db/run_goose.sh`、`make db plan/lint`、`HRM_MIGRATIONS=1 make db migrate ...` | ✅ HRM 已落地 |
+| 数据访问（sqlc） | SQL-first、编译期类型安全、避免 ORM 运行期开销 | `docs/dev-plans/010-sqlc-baseline.md`、`sqlc.yaml`、`modules/person/infrastructure/sqlc/**`、`scripts/db/export_person_schema.sh`、`make sqlc-generate` | ✅ Person 已落地 |
+| Schema/迁移（Atlas + Goose） | schema drift 可见、迁移链路可 lint/plan、Person 独立迁移闭环 | `docs/dev-plans/011A-atlas-goose-baseline-gapfix.md`、`atlas.hcl`、`migrations/person/**`、`scripts/db/run_goose.sh`、`make db plan/lint`、`PERSON_MIGRATIONS=1 make db migrate ...` | ✅ Person 已落地 |
 | 授权（Casbin + 策略平台） | 统一 RBAC/ABAC、策略可审计/可回滚、UI→草稿→Bot→PR 闭环 | `docs/dev-plans/013-015*.md`、`pkg/authz/**`、`config/access/**`、`scripts/authz/**`、`cmd/authzbot/**`、`make authz-test/authz-lint/authz-pack` | ✅ 基础设施/首批模块已落地，UI 体验持续完善 |
 | 可靠事件（Transactional Outbox） | 业务写入与事件入队同事务、可重试/可观测、避免 ad-hoc 异步 | `docs/dev-plans/017-transactional-outbox.md`、`pkg/outbox/**`、`docs/runbooks/transactional-outbox.md` | 🚧 M1 基础设施已落地 |
 | 后台作业队列（Asynq） | 报表/导入/通知类长耗时任务的可靠执行与重试 | `docs/dev-plans/009-r200-tooling-alignment.md`（路线图） | ⏸️ 尚未落地（优先复用 Outbox；如需队列化再立项引入） |
 | 路由治理（Routing Strategy + Gates） | UI/HTMX/API/Webhooks/Ops 命名空间与错误契约统一、门禁可阻断漂移 | `docs/dev-plans/018-routing-strategy.md`、`config/routing/allowlist.yaml`、`make check routing` | ✅ 已落地并纳入门禁 |
-| 多租户工具链（RLS/Kratos/SSO/Tenant Console） | “认人-圈地-管事”纵深防御：Identity/RLS/Authz | `docs/dev-plans/019*.md`（含子计划）、`migrations/hrm/00003_hrm_employees_rls.sql`、`make db rls-role`、superadmin Tenant Console | 🚧 RLS PoC/Console 已落地，Kratos/SSO 在推进 |
+| 多租户工具链（RLS/Kratos/SSO/Tenant Console） | “认人-圈地-管事”纵深防御：Identity/RLS/Authz | `docs/dev-plans/019*.md`（含子计划）、`make db rls-role`、superadmin Tenant Console | 🚧 Console 已落地，RLS/Kratos/SSO 在推进 |
 
 > 变更触发器与本地必跑命令矩阵以 `AGENTS.md` 为准；本文只强调“新增模块/功能应复用哪个工具链”。
 
@@ -37,8 +37,8 @@
 - 多语言 JSON：`make check tr`
 - Authz：`make authz-test && make authz-lint`
 - 路由/allowlist：`make check routing`
-- HRM sqlc：`scripts/db/export_hrm_schema.sh && make sqlc-generate && git status --short`
-- HRM Atlas/Goose：`make db plan && make db lint && HRM_MIGRATIONS=1 make db migrate up`
+- Person sqlc：`scripts/db/export_person_schema.sh && make sqlc-generate && git status --short`
+- Person Atlas/Goose：`make db plan && make db lint && PERSON_MIGRATIONS=1 make db migrate up`
 
 ## 3. 复用优先级：新增模块/功能怎么选（避免自建）
 
@@ -49,18 +49,18 @@
   - 参考 `DEV-PLAN-010` 的目录与生成策略：`modules/<module>/infrastructure/sqlc/<aggregate>/...`
   - 生成入口统一走 `Makefile`：`make sqlc-generate`（或 `make generate`）。
 - **注意**：
-  - `sqlc.yaml` 当前以 HRM 为基线，扩展到新模块前应先对齐 CI 过滤器与代码审查口径（避免“生成物忘提交”与“冻结模块被误触发”）。
-  - 修改 HRM SQL/Schema 时严格按 `docs/runbooks/hrm-sqlc.md` 流程执行。
+  - `sqlc.yaml` 当前以 Person 为基线，扩展到新模块前应先对齐 CI 过滤器与代码审查口径（避免“生成物忘提交”与“冻结模块被误触发”）。
+  - 修改 Person SQL/Schema 时严格按 `docs/runbooks/person-sqlc.md` 流程执行。
 
 ### 3.2 Schema/迁移：遵循“模块迁移链路”而非散落脚本
 
 - **现状**：
   - 全仓库通用迁移入口：`make db migrate up|down|redo|status`（默认链路）。
-  - HRM 专用链路（Goose）：`HRM_MIGRATIONS=1 make db migrate up|down|redo|status`（见 `DEV-PLAN-011A`）。
-- **HRM/采用 Atlas+Goose 的模块**：
-  - schema SSOT：`atlas.hcl`（`src` 指向 HRM schema SQL 组合）。
-  - drift/门禁入口：`make db plan`、`make db lint`（并在 CI 通过 `hrm-atlas` 过滤器触发）。
-  - 若发现历史文档仍引用 `schema.hcl`：以 `DEV-PLAN-011A` 与仓库实际资产（`atlas.hcl`/`modules/hrm/infrastructure/atlas/core_deps.sql`/`modules/hrm/infrastructure/persistence/schema/hrm-schema.sql`）为准。
+  - Person 专用链路（Goose）：`PERSON_MIGRATIONS=1 make db migrate up|down|redo|status`（见 `DEV-PLAN-061`）。
+- **Person/采用 Atlas+Goose 的模块**：
+  - schema SSOT：`atlas.hcl`（`src` 指向 Person schema SQL 组合）。
+  - drift/门禁入口：`make db plan`、`make db lint`（并在 CI 通过 `person-atlas` 过滤器触发）。
+  - 若发现历史文档仍引用 `schema.hcl`：以 `DEV-PLAN-011A` 与仓库实际资产（`atlas.hcl`/`modules/person/infrastructure/atlas/core_deps.sql`/`modules/person/infrastructure/persistence/schema/person-schema.sql`）为准。
 - **新增模块要不要“再搞一套”Atlas+Goose？**
   - 不建议“直接复制 HRM 方案”并在 Makefile/CI 里加第二套门禁；应先在 `docs/dev-plans/` 通过新计划明确并落地至少以下要素：
     - Makefile 入口（本地可复现）
@@ -96,7 +96,7 @@
 
 - **数据模型最小要求**：业务表必须具备 `tenant_id`，并在服务/仓储层明确租户上下文来源。
 - **RLS（已 PoC）**：
-  - 启用/回滚策略见 `DEV-PLAN-019A`；PoC 表为 HRM `employees`。
+  - 启用/回滚策略见 `DEV-PLAN-019A`；当前 RLS PoC 表仍在推进中（旧 HRM `employees` 已在 061 中移除）。
   - 关键约束：事务内注入 `app.current_tenant`（fail-closed），且应用 DB 角色不能是 superuser/BYPASSRLS。
   - DB 角色入口：`make db rls-role`。
 - **控制面（已落地）**：superadmin Tenant Console 见 `DEV-PLAN-019D`（跨租户配置仅允许在 superadmin server）。
@@ -105,7 +105,7 @@
 
 1. **按 DDD 分层建目录**：`modules/<module>/{domain,infrastructure,services,presentation}`（依赖约束见 `.gocleanarch.yml` 与 `DEV-PLAN-008`）。
 2. **路由注册遵循 018**：先确定路由类别，再在模块 `module.go` 中注册到正确 namespace；必要时更新 `config/routing/allowlist.yaml` 并跑 `make check routing`。
-3. **数据访问优先 sqlc**：新增 SQL 放在 `modules/<module>/infrastructure/sqlc/**`（如要扩展到非 HRM，先补齐 dev-plan 与门禁/过滤器）。
+3. **数据访问优先 sqlc**：新增 SQL 放在 `modules/<module>/infrastructure/sqlc/**`（如要扩展到非 Person，先补齐 dev-plan 与门禁/过滤器）。
 4. **鉴权必须走 authz**：控制器/服务层调用 `pkg/authz`；策略走 `config/access/policies/**` + `make authz-pack`，并跑 `make authz-test && make authz-lint`。
 5. **需要异步一致性就用 outbox**：复用 `pkg/outbox`，不要自建队列轮询器。
 6. **按 AGENTS 触发器跑本地命令**：Go/templ/翻译/迁移/Authz/Outbox/Routing 各自有门禁入口，确保 CI 不因“漏跑生成/漏提交产物”失败。
