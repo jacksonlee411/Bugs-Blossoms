@@ -340,6 +340,7 @@ func isTransientPostgresError(err error) bool {
 	msg := err.Error()
 	switch {
 	case strings.Contains(msg, "the database system is starting up"),
+		strings.Contains(msg, "the database system is not yet accepting connections"),
 		strings.Contains(msg, "connect: connection refused"),
 		strings.Contains(msg, "i/o timeout"),
 		strings.Contains(msg, "connection reset by peer"),
