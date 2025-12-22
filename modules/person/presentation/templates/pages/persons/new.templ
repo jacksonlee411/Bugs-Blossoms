@@ -26,14 +26,14 @@ templ New(props *viewmodels.PersonCreatePageProps) {
 	}
 }
 
-	templ CreateForm(props *viewmodels.PersonCreatePageProps) {
-		{{ pageCtx := composables.UsePageCtx(ctx) }}
-		<form class="space-y-4" method="post" action={ templ.SafeURL(props.PostTo) }>
-			@PersonForm(props)
-			<div class="flex justify-end">
-				@button.Primary(button.Props{Attrs: templ.Attributes{"type": "submit"}}) {
-					{ pageCtx.T("Create") }
-				}
-			</div>
-		</form>
-	}
+templ CreateForm(props *viewmodels.PersonCreatePageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<form class="space-y-4" method="post" action={ templ.SafeURL(props.PostTo) }>
+		@PersonForm(props)
+		<div class="flex justify-end">
+			@button.Primary(button.Props{Attrs: templ.Attributes{"type": "submit"}}) {
+				{ pageCtx.T("Create") }
+			}
+		</div>
+	</form>
+}

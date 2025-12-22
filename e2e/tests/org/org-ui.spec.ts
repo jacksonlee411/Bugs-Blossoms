@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { assertAuthenticated, login } from '../../fixtures/auth';
 import { checkTestEndpointsHealth, resetTestDatabase, seedScenario } from '../../fixtures/test-data';
 
@@ -16,6 +16,19 @@ async function ensureSeeded({ request }: { request: any }) {
 	await checkTestEndpointsHealth(request);
 	await resetTestDatabase(request);
 	await seedScenario(request, 'org');
+}
+
+async function createPerson(args: { page: Page; pernr: string; displayName: string }) {
+	await args.page.goto('/person/persons/new', { waitUntil: 'domcontentloaded' });
+	await expect(args.page).toHaveURL(/\/person\/persons\/new/);
+
+	await args.page.locator('input[name="Pernr"]').fill(args.pernr);
+	await args.page.locator('input[name="DisplayName"]').fill(args.displayName);
+
+	await Promise.all([
+		args.page.waitForURL(/\/person\/persons\/[0-9a-f-]+$/),
+		args.page.getByRole('button', { name: 'Create' }).click(),
+	]);
 }
 
 function formatUTCDate(date: Date) {
@@ -65,6 +78,8 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 	test('管理员可创建/编辑/移动节点，并创建/编辑分配', async ({ page }) => {
 		await login(page, ADMIN.email, ADMIN.password);
 		await assertAuthenticated(page);
+
+		await createPerson({ page, pernr: '0001', displayName: 'E2E Person 0001' });
 
 		await page.goto('/org/nodes', { waitUntil: 'domcontentloaded' });
 		await expect(page).toHaveURL(/\/org\/nodes/);

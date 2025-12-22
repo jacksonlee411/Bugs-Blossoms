@@ -1,9 +1,9 @@
 package persons
 
-	import (
-		"fmt"
+import (
+	"fmt"
 
-		icons "github.com/iota-uz/icons/phosphor"
+	icons "github.com/iota-uz/icons/phosphor"
 
 	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base"
@@ -47,33 +47,31 @@ templ Content(props *viewmodels.PersonsListPageProps) {
 				}
 			}
 		</div>
-
-			<form class="flex flex-wrap items-end gap-3" method="get" action="/person/persons">
-				@input.Text(&input.Props{
-					Label:       pageCtx.T("Person.UI.Persons.Fields.Q"),
-					Placeholder: pageCtx.T("Person.UI.Persons.Fields.QPlaceholder"),
-					Attrs: templ.Attributes{
-						"name":  "q",
-						"value": props.Q,
-					},
-				})
-				@button.Secondary(button.Props{Attrs: templ.Attributes{"type": "submit"}}) {
-					{ pageCtx.T("Person.UI.Persons.Actions.Search") }
-				}
-			</form>
-
+		<form class="flex flex-wrap items-end gap-3" method="get" action="/person/persons">
+			@input.Text(&input.Props{
+				Label:       pageCtx.T("Person.UI.Persons.Fields.Q"),
+				Placeholder: pageCtx.T("Person.UI.Persons.Fields.QPlaceholder"),
+				Attrs: templ.Attributes{
+					"name":  "q",
+					"value": props.Q,
+				},
+			})
+			@button.Secondary(button.Props{Attrs: templ.Attributes{"type": "submit"}}) {
+				{ pageCtx.T("Person.UI.Persons.Actions.Search") }
+			}
+		</form>
 		@PersonsTable(props)
 	</div>
 }
 
 templ PersonsTable(props *viewmodels.PersonsListPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-		if props == nil || len(props.Items) == 0 {
-			@base.TableEmptyState(base.TableEmptyStateProps{
-				Title:       pageCtx.T("Person.UI.Persons.Empty.Title"),
-				Description: pageCtx.T("Person.UI.Persons.Empty._Description"),
-			})
-		} else {
+	if props == nil || len(props.Items) == 0 {
+		@base.TableEmptyState(base.TableEmptyStateProps{
+			Title:       pageCtx.T("Person.UI.Persons.Empty.Title"),
+			Description: pageCtx.T("Person.UI.Persons.Empty._Description"),
+		})
+	} else {
 		@base.Table(base.TableProps{
 			Columns: []*base.TableColumn{
 				{Label: pageCtx.T("Person.Fields.Pernr"), Key: "pernr"},

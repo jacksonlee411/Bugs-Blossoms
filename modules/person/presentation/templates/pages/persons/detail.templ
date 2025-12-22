@@ -1,34 +1,33 @@
 package persons
 
-	import (
-		"fmt"
+import (
+	"fmt"
 
-		icons "github.com/iota-uz/icons/phosphor"
+	icons "github.com/iota-uz/icons/phosphor"
 
-		"github.com/iota-uz/iota-sdk/components/base/card"
-		"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
-		"github.com/iota-uz/iota-sdk/modules/person/presentation/viewmodels"
-		"github.com/iota-uz/iota-sdk/pkg/composables"
-	)
+	"github.com/iota-uz/iota-sdk/components/base/card"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
+	"github.com/iota-uz/iota-sdk/modules/person/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
 
 templ Detail(props *viewmodels.PersonDetailPageProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	@layouts.Authenticated(layouts.AuthenticatedProps{
 		BaseProps: layouts.BaseProps{Title: pageCtx.T("Person.UI.Persons.Meta.Detail.Title")},
 	}) {
-			<div class="m-6 space-y-6">
-				<div class="flex items-center gap-3">
-					<a class="text-sm text-surface-300 hover:text-surface-100" href={ templ.SafeURL(props.BackURL) }>
-						@icons.ArrowLeft(icons.Props{Size: "18"})
-					</a>
-					<h1 class="text-2xl font-medium">{ pageCtx.T("Person.UI.Persons.Title.Detail") }</h1>
-				</div>
-
-				@card.Card(card.Props{}) {
-					<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-						<div>
-							<div class="text-xs text-surface-300">{ pageCtx.T("Person.Fields.Pernr") }</div>
-							<div class="text-base">{ props.Person.Pernr }</div>
+		<div class="m-6 space-y-6">
+			<div class="flex items-center gap-3">
+				<a class="text-sm text-surface-300 hover:text-surface-100" href={ templ.SafeURL(props.BackURL) }>
+					@icons.ArrowLeft(icons.Props{Size: "18"})
+				</a>
+				<h1 class="text-2xl font-medium">{ pageCtx.T("Person.UI.Persons.Title.Detail") }</h1>
+			</div>
+			@card.Card(card.Props{}) {
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+					<div>
+						<div class="text-xs text-surface-300">{ pageCtx.T("Person.Fields.Pernr") }</div>
+						<div class="text-base">{ props.Person.Pernr }</div>
 					</div>
 					<div>
 						<div class="text-xs text-surface-300">{ pageCtx.T("Person.Fields.DisplayName") }</div>
@@ -42,13 +41,12 @@ templ Detail(props *viewmodels.PersonDetailPageProps) {
 						<div class="text-xs text-surface-300">{ pageCtx.T("Person.Fields.PersonUUID") }</div>
 						<div class="text-sm font-mono break-all">{ props.Person.PersonUUID }</div>
 					</div>
-					</div>
-				}
-
-				@card.Card(card.Props{}) {
-					<div class="flex items-center justify-between gap-3">
-						<h2 class="text-lg font-medium">{ pageCtx.T("Person.UI.Assignments.Timeline.Title") }</h2>
-					</div>
+				</div>
+			}
+			@card.Card(card.Props{}) {
+				<div class="flex items-center justify-between gap-3">
+					<h2 class="text-lg font-medium">{ pageCtx.T("Person.UI.Assignments.Timeline.Title") }</h2>
+				</div>
 				<div
 					id="org-assignments-timeline"
 					class="mt-3"
