@@ -5,8 +5,8 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/rbac"
 
 	corePerms "github.com/iota-uz/iota-sdk/modules/core/permissions"
-	hrmPerms "github.com/iota-uz/iota-sdk/modules/hrm/permissions"
 	loggingPerms "github.com/iota-uz/iota-sdk/modules/logging/permissions"
+	personPerms "github.com/iota-uz/iota-sdk/modules/person/permissions"
 )
 
 // permissionSetBuilder helps create consistent permission sets
@@ -50,12 +50,12 @@ func (b *permissionSetBuilder) manageSet(resource string, create, read, update, 
 func AllPermissions() []*permission.Permission {
 	// Pre-calculate total capacity to avoid slice re-allocations
 	totalCapacity := len(corePerms.Permissions) +
-		len(hrmPerms.Permissions) +
+		len(personPerms.Permissions) +
 		len(loggingPerms.Permissions)
 
 	permissions := make([]*permission.Permission, 0, totalCapacity)
 	permissions = append(permissions, corePerms.Permissions...)
-	permissions = append(permissions, hrmPerms.Permissions...)
+	permissions = append(permissions, personPerms.Permissions...)
 	permissions = append(permissions, loggingPerms.Permissions...)
 	return permissions
 }
@@ -90,11 +90,11 @@ func buildModulePermissionSets() []rbac.PermissionSet {
 		core.viewSet("AuthzDebug", corePerms.AuthzDebug),
 	)
 
-	// HRM module
-	hrm := newPermissionSetBuilder("HRM")
+	// Person module
+	person := newPermissionSetBuilder("Person")
 	sets = append(sets,
-		hrm.viewSet("Employee", hrmPerms.EmployeeRead),
-		hrm.manageSet("Employee", hrmPerms.EmployeeCreate, hrmPerms.EmployeeRead, hrmPerms.EmployeeUpdate, hrmPerms.EmployeeDelete),
+		person.viewSet("Person", personPerms.PersonRead),
+		person.manageSet("Person", personPerms.PersonCreate, personPerms.PersonRead, personPerms.PersonUpdate, personPerms.PersonDelete),
 	)
 
 	// Logging module

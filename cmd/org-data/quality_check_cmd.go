@@ -3,12 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/iota-uz/iota-sdk/modules/org/domain/subjectid"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -404,9 +404,29 @@ func runQualityCheckDB(ctx context.Context, pool *pgxpool.Pool, opts qualityChec
 
 		// ORG_Q_008
 		for _, a := range assignmentsAsOf {
+			if strings.TrimSpace(a.SubjectType) != "person" {
+				continue
+			}
 			pernrTrim := strings.TrimSpace(a.Pernr)
-			expected, err := subjectid.NormalizedSubjectID(opts.tenantID, a.SubjectType, pernrTrim)
+			expected, err := resolvePersonUUIDByPernr(txCtx, tx, opts.tenantID, pernrTrim)
 			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					report.Issues = append(report.Issues, qualityIssue{
+						IssueID:  uuid.New(),
+						RuleID:   ruleAssignmentSubjectMapping,
+						Severity: severityError,
+						Entity:   qualityEntityRef{Type: "org_assignment", ID: a.ID},
+						EffectiveWindow: &qualityEffectiveWindow{
+							EffectiveDate: a.EffectiveDate,
+							EndDate:       a.EndDate,
+						},
+						Message: "person not found for pernr",
+						Details: map[string]any{
+							"pernr": a.Pernr,
+						},
+					})
+					continue
+				}
 				report.Issues = append(report.Issues, qualityIssue{
 					IssueID:  uuid.New(),
 					RuleID:   ruleAssignmentSubjectMapping,
@@ -416,7 +436,7 @@ func runQualityCheckDB(ctx context.Context, pool *pgxpool.Pool, opts qualityChec
 						EffectiveDate: a.EffectiveDate,
 						EndDate:       a.EndDate,
 					},
-					Message: "subject_id mapping failed",
+					Message: "person mapping lookup failed",
 					Details: map[string]any{
 						"pernr": a.Pernr,
 						"err":   err.Error(),
@@ -983,27 +1003,11 @@ func runQualityCheckAPI(ctx context.Context, client *orgAPIClient, opts qualityC
 
 	// ORG_Q_008
 	for _, a := range assignments {
-		pernrTrim := strings.TrimSpace(a.Pernr)
-		expected, err := subjectid.NormalizedSubjectID(opts.tenantID, a.SubjectType, pernrTrim)
-		if err != nil {
-			report.Issues = append(report.Issues, qualityIssue{
-				IssueID:  uuid.New(),
-				RuleID:   ruleAssignmentSubjectMapping,
-				Severity: severityError,
-				Entity:   qualityEntityRef{Type: "org_assignment", ID: a.OrgAssignmentID},
-				EffectiveWindow: &qualityEffectiveWindow{
-					EffectiveDate: a.EffectiveDate,
-					EndDate:       a.EndDate,
-				},
-				Message: "subject_id mapping failed",
-				Details: map[string]any{
-					"pernr": a.Pernr,
-					"err":   err.Error(),
-				},
-			})
+		if strings.TrimSpace(a.SubjectType) != "person" {
 			continue
 		}
-		if a.SubjectID == expected && a.Pernr == pernrTrim {
+		pernrTrim := strings.TrimSpace(a.Pernr)
+		if a.SubjectID != uuid.Nil && a.Pernr == pernrTrim {
 			continue
 		}
 		autofix := (*qualityAutofix)(nil)
@@ -1021,12 +1025,11 @@ func runQualityCheckAPI(ctx context.Context, client *orgAPIClient, opts qualityC
 			},
 			Message: "subject_id mismatch with SSOT mapping",
 			Details: map[string]any{
-				"pernr":               a.Pernr,
-				"pernr_trim":          pernrTrim,
-				"expected_subject_id": expected.String(),
-				"actual_subject_id":   a.SubjectID.String(),
-				"position_id":         a.PositionID.String(),
-				"assignment_type":     a.AssignmentType,
+				"pernr":             a.Pernr,
+				"pernr_trim":        pernrTrim,
+				"actual_subject_id": a.SubjectID.String(),
+				"position_id":       a.PositionID.String(),
+				"assignment_type":   a.AssignmentType,
 			},
 			Autofix: autofix,
 		})
@@ -1064,4 +1067,18 @@ func runQualityCheckAPI(ctx context.Context, client *orgAPIClient, opts qualityC
 	}
 
 	return nil
+}
+
+func resolvePersonUUIDByPernr(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID, pernr string) (uuid.UUID, error) {
+	var personUUID uuid.UUID
+	err := tx.QueryRow(ctx, `
+SELECT person_uuid
+FROM persons
+WHERE tenant_id = $1 AND pernr = $2
+LIMIT 1
+`, tenantID, strings.TrimSpace(pernr)).Scan(&personUUID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return personUUID, nil
 }

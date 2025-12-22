@@ -16,7 +16,7 @@ case "${cmd}" in
 esac
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
-GOOSE_MIGRATIONS_DIR="${GOOSE_MIGRATIONS_DIR:-migrations/hrm}"
+GOOSE_MIGRATIONS_DIR="${GOOSE_MIGRATIONS_DIR:-migrations/person}"
 GOOSE_TABLE="${GOOSE_TABLE:-goose_db_version}"
 
 if ! [[ "${GOOSE_TABLE}" =~ ^[a-zA-Z_][a-zA-Z0-9_]*$ ]]; then

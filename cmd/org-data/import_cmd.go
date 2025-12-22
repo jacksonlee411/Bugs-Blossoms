@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/iota-uz/iota-sdk/modules/org/domain/subjectid"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -213,6 +212,9 @@ func runImport(ctx context.Context, opts importOptions) error {
 		return err
 	}
 	if err := resolveManagers(ctx, pool, &data); err != nil {
+		return err
+	}
+	if err := resolvePersons(ctx, pool, &data); err != nil {
 		return err
 	}
 
@@ -997,19 +999,16 @@ func normalizeAssignments(tenantID uuid.UUID, rows []assignmentCSVRow, positions
 	out := make([]assignmentRow, 0, len(rows))
 	subjectMappings := map[string]uuid.UUID{}
 	for _, r := range rows {
-		derived, err := subjectid.NormalizedSubjectID(tenantID, "person", r.pernr)
-		if err != nil {
-			return nil, nil, fmt.Errorf("line %d: subject_id mapping: %w", r.line, err)
-		}
-		if r.subjectID != nil && *r.subjectID != derived {
-			return nil, nil, fmt.Errorf("line %d: subject_id mismatch for pernr=%s", r.line, r.pernr)
+		subjectID := uuid.Nil
+		if r.subjectID != nil {
+			subjectID = *r.subjectID
 		}
 		positionID, err := resolvePositionID(r.positionCode, r.effectiveDate)
 		if err != nil {
 			return nil, nil, fmt.Errorf("line %d: %w", r.line, err)
 		}
 
-		subjectMappings[r.pernr] = derived
+		subjectMappings[r.pernr] = subjectID
 		out = append(out, assignmentRow{
 			id:             uuid.New(),
 			line:           r.line,
@@ -1017,7 +1016,7 @@ func normalizeAssignments(tenantID uuid.UUID, rows []assignmentCSVRow, positions
 			positionID:     positionID,
 			assignmentType: "primary",
 			pernr:          r.pernr,
-			subjectID:      derived,
+			subjectID:      subjectID,
 			effectiveDate:  r.effectiveDate,
 			endDate:        r.endDate,
 		})
@@ -1033,6 +1032,14 @@ func dbPrecheckSeed(ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID)
 			return withCode(exitValidation, fmt.Errorf("unknown tenant: %s", tenantID))
 		}
 		return withCode(exitDB, fmt.Errorf("check tenant existence: %w", err))
+	}
+
+	var personsOK bool
+	if err := pool.QueryRow(ctx, "SELECT to_regclass('public.persons') IS NOT NULL").Scan(&personsOK); err != nil {
+		return withCode(exitDB, fmt.Errorf("check persons table: %w", err))
+	}
+	if !personsOK {
+		return withCode(exitValidation, fmt.Errorf("persons table is missing; run `PERSON_MIGRATIONS=1 make db migrate up`"))
 	}
 
 	if err := pool.QueryRow(ctx, `SELECT 1 FROM org_nodes WHERE tenant_id=$1 LIMIT 1`, tenantID).Scan(&dummy); err == nil {
@@ -1083,6 +1090,48 @@ func resolveManagers(ctx context.Context, pool *pgxpool.Pool, data *normalizedDa
 			}
 		}
 	}
+	return nil
+}
+
+func resolvePersons(ctx context.Context, pool *pgxpool.Pool, data *normalizedData) error {
+	resolved := map[string]uuid.UUID{}
+	for pernr, subjectID := range data.subjectMappings {
+		pernrTrim := strings.TrimSpace(pernr)
+		if pernrTrim == "" {
+			continue
+		}
+
+		var personUUID uuid.UUID
+		err := pool.QueryRow(
+			ctx,
+			`SELECT person_uuid FROM persons WHERE tenant_id=$1 AND pernr=$2`,
+			data.tenantID,
+			pernrTrim,
+		).Scan(&personUUID)
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return withCode(exitValidation, fmt.Errorf("pernr not found in persons: %s", pernrTrim))
+			}
+			return withCode(exitDB, fmt.Errorf("pernr lookup failed: %w", err))
+		}
+
+		if subjectID != uuid.Nil && subjectID != personUUID {
+			return withCode(exitValidation, fmt.Errorf("subject_id mismatch for pernr=%s", pernrTrim))
+		}
+		resolved[pernrTrim] = personUUID
+	}
+	data.subjectMappings = resolved
+
+	for i := range data.assignments {
+		pernrTrim := strings.TrimSpace(data.assignments[i].pernr)
+		if pernrTrim == "" {
+			continue
+		}
+		if mapped, ok := data.subjectMappings[pernrTrim]; ok && mapped != uuid.Nil {
+			data.assignments[i].subjectID = mapped
+		}
+	}
+
 	return nil
 }
 

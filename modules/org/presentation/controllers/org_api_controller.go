@@ -109,6 +109,10 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/assignments/{id}:correct", c.instrumentAPI("assignments.correct", c.CorrectAssignment)).Methods(http.MethodPost)
 	api.HandleFunc("/assignments/{id}:rescind", c.instrumentAPI("assignments.rescind", c.RescindAssignment)).Methods(http.MethodPost)
 
+	api.HandleFunc("/personnel-events/hire", c.instrumentAPI("personnel_events.hire", c.HirePersonnelEvent)).Methods(http.MethodPost)
+	api.HandleFunc("/personnel-events/transfer", c.instrumentAPI("personnel_events.transfer", c.TransferPersonnelEvent)).Methods(http.MethodPost)
+	api.HandleFunc("/personnel-events/termination", c.instrumentAPI("personnel_events.termination", c.TerminationPersonnelEvent)).Methods(http.MethodPost)
+
 	api.HandleFunc("/roles", c.instrumentAPI("roles.list", c.GetRoles)).Methods(http.MethodGet)
 	api.HandleFunc("/role-assignments", c.instrumentAPI("role_assignments.list", c.GetRoleAssignments)).Methods(http.MethodGet)
 
@@ -2628,6 +2632,193 @@ func (c *OrgAPIController) CreateAssignment(w http.ResponseWriter, r *http.Reque
 			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
 			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
 		},
+	})
+}
+
+type hirePersonnelEventRequest struct {
+	Pernr         string     `json:"pernr"`
+	OrgNodeID     uuid.UUID  `json:"org_node_id"`
+	PositionID    *uuid.UUID `json:"position_id"`
+	EffectiveDate string     `json:"effective_date"`
+	AllocatedFTE  *float64   `json:"allocated_fte"`
+	ReasonCode    string     `json:"reason_code"`
+}
+
+type transferPersonnelEventRequest struct {
+	Pernr         string     `json:"pernr"`
+	OrgNodeID     uuid.UUID  `json:"org_node_id"`
+	PositionID    *uuid.UUID `json:"position_id"`
+	EffectiveDate string     `json:"effective_date"`
+	AllocatedFTE  *float64   `json:"allocated_fte"`
+	ReasonCode    string     `json:"reason_code"`
+}
+
+type terminationPersonnelEventRequest struct {
+	Pernr         string `json:"pernr"`
+	EffectiveDate string `json:"effective_date"`
+	ReasonCode    string `json:"reason_code"`
+}
+
+type personnelEventResponse struct {
+	PersonnelEventID string `json:"personnel_event_id"`
+	EventType        string `json:"event_type"`
+	PersonUUID       string `json:"person_uuid"`
+	Pernr            string `json:"pernr"`
+	EffectiveDate    string `json:"effective_date"`
+	ReasonCode       string `json:"reason_code"`
+}
+
+func (c *OrgAPIController) HirePersonnelEvent(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "assign") {
+		return
+	}
+
+	var req hirePersonnelEventRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.HirePersonnelEvent(r.Context(), tenantID, requestID, initiatorID, services.HirePersonnelEventInput{
+		Pernr:         req.Pernr,
+		OrgNodeID:     req.OrgNodeID,
+		PositionID:    req.PositionID,
+		EffectiveDate: effectiveDate,
+		AllocatedFTE: func() float64 {
+			if req.AllocatedFTE == nil {
+				return 0
+			}
+			return *req.AllocatedFTE
+		}(),
+		ReasonCode: req.ReasonCode,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	status := http.StatusCreated
+	if !res.Created {
+		status = http.StatusOK
+	}
+
+	writeJSON(w, status, personnelEventResponse{
+		PersonnelEventID: res.Event.ID.String(),
+		EventType:        res.Event.EventType,
+		PersonUUID:       res.Event.PersonUUID.String(),
+		Pernr:            res.Event.Pernr,
+		EffectiveDate:    res.Event.EffectiveDate.UTC().Format(time.RFC3339),
+		ReasonCode:       res.Event.ReasonCode,
+	})
+}
+
+func (c *OrgAPIController) TransferPersonnelEvent(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "assign") {
+		return
+	}
+
+	var req transferPersonnelEventRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.TransferPersonnelEvent(r.Context(), tenantID, requestID, initiatorID, services.TransferPersonnelEventInput{
+		Pernr:         req.Pernr,
+		OrgNodeID:     req.OrgNodeID,
+		PositionID:    req.PositionID,
+		EffectiveDate: effectiveDate,
+		AllocatedFTE: func() float64 {
+			if req.AllocatedFTE == nil {
+				return 0
+			}
+			return *req.AllocatedFTE
+		}(),
+		ReasonCode: req.ReasonCode,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	status := http.StatusCreated
+	if !res.Created {
+		status = http.StatusOK
+	}
+
+	writeJSON(w, status, personnelEventResponse{
+		PersonnelEventID: res.Event.ID.String(),
+		EventType:        res.Event.EventType,
+		PersonUUID:       res.Event.PersonUUID.String(),
+		Pernr:            res.Event.Pernr,
+		EffectiveDate:    res.Event.EffectiveDate.UTC().Format(time.RFC3339),
+		ReasonCode:       res.Event.ReasonCode,
+	})
+}
+
+func (c *OrgAPIController) TerminationPersonnelEvent(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "assign") {
+		return
+	}
+
+	var req terminationPersonnelEventRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.TerminationPersonnelEvent(r.Context(), tenantID, requestID, initiatorID, services.TerminationPersonnelEventInput{
+		Pernr:         req.Pernr,
+		EffectiveDate: effectiveDate,
+		ReasonCode:    req.ReasonCode,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	status := http.StatusCreated
+	if !res.Created {
+		status = http.StatusOK
+	}
+
+	writeJSON(w, status, personnelEventResponse{
+		PersonnelEventID: res.Event.ID.String(),
+		EventType:        res.Event.EventType,
+		PersonUUID:       res.Event.PersonUUID.String(),
+		Pernr:            res.Event.Pernr,
+		EffectiveDate:    res.Event.EffectiveDate.UTC().Format(time.RFC3339),
+		ReasonCode:       res.Event.ReasonCode,
 	})
 }
 

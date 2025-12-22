@@ -136,8 +136,8 @@ pnpm run test:debug
 # Run user tests only
 pnpm run test:users
 
-# Run employee tests only
-pnpm run test:employees
+# Run person tests only
+pnpm run test:persons
 ```
 
 ### Advanced Usage
@@ -204,8 +204,8 @@ e2e/
     ├── users/
     │   ├── register.spec.ts
     │   └── realtime.spec.ts
-    └── employees/
-        └── employees.spec.ts
+    └── persons/
+        └── persons.spec.ts
 ```
 
 ## Environment Configuration

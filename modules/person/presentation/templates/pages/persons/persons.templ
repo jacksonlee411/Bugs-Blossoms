@@ -1,0 +1,113 @@
+package persons
+
+	import (
+		"fmt"
+
+		icons "github.com/iota-uz/icons/phosphor"
+
+	authzcomponents "github.com/iota-uz/iota-sdk/components/authorization"
+	"github.com/iota-uz/iota-sdk/components/base"
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
+	"github.com/iota-uz/iota-sdk/modules/person/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+templ Index(props *viewmodels.PersonsListPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{Title: pageCtx.T("Person.UI.Persons.Meta.List.Title")},
+	}) {
+		@Content(props)
+	}
+}
+
+templ Content(props *viewmodels.PersonsListPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div class="m-6 space-y-4">
+		if props.CanDebug {
+			@authzcomponents.PolicyInspector(&authzcomponents.PolicyInspectorProps{
+				State:      pageCtx.AuthzState(),
+				Object:     "person.persons",
+				Action:     "list",
+				Domain:     "person",
+				RequestURL: "/core/api/authz/requests",
+				CanDebug:   props.CanDebug,
+			})
+		}
+		<div class="flex flex-wrap items-center justify-between gap-3">
+			<h1 class="text-2xl font-medium">{ pageCtx.T("NavigationLinks.Persons") }</h1>
+			if props.CanCreate {
+				@button.Primary(button.Props{
+					Href: props.NewURL,
+				}) {
+					@icons.Plus(icons.Props{Size: "18"})
+					<span class="ml-2">{ pageCtx.T("Person.UI.Persons.Actions.New") }</span>
+				}
+			}
+		</div>
+
+			<form class="flex flex-wrap items-end gap-3" method="get" action="/person/persons">
+				@input.Text(&input.Props{
+					Label:       pageCtx.T("Person.UI.Persons.Fields.Q"),
+					Placeholder: pageCtx.T("Person.UI.Persons.Fields.QPlaceholder"),
+					Attrs: templ.Attributes{
+						"name":  "q",
+						"value": props.Q,
+					},
+				})
+				@button.Secondary(button.Props{Attrs: templ.Attributes{"type": "submit"}}) {
+					{ pageCtx.T("Person.UI.Persons.Actions.Search") }
+				}
+			</form>
+
+		@PersonsTable(props)
+	</div>
+}
+
+templ PersonsTable(props *viewmodels.PersonsListPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+		if props == nil || len(props.Items) == 0 {
+			@base.TableEmptyState(base.TableEmptyStateProps{
+				Title:       pageCtx.T("Person.UI.Persons.Empty.Title"),
+				Description: pageCtx.T("Person.UI.Persons.Empty._Description"),
+			})
+		} else {
+		@base.Table(base.TableProps{
+			Columns: []*base.TableColumn{
+				{Label: pageCtx.T("Person.Fields.Pernr"), Key: "pernr"},
+				{Label: pageCtx.T("Person.Fields.DisplayName"), Key: "display_name"},
+				{Label: pageCtx.T("Person.Fields.Status"), Key: "status"},
+				{Label: pageCtx.T("Actions"), Class: "w-16"},
+			},
+		}) {
+			for _, item := range props.Items {
+				@base.TableRow(base.TableRowProps{}) {
+					@base.TableCell(base.TableCellProps{}) {
+						{ item.Pernr }
+					}
+					@base.TableCell(base.TableCellProps{}) {
+						{ item.DisplayName }
+					}
+					@base.TableCell(base.TableCellProps{}) {
+						{ item.Status }
+					}
+					@base.TableCell(base.TableCellProps{}) {
+						@button.Secondary(button.Props{
+							Fixed: true,
+							Size:  button.SizeSM,
+							Class: "btn-fixed",
+							Href:  fmt.Sprintf("/person/persons/%s", item.PersonUUID),
+							Attrs: templ.Attributes{
+								"aria-label": pageCtx.T("View"),
+							},
+						}) {
+							@icons.Eye(icons.Props{Size: "20"})
+						}
+					}
+				}
+			}
+		}
+	}
+}

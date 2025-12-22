@@ -21,6 +21,8 @@ import (
 func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpool.Pool) {
 	tb.Helper()
 
+	applyAllPersonMigrations(tb, ctx, pool)
+
 	files := []string{
 		"00001_org_baseline.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
@@ -78,6 +80,7 @@ func TestOrg058_ExtendedAssignmentTypes_NonPrimaryDoesNotAffectCapacity(t *testi
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ensureTenant(t, ctx, pool, tenantID)
+	seedPerson(t, ctx, pool, tenantID, uuid.New(), "000123", "Test Person 000123")
 	_, err := pool.Exec(ctx, `
 INSERT INTO org_settings (tenant_id, freeze_mode, freeze_grace_days)
 VALUES ($1,'disabled',0)
@@ -165,6 +168,7 @@ func TestOrg058_AssignmentUpdate_TransferAndMultiSegments(t *testing.T) {
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ensureTenant(t, ctx, pool, tenantID)
+	seedPerson(t, ctx, pool, tenantID, uuid.New(), "000123", "Test Person 000123")
 	_, err := pool.Exec(ctx, `
 INSERT INTO org_settings (tenant_id, freeze_mode, freeze_grace_days)
 VALUES ($1,'disabled',0)
@@ -265,6 +269,7 @@ func TestOrg058_AssignmentCorrectAndRescind_WritesAuditAndOutbox(t *testing.T) {
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ensureTenant(t, ctx, pool, tenantID)
+	seedPerson(t, ctx, pool, tenantID, uuid.New(), "000123", "Test Person 000123")
 	_, err := pool.Exec(ctx, `
 INSERT INTO org_settings (tenant_id, freeze_mode, freeze_grace_days)
 VALUES ($1,'disabled',0)

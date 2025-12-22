@@ -8,7 +8,7 @@
 		"test:headed": "playwright test --headed",
 		"test:debug": "playwright test --debug",
 		"test:users": "playwright test tests/users",
-		"test:employees": "playwright test tests/employees"
+		"test:persons": "playwright test tests/persons"
 	},
 	"dependencies": {
 		"dotenv": "^16.6.1",

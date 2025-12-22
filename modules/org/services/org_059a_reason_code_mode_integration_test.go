@@ -42,6 +42,8 @@ func setupOrg059ADB(tb testing.TB, reasonCodeMode string) (context.Context, *pgx
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000059")
 	ensureTenant(tb, ctx, pool, tenantID)
+	seedPerson(tb, ctx, pool, tenantID, uuid.New(), "000123", "Test Person 000123")
+	seedPerson(tb, ctx, pool, tenantID, uuid.New(), "000456", "Test Person 000456")
 	_, err := pool.Exec(ctx, `
 INSERT INTO org_settings (tenant_id, freeze_mode, freeze_grace_days)
 VALUES ($1,'disabled',0)

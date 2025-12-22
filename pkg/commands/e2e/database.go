@@ -12,8 +12,33 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/commands/common"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func runPersonMigrations(projectRoot string, conf *configuration.Configuration) error {
+	cmd := exec.CommandContext(context.Background(), "./scripts/db/run_goose.sh", "up")
+	cmd.Dir = projectRoot
+	cmd.Env = append(
+		os.Environ(),
+		"GOOSE_MIGRATIONS_DIR=migrations/person",
+		"GOOSE_TABLE=goose_db_version_person",
+		"DB_NAME="+E2E_DB_NAME,
+		"DB_HOST="+conf.Database.Host,
+		"DB_PORT="+conf.Database.Port,
+		"DB_USER="+conf.Database.User,
+		"DB_PASSWORD="+conf.Database.Password,
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// goose up exits non-zero when the database is already up to date.
+		if strings.Contains(string(out), "goose run: no next version found") {
+			return nil
+		}
+		_, _ = os.Stdout.Write(out)
+		return err
+	}
+	_, _ = os.Stdout.Write(out)
+	return nil
+}
 
 func runOrgMigrations(projectRoot string, conf *configuration.Configuration) error {
 	cmd := exec.CommandContext(context.Background(), "./scripts/db/run_goose.sh", "up")
@@ -125,7 +150,6 @@ func Migrate() error {
 	if err := os.Chdir(projectRoot); err != nil {
 		return fmt.Errorf("failed to change to project root: %w", err)
 	}
-	hrmSchemaPath := filepath.Join(projectRoot, "modules", "hrm", "infrastructure", "persistence", "schema", "hrm-schema.sql")
 
 	// Set environment variable for e2e database
 	_ = os.Setenv("DB_NAME", E2E_DB_NAME)
@@ -148,8 +172,8 @@ func Migrate() error {
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 
-	if err := ensureHRMSchema(context.Background(), pool, hrmSchemaPath); err != nil {
-		return fmt.Errorf("failed to ensure HRM schema: %w", err)
+	if err := runPersonMigrations(projectRoot, conf); err != nil {
+		return fmt.Errorf("failed to run person migrations: %w", err)
 	}
 
 	if err := runOrgMigrations(projectRoot, conf); err != nil {
@@ -304,57 +328,4 @@ func TruncateAllTables() error {
 	}
 
 	return nil
-}
-
-func ensureHRMSchema(ctx context.Context, pool *pgxpool.Pool, schemaPath string) error {
-	const tableName = "employees"
-	exists, err := tableExists(ctx, pool, tableName)
-	if err != nil {
-		return fmt.Errorf("failed to verify HRM schema presence: %w", err)
-	}
-	if exists {
-		return nil
-	}
-
-	contents, err := os.ReadFile(schemaPath)
-	if err != nil {
-		return fmt.Errorf("failed to read HRM schema file: %w", err)
-	}
-
-	statements := splitSQLStatements(string(contents))
-	for _, stmt := range statements {
-		if _, err := pool.Exec(ctx, stmt); err != nil {
-			return fmt.Errorf("failed to execute HRM schema statement: %w", err)
-		}
-	}
-
-	configuration.Use().Logger().Info("HRM schema created for e2e database")
-	return nil
-}
-
-func tableExists(ctx context.Context, pool *pgxpool.Pool, table string) (bool, error) {
-	const query = `
-		SELECT EXISTS (
-			SELECT 1
-			FROM information_schema.tables
-			WHERE table_schema = 'public' AND table_name = $1
-		)`
-	var exists bool
-	if err := pool.QueryRow(ctx, query, table).Scan(&exists); err != nil {
-		return false, err
-	}
-	return exists, nil
-}
-
-func splitSQLStatements(script string) []string {
-	raw := strings.Split(script, ";")
-	statements := make([]string, 0, len(raw))
-	for _, stmt := range raw {
-		stmt = strings.TrimSpace(stmt)
-		if stmt == "" || strings.HasPrefix(stmt, "--") {
-			continue
-		}
-		statements = append(statements, stmt)
-	}
-	return statements
 }

@@ -182,8 +182,6 @@
     "Finances": "财务",
     "Projects": "项目",
     "Reports": "报告",
-    "HRM": "人力资源管理",
-    "Employees": "员工",
     "Navbar": {
       "Profile": "个人资料",
       "Logout": "退出登录"
@@ -756,16 +754,6 @@
         "Label": "管理客户",
         "_Description": "完整的客户管理功能"
       }
-    },
-    "HRM": {
-      "EmployeeView": {
-        "Label": "查看员工",
-        "_Description": "仅查看员工信息"
-      },
-      "EmployeeManage": {
-        "Label": "管理员工",
-        "_Description": "完整的员工管理功能"
-      }
     }
   },
   "Modules": {
@@ -774,7 +762,6 @@
     "Projects": "项目",
     "Warehouse": "仓库",
     "CRM": "CRM",
-    "HRM": "人力资源管理",
     "Logging": "日志"
   },
   "Countries": {

@@ -18,8 +18,8 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
 	coreseed "github.com/iota-uz/iota-sdk/modules/core/seed"
 	coreservices "github.com/iota-uz/iota-sdk/modules/core/services"
-	"github.com/iota-uz/iota-sdk/modules/hrm/domain/aggregates/employee"
-	hrmservices "github.com/iota-uz/iota-sdk/modules/hrm/services"
+	"github.com/iota-uz/iota-sdk/modules/person/domain/aggregates/person"
+	personservices "github.com/iota-uz/iota-sdk/modules/person/services"
 	"github.com/iota-uz/iota-sdk/modules/website/domain/entities/aichatconfig"
 	websiteseed "github.com/iota-uz/iota-sdk/modules/website/seed"
 	"github.com/iota-uz/iota-sdk/pkg/application"
@@ -28,7 +28,6 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/defaults"
 	"github.com/iota-uz/iota-sdk/pkg/repo"
-	"github.com/iota-uz/iota-sdk/pkg/shared"
 )
 
 // Seed populates the e2e database with test data
@@ -77,7 +76,7 @@ func Seed() error {
 	}
 
 	allPermissions := defaults.AllPermissions()
-	noHRMPermissions := filterOutHRMPermissions(allPermissions)
+	noPersonPermissions := filterOutPersonPermissions(allPermissions)
 	seeder.Register(
 		coreseed.CreateDefaultTenant,
 		coreseed.CreateCurrencies,
@@ -92,7 +91,7 @@ func Seed() error {
 			user.UILanguageEN,
 			user.WithTenantID(defaultTenant.ID),
 		), allPermissions),
-		createLimitedUserSeedFunc(noHRMPermissions),
+		createLimitedUserSeedFunc(noPersonPermissions),
 		websiteseed.AIChatConfigSeedFunc(aichatconfig.MustNew(
 			"gemma-12b-it",
 			aichatconfig.AIModelTypeOpenAI,
@@ -113,7 +112,7 @@ func Seed() error {
 		return err
 	}
 
-	if err := seedEmployees(ctxWithTenant, app); err != nil {
+	if err := seedPersons(ctxWithTenant, app); err != nil {
 		if rollbackErr := tx.Rollback(ctx); rollbackErr != nil {
 			return fmt.Errorf("rollback failed: %w (original error: %w)", rollbackErr, err)
 		}
@@ -128,10 +127,10 @@ func Seed() error {
 	return nil
 }
 
-func filterOutHRMPermissions(perms []*permission.Permission) []*permission.Permission {
+func filterOutPersonPermissions(perms []*permission.Permission) []*permission.Permission {
 	filtered := make([]*permission.Permission, 0, len(perms))
 	skipPrefixes := []string{
-		"hrm.",
+		"person.",
 		"logging.",
 		"logs.",
 		"log.",
@@ -181,7 +180,7 @@ func createLimitedUserSeedFunc(perms []*permission.Permission) application.SeedF
 			Filters: []role.Filter{
 				{
 					Column: role.NameField,
-					Filter: repo.Eq("NoHRM"),
+					Filter: repo.Eq("NoPerson"),
 				},
 			},
 		})
@@ -189,9 +188,8 @@ func createLimitedUserSeedFunc(perms []*permission.Permission) application.SeedF
 			return err
 		}
 
-		limitedRole := role.New(
-			"NoHRM",
-			role.WithDescription("User without HRM permissions"),
+		limitedRole := role.New("NoPerson",
+			role.WithDescription("User without Person permissions"),
 			role.WithPermissions(perms),
 			role.WithType(role.TypeSystem),
 			role.WithTenantID(tenantID),
@@ -206,7 +204,7 @@ func createLimitedUserSeedFunc(perms []*permission.Permission) application.SeedF
 
 		uploadRepo := persistence.NewUploadRepository()
 		userRepo := persistence.NewUserRepository(uploadRepo)
-		existing, err := userRepo.GetByEmail(ctx, "nohrm@example.com")
+		existing, err := userRepo.GetByEmail(ctx, "noperson@example.com")
 		if err != nil && !errors.Is(err, persistence.ErrUserNotFound) {
 			return err
 		}
@@ -215,9 +213,9 @@ func createLimitedUserSeedFunc(perms []*permission.Permission) application.SeedF
 		}
 
 		limitedUser, err := user.New(
-			"NoHRM",
+			"NoPerson",
 			"User",
-			internet.MustParseEmail("nohrm@example.com"),
+			internet.MustParseEmail("noperson@example.com"),
 			user.UILanguageEN,
 			user.WithTenantID(tenantID),
 		).SetPassword("TestPass123!")
@@ -230,8 +228,8 @@ func createLimitedUserSeedFunc(perms []*permission.Permission) application.SeedF
 	}
 }
 
-func seedEmployees(ctx context.Context, app application.Application) error {
-	service := app.Service(hrmservices.EmployeeService{}).(*hrmservices.EmployeeService)
+func seedPersons(ctx context.Context, app application.Application) error {
+	service := app.Service(personservices.PersonService{}).(*personservices.PersonService)
 	userService := app.Service(coreservices.UserService{}).(*coreservices.UserService)
 
 	adminUser, err := userService.GetByEmail(ctx, "test@gmail.com")
@@ -250,58 +248,21 @@ func seedEmployees(ctx context.Context, app application.Application) error {
 		CreatedAt: time.Now(),
 	})
 
-	employees := []employee.CreateDTO{
-		{
-			FirstName:         "Ava",
-			LastName:          "Reed",
-			MiddleName:        "Marie",
-			Email:             "ava.reed@example.com",
-			Phone:             "+14155550001",
-			Salary:            5200.00,
-			PrimaryLanguage:   "en",
-			SecondaryLanguage: "ru",
-			BirthDate:         toDateOnly(1990, time.March, 5),
-			HireDate:          toDateOnly(2023, time.January, 10),
-			Notes:             "HR operations lead for onboarding workflows.",
-		},
-		{
-			FirstName:         "Bruno",
-			LastName:          "Silva",
-			MiddleName:        "Henrique",
-			Email:             "bruno.silva@example.com",
-			Phone:             "+14155550002",
-			Salary:            6100.00,
-			PrimaryLanguage:   "pt",
-			SecondaryLanguage: "en",
-			BirthDate:         toDateOnly(1988, time.June, 17),
-			HireDate:          toDateOnly(2022, time.September, 2),
-			Notes:             "Payroll specialist focusing on LATAM compliance.",
-		},
-		{
-			FirstName:         "Chloe",
-			LastName:          "Tanaka",
-			MiddleName:        "Aiko",
-			Email:             "chloe.tanaka@example.com",
-			Phone:             "+14155550003",
-			Salary:            5700.00,
-			PrimaryLanguage:   "ja",
-			SecondaryLanguage: "en",
-			BirthDate:         toDateOnly(1993, time.November, 28),
-			HireDate:          toDateOnly(2023, time.April, 14),
-			Notes:             "People partner coordinating APAC reviews.",
-		},
+	persons := []person.CreateDTO{
+		{Pernr: "0001", DisplayName: "Ava Reed"},
+		{Pernr: "0002", DisplayName: "Bruno Silva"},
+		{Pernr: "0003", DisplayName: "Chloe Tanaka"},
 	}
 
-	for _, emp := range employees {
-		dto := emp
-		if err := service.Create(ctx, &dto); err != nil {
-			return fmt.Errorf("failed to create employee %s: %w", dto.Email, err)
+	for _, p := range persons {
+		dto := p
+		if _, err := service.Create(ctx, &dto); err != nil {
+			if errors.Is(err, person.ErrPernrTaken) {
+				continue
+			}
+			return fmt.Errorf("failed to create person pernr=%s: %w", dto.Pernr, err)
 		}
 	}
 
 	return nil
-}
-
-func toDateOnly(year int, month time.Month, day int) shared.DateOnly {
-	return shared.DateOnly(time.Date(year, month, day, 0, 0, 0, 0, time.UTC))
 }

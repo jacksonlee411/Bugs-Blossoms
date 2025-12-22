@@ -1,4 +1,4 @@
-h1:5P1aCmttx6JTxo8m316LY9S56vDiK/0QgbR2j3iwbBc=
+h1:KEXZLEnkoZ3WTRC7JDWzxMRDknFQq9Jt26gbD+L0tPA=
 00001_org_baseline.sql h1:HKEUK9io9zwPWO60nEqXEqYxCigSLmO1D/mRcH82dhQ=
 00002_org_migration_smoke.sql h1:D9VgnC2eBDeHyMVqBzEP1/rtMwdtRkcpCGqPwg1L7Gw=
 20251218005114_org_placeholders_and_event_contracts.sql h1:TSQBkvi1nm7SCw+q2BX6ltB/V2naYuznwC923I2PH88=
@@ -10,3 +10,4 @@ h1:5P1aCmttx6JTxo8m316LY9S56vDiK/0QgbR2j3iwbBc=
 20251220160000_org_position_slices_and_fte.sql h1:PGVOrJpnNv/uKB6+tsqmnx/I/IqsvsFxPcA01mNhh/4=
 20251220200000_org_job_catalog_profiles_and_validation_modes.sql h1:m6NwgSaE7OBcPVhuvA9idk8f2lRZ6P4Ximh+/RniRKA=
 20251221090000_org_reason_code_mode.sql h1:/Bf7GBkAHEZFLxlhts0+1Cq079NAM2yhdCQBqKKbpog=
+20251222120000_org_personnel_events.sql h1:4HQRyUYYKhLlH4RkdCeGTYEeAIScuz+9qZyoESE1bSU=

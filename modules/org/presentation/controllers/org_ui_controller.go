@@ -248,6 +248,11 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 		subject := fmt.Sprintf("person:%s", pernr)
 		_, rows, _, err := c.org.GetAssignments(r.Context(), tenantID, subject, nil)
 		if err != nil {
+			var svcErr *services.ServiceError
+			if errors.As(err, &svcErr) {
+				http.Error(w, svcErr.Message, svcErr.Status)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}

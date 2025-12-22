@@ -88,6 +88,10 @@ entrypoints:
       class: ui
     - prefix: /org/api
       class: internal_api
+    - prefix: /person
+      class: ui
+    - prefix: /person/api
+      class: internal_api
 
     # Superadmin paths are reachable on the main server via module registration.
     - prefix: /superadmin
