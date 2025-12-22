@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -276,14 +277,14 @@ func CreateDB(name string) {
 					}
 				}()
 
-				pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				if err := db.PingContext(pingCtx); err != nil {
 					lastErr = err
 					return
 				}
 
-				dropCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				dropCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 				_, err = db.ExecContext(dropCtx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", sanitizedName))
 				if err != nil {
@@ -294,7 +295,7 @@ func CreateDB(name string) {
 					return
 				}
 
-				createCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+				createCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 				defer cancel()
 				_, err = db.ExecContext(createCtx, fmt.Sprintf("CREATE DATABASE %s", sanitizedName))
 				if err != nil {
@@ -336,6 +337,9 @@ func DbOpts(name string) string {
 func isTransientPostgresError(err error) bool {
 	if err == nil {
 		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
 	}
 	msg := err.Error()
 	switch {
