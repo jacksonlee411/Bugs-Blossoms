@@ -192,7 +192,7 @@ type Configuration struct {
 	EnableOrgExtendedAssignmentTypes bool `env:"ENABLE_ORG_EXTENDED_ASSIGNMENT_TYPES" envDefault:"false"`
 
 	// DEV-PLAN-027: Org rollout flags (tenant allowlist + rollback switches).
-	OrgRolloutMode    string `env:"ORG_ROLLOUT_MODE" envDefault:"disabled"`
+	OrgRolloutMode    string `env:"ORG_ROLLOUT_MODE" envDefault:"enabled"`
 	OrgRolloutTenants string `env:"ORG_ROLLOUT_TENANTS" envDefault:""`
 	OrgReadStrategy   string `env:"ORG_READ_STRATEGY" envDefault:"path"`
 	OrgCacheEnabled   bool   `env:"ORG_CACHE_ENABLED" envDefault:"false"`
