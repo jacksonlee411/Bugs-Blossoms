@@ -157,14 +157,14 @@ func requestForm(props RequestFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</label> <textarea id=\"authz-diff\" name=\"diff\" class=\"hidden\" readonly>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</label> <textarea id=\"authz-diff\" name=\"diff\" class=\"hidden\" hidden aria-hidden=\"true\" tabindex=\"-1\" readonly>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.Diff)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 60, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 60, Col: 116}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -556,14 +556,14 @@ func simpleRequestForm(props RequestFormProps) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\"> <input type=\"hidden\" name=\"request_access\" value=\"true\"> <textarea name=\"diff\" class=\"hidden\" readonly>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "\"> <input type=\"hidden\" name=\"request_access\" value=\"true\"> <textarea name=\"diff\" class=\"hidden\" hidden aria-hidden=\"true\" tabindex=\"-1\" readonly>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var34 string
 		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(props.Diff)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 168, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 168, Col: 100}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 		if templ_7745c5c3_Err != nil {
@@ -1040,7 +1040,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				var templ_7745c5c3_Var66 string
 				templ_7745c5c3_Var66, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.BaseRevision"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 275, Col: 54}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 275, Col: 53}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var66))
 				if templ_7745c5c3_Err != nil {
@@ -1053,7 +1053,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				var templ_7745c5c3_Var67 string
 				templ_7745c5c3_Var67, templ_7745c5c3_Err = templ.JoinStringErrs(baseRevision)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 275, Col: 121}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 275, Col: 120}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var67))
 				if templ_7745c5c3_Err != nil {
@@ -1072,7 +1072,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				var templ_7745c5c3_Var68 string
 				templ_7745c5c3_Var68, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.RequestID"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 280, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 280, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var68))
 				if templ_7745c5c3_Err != nil {
@@ -1085,7 +1085,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				var templ_7745c5c3_Var69 string
 				templ_7745c5c3_Var69, templ_7745c5c3_Err = templ.JoinStringErrs(requestID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 280, Col: 90}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 280, Col: 89}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var69))
 				if templ_7745c5c3_Err != nil {
@@ -1113,7 +1113,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				var templ_7745c5c3_Var71 string
 				templ_7745c5c3_Var71, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Debug"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 285, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 285, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var71))
 				if templ_7745c5c3_Err != nil {
@@ -1146,7 +1146,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				var templ_7745c5c3_Var72 string
 				templ_7745c5c3_Var72, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.MissingPolicies"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 295, Col: 56}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 295, Col: 55}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var72))
 				if templ_7745c5c3_Err != nil {
@@ -1164,7 +1164,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 					var templ_7745c5c3_Var73 string
 					templ_7745c5c3_Var73, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s → %s / %s", policy.Domain, policy.Object, policy.Action))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 300, Col: 85}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 300, Col: 84}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var73))
 					if templ_7745c5c3_Err != nil {
@@ -1187,7 +1187,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				var templ_7745c5c3_Var74 string
 				templ_7745c5c3_Var74, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.MissingPolicies"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 305, Col: 91}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 305, Col: 90}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var74))
 				if templ_7745c5c3_Err != nil {
@@ -1200,7 +1200,7 @@ func Unauthorized(props *UnauthorizedProps) templ.Component {
 				var templ_7745c5c3_Var75 string
 				templ_7745c5c3_Var75, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 305, Col: 115}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/unauthorized.templ`, Line: 305, Col: 114}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var75))
 				if templ_7745c5c3_Err != nil {
