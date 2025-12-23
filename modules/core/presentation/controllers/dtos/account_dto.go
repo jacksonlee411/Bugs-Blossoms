@@ -17,7 +17,7 @@ type SaveAccountDTO struct {
 	LastName   string `validate:"required"`
 	Phone      string
 	MiddleName string
-	Language   string `validate:"required"`
+	Language   string `validate:"required,oneof=en zh"`
 	AvatarID   uint
 }
 

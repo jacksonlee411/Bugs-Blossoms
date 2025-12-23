@@ -35,6 +35,15 @@
     "invalidPIN": "Invalid PIN format: {{.Details}}"
   },
   "Import": {
+    "UploadLabel": "Upload file",
+    "UploadPlaceholder": "Choose a file",
+    "DownloadTemplate": "Download template",
+    "Actions": {
+      "Submit": "Submit"
+    },
+    "Example": {
+      "Below": "Example below"
+    },
     "Error": {
       "ValidationError": "Validation Error"
     }

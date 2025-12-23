@@ -43,8 +43,8 @@ func ImportFormFields(props *ImportPageProps) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = components.UploadInput(&components.UploadInputProps{
-			Label:       pgCtx.T("UploadLabel"),
-			Placeholder: pgCtx.T("UploadPlaceholder"),
+			Label:       pgCtx.T("Import.UploadLabel"),
+			Placeholder: pgCtx.T("Import.UploadPlaceholder"),
 			Error:       props.Errors["FileID"],
 			Accept:      config.GetAcceptedFileTypes(),
 			Name:        "FileID",
@@ -97,9 +97,9 @@ func DownloadTemplateButton(downloadURL string) templ.Component {
 			}
 			ctx = templ.InitializeContext(ctx)
 			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(pgCtx.T("DownloadTemplate"))
+			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(pgCtx.T("Import.DownloadTemplate"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/import/import_form.templ`, Line: 33, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/import/import_form.templ`, Line: 33, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {

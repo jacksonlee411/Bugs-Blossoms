@@ -12,8 +12,8 @@ templ ImportFormFields(props *ImportPageProps) {
 	{{ config := props.Config }}
 	<div class="mt-6">
 		@components.UploadInput(&components.UploadInputProps{
-			Label:       pgCtx.T("UploadLabel"),
-			Placeholder: pgCtx.T("UploadPlaceholder"),
+			Label:       pgCtx.T("Import.UploadLabel"),
+			Placeholder: pgCtx.T("Import.UploadPlaceholder"),
 			Error:       props.Errors["FileID"],
 			Accept:      config.GetAcceptedFileTypes(),
 			Name:        "FileID",
@@ -30,6 +30,6 @@ templ DownloadTemplateButton(downloadURL string) {
 		Icon: icons.FileXls(icons.Props{Size: "18"}),
 		Href: downloadURL,
 	}) {
-		{ pgCtx.T("DownloadTemplate") }
+		{ pgCtx.T("Import.DownloadTemplate") }
 	}
 }

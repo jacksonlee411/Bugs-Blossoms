@@ -95,16 +95,26 @@ type ApplicationOptions struct {
 }
 
 func LoadBundle() *i18n.Bundle {
-	bundle := i18n.NewBundle(language.Russian)
+	// Default language must match the runtime fallback strategy (DEV-PLAN-042): fallback to English.
+	bundle := i18n.NewBundle(language.English)
 	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
 	bundle.RegisterUnmarshalFunc("toml", toml.Unmarshal)
 	return bundle
+}
+
+func defaultSupportedLanguageCodes() []string {
+	return []string{"en", "zh"}
 }
 
 func New(opts *ApplicationOptions) Application {
 	sl := spotlight.New()
 	quickLinks := &spotlight.QuickLinks{}
 	sl.Register(quickLinks)
+
+	supportedLanguages := opts.SupportedLanguages
+	if len(supportedLanguages) == 0 {
+		supportedLanguages = defaultSupportedLanguageCodes()
+	}
 
 	return &application{
 		pool:               opts.Pool,
@@ -116,7 +126,7 @@ func New(opts *ApplicationOptions) Application {
 		spotlight:          sl,
 		bundle:             opts.Bundle,
 		migrations:         NewMigrationManager(opts.Pool),
-		supportedLanguages: opts.SupportedLanguages,
+		supportedLanguages: supportedLanguages,
 	}
 }
 

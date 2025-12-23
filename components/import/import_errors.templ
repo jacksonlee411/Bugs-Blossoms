@@ -17,7 +17,7 @@ templ ImportErrors(errors map[string]string) {
 		<div class="bg-red-100 text-red-700 py-3 px-4 text-sm font-medium rounded-md mb-4">
 			<div class="flex items-center space-x-2">
 				@icons.WarningCircle(icons.Props{Size: "20", Class: "text-red-600"})
-				<span class="font-semibold">{ pgCtx.T("Error.ValidationError") }</span>
+				<span class="font-semibold">{ pgCtx.T("Import.Error.ValidationError") }</span>
 			</div>
 			<div class="mt-2 space-y-1">
 				for key, errorMsg := range errors {

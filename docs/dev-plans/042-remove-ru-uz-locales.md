@@ -52,6 +52,10 @@
 - 现状问题：`pkg/middleware/i18n.go` 当前优先使用 `user.UILanguage()`，且不校验是否在支持集合内；如果用户资料为 `ru/uz`，即使系统已裁剪 ru/uz locales，也会创建 `ru/uz` localizer，最终出现缺失 key 或直接报错。
 - 决策：**中间件层必须强制将用户语言也纳入 whitelist match**；若不在支持集合内，回退到 `en`（或匹配 Accept-Language，再回退）。
 
+4) **WebSocket 连接上下文的语言选择**
+- 现状问题：`pkg/application/websocket.go` 直接用 `string(user.UILanguage())` 创建 localizer；若用户资料为 `ru/uz`，在裁剪资源后同样可能触发缺 key 风险。
+- 决策：WebSocket 侧也必须复用同一套 whitelist match 逻辑，保证最终 locale 始终落在 `en/zh`。
+
 ### 3.2 替代方案（未选）
 - 仅删除 `ru/uz` JSON 文件，不改中间件：风险高（用户资料为 `ru/uz` 时仍会创建 `ru/uz` localizer）。
 - 仅在 UI 层隐藏 `ru/uz`：不够（API/Accept-Language/已有用户语言仍可能触发 ru/uz）。
@@ -113,8 +117,9 @@ return matcher.Match(tags...).Tag
 1. [ ] 代码层：将 application 的 `SupportedLanguages` 默认固定为 `en/zh`（覆盖 server / superadmin / CLI common 等 entrypoints）
 2. [ ] 代码层：调整 `pkg/middleware/i18n.go`，确保 user language 也走 whitelist matcher
 3. [ ] 资源层：删除所有 `modules/**/presentation/locales/ru.json` 与 `modules/**/presentation/locales/uz.json`
-4. [ ] UI 层：语言选择组件与账号设置仅展示 `en/zh`；保存时拒绝/回退 `ru/uz`
-5. [ ] 门禁与回归：
+4. [ ] 代码层：调整 `pkg/application/websocket.go`，确保 WebSocket 侧 locale 也走 whitelist matcher
+5. [ ] UI 层：语言选择组件与账号设置仅展示 `en/zh`；保存时拒绝/回退 `ru/uz`（含用户管理 Create/Update）
+6. [ ] 门禁与回归：
    - [ ] `make check tr`（翻译键一致性）
    - [ ] `check_tr_usage`（本计划新增：引用 key 不可缺失）
    - [ ] `make check doc` + `make check lint` + `make test`

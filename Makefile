@@ -443,7 +443,8 @@ check:
 		GOFLAGS="-buildvcs=false" golangci-lint run ./... && \
 		go run ./cmd/cleanarchguard -config .gocleanarch.yml; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "tr" ]; then \
-		go run cmd/command/main.go check_tr_keys; \
+		go run cmd/command/main.go check_tr_keys && \
+		go run cmd/command/main.go check_tr_usage; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "doc" ]; then \
 		bash ./scripts/docs/check.sh; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "routing" ]; then \

@@ -83,7 +83,7 @@ templ ImportContent(props *ImportPageProps) {
 						"type": "submit",
 					},
 				}) {
-					{ pgCtx.T("Submit") }
+					{ pgCtx.T("Import.Actions.Submit") }
 				}
 			</div>
 		</div>
@@ -113,7 +113,7 @@ templ ExampleSection(props *ImportPageProps) {
 	{{ pgCtx := composables.UsePageCtx(ctx) }}
 	<div class="mt-6">
 		<p class="text-base mb-3">
-			{ pgCtx.T("Example.Below") }
+			{ pgCtx.T("Import.Example.Below") }
 		</p>
 		@ExampleTable(props)
 	</div>
