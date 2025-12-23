@@ -160,6 +160,7 @@ modules/{module}/
 - Org UI IA 与侧栏集成（DEV-PLAN-035A）：`docs/dev-plans/035A-org-ui-ia-and-sidebar-integration.md`
 - 移除 finance/billing/crm/projects 模块（DEV-PLAN-040）：`docs/dev-plans/040-remove-finance-billing-crm.md`
 - 移除 warehouse（仓库）模块（DEV-PLAN-041）：`docs/dev-plans/041-remove-warehouse-module.md`
+- 移除 ru/uz 多语言（DEV-PLAN-042）：`docs/dev-plans/042-remove-ru-uz-locales.md`
 - 职位管理业务需求（DEV-PLAN-050）：`docs/dev-plans/050-position-management-business-requirements.md`
 - 职位管理实施蓝图（DEV-PLAN-051）：`docs/dev-plans/051-position-management-implementation-blueprint.md`
 - DEV-PLAN-051 Readiness：`docs/dev-records/DEV-PLAN-051-READINESS.md`
