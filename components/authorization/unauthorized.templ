@@ -57,7 +57,7 @@ templ requestForm(props RequestFormProps) {
 		<label class="block text-xs font-semibold text-surface-200" for="authz-diff">
 			{ pageCtx.T("Authz.Unauthorized.SuggestedDiff") }
 		</label>
-		<textarea id="authz-diff" name="diff" class="hidden" readonly>{ props.Diff }</textarea>
+		<textarea id="authz-diff" name="diff" class="hidden" hidden aria-hidden="true" tabindex="-1" readonly>{ props.Diff }</textarea>
 		<div class="rounded-md border border-surface-400/60 bg-surface-500/30 p-3 space-y-2">
 			if len(suggestions) > 0 {
 				<table class="w-full table-auto border-collapse text-xs">
@@ -138,6 +138,67 @@ templ requestForm(props RequestFormProps) {
 	</form>
 }
 
+templ simpleRequestForm(props RequestFormProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ _ = templ.URL("") }}
+	{{ requestURL := strings.TrimSpace(props.RequestURL) }}
+	{{if requestURL == "" {
+	requestURL = "/core/api/authz/requests"
+}
+	}}
+	{{ submitLabel := strings.TrimSpace(props.SubmitLabel) }}
+	{{if submitLabel == "" {
+	submitLabel = pageCtx.T("Authz.Unauthorized.Apply")
+}
+	}}
+	<form
+		class="space-y-3"
+		hx-post={ requestURL }
+		hx-target="body"
+		hx-swap="none"
+		hx-encoding="urlencoded"
+		hx-on::after-request="window.handleAuthzRequest && window.handleAuthzRequest(event)"
+	>
+		<input type="hidden" name="object" value={ props.Object }/>
+		<input type="hidden" name="action" value={ props.Action }/>
+		<input type="hidden" name="domain" value={ props.Domain }/>
+		<input type="hidden" name="subject" value={ props.Subject }/>
+		<input type="hidden" name="base_revision" value={ props.BaseRevision }/>
+		<input type="hidden" name="request_access" value="true"/>
+		<textarea name="diff" class="hidden" hidden aria-hidden="true" tabindex="-1" readonly>{ props.Diff }</textarea>
+		<div class="space-y-2">
+			<label class="block text-xs font-semibold text-surface-200" for="authz-reason-simple">
+				{ pageCtx.T("Authz.Unauthorized.Reason") }
+			</label>
+			<input
+				id="authz-reason-simple"
+				name="reason"
+				type="text"
+				class="w-full rounded-md border border-surface-400/60 bg-surface-500/40 p-2 text-sm text-100"
+				value={ props.Reason }
+				required
+			/>
+		</div>
+		<div class="flex flex-wrap items-center gap-3">
+			<button
+				type="submit"
+				class="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-100 hover:bg-primary/90"
+			>
+				{ submitLabel }
+			</button>
+			if strings.TrimSpace(props.RequestID) != "" {
+				<button
+					type="button"
+					class="inline-flex items-center rounded-md border border-surface-300/80 px-3 py-2 text-xs font-medium text-surface-50 hover:bg-surface-400/40"
+					data-authz-copy-request-id
+				>
+					{ pageCtx.T("Authz.Unauthorized.CopyRequestID") }
+				</button>
+			}
+		</div>
+	</form>
+}
+
 templ Unauthorized(props *UnauthorizedProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ state := props.State }}
@@ -207,51 +268,69 @@ templ Unauthorized(props *UnauthorizedProps) {
 					{ pageCtx.T("Authz.Unauthorized.ApplyDescription") }
 				</p>
 			</div>
-			<div class="text-right text-xs text-surface-200 space-y-1">
-				if baseRevision != "" {
-					<div>
-						{ pageCtx.T("Authz.Unauthorized.BaseRevision") }: <span class="font-mono" data-authz-base-revision>{ baseRevision }</span>
-					</div>
-				}
-				if requestID != "" {
-					<div>
-						{ pageCtx.T("Authz.Unauthorized.RequestID") }: <span class="font-mono">{ requestID }</span>
-					</div>
-				}
-				if debug != "" {
-					<a class="text-primary hover:underline" href={ templ.URL(debug) } target="_blank" rel="noreferrer">
-						{ pageCtx.T("Authz.Debug") }
-					</a>
-				}
-			</div>
-		</div>
-		<div class="rounded-md border border-dashed border-surface-400/60 bg-surface-500/30 p-3">
-			if len(policies) > 0 {
-				<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-200">
-					{ pageCtx.T("Authz.Unauthorized.MissingPolicies") }
-				</div>
-				<ul class="space-y-2">
-					for _, policy := range policies {
-						<li class="rounded-md border border-surface-400/60 bg-surface-500/50 p-3 text-xs font-mono text-surface-50">
-							{ fmt.Sprintf("%s → %s / %s", policy.Domain, policy.Object, policy.Action) }
-						</li>
+			if props.CanDebug {
+				<div class="text-right text-xs text-surface-200 space-y-1">
+					if baseRevision != "" {
+						<div>
+							{ pageCtx.T("Authz.Unauthorized.BaseRevision") }: <span class="font-mono" data-authz-base-revision>{ baseRevision }</span>
+						</div>
 					}
-				</ul>
-			} else {
-				<p class="text-xs text-surface-200">{ pageCtx.T("Authz.Unauthorized.MissingPolicies") }: { pageCtx.T("Empty") }</p>
+					if requestID != "" {
+						<div>
+							{ pageCtx.T("Authz.Unauthorized.RequestID") }: <span class="font-mono">{ requestID }</span>
+						</div>
+					}
+					if debug != "" {
+						<a class="text-primary hover:underline" href={ templ.URL(debug) } target="_blank" rel="noreferrer">
+							{ pageCtx.T("Authz.Debug") }
+						</a>
+					}
+				</div>
 			}
 		</div>
-		@requestForm(RequestFormProps{
-			RequestURL:   props.RequestURL,
-			Object:       object,
-			Action:       normalizedAction,
-			Domain:       domain,
-			Subject:      subject,
-			BaseRevision: baseRevision,
-			RequestID:    requestID,
-			Diff:         diffJSON,
-			Reason:       reason,
-		})
+		if props.CanDebug {
+			<div class="rounded-md border border-dashed border-surface-400/60 bg-surface-500/30 p-3">
+				if len(policies) > 0 {
+					<div class="mb-2 text-xs font-semibold uppercase tracking-wide text-surface-200">
+						{ pageCtx.T("Authz.Unauthorized.MissingPolicies") }
+					</div>
+					<ul class="space-y-2">
+						for _, policy := range policies {
+							<li class="rounded-md border border-surface-400/60 bg-surface-500/50 p-3 text-xs font-mono text-surface-50">
+								{ fmt.Sprintf("%s → %s / %s", policy.Domain, policy.Object, policy.Action) }
+							</li>
+						}
+					</ul>
+				} else {
+					<p class="text-xs text-surface-200">{ pageCtx.T("Authz.Unauthorized.MissingPolicies") }: { pageCtx.T("Empty") }</p>
+				}
+			</div>
+		}
+		if props.CanDebug {
+			@requestForm(RequestFormProps{
+				RequestURL:   props.RequestURL,
+				Object:       object,
+				Action:       normalizedAction,
+				Domain:       domain,
+				Subject:      subject,
+				BaseRevision: baseRevision,
+				RequestID:    requestID,
+				Diff:         diffJSON,
+				Reason:       reason,
+			})
+		} else {
+			@simpleRequestForm(RequestFormProps{
+				RequestURL:   props.RequestURL,
+				Object:       object,
+				Action:       normalizedAction,
+				Domain:       domain,
+				Subject:      subject,
+				BaseRevision: baseRevision,
+				RequestID:    requestID,
+				Diff:         diffJSON,
+				Reason:       reason,
+			})
+		}
 		<div class="space-y-2 text-xs text-surface-100" data-authz-status-block>
 			<div class="flex items-center gap-2 flex-wrap">
 				<span>{ pageCtx.T("Status") }:</span>

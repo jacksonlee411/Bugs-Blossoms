@@ -17,10 +17,12 @@ type PersonsListPageProps struct {
 }
 
 type PersonDetailPageProps struct {
-	Person     *PersonListItem
-	BackURL    string
-	CanRequest bool
-	CanDebug   bool
+	Person        *PersonListItem
+	BackURL       string
+	CanRequest    bool
+	CanDebug      bool
+	EffectiveDate string
+	Step          string
 }
 
 type PersonCreatePageProps struct {

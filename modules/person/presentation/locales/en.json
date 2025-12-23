@@ -11,7 +11,14 @@
       "Pernr": "Pernr",
       "DisplayName": "Display name",
       "Status": "Status",
+      "Department": "Department",
+      "Position": "Position",
       "PersonUUID": "Person UUID"
+    },
+    "Status": {
+      "Active": "Active",
+      "Inactive": "Inactive",
+      "Terminated": "Terminated"
     },
     "UI": {
       "Persons": {
@@ -23,6 +30,9 @@
         "Title": {
           "New": "Create person",
           "Detail": "Person"
+        },
+        "New": {
+          "NextStepHint": "After creating the person, you will be guided to set department and position."
         },
         "Actions": {
           "New": "New person",

@@ -20,13 +20,14 @@ import (
 )
 
 type importOptions struct {
-	tenantID  uuid.UUID
-	inputDir  string
-	outputDir string
-	apply     bool
-	strict    bool
-	backend   string
-	mode      string
+	tenantID        uuid.UUID
+	inputDir        string
+	outputDir       string
+	apply           bool
+	skipAssignments bool
+	strict          bool
+	backend         string
+	mode            string
 }
 
 func newImportCmd() *cobra.Command {
@@ -44,6 +45,7 @@ func newImportCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.inputDir, "input", "", "Input directory containing CSV files (required)")
 	cmd.Flags().StringVar(&opts.outputDir, "output", "", "Output directory for manifest (default: input dir)")
 	cmd.Flags().BoolVar(&opts.apply, "apply", false, "Apply changes to DB (default is dry-run)")
+	cmd.Flags().BoolVar(&opts.skipAssignments, "skip-assignments", false, "Skip assignments import even if assignments.csv exists")
 	cmd.Flags().BoolVar(&opts.strict, "strict", false, "Strict cycle checks across all effective dates")
 	cmd.Flags().StringVar(&opts.backend, "backend", "db", "Backend: db (MVP)")
 	cmd.Flags().StringVar(&opts.mode, "mode", "seed", "Mode: seed (MVP)")
@@ -191,10 +193,14 @@ func runImport(ctx context.Context, opts importOptions) error {
 		return withCode(exitValidation, fmt.Errorf("positions.csv: %w", err))
 	}
 
-	assignmentsPath := filepath.Join(opts.inputDir, "assignments.csv")
-	assignmentsRaw, err := parseAssignmentsCSVIfExists(assignmentsPath)
-	if err != nil {
-		return withCode(exitValidation, fmt.Errorf("assignments.csv: %w", err))
+	var assignmentsRaw []assignmentCSVRow
+	if !opts.skipAssignments {
+		assignmentsPath := filepath.Join(opts.inputDir, "assignments.csv")
+		parsedAssignments, err := parseAssignmentsCSVIfExists(assignmentsPath)
+		if err != nil {
+			return withCode(exitValidation, fmt.Errorf("assignments.csv: %w", err))
+		}
+		assignmentsRaw = parsedAssignments
 	}
 
 	data, err := normalizeAndValidate(runID, opts.tenantID, startedAt, nodes, positionsRaw, assignmentsRaw, opts.strict)
@@ -214,8 +220,10 @@ func runImport(ctx context.Context, opts importOptions) error {
 	if err := resolveManagers(ctx, pool, &data); err != nil {
 		return err
 	}
-	if err := resolvePersons(ctx, pool, &data); err != nil {
-		return err
+	if !opts.skipAssignments {
+		if err := resolvePersons(ctx, pool, &data); err != nil {
+			return err
+		}
 	}
 
 	if !opts.apply {
@@ -1190,8 +1198,10 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 	if _, err := os.Stat(filepath.Join(opts.inputDir, "positions.csv")); err == nil {
 		manifest.Input.Files["positions"] = "positions.csv"
 	}
-	if _, err := os.Stat(filepath.Join(opts.inputDir, "assignments.csv")); err == nil {
-		manifest.Input.Files["assignments"] = "assignments.csv"
+	if !opts.skipAssignments {
+		if _, err := os.Stat(filepath.Join(opts.inputDir, "assignments.csv")); err == nil {
+			manifest.Input.Files["assignments"] = "assignments.csv"
+		}
 	}
 
 	rootCode := findRootCode(data.nodeSlices)
@@ -1270,14 +1280,24 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 	manifest.Inserted.OrgEdges = edgeIDs
 
 	for _, p := range data.positions {
+		sliceID := uuid.New()
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_positions (
-				tenant_id, id, org_node_id, code, title, status, is_auto_created, effective_date, end_date
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+					tenant_id, id, org_node_id, code, title, status, is_auto_created, effective_date, end_date
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
 			data.tenantID, p.id, p.orgNodeID, p.code, p.title, p.status, p.isAutoCreated, p.effectiveDate, p.endDate,
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_positions(%s): %w", p.line, p.code, err))
+		}
+		if _, err := tx.Exec(
+			txCtx,
+			`INSERT INTO org_position_slices (
+					tenant_id, id, position_id, org_node_id, title, lifecycle_status, capacity_fte, effective_date, end_date
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			data.tenantID, sliceID, p.id, p.orgNodeID, p.title, p.status, 1.0, p.effectiveDate, p.endDate,
+		); err != nil {
+			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slices(%s): %w", p.line, p.code, err))
 		}
 		manifest.Inserted.OrgPositions = append(manifest.Inserted.OrgPositions, p.id)
 	}

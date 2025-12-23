@@ -11,7 +11,14 @@
       "Pernr": "工号（Pernr）",
       "DisplayName": "姓名",
       "Status": "状态",
+      "Department": "部门",
+      "Position": "职位",
       "PersonUUID": "人员 UUID"
+    },
+    "Status": {
+      "Active": "在职",
+      "Inactive": "停用",
+      "Terminated": "离职"
     },
     "UI": {
       "Persons": {
@@ -23,6 +30,9 @@
         "Title": {
           "New": "新建人员",
           "Detail": "人员"
+        },
+        "New": {
+          "NextStepHint": "创建人员后将引导补齐部门与职位。"
         },
         "Actions": {
           "New": "新建人员",

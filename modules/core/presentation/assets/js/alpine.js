@@ -204,7 +204,7 @@ let combobox = (searchable = false) => ({
   searchQuery: '',
   searchable,
   setValue(value) {
-    if (value == null || !(this.open || this.openedWithKeyboard)) return;
+    if (value == null) return;
     let index, option
     for (let i = 0, len = this.allOptions.length; i < len; i++) {
       let o = this.allOptions[i];
@@ -226,19 +226,13 @@ let combobox = (searchable = false) => ({
       }
     } else {
       for (let i = 0, len = this.allOptions.length; i < len; i++) {
-        let option = this.allOptions[i];
-        if (option.value === value) this.allOptions[i].toggleAttribute("selected");
-        else this.allOptions[i].removeAttribute("selected");
+        const opt = this.allOptions[i];
+        opt.selected = opt.value === value;
       }
-      if (
-        this.selectedValues.size > 0 &&
-        !this.selectedValues.has(value)
-      ) {
-        this.selectedValues.clear();
-      }
-      if (this.selectedValues.has(value)) {
-        this.selectedValues.delete(value);
-      } else this.selectedValues.set(value, {
+      if (this.$refs.select) this.$refs.select.value = value;
+
+      this.selectedValues.clear();
+      this.selectedValues.set(value, {
         value,
         label: option.textContent,
       });
@@ -334,7 +328,9 @@ let combobox = (searchable = false) => ({
         }
       }
       this.observer = new MutationObserver(() => {
-        this.options = this.$el.querySelectorAll("option");
+        const nextOptions = this.$el.querySelectorAll("option");
+        this.options = nextOptions;
+        this.allOptions = nextOptions;
         if (this.$refs.input) {
           this.setActiveIndex(this.$refs.input.value);
           this.setActiveValue(this.$refs.input.value);

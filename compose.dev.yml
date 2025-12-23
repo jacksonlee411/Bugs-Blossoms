@@ -2,6 +2,7 @@ services:
   db:
     image: postgres:17
     restart: always
+    shm_size: "1g"
     command: [ "postgres", "-c", "log_statement=all", "-c", "log_destination=stderr", "-c", "logging_collector=off", "-c", "max_connections=500" ]
     environment:
       POSTGRES_USER: postgres

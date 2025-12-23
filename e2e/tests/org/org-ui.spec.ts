@@ -26,7 +26,7 @@ async function createPerson(args: { page: Page; pernr: string; displayName: stri
 	await args.page.locator('input[name="DisplayName"]').fill(args.displayName);
 
 	await Promise.all([
-		args.page.waitForURL(/\/person\/persons\/[0-9a-f-]+$/),
+		args.page.waitForURL(/\/person\/persons\/[0-9a-f-]+(?:\?.*)?$/),
 		args.page.getByRole('button', { name: 'Create' }).click(),
 	]);
 }
@@ -296,11 +296,11 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		const updateAssignmentResponse = page.waitForResponse((resp) => {
 			return resp.request().method() === 'PATCH' && resp.url().includes('/org/assignments/');
 		});
-		await page.getByRole('button', { name: 'Save' }).click();
-		expect((await updateAssignmentResponse).status()).toBe(200);
-		await expect(page.locator('#org-assignments-timeline tbody tr')).toHaveCount(2);
-		await expect(page.locator('#org-assignments-timeline')).toContainText(companyIDValue);
-	});
+			await page.getByRole('button', { name: 'Save' }).click();
+			expect((await updateAssignmentResponse).status()).toBe(200);
+			await expect(page.locator('#org-assignments-timeline tbody tr')).toHaveCount(2);
+			await expect(page.locator('#org-assignments-timeline')).toContainText('Company (ROOT)');
+		});
 
 	test('无 Org 权限账号访问 /org/nodes 返回 Unauthorized', async ({ page }) => {
 		await login(page, READONLY.email, READONLY.password);

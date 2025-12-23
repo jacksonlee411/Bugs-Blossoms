@@ -12,7 +12,8 @@
       "Shared": {
         "AsOf": "As of",
         "EffectiveDate": "Effective date",
-        "NotFound": "Not found"
+        "NotFound": "Not found",
+        "Present": "Present"
       },
       "Nodes": {
         "MetaTitle": "Org structure",
@@ -25,6 +26,15 @@
         "EditTitle": "Edit assignment",
         "TimelineTitle": "Timeline",
         "Empty": "Enter a pernr and refresh to see the timeline.",
+        "EmptyForPerson": "No assignment timeline yet.",
+        "Unassigned": "Unassigned",
+        "Callout": {
+          "Unassigned": {
+            "Title": "Department and position not set",
+            "Body": "This person has no active assignment as of today. Create an assignment to continue.",
+            "Action": "Create assignment"
+          }
+        },
         "Actions": {
           "Create": "Create",
           "Edit": "Edit",
@@ -32,13 +42,16 @@
         },
         "Fields": {
           "Pernr": "Pernr",
-          "OrgNode": "Org node",
-          "PositionID": "Position ID (optional)"
+          "OrgNode": "Department",
+          "PositionID": "Position"
+        },
+        "Position": {
+          "Placeholder": "Select a department first, then search positions"
         },
         "Table": {
           "Pernr": "Pernr",
           "Effective": "Effective",
-          "OrgNodeID": "Org node",
+          "OrgNodeID": "Department",
           "Position": "Position"
         }
       },

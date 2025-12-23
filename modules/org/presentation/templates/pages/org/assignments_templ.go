@@ -277,6 +277,7 @@ func AssignmentsPage(props AssignmentsPageProps) templ.Component {
 			templ_7745c5c3_Err = orgui.AssignmentsTimeline(orgui.AssignmentsTimelineProps{
 				EffectiveDate: props.EffectiveDate,
 				Timeline:      props.Timeline,
+				SwapSummary:   false,
 			}).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err

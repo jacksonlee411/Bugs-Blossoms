@@ -257,12 +257,19 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 			return
 		}
 		timeline = mappers.AssignmentsToTimeline(subject, rows)
+		for i := range timeline.Rows {
+			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, effectiveDate)
+			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
+		}
 	}
 
 	if htmx.IsHxRequest(r) && htmx.Target(r) == "org-assignments-timeline" {
+		swapSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
 		templ.Handler(orgui.AssignmentsTimeline(orgui.AssignmentsTimelineProps{
 			EffectiveDate: effectiveDateStr,
+			Pernr:         pernr,
 			Timeline:      timeline,
+			SwapSummary:   swapSummary,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
@@ -606,11 +613,36 @@ func (c *OrgUIController) PositionSearchOptions(w http.ResponseWriter, r *http.R
 	if raw != "" {
 		qStr = &raw
 	}
+
+	var orgNodeID *uuid.UUID
+	if rawNode := strings.TrimSpace(param(r, "org_node_id")); rawNode != "" {
+		if parsed, err := uuid.Parse(rawNode); err == nil && parsed != uuid.Nil {
+			orgNodeID = &parsed
+		}
+	}
+	orgNodeRequired := strings.TrimSpace(param(r, "org_node_required")) == "1"
+	if orgNodeRequired && orgNodeID == nil {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	var lifecycle *string
+	if v := strings.TrimSpace(param(r, "lifecycle_status")); v != "" {
+		lifecycle = &v
+	}
+	var staffing *string
+	if v := strings.TrimSpace(param(r, "staffing_state")); v != "" {
+		staffing = &v
+	}
+
 	rows, _, err := c.org.GetPositions(r.Context(), tenantID, services.GetPositionsInput{
-		AsOf:   &effectiveDate,
-		Q:      qStr,
-		Limit:  50,
-		Offset: 0,
+		AsOf:            &effectiveDate,
+		OrgNodeID:       orgNodeID,
+		Q:               qStr,
+		LifecycleStatus: lifecycle,
+		StaffingState:   staffing,
+		Limit:           50,
+		Offset:          0,
 	})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -1173,6 +1205,24 @@ func attachRequestID(msg, requestID string) string {
 	return fmt.Sprintf("%s (request_id: %s)", msg, requestID)
 }
 
+func replaceStepInCurrentURL(w http.ResponseWriter, r *http.Request) {
+	current := strings.TrimSpace(htmx.CurrentUrl(r))
+	if current == "" {
+		return
+	}
+	u, err := url.Parse(current)
+	if err != nil {
+		return
+	}
+	q := u.Query()
+	if q.Get("step") == "" {
+		return
+	}
+	q.Del("step")
+	u.RawQuery = q.Encode()
+	htmx.ReplaceUrl(w, u.RequestURI())
+}
+
 func param(r *http.Request, key string) string {
 	v := strings.TrimSpace(r.URL.Query().Get(key))
 	if v != "" {
@@ -1205,6 +1255,7 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+	includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
 
 	pernr := strings.TrimSpace(r.FormValue("pernr"))
 	orgNodeRaw := strings.TrimSpace(r.FormValue("org_node_id"))
@@ -1243,14 +1294,20 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 			orgNodeIDStr = orgNodeID.String()
 			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
 		}
+		positionLabel := ""
+		if positionID != nil {
+			positionLabel = c.positionLabelFor(r, tenantID, *positionID, effectiveDate, "")
+		}
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
-			Mode:          orgui.AssignmentFormCreate,
-			EffectiveDate: effectiveDateStr,
-			Pernr:         pernr,
-			OrgNodeID:     orgNodeIDStr,
-			OrgNodeLabel:  orgNodeLabel,
-			PositionID:    positionRaw,
-			Errors:        fieldErrs,
+			Mode:           orgui.AssignmentFormCreate,
+			EffectiveDate:  effectiveDateStr,
+			Pernr:          pernr,
+			OrgNodeID:      orgNodeIDStr,
+			OrgNodeLabel:   orgNodeLabel,
+			PositionID:     positionRaw,
+			PositionLabel:  positionLabel,
+			IncludeSummary: includeSummary,
+			Errors:         fieldErrs,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
@@ -1272,20 +1329,30 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 			orgNodeIDStr = orgNodeID.String()
 			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
 		}
+		positionLabel := ""
+		if positionID != nil {
+			positionLabel = c.positionLabelFor(r, tenantID, *positionID, effectiveDate, "")
+		}
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
-			Mode:          orgui.AssignmentFormCreate,
-			EffectiveDate: effectiveDateStr,
-			Pernr:         pernr,
-			OrgNodeID:     orgNodeIDStr,
-			OrgNodeLabel:  orgNodeLabel,
-			PositionID:    positionRaw,
-			Errors:        map[string]string{},
-			FormError:     formErr,
+			Mode:           orgui.AssignmentFormCreate,
+			EffectiveDate:  effectiveDateStr,
+			Pernr:          pernr,
+			OrgNodeID:      orgNodeIDStr,
+			OrgNodeLabel:   orgNodeLabel,
+			PositionID:     positionRaw,
+			PositionLabel:  positionLabel,
+			IncludeSummary: includeSummary,
+			Errors:         map[string]string{},
+			FormError:      formErr,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
 
-	htmx.PushUrl(w, fmt.Sprintf("/org/assignments?effective_date=%s&pernr=%s", effectiveDateStr, pernr))
+	if includeSummary {
+		replaceStepInCurrentURL(w, r)
+	} else {
+		htmx.PushUrl(w, fmt.Sprintf("/org/assignments?effective_date=%s&pernr=%s", effectiveDateStr, pernr))
+	}
 	subject := fmt.Sprintf("person:%s", pernr)
 	_, rows, _, err := c.org.GetAssignments(r.Context(), tenantID, subject, nil)
 	if err != nil {
@@ -1293,6 +1360,12 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	timeline := mappers.AssignmentsToTimeline(subject, rows)
+	if timeline != nil {
+		for i := range timeline.Rows {
+			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, effectiveDate)
+			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
+		}
+	}
 	c.writeAssignmentsFormWithOOBTimeline(w, r, effectiveDateStr, pernr, timeline)
 }
 
@@ -1319,11 +1392,14 @@ func (c *OrgUIController) AssignmentForm(w http.ResponseWriter, r *http.Request)
 	if pernr == "" {
 		pernr = strings.TrimSpace(r.FormValue("pernr"))
 	}
+	includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
 	templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
-		Mode:          orgui.AssignmentFormCreate,
-		EffectiveDate: effectiveDateStr,
-		Pernr:         pernr,
-		Errors:        map[string]string{},
+		Mode:           orgui.AssignmentFormCreate,
+		EffectiveDate:  effectiveDateStr,
+		Pernr:          pernr,
+		PositionLabel:  "",
+		IncludeSummary: includeSummary,
+		Errors:         map[string]string{},
 	}), templ.WithStreaming()).ServeHTTP(w, r)
 }
 
@@ -1351,6 +1427,7 @@ func (c *OrgUIController) EditAssignmentForm(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+	includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
 
 	pernr := strings.TrimSpace(r.URL.Query().Get("pernr"))
 	if pernr == "" {
@@ -1388,16 +1465,19 @@ func (c *OrgUIController) EditAssignmentForm(w http.ResponseWriter, r *http.Requ
 			orgNodeLabel = strings.TrimSpace(details.Name)
 		}
 	}
+	positionLabel := c.positionLabelFor(r, tenantID, selected.PositionID, effectiveDate, strings.TrimSpace(selected.PositionCode))
 
 	templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
-		Mode:          orgui.AssignmentFormEdit,
-		EffectiveDate: effectiveDateStr,
-		Pernr:         strings.TrimSpace(selected.Pernr),
-		AssignmentID:  selected.ID.String(),
-		OrgNodeID:     selected.OrgNodeID.String(),
-		OrgNodeLabel:  orgNodeLabel,
-		PositionID:    "",
-		Errors:        map[string]string{},
+		Mode:           orgui.AssignmentFormEdit,
+		EffectiveDate:  effectiveDateStr,
+		Pernr:          strings.TrimSpace(selected.Pernr),
+		AssignmentID:   selected.ID.String(),
+		OrgNodeID:      selected.OrgNodeID.String(),
+		OrgNodeLabel:   orgNodeLabel,
+		PositionID:     selected.PositionID.String(),
+		PositionLabel:  positionLabel,
+		IncludeSummary: includeSummary,
+		Errors:         map[string]string{},
 	}), templ.WithStreaming()).ServeHTTP(w, r)
 }
 
@@ -1429,6 +1509,7 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+	includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
 
 	pernr := strings.TrimSpace(r.FormValue("pernr"))
 	orgNodeRaw := strings.TrimSpace(r.FormValue("org_node_id"))
@@ -1466,15 +1547,21 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 			orgNodeIDStr = orgNodeID.String()
 			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
 		}
+		positionLabel := ""
+		if positionID != nil {
+			positionLabel = c.positionLabelFor(r, tenantID, *positionID, effectiveDate, "")
+		}
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
-			Mode:          orgui.AssignmentFormEdit,
-			EffectiveDate: effectiveDateStr,
-			Pernr:         pernr,
-			AssignmentID:  assignmentID.String(),
-			OrgNodeID:     orgNodeIDStr,
-			OrgNodeLabel:  orgNodeLabel,
-			PositionID:    positionRaw,
-			Errors:        fieldErrs,
+			Mode:           orgui.AssignmentFormEdit,
+			EffectiveDate:  effectiveDateStr,
+			Pernr:          pernr,
+			AssignmentID:   assignmentID.String(),
+			OrgNodeID:      orgNodeIDStr,
+			OrgNodeLabel:   orgNodeLabel,
+			PositionID:     positionRaw,
+			PositionLabel:  positionLabel,
+			IncludeSummary: includeSummary,
+			Errors:         fieldErrs,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
@@ -1495,21 +1582,31 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 			orgNodeIDStr = orgNodeID.String()
 			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
 		}
+		positionLabel := ""
+		if positionID != nil {
+			positionLabel = c.positionLabelFor(r, tenantID, *positionID, effectiveDate, "")
+		}
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
-			Mode:          orgui.AssignmentFormEdit,
-			EffectiveDate: effectiveDateStr,
-			Pernr:         pernr,
-			AssignmentID:  assignmentID.String(),
-			OrgNodeID:     orgNodeIDStr,
-			OrgNodeLabel:  orgNodeLabel,
-			PositionID:    positionRaw,
-			Errors:        map[string]string{},
-			FormError:     formErr,
+			Mode:           orgui.AssignmentFormEdit,
+			EffectiveDate:  effectiveDateStr,
+			Pernr:          pernr,
+			AssignmentID:   assignmentID.String(),
+			OrgNodeID:      orgNodeIDStr,
+			OrgNodeLabel:   orgNodeLabel,
+			PositionID:     positionRaw,
+			PositionLabel:  positionLabel,
+			IncludeSummary: includeSummary,
+			Errors:         map[string]string{},
+			FormError:      formErr,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
 
-	htmx.PushUrl(w, fmt.Sprintf("/org/assignments?effective_date=%s&pernr=%s", effectiveDateStr, pernr))
+	if includeSummary {
+		replaceStepInCurrentURL(w, r)
+	} else {
+		htmx.PushUrl(w, fmt.Sprintf("/org/assignments?effective_date=%s&pernr=%s", effectiveDateStr, pernr))
+	}
 	subject := fmt.Sprintf("person:%s", pernr)
 	_, rows, _, err := c.org.GetAssignments(r.Context(), tenantID, subject, nil)
 	if err != nil {
@@ -1517,23 +1614,38 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	timeline := mappers.AssignmentsToTimeline(subject, rows)
+	if timeline != nil {
+		for i := range timeline.Rows {
+			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, effectiveDate)
+			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
+		}
+	}
 	c.writeAssignmentsFormWithOOBTimeline(w, r, effectiveDateStr, pernr, timeline)
 }
 
 func (c *OrgUIController) writeAssignmentsFormWithOOBTimeline(w http.ResponseWriter, r *http.Request, effectiveDateStr string, pernr string, timeline *viewmodels.OrgAssignmentsTimeline) {
 	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
-		if err := orgui.AssignmentForm(orgui.AssignmentFormProps{
-			Mode:          orgui.AssignmentFormCreate,
-			EffectiveDate: effectiveDateStr,
-			Pernr:         pernr,
-			Errors:        map[string]string{},
-		}).Render(ctx, ww); err != nil {
-			return err
+		includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
+		if includeSummary {
+			if _, err := io.WriteString(ww, `<div id="org-assignment-form" class="mt-3"></div>`); err != nil {
+				return err
+			}
+		} else {
+			if err := orgui.AssignmentForm(orgui.AssignmentFormProps{
+				Mode:           orgui.AssignmentFormCreate,
+				EffectiveDate:  effectiveDateStr,
+				Pernr:          pernr,
+				PositionLabel:  "",
+				IncludeSummary: includeSummary,
+				Errors:         map[string]string{},
+			}).Render(ctx, ww); err != nil {
+				return err
+			}
 		}
 		if _, err := io.WriteString(ww, `<div id="org-assignments-timeline" class="p-4" hx-swap-oob="true">`); err != nil {
 			return err
 		}
-		if err := orgui.AssignmentsTimeline(orgui.AssignmentsTimelineProps{EffectiveDate: effectiveDateStr, Timeline: timeline}).Render(ctx, ww); err != nil {
+		if err := orgui.AssignmentsTimeline(orgui.AssignmentsTimelineProps{EffectiveDate: effectiveDateStr, Pernr: pernr, Timeline: timeline, SwapSummary: includeSummary}).Render(ctx, ww); err != nil {
 			return err
 		}
 		_, err := io.WriteString(ww, `</div>`)
@@ -1975,6 +2087,32 @@ func (c *OrgUIController) orgNodeLabelFor(r *http.Request, tenantID uuid.UUID, n
 	}
 	if strings.TrimSpace(details.Name) != "" {
 		return strings.TrimSpace(details.Name)
+	}
+	return label
+}
+
+func (c *OrgUIController) positionLabelFor(r *http.Request, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time, fallbackCode string) string {
+	fallbackCode = strings.TrimSpace(fallbackCode)
+	if positionID == uuid.Nil {
+		return fallbackCode
+	}
+
+	row, _, err := c.org.GetPosition(r.Context(), tenantID, positionID, &asOf)
+	if err != nil {
+		if fallbackCode != "" {
+			return fallbackCode
+		}
+		return positionID.String()
+	}
+	label := strings.TrimSpace(row.Code)
+	if label == "" {
+		label = fallbackCode
+	}
+	if row.Title != nil && strings.TrimSpace(*row.Title) != "" {
+		if label != "" {
+			return fmt.Sprintf("%s — %s", label, strings.TrimSpace(*row.Title))
+		}
+		return strings.TrimSpace(*row.Title)
 	}
 	return label
 }
