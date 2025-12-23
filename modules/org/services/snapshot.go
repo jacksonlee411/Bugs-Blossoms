@@ -158,6 +158,17 @@ func (s *OrgService) GetSnapshot(ctx context.Context, tenantID uuid.UUID, asOf t
 			nextCursor = &c
 			break
 		}
+
+		// If we filled the page exactly at a type boundary, emit a cursor that
+		// advances to the next entity type (starting from the beginning).
+		if len(items) == limit && i+1 < len(order) {
+			nextType := includeToEntityType(order[i+1])
+			if nextType != "" {
+				c := fmt.Sprintf("%s:%s", nextType, uuid.Nil.String())
+				nextCursor = &c
+			}
+			break
+		}
 	}
 
 	return &SnapshotResult{
@@ -181,6 +192,21 @@ func mapEntityTypeToInclude(entityType string) string {
 		return "positions"
 	case "org_assignment":
 		return "assignments"
+	default:
+		return ""
+	}
+}
+
+func includeToEntityType(include string) string {
+	switch include {
+	case "nodes":
+		return "org_node"
+	case "edges":
+		return "org_edge"
+	case "positions":
+		return "org_position"
+	case "assignments":
+		return "org_assignment"
 	default:
 		return ""
 	}

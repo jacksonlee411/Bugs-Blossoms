@@ -43,14 +43,10 @@ LEFT JOIN org_edges e
   AND e.effective_date <= $2
   AND e.end_date > $2
 WHERE n.tenant_id = $1
+  AND ($3::uuid IS NULL OR n.id > $3)
 `
-	args := []any{pgUUID(tenantID), asOf}
-	if afterID != nil && *afterID != uuid.Nil {
-		q += " AND n.id > $3"
-		args = append(args, pgUUID(*afterID))
-	}
+	args := []any{pgUUID(tenantID), asOf, pgNullableUUID(afterID), limit}
 	q += " ORDER BY n.id ASC LIMIT $4"
-	args = append(args, limit)
 
 	rows, err := tx.Query(ctx, q, args...)
 	if err != nil {
@@ -96,14 +92,10 @@ WHERE e.tenant_id = $1
   AND e.hierarchy_type = 'OrgUnit'
   AND e.effective_date <= $2
   AND e.end_date > $2
+  AND ($3::uuid IS NULL OR e.id > $3)
 `
-	args := []any{pgUUID(tenantID), asOf}
-	if afterID != nil && *afterID != uuid.Nil {
-		q += " AND e.id > $3"
-		args = append(args, pgUUID(*afterID))
-	}
+	args := []any{pgUUID(tenantID), asOf, pgNullableUUID(afterID), limit}
 	q += " ORDER BY e.id ASC LIMIT $4"
-	args = append(args, limit)
 
 	rows, err := tx.Query(ctx, q, args...)
 	if err != nil {
@@ -153,14 +145,10 @@ func (r *OrgRepository) ListSnapshotPositions(ctx context.Context, tenantID uuid
 	  AND s.effective_date <= $2
 	  AND s.end_date > $2
 	WHERE p.tenant_id = $1
+	  AND ($3::uuid IS NULL OR p.id > $3)
 	`
-	args := []any{pgUUID(tenantID), asOf}
-	if afterID != nil && *afterID != uuid.Nil {
-		q += " AND p.id > $3"
-		args = append(args, pgUUID(*afterID))
-	}
+	args := []any{pgUUID(tenantID), asOf, pgNullableUUID(afterID), limit}
 	q += " ORDER BY p.id ASC LIMIT $4"
-	args = append(args, limit)
 
 	rows, err := tx.Query(ctx, q, args...)
 	if err != nil {
@@ -209,14 +197,10 @@ func (r *OrgRepository) ListSnapshotAssignments(ctx context.Context, tenantID uu
 	WHERE a.tenant_id = $1
   AND a.effective_date <= $2
   AND a.end_date > $2
+  AND ($3::uuid IS NULL OR a.id > $3)
 `
-	args := []any{pgUUID(tenantID), asOf}
-	if afterID != nil && *afterID != uuid.Nil {
-		q += " AND a.id > $3"
-		args = append(args, pgUUID(*afterID))
-	}
+	args := []any{pgUUID(tenantID), asOf, pgNullableUUID(afterID), limit}
 	q += " ORDER BY a.id ASC LIMIT $4"
-	args = append(args, limit)
 
 	rows, err := tx.Query(ctx, q, args...)
 	if err != nil {
