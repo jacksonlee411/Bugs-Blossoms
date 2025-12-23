@@ -29,6 +29,10 @@
   - [ ] Go 代码（`go fmt ./... && go vet ./... && make check lint && make test`）
   - [ ] 多语言 JSON（`make check tr`）
   - [ ] 文档新增/整理（`make check doc`）
+- 建议新增门禁（本计划内落地）：
+  - [ ] **翻译使用校验门禁（Fail Fast）**：若代码/模板引用了任意翻译 key，但在运行期允许语言集合（`en/zh`）里缺失，则门禁失败。
+    - 背景：`PageContext.T()` 使用 `MustLocalize`，缺 key 会直接 panic；门禁应在 CI 阶段提前拦截。
+    - 形态：新增 CLI 命令（例如 `command check_tr_usage`）并纳入 `make check tr` / CI。
 - SSOT：
   - 触发器矩阵：`AGENTS.md`
   - 命令入口：`Makefile`
@@ -110,12 +114,16 @@ return matcher.Match(tags...).Tag
 2. [ ] 代码层：调整 `pkg/middleware/i18n.go`，确保 user language 也走 whitelist matcher
 3. [ ] 资源层：删除所有 `modules/**/presentation/locales/ru.json` 与 `modules/**/presentation/locales/uz.json`
 4. [ ] UI 层：语言选择组件与账号设置仅展示 `en/zh`；保存时拒绝/回退 `ru/uz`
-5. [ ] 门禁与回归：`make check tr` + `make check doc` + `make check lint` + `make test`
+5. [ ] 门禁与回归：
+   - [ ] `make check tr`（翻译键一致性）
+   - [ ] `check_tr_usage`（本计划新增：引用 key 不可缺失）
+   - [ ] `make check doc` + `make check lint` + `make test`
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 
 ### 9.1 门禁
 - [ ] `make check tr` 通过（仅对 `en/zh` 做键一致性校验）
+- [ ] `check_tr_usage` 通过（仅对 `en/zh` 校验：被引用的 key 必须存在）
 - [ ] `make check doc` 通过
 - [ ] `make check lint` 通过
 - [ ] `make test` 通过
@@ -126,6 +134,11 @@ return matcher.Match(tags...).Tag
 - [ ] `Accept-Language=zh` 时页面可正常渲染（最终 locale= `zh`）
 - [ ] UI 语言选择不再出现 `ru/uz`
 - [ ] 运行期无 `message "<key>" not found` 的 panic（可通过访问关键页面 + 观察日志验证）
+
+### 9.3 check_tr_usage 约束（建议实现细节）
+- **输入**：扫描仓库中 `.templ` 与 `.go` 的“翻译调用点”，提取 string literal 形式的 message id（例如 `pageCtx.T("View")`、`intl.MustT(ctx,"Login.Errors.PasswordInvalid")`）。
+- **校验**：对运行期允许语言集合（目标为 `en/zh`）逐个 `Localize`，若任意语言缺失则失败，并输出：`missing_key + locale + source_file:line`。
+- **限制**：对动态 key（例如 `fmt.Sprintf("X.%s", v)`）可先跳过或要求迁移为常量 key；实现时需在文档与输出中明确策略，避免误报/漏报。
 
 ## 10. 运维与回滚 (Ops & Rollback)
 
