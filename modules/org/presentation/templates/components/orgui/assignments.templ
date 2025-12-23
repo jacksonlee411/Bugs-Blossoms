@@ -232,7 +232,7 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 			</thead>
 			<tbody>
 				for _, row := range props.Timeline.Rows {
-					{{ canEdit := !asOf.Before(row.EffectiveDate) && asOf.Before(row.EndDate) }}
+					{{ canEdit := asOf.After(row.EffectiveDate) && asOf.Before(row.EndDate) }}
 					<tr class="border-b border-surface-400/60">
 						<td class="py-2 pr-2 text-200">{ row.Pernr }</td>
 						<td class="py-2 pr-2 text-200">
