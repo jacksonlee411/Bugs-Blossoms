@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/a-h/templ"
 	"github.com/google/uuid"
@@ -170,7 +171,7 @@ func (c *PersonUIController) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/person/persons/%s", created.PersonUUID().String()), http.StatusFound)
+	http.Redirect(w, r, fmt.Sprintf("/person/persons/%s?step=assignment", created.PersonUUID().String()), http.StatusFound)
 }
 
 func (c *PersonUIController) Detail(w http.ResponseWriter, r *http.Request) {
@@ -192,10 +193,12 @@ func (c *PersonUIController) Detail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	props := &viewmodels.PersonDetailPageProps{
-		Person:     mappers.PersonToListItem(entity),
-		BackURL:    "/person/persons",
-		CanRequest: composables.CanUser(r.Context(), corepermissions.AuthzRequestsWrite) == nil,
-		CanDebug:   composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil,
+		Person:        mappers.PersonToListItem(entity),
+		BackURL:       "/person/persons",
+		CanRequest:    composables.CanUser(r.Context(), corepermissions.AuthzRequestsWrite) == nil,
+		CanDebug:      composables.CanUser(r.Context(), corepermissions.AuthzDebug) == nil,
+		EffectiveDate: time.Now().UTC().Format("2006-01-02"),
+		Step:          strings.TrimSpace(r.URL.Query().Get("step")),
 	}
 
 	templ.Handler(persontemplates.Detail(props), templ.WithStreaming()).ServeHTTP(w, r)

@@ -8,14 +8,22 @@ import { promisify } from 'util';
 
 const exec = promisify(execCallback);
 
-// Smart environment detection
-function loadEnvironmentConfig() {
-	const envPath = path.join(__dirname, '.env.e2e');
+	// Smart environment detection
+	function loadEnvironmentConfig() {
+		const envPath = path.join(__dirname, '.env.e2e');
+		const repoEnvPath = path.join(__dirname, '..', '.env');
+		const repoEnvLocalPath = path.join(__dirname, '..', '.env.local');
 
-	// Load .env.e2e if it exists (local development)
-	if (fs.existsSync(envPath)) {
-		dotenv.config({ path: envPath });
-	}
+		// Load repo env files first (to pick up per-worktree port overrides), then override with e2e env.
+		if (fs.existsSync(repoEnvPath)) {
+			dotenv.config({ path: repoEnvPath, override: false });
+		}
+		if (fs.existsSync(repoEnvLocalPath)) {
+			dotenv.config({ path: repoEnvLocalPath, override: false });
+		}
+		if (fs.existsSync(envPath)) {
+			dotenv.config({ path: envPath, override: true });
+		}
 
 	// Extract configuration with smart defaults based on environment
 	const isCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
@@ -27,7 +35,7 @@ function loadEnvironmentConfig() {
 		DB_HOST: process.env.DB_HOST || 'localhost',
 		DB_PORT: parseInt(process.env.DB_PORT || String(defaultPort)),
 		DB_NAME: process.env.DB_NAME || 'iota_erp_e2e',
-		BASE_URL: process.env.BASE_URL || 'http://default.localhost:3201',
+		BASE_URL: process.env.BASE_URL || 'http://localhost:3201',
 	};
 }
 

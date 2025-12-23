@@ -12,6 +12,8 @@ type OrgAssignmentRow struct {
 	OrgNodeID     uuid.UUID
 	Pernr         string
 	PositionCode  string
+	OrgNodeLabel  string
+	PositionLabel string
 	EffectiveDate time.Time
 	EndDate       time.Time
 }

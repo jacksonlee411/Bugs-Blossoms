@@ -2,6 +2,7 @@ package persons
 
 import (
 	"fmt"
+	"strings"
 
 	icons "github.com/iota-uz/icons/phosphor"
 
@@ -88,9 +89,18 @@ templ PersonsTable(props *viewmodels.PersonsListPageProps) {
 					@base.TableCell(base.TableCellProps{}) {
 						{ item.DisplayName }
 					}
-					@base.TableCell(base.TableCellProps{}) {
-						{ item.Status }
-					}
+						@base.TableCell(base.TableCellProps{}) {
+							{{ status := strings.ToLower(strings.TrimSpace(item.Status)) }}
+							{{ label := strings.TrimSpace(item.Status) }}
+							{{if status == "active" {
+								label = pageCtx.T("Person.Status.Active")
+							} else if status == "inactive" {
+								label = pageCtx.T("Person.Status.Inactive")
+							} else if status == "terminated" {
+								label = pageCtx.T("Person.Status.Terminated")
+							}}}
+							{ label }
+						}
 					@base.TableCell(base.TableCellProps{}) {
 						@button.Secondary(button.Props{
 							Fixed: true,

@@ -28,6 +28,7 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 			OrgNodeID:     r.OrgNodeID,
 			Pernr:         p,
 			PositionCode:  code,
+			PositionLabel: strings.TrimSpace(code),
 			EffectiveDate: r.EffectiveDate,
 			EndDate:       r.EndDate,
 		})

@@ -111,12 +111,13 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 						<div class="border-b border-surface-400 p-3">
 							<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Assignments.TimelineTitle") }</div>
 						</div>
-						<div id="org-assignments-timeline" class="p-4">
-							@orgui.AssignmentsTimeline(orgui.AssignmentsTimelineProps{
-								EffectiveDate: props.EffectiveDate,
-								Timeline:      props.Timeline,
-							})
-						</div>
+							<div id="org-assignments-timeline" class="p-4">
+								@orgui.AssignmentsTimeline(orgui.AssignmentsTimelineProps{
+									EffectiveDate: props.EffectiveDate,
+									Timeline:      props.Timeline,
+									SwapSummary:   false,
+								})
+							</div>
 					</div>
 				</div>
 			</div>

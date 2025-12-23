@@ -217,13 +217,13 @@ The `.env.e2e` file contains environment-specific configuration:
 ```bash
 # Database Configuration (E2E-specific database)
 DB_HOST=localhost
-DB_PORT=5438                    # Local: 5438, CI: 5432
+DB_PORT=5438                    # Local default: 5438 (may be overridden by repo .env.local)
 DB_NAME=iota_erp_e2e           # Separate from dev database
 DB_USER=postgres
 DB_PASSWORD=postgres
 
 # Server Configuration
-BASE_URL=http://default.localhost:3201  # E2E server URL (tenant host required)
+BASE_URL=http://localhost:3201  # E2E server URL
 PORT=3201
 SERVER_HOST=localhost
 
@@ -235,7 +235,7 @@ LOG_LEVEL=debug
 ### Smart Environment Detection
 
 The Playwright configuration automatically detects the environment:
-- **Local Development**: Uses port 5438 for database
+- **Local Development**: Uses port 5438 by default (or repo `.env.local` if present)
 - **CI Environment**: Uses port 5432 for database
 
 This is configured in `playwright.config.ts`:

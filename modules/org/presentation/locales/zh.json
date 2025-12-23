@@ -9,11 +9,12 @@
 				"Assignments": "人员分配",
 				"Positions": "职位"
 			},
-			"Shared": {
-				"AsOf": "生效视图",
-				"EffectiveDate": "生效日期",
-				"NotFound": "未找到"
-			},
+				"Shared": {
+					"AsOf": "生效视图",
+					"EffectiveDate": "生效日期",
+					"NotFound": "未找到",
+					"Present": "至今"
+				},
 			"Nodes": {
 				"MetaTitle": "组织结构",
 				"Title": "组织结构"
@@ -25,22 +26,34 @@
 					"EditTitle": "编辑分配",
 					"TimelineTitle": "时间线",
 					"Empty": "请输入 pernr 后刷新查看时间线。",
+					"EmptyForPerson": "暂无任职记录。",
+					"Unassigned": "未分配",
+					"Callout": {
+						"Unassigned": {
+							"Title": "部门与职位尚未设置",
+							"Body": "该人员在“今天”的生效视图下没有有效任职记录，请先创建任职。",
+							"Action": "创建任职"
+						}
+					},
 					"Actions": {
 						"Create": "创建",
 						"Edit": "编辑",
 						"Refresh": "刷新时间线"
 					},
 					"Fields": {
-						"Pernr": "Pernr",
-						"OrgNode": "组织节点",
-					"PositionID": "职位 ID（可选）"
+						"Pernr": "工号（Pernr）",
+						"OrgNode": "部门",
+					"PositionID": "职位"
 				},
-				"Table": {
-					"Pernr": "Pernr",
-					"Effective": "生效区间",
-					"OrgNodeID": "组织节点",
-					"Position": "职位"
-				}
+					"Position": {
+						"Placeholder": "请先选择部门，再搜索职位"
+					},
+					"Table": {
+						"Pernr": "工号",
+						"Effective": "生效区间",
+						"OrgNodeID": "部门",
+						"Position": "职位"
+					}
 			},
 			"Tree": {
 				"Title": "组织树",
