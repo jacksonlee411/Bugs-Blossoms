@@ -38,7 +38,7 @@ test.describe('logging authz gating', () => {
 	});
 
 	test('shows logs page in restricted mode for user without logging permissions', async ({ page }) => {
-		await login(page, 'nohrm@example.com', 'TestPass123!');
+		await login(page, 'noperson@example.com', 'TestPass123!');
 
 		const response = await page.goto('/logs', { waitUntil: 'domcontentloaded' });
 		if (response) {

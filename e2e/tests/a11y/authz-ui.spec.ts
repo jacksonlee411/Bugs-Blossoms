@@ -117,11 +117,11 @@ test.describe('a11y smoke - authz ui', () => {
 	});
 
 	test('unauthorized page has no critical/serious violations', async ({ page }) => {
-		await login(page, 'nohrm@example.com', 'TestPass123!');
+		await login(page, 'noperson@example.com', 'TestPass123!');
 
-		await page.goto('/hrm/employees', { waitUntil: 'domcontentloaded' });
+		await page.goto('/person/persons', { waitUntil: 'domcontentloaded' });
 		await expect(page.locator('section[data-authz-container]')).toBeVisible();
 
-		await runAxeSmoke('unauthorized-hrm-employees', page);
+		await runAxeSmoke('unauthorized-person-persons', page);
 	});
 });

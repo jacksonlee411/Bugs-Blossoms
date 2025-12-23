@@ -5,9 +5,9 @@ import (
 
 	"github.com/iota-uz/iota-sdk/modules/bichat"
 	"github.com/iota-uz/iota-sdk/modules/core"
-	"github.com/iota-uz/iota-sdk/modules/hrm"
 	"github.com/iota-uz/iota-sdk/modules/logging"
 	"github.com/iota-uz/iota-sdk/modules/org"
+	"github.com/iota-uz/iota-sdk/modules/person"
 	"github.com/iota-uz/iota-sdk/modules/testkit"
 	"github.com/iota-uz/iota-sdk/modules/website"
 	"github.com/iota-uz/iota-sdk/pkg/application"
@@ -20,9 +20,9 @@ var (
 			PermissionSchema: defaults.PermissionSchema(),
 		}),
 		bichat.NewModule(),
-		hrm.NewModule(),
 		logging.NewModule(),
 		org.NewModule(),
+		person.NewModule(),
 		website.NewModule(),
 		testkit.NewModule(), // Test endpoints - only active when ENABLE_TEST_ENDPOINTS=true
 	}
@@ -30,9 +30,9 @@ var (
 	NavLinks = slices.Concat(
 		core.NavItems,
 		bichat.NavItems,
-		hrm.NavItems,
 		logging.NavItems,
 		org.NavItems,
+		person.NavItems,
 		website.NavItems,
 	)
 )

@@ -1,0 +1,48 @@
+{
+  "NavigationLinks": {
+    "Person": "Person",
+    "Persons": "Persons"
+  },
+  "Person": {
+    "Errors": {
+      "PernrTaken": "Pernr already exists"
+    },
+    "Fields": {
+      "Pernr": "Pernr",
+      "DisplayName": "Display name",
+      "Status": "Status",
+      "PersonUUID": "Person UUID"
+    },
+    "UI": {
+      "Persons": {
+        "Meta": {
+          "List": { "Title": "Persons" },
+          "New": { "Title": "Create person" },
+          "Detail": { "Title": "Person" }
+        },
+        "Title": {
+          "New": "Create person",
+          "Detail": "Person"
+        },
+        "Actions": {
+          "New": "New person",
+          "Search": "Search"
+        },
+        "Fields": {
+          "Q": "Search",
+          "QPlaceholder": "Search by pernr or name"
+        },
+        "Empty": {
+          "Title": "No persons yet",
+          "_Description": "Create the first person to start."
+        }
+      },
+      "Assignments": {
+        "Timeline": {
+          "Title": "Assignment timeline",
+          "Loading": "Loading..."
+        }
+      }
+    }
+  }
+}

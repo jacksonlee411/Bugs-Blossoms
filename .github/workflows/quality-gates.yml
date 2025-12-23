@@ -56,19 +56,17 @@ jobs:
               - 'go.mod'
               - 'go.sum'
               - '.gocleanarch.yml'
-            hrm-sqlc:
+            person-sqlc:
               - 'sqlc.yaml'
-              - 'modules/hrm/infrastructure/sqlc/**'
-              - 'modules/hrm/infrastructure/persistence/**/*.sql'
-              - 'scripts/db/export_hrm_schema.sh'
-              - 'docs/dev-records/hrm-sql-inventory.md'
-            hrm-atlas:
+              - 'modules/person/infrastructure/sqlc/**'
+              - 'modules/person/infrastructure/persistence/**/*.sql'
+              - 'scripts/db/export_person_schema.sh'
+            person-atlas:
               - 'atlas.hcl'
-              - 'modules/hrm/infrastructure/atlas/**'
-              - 'migrations/hrm/**'
+              - 'modules/person/infrastructure/atlas/**'
+              - 'migrations/person/**'
               - 'scripts/db/run_goose.sh'
-              - 'scripts/db/export_hrm_schema.sh'
-              - 'docs/dev-records/DEV-PLAN-011-HRM-ATLAS-POC.md'
+              - 'scripts/db/export_person_schema.sh'
             org-atlas:
               - 'atlas.hcl'
               - 'modules/org/infrastructure/atlas/**'
@@ -130,11 +128,11 @@ jobs:
         run: go mod download
 
       - name: Install Atlas CLI
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
+        if: ${{ steps.changed-files.outputs.person-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
         run: make atlas-install
 
       - name: Install goose CLI
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
+        if: ${{ steps.changed-files.outputs.person-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
         run: make goose-install
 
       - name: Regenerate templ artifacts
@@ -194,8 +192,8 @@ jobs:
           done
           echo "All SQL files are properly formatted"
 
-      - name: Run HRM sqlc generate
-        if: ${{ steps.changed-files.outputs.hrm-sqlc == 'true' }}
+      - name: Run Person sqlc generate
+        if: ${{ steps.changed-files.outputs.person-sqlc == 'true' }}
         env:
           DB_HOST: localhost
           DB_PORT: 5432
@@ -203,11 +201,11 @@ jobs:
           DB_PASSWORD: postgres
           DB_NAME: iota_erp
         run: |
-          scripts/db/export_hrm_schema.sh
+          scripts/db/export_person_schema.sh
           make sqlc-generate
 
       - name: Ensure sqlc artifacts are committed
-        if: ${{ steps.changed-files.outputs.hrm-sqlc == 'true' }}
+        if: ${{ steps.changed-files.outputs.person-sqlc == 'true' }}
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             echo "Detected sqlc artifacts that are not committed"
@@ -248,37 +246,37 @@ jobs:
           go test ./modules/core/services
           go test ./modules/core/presentation/controllers
 
-      - name: Run HRM Atlas plan
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
+      - name: Run Person Atlas plan
+        if: ${{ steps.changed-files.outputs.person-atlas == 'true' }}
         env:
           DB_HOST: localhost
           DB_PORT: 5432
           DB_USER: postgres
           DB_PASSWORD: postgres
-          DB_NAME: iota_erp_hrm_atlas
-          ATLAS_DEV_DB_NAME: hrm_dev
+          DB_NAME: iota_erp_person_atlas
+          ATLAS_DEV_DB_NAME: person_dev
         run: make db plan
 
-      - name: Run HRM Atlas lint
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
+      - name: Run Person Atlas lint
+        if: ${{ steps.changed-files.outputs.person-atlas == 'true' }}
         env:
           DB_HOST: localhost
           DB_PORT: 5432
           DB_USER: postgres
           DB_PASSWORD: postgres
-          DB_NAME: iota_erp_hrm_atlas
-          ATLAS_DEV_DB_NAME: hrm_dev
+          DB_NAME: iota_erp_person_atlas
+          ATLAS_DEV_DB_NAME: person_dev
         run: make db lint
 
-      - name: Run HRM goose migrations (smoke)
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' }}
+      - name: Run Person goose migrations (smoke)
+        if: ${{ steps.changed-files.outputs.person-atlas == 'true' }}
         env:
           DB_HOST: localhost
           DB_PORT: 5432
           DB_USER: postgres
           DB_PASSWORD: postgres
-          DB_NAME: iota_erp_hrm_atlas
-          HRM_MIGRATIONS: "1"
+          DB_NAME: iota_erp_person_atlas
+          PERSON_MIGRATIONS: "1"
         run: make db migrate up
 
       - name: Run Org Atlas plan
@@ -315,7 +313,7 @@ jobs:
         run: make org migrate up
 
       - name: Ensure atlas artifacts are committed
-        if: ${{ steps.changed-files.outputs.hrm-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
+        if: ${{ steps.changed-files.outputs.person-atlas == 'true' || steps.changed-files.outputs.org-atlas == 'true' }}
         run: |
           if [[ -n "$(git status --porcelain)" ]]; then
             echo "Atlas/goose commands produced uncommitted changes"

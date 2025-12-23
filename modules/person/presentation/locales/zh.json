@@ -1,0 +1,48 @@
+{
+  "NavigationLinks": {
+    "Person": "人员",
+    "Persons": "人员"
+  },
+  "Person": {
+    "Errors": {
+      "PernrTaken": "工号已存在"
+    },
+    "Fields": {
+      "Pernr": "工号（Pernr）",
+      "DisplayName": "姓名",
+      "Status": "状态",
+      "PersonUUID": "人员 UUID"
+    },
+    "UI": {
+      "Persons": {
+        "Meta": {
+          "List": { "Title": "人员" },
+          "New": { "Title": "新建人员" },
+          "Detail": { "Title": "人员" }
+        },
+        "Title": {
+          "New": "新建人员",
+          "Detail": "人员"
+        },
+        "Actions": {
+          "New": "新建人员",
+          "Search": "搜索"
+        },
+        "Fields": {
+          "Q": "搜索",
+          "QPlaceholder": "按工号或姓名搜索"
+        },
+        "Empty": {
+          "Title": "暂无人员",
+          "_Description": "请先创建人员。"
+        }
+      },
+      "Assignments": {
+        "Timeline": {
+          "Title": "任职经历",
+          "Loading": "加载中..."
+        }
+      }
+    }
+  }
+}

@@ -90,7 +90,7 @@ func TestNormalizeNodes_DetectsCycle(t *testing.T) {
 	}
 }
 
-func TestNormalizeAssignments_SubjectIDMismatch(t *testing.T) {
+func TestNormalizeAssignments_SubjectIDProvidedIsParsed(t *testing.T) {
 	runID := uuid.New()
 	tenantID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	startedAt := time.Now().UTC()
@@ -138,8 +138,11 @@ func TestNormalizeAssignments_SubjectIDMismatch(t *testing.T) {
 		},
 	}
 
-	_, err := normalizeAndValidate(runID, tenantID, startedAt, nodes, positions, assignments, false)
-	if err == nil {
-		t.Fatalf("expected error")
+	data, err := normalizeAndValidate(runID, tenantID, startedAt, nodes, positions, assignments, false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := data.assignments[0].subjectID; got != bad {
+		t.Fatalf("unexpected subject_id: got=%s want=%s", got, bad)
 	}
 }

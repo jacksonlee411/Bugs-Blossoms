@@ -755,16 +755,6 @@
         "Label": "Mijozlarni boshqarish",
         "_Description": "Mijozlarni to'liq boshqarish"
       }
-    },
-    "HRM": {
-      "EmployeeView": {
-        "Label": "Xodimlarni ko'rish",
-        "_Description": "Xodimlar ma'lumotlarini faqat ko'rish"
-      },
-      "EmployeeManage": {
-        "Label": "Xodimlarni boshqarish",
-        "_Description": "Xodimlarni to'liq boshqarish"
-      }
     }
   },
   "Modules": {
@@ -773,7 +763,6 @@
     "Projects": "Loyihalar",
     "Warehouse": "Ombor",
     "CRM": "CRM",
-    "HRM": "Kadrlar boshqaruvi",
     "Logging": "Loglar"
   },
   "Countries": {

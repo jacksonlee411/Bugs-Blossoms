@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	TopicOrgChangedV1           = "org.changed.v1"
-	TopicOrgAssignmentChangedV1 = "org.assignment.changed.v1"
-	EventVersionV1              = 1
+	TopicOrgChangedV1               = "org.changed.v1"
+	TopicOrgAssignmentChangedV1     = "org.assignment.changed.v1"
+	TopicOrgPersonnelEventChangedV1 = "org.personnel_event.changed.v1"
+	EventVersionV1                  = 1
 )
 
 type EffectiveWindowV1 struct {

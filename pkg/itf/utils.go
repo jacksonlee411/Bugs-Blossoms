@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -259,26 +260,68 @@ func CreateDB(name string) {
 		"host=%s port=%s user=%s dbname=postgres password=%s sslmode=disable",
 		c.Database.Host, c.Database.Port, c.Database.User, c.Database.Password,
 	)
-	db, err := sql.Open("postgres", adminConnStr)
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if err := db.Close(); err != nil {
-			log.Printf("[WARNING] Error closing CreateDB connection: %v", err)
+
+	var lastErr error
+	// When using Docker volumes, Postgres may spend minutes in crash-recovery fsync after an unclean shutdown.
+	// CreateDB is called by many integration tests; waiting here makes `make test` resilient to slow startups.
+	const maxAttempts = 600
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		db, err := sql.Open("postgres", adminConnStr)
+		if err != nil {
+			lastErr = err
+		} else {
+			func() {
+				defer func() {
+					if err := db.Close(); err != nil {
+						log.Printf("[WARNING] Error closing CreateDB connection: %v", err)
+					}
+				}()
+
+				pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := db.PingContext(pingCtx); err != nil {
+					lastErr = err
+					return
+				}
+
+				dropCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				_, err = db.ExecContext(dropCtx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", sanitizedName))
+				if err != nil {
+					_, err = db.ExecContext(dropCtx, fmt.Sprintf("DROP DATABASE IF EXISTS %s", sanitizedName))
+				}
+				if err != nil {
+					lastErr = err
+					return
+				}
+
+				createCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+				_, err = db.ExecContext(createCtx, fmt.Sprintf("CREATE DATABASE %s", sanitizedName))
+				if err != nil {
+					lastErr = err
+					return
+				}
+
+				lastErr = nil
+			}()
 		}
-	}()
-	_, err = db.ExecContext(context.Background(), fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", sanitizedName))
-	if err != nil {
-		_, err = db.ExecContext(context.Background(), fmt.Sprintf("DROP DATABASE IF EXISTS %s", sanitizedName))
+
+		if lastErr == nil {
+			return
+		}
+		if !isTransientPostgresError(lastErr) {
+			panic(lastErr)
+		}
+
+		delay := time.Duration(attempt+1) * 100 * time.Millisecond
+		if delay > time.Second {
+			delay = time.Second
+		}
+		time.Sleep(delay)
 	}
-	if err != nil {
-		panic(err)
-	}
-	_, err = db.ExecContext(context.Background(), fmt.Sprintf("CREATE DATABASE %s", sanitizedName))
-	if err != nil {
-		panic(err)
-	}
+
+	panic(lastErr)
 }
 
 func DbOpts(name string) string {
@@ -289,6 +332,27 @@ func DbOpts(name string) string {
 		"host=%s port=%s user=%s dbname=%s password=%s sslmode=disable",
 		c.Database.Host, c.Database.Port, c.Database.User, strings.ToLower(sanitizedName), c.Database.Password,
 	)
+}
+
+func isTransientPostgresError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "the database system is starting up"),
+		strings.Contains(msg, "the database system is not yet accepting connections"),
+		strings.Contains(msg, "connect: connection refused"),
+		strings.Contains(msg, "i/o timeout"),
+		strings.Contains(msg, "connection reset by peer"),
+		strings.Contains(msg, "EOF"):
+		return true
+	default:
+		return false
+	}
 }
 
 func SetupApplication(pool *pgxpool.Pool, mods ...application.Module) (application.Application, error) {

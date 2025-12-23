@@ -32,8 +32,8 @@
 | `modules/**/presentation/locales/**/*.json` | `make check tr` | |
 | `migrations/**` 或 `modules/**/infrastructure/persistence/schema/**` | `make db migrate up && make db seed` | CI 会跑 PG17 + migrate smoke |
 | Authz（`config/access/**` / `pkg/authz/**` / `scripts/authz/**` 等） | `make authz-test && make authz-lint` | 另见 `docs/runbooks/AUTHZ-BOT.md` |
-| HRM sqlc（`sqlc.yaml` / `modules/hrm/infrastructure/sqlc/**` 等） | `scripts/db/export_hrm_schema.sh` + `make sqlc-generate` + `git status --short` | |
-| HRM Atlas/Goose（`modules/hrm/infrastructure/atlas/**` / `migrations/hrm/**` 等） | `make db plan && make db lint` | 另见 dev-plan 对应章节 |
+| Person sqlc（`sqlc.yaml` / `modules/person/infrastructure/sqlc/**` 等） | `scripts/db/export_person_schema.sh` + `make sqlc-generate` + `git status --short` | |
+| Person Atlas/Goose（`modules/person/infrastructure/atlas/**` / `migrations/person/**` 等） | `make db plan && make db lint` | 另见 `docs/runbooks/person-atlas-goose.md` |
 | Org Atlas/Goose（`modules/org/infrastructure/atlas/**` / `modules/org/infrastructure/persistence/schema/**` / `migrations/org/**` 等） | `make org plan && make org lint && make org migrate up` | 另见 `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md` |
 | 新增/调整文档 | `make check doc` | 门禁见“文档收敛与门禁” |
 
@@ -88,10 +88,10 @@ modules/{module}/
 - 测试与校验：Authz 相关改动必须跑 `make authz-test && make authz-lint`。
 - Bot：见 `docs/runbooks/AUTHZ-BOT.md`。
 
-## 7. HRM/Org（sqlc / Atlas+Goose）工作流（摘要）
+## 7. Person/Org（sqlc / Atlas+Goose）工作流（摘要）
 
-- sqlc：影响 `sqlc.yaml` / `modules/hrm/infrastructure/sqlc/**` / `modules/hrm/infrastructure/persistence/**/*.sql` / `docs/dev-records/hrm-sql-inventory.md` 时：先 `scripts/db/export_hrm_schema.sh`，再 `make sqlc-generate`，最后 `git status --short` 必须为空。
-- Atlas/Goose：HRM schema 由 `atlas.hcl` 的 `src`（SQL 文件组合）为权威；`make db plan` 做 dry-run，`make db lint` 跑 atlas lint；执行 HRM 迁移用 `HRM_MIGRATIONS=1 make db migrate up`。
+- sqlc：影响 `sqlc.yaml` / `modules/person/infrastructure/sqlc/**` / `modules/person/infrastructure/persistence/**/*.sql` 时：先 `scripts/db/export_person_schema.sh`，再 `make sqlc-generate`，最后 `git status --short` 必须为空。
+- Atlas/Goose：Person schema 由 `atlas.hcl` 的 `src`（SQL 文件组合）为权威；`make db plan` 做 dry-run，`make db lint` 跑 atlas lint；执行 Person 迁移用 `PERSON_MIGRATIONS=1 make db migrate up`。
 - Atlas/Goose（Org）：命中 `modules/org/infrastructure/**` 或 `migrations/org/**` 时：按 `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md` 的口径执行 `make org plan && make org lint && make org migrate up`；并确保 Org 使用独立 goose 版本表（例如 `GOOSE_TABLE=goose_db_version_org`）。
 
 ## 8. 文档收敛与门禁（New Doc Gate）
@@ -130,8 +130,8 @@ modules/{module}/
 - Authz Policy Draft API：`docs/runbooks/authz-policy-draft-api.md`
 - Authz Bot：`docs/runbooks/AUTHZ-BOT.md`
 - Transactional Outbox（relay/cleaner/排障）：`docs/runbooks/transactional-outbox.md`
-- HRM sqlc：`docs/runbooks/hrm-sqlc.md`
-- HRM Atlas+Goose：`docs/runbooks/hrm-atlas-goose.md`
+- Person sqlc：`docs/runbooks/person-sqlc.md`
+- Person Atlas+Goose：`docs/runbooks/person-atlas-goose.md`
 - PostgreSQL 17 迁移：`docs/runbooks/postgres17-migration.md`
 - 文档规范：`docs/dev-plans/000-docs-format.md`
 - R200 工具链落地现状与复用指引（DEV-PLAN-009A）：`docs/dev-plans/009A-r200-tooling-playbook.md`
@@ -172,5 +172,7 @@ modules/{module}/
 - 职位管理子计划：任职管理增强（DEV-PLAN-058）：`docs/dev-plans/058-assignment-management-enhancements.md`
 - 职位管理子计划：收口与上线（DEV-PLAN-059）：`docs/dev-plans/059-position-rollout-readiness-and-observability.md`
 - 职位管理子计划：收口补齐（DEV-PLAN-059A）：`docs/dev-plans/059A-position-rollout-reason-code-mode-and-readiness-smoke.md`
+- PeopleSoft Core HR 功能菜单参考（DEV-PLAN-060）：`docs/dev-plans/060-peoplesoft-corehr-menu-reference.md`
+- Org-Position-Person 打通与最小人事事件（DEV-PLAN-061）：`docs/dev-plans/061-org-position-person-bridge-and-minimal-personnel-events.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`

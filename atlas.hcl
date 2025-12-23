@@ -9,9 +9,9 @@ variable "atlas_dev_url" {
 }
 
 locals {
-  hrm_src = [
-    "file://modules/hrm/infrastructure/atlas/core_deps.sql",
-    "file://modules/hrm/infrastructure/persistence/schema/hrm-schema.sql",
+  person_src = [
+    "file://modules/person/infrastructure/atlas/core_deps.sql",
+    "file://modules/person/infrastructure/persistence/schema/person-schema.sql",
   ]
   org_src = [
     "file://modules/org/infrastructure/atlas/core_deps.sql",
@@ -22,10 +22,10 @@ locals {
 env "dev" {
   url = var.db_url
   dev = var.atlas_dev_url
-  src = local.hrm_src
+  src = local.person_src
 
   migration {
-    dir    = "file://migrations/hrm"
+    dir    = "file://migrations/person"
     format = "goose"
   }
 }
@@ -33,10 +33,10 @@ env "dev" {
 env "test" {
   url = var.db_url
   dev = var.atlas_dev_url
-  src = local.hrm_src
+  src = local.person_src
 
   migration {
-    dir    = "file://migrations/hrm"
+    dir    = "file://migrations/person"
     format = "goose"
   }
 }
@@ -44,10 +44,10 @@ env "test" {
 env "ci" {
   url = var.db_url
   dev = var.atlas_dev_url
-  src = local.hrm_src
+  src = local.person_src
 
   migration {
-    dir    = "file://migrations/hrm"
+    dir    = "file://migrations/person"
     format = "goose"
   }
 }

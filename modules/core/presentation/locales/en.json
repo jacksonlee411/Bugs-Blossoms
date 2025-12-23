@@ -755,16 +755,6 @@
         "Label": "Manage Clients",
         "_Description": "Full client management capabilities"
       }
-    },
-    "HRM": {
-      "EmployeeView": {
-        "Label": "View Employees",
-        "_Description": "View employee information only"
-      },
-      "EmployeeManage": {
-        "Label": "Manage Employees",
-        "_Description": "Full employee management capabilities"
-      }
     }
   },
   "Modules": {
@@ -773,7 +763,6 @@
     "Projects": "Projects",
     "Warehouse": "Warehouse",
     "CRM": "CRM",
-    "HRM": "HR Management",
     "Logging": "Logging"
   },
   "Countries": {

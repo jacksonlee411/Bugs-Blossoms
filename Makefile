@@ -42,10 +42,10 @@ deps:
 atlas-install:
 	mkdir -p $(ATLAS_BIN_DIR)
 	rm -rf /tmp/atlas-src-install
-	git clone https://github.com/ariga/atlas.git /tmp/atlas-src-install
-	cd /tmp/atlas-src-install && git checkout tags/$(ATLAS_VERSION)
+	git clone --depth 1 --branch $(ATLAS_VERSION) https://github.com/ariga/atlas.git /tmp/atlas-src-install
 	cd /tmp/atlas-src-install/cmd/atlas && GOWORK=off go mod tidy
 	cd /tmp/atlas-src-install/cmd/atlas && GOWORK=off go build -o $(ATLAS_BIN_DIR)/atlas .
+	$(ATLAS) version
 
 .PHONY: goose-install
 goose-install:
@@ -101,7 +101,7 @@ db:
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "seed" ]; then \
 		go run cmd/command/main.go seed; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "migrate" ]; then \
-		if [ "${HRM_MIGRATIONS}" = "1" ]; then \
+		if [ "${PERSON_MIGRATIONS}" = "1" ]; then \
 			./scripts/db/run_goose.sh $(word 3,$(MAKECMDGOALS)); \
 		else \
 			go run cmd/command/main.go migrate $(word 3,$(MAKECMDGOALS)); \
@@ -111,19 +111,19 @@ db:
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "plan" ]; then \
 		TARGET_DB_NAME="$(DB_NAME)"; \
 		DB_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"; \
-		DEV_DB_NAME="$${ATLAS_DEV_DB_NAME:-hrm_dev}"; \
+		DEV_DB_NAME="$${ATLAS_DEV_DB_NAME:-person_dev}"; \
 		DEV_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$$DEV_DB_NAME?sslmode=disable"; \
 		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$TARGET_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$TARGET_DB_NAME"; \
 		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$DEV_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$DEV_DB_NAME"; \
-		TMP_SCHEMA="$$(mktemp -t hrm_atlas_schema_XXXXXX.sql)"; \
+		TMP_SCHEMA="$$(mktemp -t person_atlas_schema_XXXXXX.sql)"; \
 		trap 'rm -f "$$TMP_SCHEMA"' EXIT; \
-		cat modules/hrm/infrastructure/atlas/core_deps.sql modules/hrm/infrastructure/persistence/schema/hrm-schema.sql > "$$TMP_SCHEMA"; \
+		cat modules/person/infrastructure/atlas/core_deps.sql modules/person/infrastructure/persistence/schema/person-schema.sql > "$$TMP_SCHEMA"; \
 		TO_URL="file:///$${TMP_SCHEMA#/}"; \
 		$(ATLAS) schema diff --from $$DB_URL --to $$TO_URL --dev-url $$DEV_URL --format '{{ sql . }}'; \
 	elif [ "$(word 2,$(MAKECMDGOALS))" = "lint" ]; then \
 		TARGET_DB_NAME="$(DB_NAME)"; \
 		DB_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=disable"; \
-		DEV_DB_NAME="$${ATLAS_DEV_DB_NAME:-hrm_dev}"; \
+		DEV_DB_NAME="$${ATLAS_DEV_DB_NAME:-person_dev}"; \
 		DEV_URL="postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$$DEV_DB_NAME?sslmode=disable"; \
 		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$TARGET_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$TARGET_DB_NAME"; \
 		PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname='$$DEV_DB_NAME'" | grep -q 1 || PGPASSWORD="$(DB_PASSWORD)" psql "postgres://$(DB_USER)@$(DB_HOST):$(DB_PORT)/postgres?sslmode=disable" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $$DEV_DB_NAME"; \
@@ -137,7 +137,7 @@ db:
 		echo "  seed    - Seed database with test data"; \
 		echo "  migrate - Run database migrations (up/down/redo/status)"; \
 		echo "  rls-role - Create/update non-superuser DB role for RLS PoC"; \
-		echo "  plan    - Dry-run Atlas diff for HRM schema"; \
+		echo "  plan    - Dry-run Atlas diff for Person schema"; \
 		echo "  lint    - Run Atlas lint (ci env)"; \
 	fi
 
@@ -538,5 +538,5 @@ watch coverage verbose docker score report linux docker-base docker-prod up down
 # HRM sqlc generation
 sqlc-generate:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0 generate -f sqlc.yaml
-	gofmt -w modules/hrm/infrastructure/sqlc modules/org/infrastructure/sqlc
-	go run golang.org/x/tools/cmd/goimports@v0.26.0 -w modules/hrm/infrastructure/sqlc modules/org/infrastructure/sqlc
+	gofmt -w modules/person/infrastructure/sqlc modules/org/infrastructure/sqlc
+	go run golang.org/x/tools/cmd/goimports@v0.26.0 -w modules/person/infrastructure/sqlc modules/org/infrastructure/sqlc

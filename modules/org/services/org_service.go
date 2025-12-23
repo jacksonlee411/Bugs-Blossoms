@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/iota-uz/iota-sdk/modules/org/domain/events"
-	"github.com/iota-uz/iota-sdk/modules/org/domain/subjectid"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/constants"
@@ -156,6 +156,7 @@ type OrgRepository interface {
 	InsertAssignment(ctx context.Context, tenantID uuid.UUID, assignment AssignmentInsert) (uuid.UUID, error)
 	ListAssignmentsTimeline(ctx context.Context, tenantID uuid.UUID, subjectID uuid.UUID) ([]AssignmentViewRow, error)
 	ListAssignmentsAsOf(ctx context.Context, tenantID uuid.UUID, subjectID uuid.UUID, asOf time.Time) ([]AssignmentViewRow, error)
+	ResolvePersonUUIDByPernr(ctx context.Context, tenantID uuid.UUID, pernr string) (uuid.UUID, error)
 
 	HasChildrenAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (bool, error)
 	HasPositionsAt(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) (bool, error)
@@ -174,6 +175,8 @@ type OrgRepository interface {
 	LockAssignmentByID(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID) (AssignmentRow, error)
 	UpdateAssignmentInPlace(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, patch AssignmentInPlacePatch) error
 	UpdateAssignmentEndDate(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, endDate time.Time) error
+
+	UpsertPersonnelEvent(ctx context.Context, tenantID uuid.UUID, in PersonnelEventInsert) (PersonnelEventRow, bool, error)
 }
 
 type HierarchyNode struct {
@@ -592,6 +595,9 @@ func (s *OrgService) CreateNode(ctx context.Context, tenantID uuid.UUID, request
 func outboxTopicForEntityType(entityType string) string {
 	if entityType == "org_assignment" {
 		return events.TopicOrgAssignmentChangedV1
+	}
+	if entityType == "org_personnel_event" {
+		return events.TopicOrgPersonnelEventChangedV1
 	}
 	return events.TopicOrgChangedV1
 }
@@ -1045,15 +1051,18 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 	}
 	isPrimary := assignmentType == "primary"
 
-	derivedSubjectID, err := subjectid.NormalizedSubjectID(tenantID, "person", in.Pernr)
-	if err != nil {
-		return nil, newServiceError(400, "ORG_INVALID_BODY", err.Error(), err)
-	}
-	if in.SubjectID != nil && *in.SubjectID != derivedSubjectID {
-		return nil, newServiceError(422, "ORG_SUBJECT_MISMATCH", "subject_id does not match SSOT mapping", nil)
-	}
-
 	written, err := inTx(ctx, tenantID, func(txCtx context.Context) (*CreateAssignmentResult, error) {
+		personUUID, err := s.repo.ResolvePersonUUIDByPernr(txCtx, tenantID, in.Pernr)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, newServiceError(http.StatusNotFound, "ORG_PERSON_NOT_FOUND", "pernr not found", nil)
+			}
+			return nil, err
+		}
+		if in.SubjectID != nil && *in.SubjectID != personUUID {
+			return nil, newServiceError(422, "ORG_SUBJECT_MISMATCH", "subject_id does not match persons mapping", nil)
+		}
+
 		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
 		if err != nil {
 			return nil, err
@@ -1067,7 +1076,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		if err != nil {
 			maybeLogFrozenWindowRejected(txCtx, tenantID, requestID, initiatorID, "assignment.created", "org_assignment", uuid.Nil, in.EffectiveDate, freeze, err, logrus.Fields{
 				"pernr":           in.Pernr,
-				"subject_id":      derivedSubjectID.String(),
+				"subject_id":      personUUID.String(),
 				"assignment_type": assignmentType,
 				"operation":       "Create",
 			})
@@ -1099,7 +1108,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			if !exists {
 				return nil, newServiceError(422, "ORG_NODE_NOT_FOUND_AT_DATE", "org_node_id not found at effective_date", nil)
 			}
-			positionID, err = autoPositionID(tenantID, *in.OrgNodeID, derivedSubjectID)
+			positionID, err = autoPositionID(tenantID, *in.OrgNodeID, personUUID)
 			if err != nil {
 				return nil, err
 			}
@@ -1185,7 +1194,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		assignmentID, err := s.repo.InsertAssignment(txCtx, tenantID, AssignmentInsert{
 			PositionID:     positionID,
 			SubjectType:    "person",
-			SubjectID:      derivedSubjectID,
+			SubjectID:      personUUID,
 			Pernr:          in.Pernr,
 			AssignmentType: assignmentType,
 			IsPrimary:      isPrimary,
@@ -1202,7 +1211,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				"assignment_id":   assignmentID.String(),
 				"position_id":     positionID.String(),
 				"pernr":           in.Pernr,
-				"subject_id":      derivedSubjectID.String(),
+				"subject_id":      personUUID.String(),
 				"assignment_type": assignmentType,
 				"effective_date":  in.EffectiveDate.UTC().Format(time.RFC3339),
 			})
@@ -1222,7 +1231,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				"assignment_id":   assignmentID.String(),
 				"position_id":     positionID.String(),
 				"subject_type":    "person",
-				"subject_id":      derivedSubjectID.String(),
+				"subject_id":      personUUID.String(),
 				"pernr":           in.Pernr,
 				"assignment_type": assignmentType,
 				"is_primary":      isPrimary,
@@ -1256,7 +1265,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		res := &CreateAssignmentResult{
 			AssignmentID:  assignmentID,
 			PositionID:    positionID,
-			SubjectID:     derivedSubjectID,
+			SubjectID:     personUUID,
 			EffectiveDate: in.EffectiveDate,
 			EndDate:       endOfTime,
 			GeneratedEvents: []events.OrgEventV1{
@@ -1614,28 +1623,48 @@ func (s *OrgService) GetAssignments(ctx context.Context, tenantID uuid.UUID, sub
 		return uuid.Nil, nil, time.Time{}, newServiceError(400, "ORG_INVALID_QUERY", "subject must be person:{pernr}", nil)
 	}
 	pernr := strings.TrimPrefix(subject, "person:")
-	subjectUUID, err := subjectid.NormalizedSubjectID(tenantID, "person", pernr)
-	if err != nil {
-		return uuid.Nil, nil, time.Time{}, newServiceError(400, "ORG_INVALID_QUERY", err.Error(), err)
-	}
+	pernr = strings.TrimSpace(pernr)
 
 	if asOf == nil || (*asOf).IsZero() {
-		rows, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]AssignmentViewRow, error) {
-			return s.repo.ListAssignmentsTimeline(txCtx, tenantID, subjectUUID)
+		type result struct {
+			subjectUUID uuid.UUID
+			rows        []AssignmentViewRow
+		}
+		out, err := inTx(ctx, tenantID, func(txCtx context.Context) (result, error) {
+			subjectUUID, err := s.repo.ResolvePersonUUIDByPernr(txCtx, tenantID, pernr)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return result{}, newServiceError(http.StatusNotFound, "ORG_PERSON_NOT_FOUND", "pernr not found", nil)
+				}
+				return result{}, err
+			}
+			rows, err := s.repo.ListAssignmentsTimeline(txCtx, tenantID, subjectUUID)
+			if err != nil {
+				return result{}, err
+			}
+			return result{subjectUUID: subjectUUID, rows: rows}, nil
 		})
 		if err != nil {
 			return uuid.Nil, nil, time.Time{}, err
 		}
-		return subjectUUID, rows, time.Time{}, nil
+		return out.subjectUUID, out.rows, time.Time{}, nil
 	}
 
-	rows, err := inTx(ctx, tenantID, func(txCtx context.Context) ([]AssignmentViewRow, error) {
+	out, err := inTx(ctx, tenantID, func(txCtx context.Context) (cachedAssignments, error) {
+		subjectUUID, err := s.repo.ResolvePersonUUIDByPernr(txCtx, tenantID, pernr)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return cachedAssignments{}, newServiceError(http.StatusNotFound, "ORG_PERSON_NOT_FOUND", "pernr not found", nil)
+			}
+			return cachedAssignments{}, err
+		}
+
 		cacheKey := repo.CacheKey("org", "assignments_asof", tenantID, subjectUUID, (*asOf).UTC().Format(time.RFC3339Nano))
 		if s != nil && s.cache != nil {
 			if cachedAny, ok := s.cache.Get(cacheKey); ok {
 				if cached, ok := cachedAny.(cachedAssignments); ok {
 					recordCacheRequest("assignments", true)
-					return cached.Rows, nil
+					return cached, nil
 				}
 			}
 			recordCacheRequest("assignments", false)
@@ -1643,7 +1672,7 @@ func (s *OrgService) GetAssignments(ctx context.Context, tenantID uuid.UUID, sub
 
 		rows, err := s.repo.ListAssignmentsAsOf(txCtx, tenantID, subjectUUID, *asOf)
 		if err != nil {
-			return nil, err
+			return cachedAssignments{}, err
 		}
 		if s != nil && s.cache != nil {
 			s.cache.Set(tenantID, cacheKey, cachedAssignments{
@@ -1652,12 +1681,16 @@ func (s *OrgService) GetAssignments(ctx context.Context, tenantID uuid.UUID, sub
 				AsOf:      *asOf,
 			})
 		}
-		return rows, nil
+		return cachedAssignments{
+			SubjectID: subjectUUID,
+			Rows:      rows,
+			AsOf:      *asOf,
+		}, nil
 	})
 	if err != nil {
 		return uuid.Nil, nil, time.Time{}, err
 	}
-	return subjectUUID, rows, *asOf, nil
+	return out.SubjectID, out.Rows, out.AsOf, nil
 }
 
 func buildEventV1(requestID string, tenantID, initiatorID uuid.UUID, txTime time.Time, changeType, entityType string, entityID uuid.UUID, effectiveDate, endDate time.Time) events.OrgEventV1 {

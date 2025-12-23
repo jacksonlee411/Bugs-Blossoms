@@ -11,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/stretchr/testify/require"
 
-	"github.com/iota-uz/iota-sdk/modules/org/domain/subjectid"
 	"github.com/iota-uz/iota-sdk/modules/org/infrastructure/persistence"
 	orgsvc "github.com/iota-uz/iota-sdk/modules/org/services"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
@@ -115,6 +114,10 @@ func TestOrg033PersonPath(t *testing.T) {
 
 	applyAllOrgMigrationsFor033(t, ctx, pool)
 
+	personSchemaSQL := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "person", "00001_person_baseline.sql")))
+	_, err := pool.Exec(ctx, personSchemaSQL)
+	require.NoError(t, err)
+
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ensureTenant(t, ctx, pool, tenantID)
 
@@ -126,7 +129,7 @@ func TestOrg033PersonPath(t *testing.T) {
 	// Minimal position + primary assignment as-of.
 	positionID := uuid.New()
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
-	_, err := pool.Exec(ctx, `
+	_, err = pool.Exec(ctx, `
 	INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
 	VALUES ($1,$2,$3,'P-1','active',false,$4,$5)
 	`, tenantID, positionID, targetNodeID, asOf, endDate)
@@ -138,13 +141,18 @@ func TestOrg033PersonPath(t *testing.T) {
 	`, tenantID, positionID, targetNodeID, asOf, endDate)
 	require.NoError(t, err)
 
-	subjectID, err := subjectid.NormalizedSubjectID(tenantID, "person", "000123")
+	personUUID := uuid.New()
+	_, err = pool.Exec(ctx, `
+INSERT INTO persons (tenant_id, person_uuid, pernr, display_name, status)
+VALUES ($1,$2,'000123','Test Person','active')
+`, tenantID, personUUID)
 	require.NoError(t, err)
+
 	assignmentID := uuid.New()
 	_, err = pool.Exec(ctx, `
 INSERT INTO org_assignments (tenant_id, id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, effective_date, end_date)
 VALUES ($1,$2,$3,'person',$4,'000123','primary',true,$5,$6)
-`, tenantID, assignmentID, positionID, subjectID, asOf, endDate)
+`, tenantID, assignmentID, positionID, personUUID, asOf, endDate)
 	require.NoError(t, err)
 
 	repo := persistence.NewOrgRepository()
@@ -218,6 +226,8 @@ func TestOrg033ReportingBuild(t *testing.T) {
 
 func applyAllOrgMigrationsFor033(tb testing.TB, ctx context.Context, pool *pgxpool.Pool) {
 	tb.Helper()
+
+	applyAllPersonMigrations(tb, ctx, pool)
 
 	files := []string{
 		"00001_org_baseline.sql",

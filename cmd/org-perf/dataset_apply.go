@@ -14,7 +14,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 
-	"github.com/iota-uz/iota-sdk/modules/org/domain/subjectid"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 )
 
@@ -122,6 +121,9 @@ func newDatasetApplyCmd() *cobra.Command {
 			if err := ensureOrgTablesExist(context.Background(), pool); err != nil {
 				return err
 			}
+			if err := ensurePersonTablesExist(context.Background(), pool); err != nil {
+				return err
+			}
 			if err := ensureTenantExists(context.Background(), pool, tenantID); err != nil {
 				return err
 			}
@@ -161,6 +163,17 @@ func ensureOrgTablesExist(ctx context.Context, pool *pgxpool.Pool) error {
 		return nil
 	}
 	return errors.New("org schema not found; run `make org migrate up` first")
+}
+
+func ensurePersonTablesExist(ctx context.Context, pool *pgxpool.Pool) error {
+	var ok bool
+	if err := pool.QueryRow(ctx, "SELECT to_regclass('public.persons') IS NOT NULL").Scan(&ok); err != nil {
+		return err
+	}
+	if ok {
+		return nil
+	}
+	return errors.New("person schema not found; run `PERSON_MIGRATIONS=1 make db migrate up` first")
 }
 
 func ensureTenantExists(ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID) error {
@@ -243,13 +256,10 @@ func buildDataset(tenantID uuid.UUID, asOf time.Time, profile string, count int,
 	assignments := make([]perfAssignment, 0, assignCount)
 	for i := 0; i < assignCount; i++ {
 		pernr := fmt.Sprintf("%06d", i+1)
-		subjectID, err := subjectid.NormalizedSubjectID(tenantID, "person", pernr)
-		if err != nil {
-			return nil, err
-		}
+		personUUID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(fmt.Sprintf("%s:person_uuid:%s", tenantID, pernr)))
 		assignments = append(assignments, perfAssignment{
 			PositionID:     positions[i].ID,
-			SubjectID:      subjectID,
+			SubjectID:      personUUID,
 			Pernr:          pernr,
 			AssignmentType: "primary",
 			IsPrimary:      true,
@@ -447,6 +457,19 @@ func importDataset(ctx context.Context, pool *pgxpool.Pool, ds *perfDataset) err
 		pgx.CopyFromSlice(len(ds.Positions), func(i int) ([]any, error) {
 			p := ds.Positions[i]
 			return []any{ds.TenantID, p.ID, p.OrgNodeID, p.Code, "active", false, ds.AsOf, endDate}, nil
+		}),
+	)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.CopyFrom(
+		ctx,
+		pgx.Identifier{"public", "persons"},
+		[]string{"tenant_id", "person_uuid", "pernr", "display_name", "status"},
+		pgx.CopyFromSlice(len(ds.Assigns), func(i int) ([]any, error) {
+			a := ds.Assigns[i]
+			return []any{ds.TenantID, a.SubjectID, a.Pernr, "Perf " + a.Pernr, "active"}, nil
 		}),
 	)
 	if err != nil {

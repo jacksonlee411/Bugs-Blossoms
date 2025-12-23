@@ -12,11 +12,11 @@ import (
 )
 
 var moduleHints = map[string]string{
-	"user":     "core",
-	"role":     "core",
-	"group":    "core",
-	"upload":   "core",
-	"employee": "hrm",
+	"user":   "core",
+	"role":   "core",
+	"group":  "core",
+	"upload": "core",
+	"person": "person",
 }
 
 var nonSlugChars = regexp.MustCompile(`[^a-z0-9]+`)

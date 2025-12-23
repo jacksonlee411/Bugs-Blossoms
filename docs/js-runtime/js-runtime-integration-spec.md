@@ -1211,11 +1211,11 @@ The phased implementation approach allows for iterative development and testing,
 
 ### Key IOTA SDK Patterns Used
 - Module registration: modules/*/module.go:Register
-- Domain entities: modules/hrm/domain/aggregates/employee/employee.go:77
-- Repository pattern: modules/hrm/domain/aggregates/employee/employee_repository.go:19
-- Service layer: modules/hrm/services/employee_service.go:11
+- Domain entities: modules/person/domain/aggregates/person/person.go
+- Repository pattern: modules/person/domain/aggregates/person/repository.go
+- Service layer: modules/person/services/person_service.go
 - Event publishing: pkg/eventbus/event_bus.go:13
 - RBAC integration: pkg/rbac/rbac.go:82
 - Context usage: pkg/composables/auth.go:67
 - Controller pattern: modules/core/presentation/controllers/crud_controller.go:95
-- Templ templates: modules/hrm/presentation/templates/pages/employees/employees.templ:23
+- Templ templates: modules/person/presentation/templates/pages/persons/persons.templ

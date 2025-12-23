@@ -167,6 +167,7 @@ flowchart LR
 ### 5.1 Topic 命名与版本
 - `org.changed.v1`
 - `org.assignment.changed.v1`
+- `org.personnel_event.changed.v1`
 
 ### 5.2 通用字段（v1，选定）
 | 字段 | 类型 | 必填 | 说明 |
@@ -178,7 +179,7 @@ flowchart LR
 | `transaction_time` | `rfc3339` | 是 | 事务提交时间（transaction time） |
 | `initiator_id` | `uuid` | 是 | 发起人用户 id（脚本/系统任务需指定 system user） |
 | `change_type` | `string` | 是 | 见 5.4 |
-| `entity_type` | `string` | 是 | 见 5.5/5.6（`org_node/org_edge/org_position/org_assignment`） |
+| `entity_type` | `string` | 是 | 见 5.5/5.6/5.7（`org_node/org_edge/org_position/org_assignment/org_personnel_event`） |
 | `entity_id` | `uuid` | 是 | 变更实体 id（与 `entity_type` 搭配） |
 | `entity_version` | `int64` | 是 | 占位；M1 可恒为 `0`，后续如引入强版本需发布 v2 |
 | `effective_window` | `object` | 是 | 见 5.3 |
@@ -214,6 +215,8 @@ flowchart LR
   - `assignment.updated`
   - `assignment.corrected`
   - `assignment.rescinded`
+- 对 `org.personnel_event.changed.v1`：
+  - `personnel_event.created`
 
 ### 5.5 `org.changed.v1` 的 `new_values` 结构（选定）
 > v1 以“最小可用快照”为准：下游若需要完整时间线与路径，走 026 的 `/org/api/snapshot` 纠偏。
@@ -257,7 +260,18 @@ flowchart LR
 - `is_primary`（bool）
 - `effective_date/end_date`（与 `effective_window` 一致）
 
-### 5.7 示例（仅示意，字段必须 snake_case）
+### 5.7 `org.personnel_event.changed.v1` 的 `new_values` 结构（选定）
+`entity_type` 固定为 `org_personnel_event`。
+
+`new_values` 必须包含：
+- `personnel_event_id`（uuid，同 `entity_id`）
+- `event_type`（`hire/transfer/termination`）
+- `person_uuid`（uuid）
+- `pernr`（string）
+- `effective_date`（与 `effective_window.effective_date` 一致）
+- `reason_code`（string）
+
+### 5.8 示例（仅示意，字段必须 snake_case）
 **节点新增（`org.changed.v1`）**
 ```json
 {

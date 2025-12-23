@@ -1,0 +1,39 @@
+package persons
+
+import (
+	icons "github.com/iota-uz/icons/phosphor"
+
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
+	"github.com/iota-uz/iota-sdk/modules/person/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+templ New(props *viewmodels.PersonCreatePageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{Title: pageCtx.T("Person.UI.Persons.Meta.New.Title")},
+	}) {
+		<div class="m-6 space-y-4">
+			<div class="flex items-center gap-3">
+				<a class="text-sm text-surface-300 hover:text-surface-100" href="/person/persons">
+					@icons.ArrowLeft(icons.Props{Size: "18"})
+				</a>
+				<h1 class="text-2xl font-medium">{ pageCtx.T("Person.UI.Persons.Title.New") }</h1>
+			</div>
+			@CreateForm(props)
+		</div>
+	}
+}
+
+templ CreateForm(props *viewmodels.PersonCreatePageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<form class="space-y-4" method="post" action={ templ.SafeURL(props.PostTo) }>
+		@PersonForm(props)
+		<div class="flex justify-end">
+			@button.Primary(button.Props{Attrs: templ.Attributes{"type": "submit"}}) {
+				{ pageCtx.T("Create") }
+			}
+		</div>
+	</form>
+}

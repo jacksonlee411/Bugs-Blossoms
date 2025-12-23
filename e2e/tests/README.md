@@ -9,8 +9,8 @@ tests/
 ├── users/              # User management and authentication tests
 │   ├── register.spec.ts
 │   └── realtime.spec.ts
-├── employees/          # Employee management tests
-│   └── employees.spec.ts
+├── persons/            # Person management tests
+│   └── persons.spec.ts
 └── README.md           # This file
 ```
 
@@ -18,7 +18,7 @@ tests/
 
 Tests are organized by business module, matching the application's module structure:
 - `users/` - User registration, authentication, profile management
-- `employees/` - Employee CRUD operations, assignments
+- `persons/` - Person CRUD operations, org assignment timeline
 - Future modules: `superadmin/`, `logs/`, `website/`, etc.
 
 ## Writing Tests
@@ -91,7 +91,7 @@ npm test
 ### Run Specific Module
 ```bash
 npm run test:users
-npm run test:employees
+npm run test:persons
 ```
 
 ### Run Specific Test File

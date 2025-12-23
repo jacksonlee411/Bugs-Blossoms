@@ -278,15 +278,15 @@ func (s *TestDataService) getScenario(name string) (*schemas.PopulateRequest, bo
 						},
 					},
 					{
-						Email:            "nohrm@example.com",
+						Email:            "noperson@example.com",
 						Password:         "TestPass123!",
-						FirstName:        "NoHRM",
+						FirstName:        "NoPerson",
 						LastName:         "User",
 						Language:         "en",
-						Ref:              "nohrmUser",
+						Ref:              "nopersonUser",
 						SkipDefaultAdmin: true,
 						CasbinRoles:      []string{
-							// intentionally empty to validate HRM forbid
+							// intentionally empty to validate authz forbid
 						},
 					},
 					{

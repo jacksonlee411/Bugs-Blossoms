@@ -19,10 +19,10 @@
 - 聚合产物：`config/access/policy.csv` 与 `config/access/policy.csv.rev`（由 `make authz-pack` 生成）
 - Bot/应急：`docs/runbooks/AUTHZ-BOT.md`
 
-## 4. HRM 数据与迁移
+## 4. Person（人员）数据与迁移
 
-- sqlc：`docs/runbooks/hrm-sqlc.md`
-- Atlas+Goose：`docs/runbooks/hrm-atlas-goose.md`
+- sqlc：`docs/runbooks/person-sqlc.md`
+- Atlas+Goose：`docs/runbooks/person-atlas-goose.md`
 
 ## 5. 已废弃/遗留表（归档保留）
 

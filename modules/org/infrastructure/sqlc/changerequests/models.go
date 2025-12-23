@@ -247,6 +247,21 @@ type OrgOutbox struct {
 	LastError   *string            `json:"last_error"`
 }
 
+type OrgPersonnelEvent struct {
+	TenantID      pgtype.UUID        `json:"tenant_id"`
+	ID            pgtype.UUID        `json:"id"`
+	RequestID     string             `json:"request_id"`
+	InitiatorID   pgtype.UUID        `json:"initiator_id"`
+	EventType     string             `json:"event_type"`
+	PersonUuid    pgtype.UUID        `json:"person_uuid"`
+	Pernr         string             `json:"pernr"`
+	EffectiveDate pgtype.Timestamptz `json:"effective_date"`
+	ReasonCode    string             `json:"reason_code"`
+	Payload       []byte             `json:"payload"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OrgPosition struct {
 	TenantID      pgtype.UUID        `json:"tenant_id"`
 	ID            pgtype.UUID        `json:"id"`

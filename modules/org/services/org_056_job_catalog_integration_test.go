@@ -38,6 +38,8 @@ func setupOrg056DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 	pool := newPoolWithQueryTracer(tb, itf.DbOpts(dbName), &queryCountTracer{})
 	tb.Cleanup(pool.Close)
 
+	applyAllPersonMigrations(tb, ctx, pool)
+
 	migrations := []string{
 		"00001_org_baseline.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
@@ -58,6 +60,7 @@ func setupOrg056DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000056")
 	ensureTenant(tb, ctx, pool, tenantID)
+	seedPerson(tb, ctx, pool, tenantID, uuid.New(), "00000001", "Test Person 00000001")
 	_, err := pool.Exec(ctx, `
 	INSERT INTO org_settings (tenant_id, freeze_mode, freeze_grace_days)
 	VALUES ($1,'disabled',0)

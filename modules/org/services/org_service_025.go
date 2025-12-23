@@ -2,15 +2,16 @@ package services
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/sirupsen/logrus"
 
 	"github.com/iota-uz/iota-sdk/modules/org/domain/events"
-	"github.com/iota-uz/iota-sdk/modules/org/domain/subjectid"
 )
 
 type CorrectNodeInput struct {
@@ -746,12 +747,15 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 			return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr cannot be empty", nil)
 		}
 
-		derivedSubjectID, err := subjectid.NormalizedSubjectID(tenantID, "person", pernr)
+		personUUID, err := s.repo.ResolvePersonUUIDByPernr(txCtx, tenantID, pernr)
 		if err != nil {
-			return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", err.Error(), err)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil, newServiceError(http.StatusNotFound, "ORG_PERSON_NOT_FOUND", "pernr not found", nil)
+			}
+			return nil, err
 		}
-		if in.SubjectID != nil && *in.SubjectID != derivedSubjectID {
-			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SUBJECT_MISMATCH", "subject_id does not match SSOT mapping", nil)
+		if in.SubjectID != nil && *in.SubjectID != personUUID {
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SUBJECT_MISMATCH", "subject_id does not match persons mapping", nil)
 		}
 
 		if in.PositionID != nil {
@@ -767,7 +771,7 @@ func (s *OrgService) CorrectAssignment(ctx context.Context, tenantID uuid.UUID, 
 		patch := AssignmentInPlacePatch{
 			PositionID: in.PositionID,
 			Pernr:      &pernr,
-			SubjectID:  &derivedSubjectID,
+			SubjectID:  &personUUID,
 		}
 		if err := s.repo.UpdateAssignmentInPlace(txCtx, tenantID, current.ID, patch); err != nil {
 			return nil, mapPgError(err)

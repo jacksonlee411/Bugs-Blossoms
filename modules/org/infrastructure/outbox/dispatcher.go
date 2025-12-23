@@ -25,7 +25,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, msg outbox.DispatchedMessage)
 	}
 
 	switch msg.Meta.Topic {
-	case events.TopicOrgChangedV1, events.TopicOrgAssignmentChangedV1:
+	case events.TopicOrgChangedV1, events.TopicOrgAssignmentChangedV1, events.TopicOrgPersonnelEventChangedV1:
 	default:
 		return fmt.Errorf("org outbox dispatcher: unsupported topic %q", msg.Meta.Topic)
 	}

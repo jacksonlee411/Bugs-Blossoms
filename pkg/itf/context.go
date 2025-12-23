@@ -2,6 +2,8 @@ package itf
 
 import (
 	"context"
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/google/uuid"
@@ -60,7 +62,7 @@ func (tc *TestContext) Build(tb testing.TB) *TestEnvironment {
 
 	// Set default db name if not set
 	if tc.dbName == "" {
-		tc.dbName = tb.Name()
+		tc.dbName = fmt.Sprintf("%s_%d", tb.Name(), os.Getpid())
 	}
 
 	// Create test database
