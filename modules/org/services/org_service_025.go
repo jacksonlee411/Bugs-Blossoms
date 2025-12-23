@@ -398,11 +398,23 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 			"end_date":       target.EndDate.UTC().Format(time.RFC3339),
 		}
 
-		if err := s.repo.UpdateNodeSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
-			return nil, mapPgError(err)
-		}
-		if err := s.repo.UpdateNodeSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
-			return nil, mapPgError(err)
+		// IMPORTANT: avoid transient overlap against the EXCLUDE constraint.
+		// - If shifting boundary later (new > target), move the target start first (creates a gap), then extend prev.
+		// - If shifting boundary earlier (new < target), shrink prev first (creates a gap), then move the target start.
+		if in.NewEffectiveDate.After(in.TargetEffectiveDate) {
+			if err := s.repo.UpdateNodeSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.UpdateNodeSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
+				return nil, mapPgError(err)
+			}
+		} else {
+			if err := s.repo.UpdateNodeSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.UpdateNodeSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
+				return nil, mapPgError(err)
+			}
 		}
 
 		prevNew := map[string]any{

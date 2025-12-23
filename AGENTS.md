@@ -154,6 +154,7 @@ modules/{module}/
 - ORY Kratos 接入与会话桥接（DEV-PLAN-019B）：`docs/dev-plans/019B-ory-kratos-session-bridge.md`
 - Jackson 企业 SSO（DEV-PLAN-019C）：`docs/dev-plans/019C-jackson-enterprise-sso.md`
 - 多租户管理页面可视化管理（DEV-PLAN-019D）：`docs/dev-plans/019D-multi-tenant-management-ui.md`
+- Org 模块功能目录（DEV-PLAN-020L）：`docs/dev-plans/020L-org-feature-catalog.md`
 - 制造示例组织树数据集（DEV-PLAN-036）：`docs/dev-plans/036-org-sample-tree-data.md`
 - Org Atlas+Goose 工具链与门禁（DEV-PLAN-021A）：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
 - Org UI（DEV-PLAN-035）：`docs/dev-plans/035-org-ui.md`

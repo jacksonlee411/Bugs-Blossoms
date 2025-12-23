@@ -149,7 +149,7 @@ func (r *OrgRepository) UpdateNodeSliceInPlace(ctx context.Context, tenantID uui
 		return err
 	}
 
-	var i18nJSON string
+	i18nJSON := "{}"
 	hasI18n := patch.I18nNames != nil
 	if hasI18n {
 		b, err := json.Marshal(patch.I18nNames)
