@@ -372,16 +372,17 @@ DEV-PLAN-020~036 将 Org 模块拆分为：Schema/迁移工具链、主链 CRUD�
   - 实现：
     - 占位表迁移：`migrations/org/20251218005114_org_placeholders_and_event_contracts.sql`
     - 事件结构（v1）：`modules/org/domain/events/`（consumer 通过 outbox/relay 获取）
-  - 已有测试（偏“表/读侧一致性”，事件 payload contract 当前无专用测试）：
+  - 已有测试（偏“表/读侧一致性”，事件 payload contract 目前以 outbox envelope 断言为主）：
     - `modules/org/services/org_028_query_budget_test.go`（rules/roles/role_assignments）
     - `modules/org/services/change_request_repository_integration_test.go`（change_requests 表 tenant 隔离）
+    - `modules/org/presentation/controllers/org_api_crud_integration_test.go`（outbox payload 可反序列化为 v1、topic 路由与字段名稳定）
   - 快速命令（需 Postgres）：`go test ./modules/org/services -run '^TestOrg028QueryBudget$|^TestChangeRequestRepository_TenantIsolation$' -count=1`
 - **DEV-PLAN-023（org-data 导入/导出/回滚）**
   - 实现：`cmd/org-data/`
-  - 已有测试（偏“Parse/Normalize/Validate”单测）：
+  - 已有测试：
     - `cmd/org-data/import_cmd_test.go`（`TestNormalizeNodes_*`、`TestNormalizeAssignments_*`）
+    - `cmd/org-data/seed_import_rollback_integration_test.go`（seed apply + manifest rollback）
   - 快速命令：`go test ./cmd/org-data/... -count=1`
-  - 缺口：缺少“seed apply + manifest rollback”的自动化集成测试（当前更多依赖 readiness/脚本演练）。
 - **DEV-PLAN-024（主链 CRUD：nodes/edges/assignments）**
   - 实现：
     - Service：`modules/org/services/org_service.go`
@@ -390,12 +391,13 @@ DEV-PLAN-020~036 将 Org 模块拆分为：Schema/迁移工具链、主链 CRUD�
   - 已有测试：
     - 单测：`modules/org/services/org_service_test.go`（auto-position 生成/格式、`ORG_INVALID_BODY`、`ORG_ASSIGNMENT_TYPE_DISABLED` 等）
     - 集成：`modules/org/services/org_assignment_subject_mismatch_integration_test.go`（`ORG_SUBJECT_MISMATCH`）
+    - API controller 集成：`modules/org/presentation/controllers/org_api_crud_integration_test.go`（nodes create/update/move、assignments create、outbox 事件 envelope）
     - E2E：`e2e/tests/org/org-ui.spec.ts`（创建/编辑/移动节点；创建/编辑分配）
   - 快速命令：
     - `go test ./modules/org/services -run '^TestAutoPosition|^TestCreateAssignment|^TestCreateNode' -count=1`
     - `go test ./modules/org/services -run '^TestOrgAssignment_SubjectMismatch_ReturnsServiceError$' -count=1`（需 Postgres）
     - `make e2e ci`（Playwright）
-  - 缺口：CRUD 主路径（Create/Update/Move/Assign 等）仍缺少 API controller 层的直接契约测试（目前主要靠 service 集成/E2E 覆盖）；但 controller 层已补齐 snapshot/batch/change-requests/preflight/ops health/metrics 的契约测试。
+  - 缺口：CRUD 在 controller 层仍缺少更完整的契约覆盖（positions 全链路、错误码映射边界、更多字段组合/回归用例）；但 nodes/assignments 的最小主路径已补齐 controller 集成测试。
 - **DEV-PLAN-025（时间治理/冻结窗口/审计：Correct/Rescind/ShiftBoundary/Correct-Move）**
   - 实现：
     - Service：`modules/org/services/org_service_025.go`、`modules/org/services/freeze.go`
@@ -458,8 +460,8 @@ DEV-PLAN-020~036 将 Org 模块拆分为：Schema/迁移工具链、主链 CRUD�
   - 已有测试：
     - `cmd/org-data/quality_plan_cmd_test.go`（从 report 生成 fix plan）
     - `cmd/org-data/quality_rollback_cmd_test.go`（从 manifest 生成回滚 batch request；对齐 030 change-request payload 校验）
+    - `cmd/org-data/quality_apply_rollback_integration_test.go`（apply 生成 manifest + rollback 通过 batch 回放）
   - 快速命令：`go test ./cmd/org-data/... -count=1`
-  - 缺口：缺少 `org-data quality apply/rollback` 通过 026 batch 的集成测试（dry-run/apply 与 manifest 可回滚）。
 - **DEV-PLAN-032（安全组映射/links/permission preview）**
   - 实现：`modules/org/services/org_service_032.go`、`modules/org/infrastructure/persistence/org_032_repository.go`、`modules/org/presentation/controllers/org_api_controller.go`
   - 已有测试：
@@ -496,10 +498,10 @@ DEV-PLAN-020~036 将 Org 模块拆分为：Schema/迁移工具链、主链 CRUD�
 
 ### 6.2 建议优先补齐的覆盖缺口（按风险排序）
 
-1. 023 `org-data` 的 seed apply + manifest rollback 的自动化集成测试（替代 readiness/脚本演练的单点依赖）。
-2. 031 `org-data quality apply/rollback` 通过 026 batch 的集成测试（dry-run/apply 与 manifest 可回滚）。
-3. 024 CRUD 主路径在 API controller 层的契约测试（HTTP status/JSON 错误映射与 request_id 幂等）。
-4. 022/026 事件 payload（outbox → integration events v1）的结构契约测试（snake_case、枚举、old/new 口径）。
+1. 025 写路径在 API controller 层的直接契约测试（correct/rescind/shift-boundary/correct-move：HTTP status/JSON 错误映射）。
+2. 030 change-request 生命周期（submit/cancel）与权限边界的自动化覆盖（API/E2E）。
+3. 034 org-load 报告（`org_load_report.v1`）schema/threshold 与 ops health 细分阈值逻辑测试。
+4. 022/026 事件 payload（outbox → integration events v1）仍缺少 old/new values 口径测试（当前主要覆盖 envelope/字段名/topic）。
 
 ## 7. 回归清单（可执行入口）
 
