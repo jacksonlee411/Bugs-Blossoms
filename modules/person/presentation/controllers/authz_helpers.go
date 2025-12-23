@@ -5,7 +5,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
+	coreuser "github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
@@ -40,9 +42,10 @@ func ensurePersonAuthz(
 
 	svc := authz.Use()
 	mode := svc.Mode()
+	authzDomain := authz.DomainFromTenant(tenantID)
 	req := authz.NewRequest(
 		authzutil.SubjectForUser(tenantID, currentUser),
-		personAuthzDomain,
+		authzDomain,
 		object,
 		authz.NormalizeAction(action),
 		opts...,
@@ -127,8 +130,46 @@ func ensurePageCapabilities(r *http.Request, object string, actions ...string) {
 		if strings.TrimSpace(action) == "" {
 			continue
 		}
-		if _, _, err := authzutil.CheckCapability(r.Context(), state, tenantID, currentUser, object, action); err != nil {
+		if _, _, err := checkPersonCapability(r.Context(), state, tenantID, currentUser, object, action); err != nil {
 			logger.WithError(err).WithField("capability", action).Warn("failed to evaluate capability")
 		}
 	}
+}
+
+func checkPersonCapability(
+	ctx context.Context,
+	state *authz.ViewState,
+	tenantID uuid.UUID,
+	u coreuser.User,
+	object,
+	action string,
+) (bool, bool, error) {
+	if u == nil || strings.TrimSpace(object) == "" {
+		return false, false, nil
+	}
+	action = authz.NormalizeAction(action)
+	capKey := authzutil.CapabilityKey(object, action)
+	if allowed, ok := state.CapabilityValue(capKey); ok {
+		return allowed, true, nil
+	}
+
+	req := authz.NewRequest(
+		authzutil.SubjectForUser(tenantID, u),
+		authz.DomainFromTenant(tenantID),
+		object,
+		action,
+	)
+	allowed, err := authz.Use().Check(ctx, req)
+	if err != nil {
+		return false, true, err
+	}
+	state.SetCapability(capKey, allowed)
+	if !allowed {
+		state.AddMissingPolicy(authz.MissingPolicy{
+			Domain: personAuthzDomain,
+			Object: object,
+			Action: action,
+		})
+	}
+	return allowed, true, nil
 }
