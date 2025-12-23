@@ -29,7 +29,7 @@ type CreateUserDTO struct {
 	RoleIDs    []uint   `validate:"omitempty,dive,required"`
 	GroupIDs   []string `validate:"omitempty,dive,required"`
 	AvatarID   uint     `validate:"omitempty,gt=0"`
-	Language   string   `validate:"required"`
+	Language   string   `validate:"required,oneof=en zh"`
 }
 
 type UpdateUserDTO struct {
@@ -42,7 +42,7 @@ type UpdateUserDTO struct {
 	RoleIDs    []uint   `validate:"omitempty,dive,required"`
 	GroupIDs   []string `validate:"omitempty,dive,required"`
 	AvatarID   uint     `validate:"omitempty,gt=0"`
-	Language   string   `validate:"required"`
+	Language   string   `validate:"required,oneof=en zh"`
 }
 
 func (dto *CreateUserDTO) Ok(ctx context.Context) (map[string]string, bool) {
@@ -116,6 +116,11 @@ func (dto *CreateUserDTO) ToEntity(tenantID uuid.UUID) (user.User, error) {
 		return nil, err
 	}
 
+	lang, err := user.NewUILanguage(dto.Language)
+	if err != nil {
+		return nil, err
+	}
+
 	options := []user.Option{
 		user.WithTenantID(tenantID),
 		user.WithMiddleName(dto.MiddleName),
@@ -137,7 +142,7 @@ func (dto *CreateUserDTO) ToEntity(tenantID uuid.UUID) (user.User, error) {
 		dto.FirstName,
 		dto.LastName,
 		email,
-		user.UILanguage(dto.Language),
+		lang,
 		options...,
 	)
 
@@ -161,6 +166,11 @@ func (dto *UpdateUserDTO) Apply(u user.User, roles []role.Role, permissions []*p
 		return nil, err
 	}
 
+	lang, err := user.NewUILanguage(dto.Language)
+	if err != nil {
+		return nil, err
+	}
+
 	groupUUIDs := make([]uuid.UUID, len(dto.GroupIDs))
 	for i, gID := range dto.GroupIDs {
 		groupUUID, err := uuid.Parse(gID)
@@ -172,7 +182,7 @@ func (dto *UpdateUserDTO) Apply(u user.User, roles []role.Role, permissions []*p
 
 	u = u.SetName(dto.FirstName, dto.LastName, dto.MiddleName).
 		SetEmail(email).
-		SetUILanguage(user.UILanguage(dto.Language)).
+		SetUILanguage(lang).
 		SetRoles(roles).
 		SetGroupIDs(groupUUIDs).
 		SetPermissions(permissions)

@@ -24,11 +24,12 @@ const (
 )
 
 type HuberOptions struct {
-	Pool           *pgxpool.Pool
-	Bundle         *i18n.Bundle
-	Logger         *logrus.Logger
-	CheckOrigin    func(r *http.Request) bool
-	UserRepository user.Repository
+	Pool               *pgxpool.Pool
+	Bundle             *i18n.Bundle
+	Logger             *logrus.Logger
+	CheckOrigin        func(r *http.Request) bool
+	UserRepository     user.Repository
+	SupportedLanguages []string
 }
 
 type Connection interface {
@@ -44,12 +45,23 @@ type Huber interface {
 }
 
 func NewHub(opts *HuberOptions) Huber {
+	codes := opts.SupportedLanguages
+	if len(codes) == 0 {
+		codes = defaultSupportedLanguageCodes()
+	}
+	supported := intl.GetSupportedLanguages(codes)
+	supportedTags := make([]language.Tag, 0, len(supported))
+	for _, lang := range supported {
+		supportedTags = append(supportedTags, lang.Tag)
+	}
+
 	appHub := &huber{
 		bundle:          opts.Bundle,
 		pool:            opts.Pool,
 		logger:          opts.Logger,
 		userRepo:        opts.UserRepository,
 		connectionsMeta: make(map[*ws.Connection]*MetaInfo),
+		supportedTags:   supportedTags,
 	}
 	hub := ws.NewHub(&ws.HubOptions{
 		Logger:       opts.Logger,
@@ -73,6 +85,7 @@ type huber struct {
 	logger          *logrus.Logger
 	connectionsMeta map[*ws.Connection]*MetaInfo
 	userRepo        user.Repository
+	supportedTags   []language.Tag
 }
 
 func (h *huber) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -133,12 +146,24 @@ func (h *huber) ForEach(channel string, f WsCallback) error {
 			h.logger.WithError(err).Error("failed to get user by ID")
 			continue
 		}
-		localizer := i18n.NewLocalizer(h.bundle, string(usr.UILanguage()))
+		locale := language.English
+		if len(h.supportedTags) > 0 {
+			userTag, parseErr := language.Parse(string(usr.UILanguage()))
+			if parseErr != nil {
+				userTag = language.English
+			}
+			matcher := language.NewMatcher(h.supportedTags)
+			_, idx, _ := matcher.Match(userTag)
+			locale = h.supportedTags[idx]
+		}
+
+		localizer := i18n.NewLocalizer(h.bundle, locale.String())
 		connCtx := intl.WithLocalizer(ctx, localizer)
+		connCtx = intl.WithLocale(connCtx, locale)
 		//nolint:staticcheck // SA1019: Using PageContext for WebSocket connection context is acceptable
 		connCtx = composables.WithPageCtx(connCtx, &types.PageContext{
 			URL:       MustParseURL("/"),
-			Locale:    language.English,
+			Locale:    locale,
 			Localizer: localizer,
 		})
 		if err := f(connCtx, &connection{

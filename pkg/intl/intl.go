@@ -14,19 +14,9 @@ var (
 	// allSupportedLanguages is the master list of all languages the SDK supports
 	allSupportedLanguages = []SupportedLanguage{
 		{
-			Code:        "ru",
-			VerboseName: "Русский",
-			Tag:         language.Russian,
-		},
-		{
 			Code:        "en",
 			VerboseName: "English",
 			Tag:         language.English,
-		},
-		{
-			Code:        "uz",
-			VerboseName: "O'zbekcha",
-			Tag:         language.Uzbek,
 		},
 		{
 			Code:        "zh",
@@ -35,7 +25,7 @@ var (
 		},
 	}
 
-	// SupportedLanguages is the default list (all languages) for backward compatibility
+	// SupportedLanguages is the default list (all languages supported by the runtime).
 	SupportedLanguages = allSupportedLanguages
 )
 

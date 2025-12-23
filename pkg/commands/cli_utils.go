@@ -4,12 +4,15 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/iota-uz/iota-sdk/modules"
+	"github.com/iota-uz/iota-sdk/modules/superadmin"
+	"github.com/iota-uz/iota-sdk/pkg/application"
 )
 
 // NewUtilityCommands creates all utility commands (check_tr_keys, seed, seed_superadmin)
 func NewUtilityCommands() []*cobra.Command {
 	return []*cobra.Command{
 		newCheckTrKeysCmd(),
+		newCheckTrUsageCmd(),
 		newSeedCmd(),
 		newSeed061Cmd(),
 		newSeedSuperadminCmd(),
@@ -22,7 +25,22 @@ func newCheckTrKeysCmd() *cobra.Command {
 		Short: "Check translation key consistency across all locales",
 		Long:  `Validates that all translation keys are present across all configured locales and reports any missing translations.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return CheckTrKeys(nil, modules.BuiltInModules...)
+			mods := append([]application.Module(nil), modules.BuiltInModules...)
+			mods = append(mods, superadmin.NewModule(nil))
+			return CheckTrKeys(nil, mods...)
+		},
+	}
+}
+
+func newCheckTrUsageCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "check_tr_usage",
+		Short: "Check translation usages for missing keys in allowed locales",
+		Long:  `Scans .go/.templ files for translation usages and ensures every referenced key exists in runtime-allowed locales (en/zh).`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mods := append([]application.Module(nil), modules.BuiltInModules...)
+			mods = append(mods, superadmin.NewModule(nil))
+			return CheckTrUsage(nil, mods...)
 		},
 	}
 }

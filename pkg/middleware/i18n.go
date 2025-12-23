@@ -40,18 +40,28 @@ func useLocaleFromUser(ctx context.Context) (language.Tag, error) {
 	return tag, nil
 }
 
+func matchSupported(defaultLocale language.Tag, supported []language.Tag, candidates []language.Tag) language.Tag {
+	if len(supported) == 0 {
+		return defaultLocale
+	}
+	if len(candidates) == 0 {
+		candidates = []language.Tag{defaultLocale}
+	}
+	matcher := language.NewMatcher(supported)
+	_, idx, _ := matcher.Match(candidates...)
+	return supported[idx]
+}
+
 func useLocale(r *http.Request, defaultLocale language.Tag, supported []language.Tag) language.Tag {
 	tag, err := useLocaleFromUser(r.Context())
 	if err == nil {
-		return tag
+		return matchSupported(defaultLocale, supported, []language.Tag{tag})
 	}
 	tags, _, err := language.ParseAcceptLanguage(r.Header.Get("Accept-Language"))
 	if err != nil || len(tags) == 0 {
-		return defaultLocale
+		return matchSupported(defaultLocale, supported, nil)
 	}
-	matcher := language.NewMatcher(supported)
-	_, idx, _ := matcher.Match(tags...)
-	return supported[idx]
+	return matchSupported(defaultLocale, supported, tags)
 }
 
 func ProvideLocalizer(app Application) mux.MiddlewareFunc {

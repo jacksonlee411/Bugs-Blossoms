@@ -70,7 +70,7 @@ const EDIT_USER: UserFormData = {
 	email: 'e2e.edit.user@example.com',
 	phone: '+14155559876',
 	password: 'TestPass123!',
-	languageCode: 'ru',
+	languageCode: 'zh',
 };
 
 const UPDATED_EDIT_USER: UserFormData = {

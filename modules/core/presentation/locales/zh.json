@@ -35,6 +35,15 @@
     "invalidPIN": "无效的 PIN 格式：{{.Details}}"
   },
   "Import": {
+    "UploadLabel": "上传文件",
+    "UploadPlaceholder": "选择文件",
+    "DownloadTemplate": "下载模板",
+    "Actions": {
+      "Submit": "提交"
+    },
+    "Example": {
+      "Below": "示例如下"
+    },
     "Error": {
       "ValidationError": "验证错误"
     }
