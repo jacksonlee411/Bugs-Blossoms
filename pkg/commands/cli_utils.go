@@ -11,6 +11,7 @@ func NewUtilityCommands() []*cobra.Command {
 	return []*cobra.Command{
 		newCheckTrKeysCmd(),
 		newSeedCmd(),
+		newSeed061Cmd(),
 		newSeedSuperadminCmd(),
 	}
 }
@@ -33,6 +34,17 @@ func newSeedCmd() *cobra.Command {
 		Long:  `Populates the main database with initial seed data including default tenant, users, permissions, and configuration.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return SeedDatabase(modules.BuiltInModules...)
+		},
+	}
+}
+
+func newSeed061Cmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "seed_061",
+		Short: "Seed DEV-PLAN-061 sample dataset",
+		Long:  `Creates an Org-Position-Person bridge sample dataset (20 employees) following DEV-PLAN-061: persons, org nodes, assignments (auto positions), and personnel events (hire/transfer/termination).`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return SeedDevPlan061(modules.BuiltInModules...)
 		},
 	}
 }

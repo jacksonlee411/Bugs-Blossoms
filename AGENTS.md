@@ -133,6 +133,7 @@ modules/{module}/
 - Person sqlc：`docs/runbooks/person-sqlc.md`
 - Person Atlas+Goose：`docs/runbooks/person-atlas-goose.md`
 - PostgreSQL 17 迁移：`docs/runbooks/postgres17-migration.md`
+- DEV-PLAN-061 示例数据集（seed_061）：`docs/runbooks/dev-plan-061-seed-dataset.md`
 - 文档规范：`docs/dev-plans/000-docs-format.md`
 - R200 工具链落地现状与复用指引（DEV-PLAN-009A）：`docs/dev-plans/009A-r200-tooling-playbook.md`
 - Core 用户权限页 IA 优化：`docs/dev-plans/016A-core-users-permissions-ia.md`
