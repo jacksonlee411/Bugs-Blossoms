@@ -704,7 +704,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for _, row := range props.Timeline.Rows {
-				canEdit := !asOf.Before(row.EffectiveDate) && asOf.Before(row.EndDate)
+				canEdit := asOf.After(row.EffectiveDate) && asOf.Before(row.EndDate)
 				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<tr class=\"border-b border-surface-400/60\"><td class=\"py-2 pr-2 text-200\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
