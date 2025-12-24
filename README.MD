@@ -7,7 +7,8 @@
 - [Discord Community](https://discord.gg/zKeTEZAQqF): Join our community for support and Q&A
 - [Contribution Guide](docs/CONTRIBUTING.MD): Learn how to contribute to the project
 - [Developer Rules (SSOT)](AGENTS.md): Local checks, workflows, and doc gates
-- [Multi-worktree local Docker isolation](docs/dev-plans/011B-worktree-local-dev-docker-isolation.md): Avoid port/volume conflicts
+- [Multi-worktree shared local dev infra](docs/dev-plans/011C-worktree-shared-local-dev-infra.md): Share Postgres/Redis across worktrees
+- [Multi-worktree isolated local dev infra (advanced)](docs/dev-plans/011B-worktree-local-dev-docker-isolation.md): Separate Postgres/Redis per worktree
 - [Setup Demo](https://github.com/iota-uz/sdk-demo): Learn how to setup IOTA-SDK
 - [Demo stand](https://demo.iotaerp.com): Explore the SDK UI
 - [Docker hub](https://hub.docker.com/r/iotauz/sdk) - Official Docker images

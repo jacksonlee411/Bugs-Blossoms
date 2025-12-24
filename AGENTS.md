@@ -136,6 +136,7 @@ modules/{module}/
 - DEV-PLAN-061 示例数据集（seed_061）：`docs/runbooks/dev-plan-061-seed-dataset.md`
 - 文档规范：`docs/dev-plans/000-docs-format.md`
 - R200 工具链落地现状与复用指引（DEV-PLAN-009A）：`docs/dev-plans/009A-r200-tooling-playbook.md`
+- 多 worktree 共享本地开发基础设施（DEV-PLAN-011C）：`docs/dev-plans/011C-worktree-shared-local-dev-infra.md`
 - Core 用户权限页 IA 优化：`docs/dev-plans/016A-core-users-permissions-ia.md`
 - Core 用户权限页签 UI/交互优化：`docs/dev-plans/016B-core-users-permissions-ui.md`
 - Transactional Outbox 工具链（DEV-PLAN-017）：`docs/dev-plans/017-transactional-outbox.md`

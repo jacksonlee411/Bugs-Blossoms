@@ -5,8 +5,8 @@ usage() {
 	cat <<'EOF'
 Usage: scripts/setup-worktree.sh [--force] [--project-name <name>] [--pg-port <port>] [--redis-port <port>] [--db-name <name>]
 
-Generates/updates .env.local with worktree-scoped Docker Compose isolation defaults:
-  - COMPOSE_PROJECT_NAME, PG_PORT, REDIS_PORT
+Generates/updates .env.local with shared local dev infrastructure defaults (single Postgres/Redis):
+  - COMPOSE_PROJECT_NAME, PG_PORT, REDIS_PORT (shared across worktrees)
   - DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
 
 By default it only fills missing keys and never overwrites existing values unless --force is provided.
@@ -54,62 +54,11 @@ while [ $# -gt 0 ]; do
 done
 
 if ! command -v python3 >/dev/null 2>&1; then
-	echo "python3 is required for port detection and env file updates." >&2
+	echo "python3 is required for env file updates." >&2
 	exit 1
 fi
 
 env_file=".env.local"
-
-port_is_free() {
-	python3 - "$1" <<'PY'
-import socket
-import sys
-
-port = int(sys.argv[1])
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-try:
-	s.bind(("127.0.0.1", port))
-except OSError:
-	sys.exit(1)
-finally:
-	s.close()
-PY
-}
-
-find_free_port() {
-	local start="$1"
-	local end="$2"
-	local port
-	for port in $(seq "$start" "$end"); do
-		if port_is_free "$port"; then
-			echo "$port"
-			return 0
-		fi
-	done
-	return 1
-}
-
-sanitize_project_name() {
-	local raw="$1"
-	python3 - "$raw" <<'PY'
-import re
-import sys
-
-raw = sys.argv[1].lower()
-raw = re.sub(r"[^a-z0-9]+", "-", raw).strip("-")
-print(raw)
-PY
-}
-
-default_project_name() {
-	local base
-	base="$(basename "$PWD")"
-	local safe
-	safe="$(sanitize_project_name "$base")"
-	local hash
-	hash="$(printf '%s' "$PWD" | sha1sum | awk '{print $1}' | cut -c1-6)"
-	echo "${safe}-${hash}"
-}
 
 read_existing_value() {
 	local key="$1"
@@ -140,37 +89,45 @@ PY
 
 project_name="${explicit_project_name}"
 if [ -z "$project_name" ]; then
-	if v="$(read_existing_value "COMPOSE_PROJECT_NAME" 2>/dev/null)"; then
+	if [ "$force" -eq 1 ]; then
+		project_name="iota-sdk-dev"
+	elif v="$(read_existing_value "COMPOSE_PROJECT_NAME" 2>/dev/null)"; then
 		project_name="$v"
 	else
-		project_name="$(default_project_name)"
+		project_name="iota-sdk-dev"
 	fi
 fi
 
 pg_port="${explicit_pg_port}"
 if [ -z "$pg_port" ]; then
-	if v="$(read_existing_value "PG_PORT" 2>/dev/null)"; then
+	if [ "$force" -eq 1 ]; then
+		pg_port="5438"
+	elif v="$(read_existing_value "PG_PORT" 2>/dev/null)"; then
 		pg_port="$v"
 	else
-		pg_port="$(find_free_port 5438 5499)"
+		pg_port="5438"
 	fi
 fi
 
 redis_port="${explicit_redis_port}"
 if [ -z "$redis_port" ]; then
-	if v="$(read_existing_value "REDIS_PORT" 2>/dev/null)"; then
+	if [ "$force" -eq 1 ]; then
+		redis_port="6379"
+	elif v="$(read_existing_value "REDIS_PORT" 2>/dev/null)"; then
 		redis_port="$v"
 	else
-		redis_port="$(find_free_port 6379 6499)"
+		redis_port="6379"
 	fi
 fi
 
 db_name="${explicit_db_name}"
 if [ -z "$db_name" ]; then
-	if v="$(read_existing_value "DB_NAME" 2>/dev/null)"; then
+	if [ "$force" -eq 1 ]; then
+		db_name="iota_erp"
+	elif v="$(read_existing_value "DB_NAME" 2>/dev/null)"; then
 		db_name="$v"
 	else
-		db_name="iota_erp_${project_name}"
+		db_name="iota_erp"
 	fi
 fi
 
@@ -244,7 +201,7 @@ missing = [k for k in keys if k not in seen and k not in existing]
 if missing:
 	if out_lines and out_lines[-1].strip():
 		out_lines.append("")
-	out_lines.append("# Worktree docker isolation")
+	out_lines.append("# Local dev infra (shared across worktrees)")
 	for k in keys:
 		if k in existing or k in seen:
 			continue

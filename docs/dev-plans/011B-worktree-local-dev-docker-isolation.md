@@ -1,6 +1,10 @@
 # DEV-PLAN-011B：多 worktree 本地 Docker 隔离（Postgres/Redis）
 
-**状态**: 已完成（待合并，2025-12-14 08:04 UTC）
+**状态**: 准备就绪（2025-12-24 09:21 UTC — 可选高级模式）
+
+> 本计划保留为**可选高级模式**：当你确实需要多个 worktree 同时运行多套 Postgres/Redis（端口/数据卷隔离）时使用。
+>
+> 默认推荐方案为 `DEV-PLAN-011C`（共享 infra + 固定端口）：`docs/dev-plans/011C-worktree-shared-local-dev-infra.md`。
 
 ## 1. 背景与上下文 (Context)
 - 当前机器上存在多个 `git worktree` 并行开发同一仓库（`bugs-blossoms`）。
@@ -8,9 +12,9 @@
   - `Bugs-Blossoms`（分支：`feature/dev-plan-011a-impl`）
   - `Bugs-Blossoms-015b4`（分支：`main`）
   - `Bugs-Blossoms-020`（`detached HEAD`：`ae86336e`）
-- 本地开发依赖 `compose.dev.yml` 启动 Postgres/Redis，但 Docker 资源默认不随 worktree 隔离，容易发生以下问题：
+- 当你需要“多套 infra 并行运行”（例如同时验证不同分支的迁移/seed、并行跑多个环境）时，如果所有 worktree 复用同一套 infra，容易出现以下问题：
   - **端口冲突**：不同 worktree 的 redis 都尝试绑定 `6379`，导致 `docker compose up redis` 失败（`port is already allocated`）。
-  - **数据互相污染**：`compose.dev.yml` 把 volume 固定命名为 `sdk-data` / `sdk-redis`，导致不同 compose project 仍共享同一份数据卷（即使 worktree 目录不同）。
+  - **数据互相污染**：迁移/seed/缓存会相互影响，导致“我以为在测 A，其实 DB 已被 B 改过”的不可复现问题。
   - **清理互相误伤**：任一 worktree 执行 `docker compose down -v` 可能影响其它 worktree 的数据，或因为“volume still in use”导致清理失败。
 - 该漂移会直接影响 011A/011B 相关的本地验证与 CI 对齐目标（尤其是需要稳定可复现的 DB 环境）。
 
@@ -28,16 +32,15 @@
 
 ## 3. 现状复核与问题定位 (Findings)
 ### 3.1 compose.dev.yml 的关键问题
-- `db` 映射固定端口：`5438:5432`（可用但无法多实例并行）。
-- `redis` 映射固定端口：`6379:6379`（多实例必冲突）。
-- volumes 显式固定名字：
-  - `sdk-data: { name: sdk-data }`
-  - `sdk-redis: { name: sdk-redis }`
-  这会绕过 compose 默认的“按 project 前缀隔离”，导致不同 worktree 共享同一份卷。
+- 011C 默认会固定 compose project 名称（例如 `iota-sdk-dev`），从而让所有 worktree **共享**同一套容器/数据卷。
+- 若要并行启动多套 infra，必须显式为每个 worktree 覆写：
+  - `COMPOSE_PROJECT_NAME`（隔离容器/网络/卷命名）
+  - `PG_PORT` / `REDIS_PORT`（隔离宿主机端口，避免冲突）
+  - `DB_*`（确保应用连接到对应实例）
 
 ### 3.2 已观测到的故障形态
 - 当某个 worktree 的 redis 已占用 `6379`，其它 worktree 启动 redis 会失败：`Bind for 0.0.0.0:6379 failed: port is already allocated`。
-- 即使不同 worktree 使用不同 `COMPOSE_PROJECT_NAME`，由于 volume 被强制命名，仍会共享 `sdk-data`/`sdk-redis`。
+- 若多个 worktree 共用同一套 DB，迁移/seed/缓存会互相干扰，导致问题难以复现与回溯。
 
 ## 4. 方案与关键决策 (Design & Decisions)
 ### 4.1 方案选型
@@ -53,8 +56,7 @@
 
 ### 4.2 关键决策
 1. **Volume 命名策略**
-   - 选定：移除 `compose.dev.yml` 中对 volume 的显式 `name:` 固定命名，恢复 compose 默认的 project-scoped 命名（`<project>_<volume>`）。
-   - 重要提示：这一改动会让原本共享的 `sdk-data`/`sdk-redis` 不再被自动挂载，新启动的实例会使用新的 `<project>_sdk-data`/`<project>_sdk-redis`，表现为“数据库像被清空”。这是**隔离的必然结果**，不是数据真的丢失。
+   - 选定：使用 compose 默认的 project-scoped volumes（`<project>_<volume>`），隔离由 `COMPOSE_PROJECT_NAME` 决定。
 2. **端口策略**
    - 选定：`compose.dev.yml` 使用环境变量注入端口：
      - Postgres：`${PG_PORT:-5438}:5432`
@@ -64,7 +66,7 @@
    - 命令口径：
      - 运行 compose：`docker compose --env-file .env.local -f compose.dev.yml up -d db redis`
      - 运行 make（Go/脚本）：Makefile 通过 `-include .env.local` 自动加载（避免“配置了但 make 读不到”的误用）。
-   - 可选增强：提供 `scripts/setup-worktree.sh` 或 `make dev-env` 自动生成 `.env.local`（按目录 hash 或扫描空闲端口），降低手工端口管理成本。
+   - 可选增强：使用 `scripts/setup-worktree.sh --force --project-name ... --pg-port ... --redis-port ... --db-name ...` 写入/更新 `.env.local`，降低手工编辑成本（端口分配仍需手动决定）。
    - 变量一致性约定（减少误配）：
      - `DB_PORT` 与 `PG_PORT` **通常应保持一致**（同一 worktree 的应用连接到自己启动的 Postgres）。
      - `DB_PORT` 未显式设置时，默认等于 `PG_PORT`（由 Makefile 提供默认联动）。
@@ -127,19 +129,19 @@ docker compose --env-file .env.local -f compose.dev.yml up -d db redis
 3. [x] **Makefile 集成（必做）**
    - [x] Makefile 加入 `-include .env.local`，并明确导出 compose/db 相关变量，确保 `make db ...`/`docker compose ...` 行为与 worktree 配置一致。
 4. [x] **端口管理辅助（可选但推荐）**
-   - [x] 提供 `scripts/setup-worktree.sh` 与 `make dev-env`，自动生成/补齐 `.env.local`（避免手工分配端口冲突/记混）。
+   - [x] 提供 `scripts/setup-worktree.sh` 与 `make dev-env`，用于写入/补齐 `.env.local`（端口/项目名需自行选择，避免与其它 worktree 冲突）。
 5. [x] **本地验证**
    - [x] 多个 project 并行启动 `db/redis` 不冲突（验证端口与 project-scoped volumes 生效）。
    - [x] `docker compose down -v` 仅清理当前 project 的 volumes，不影响其它 project。
 
 ## 7. 验收标准 (Acceptance Criteria)
-- 三个 worktree 并行执行 `docker compose -f compose.dev.yml up -d db redis` 均成功，且 `docker ps` 显示为不同 project 容器。
-- 任一 worktree 执行 `docker compose -f compose.dev.yml down -v` 仅清理自身的 volumes，不影响其它 worktree。
+- 三个 worktree 各自使用自己的 `.env.local`，分别执行 `docker compose --env-file .env.local -f compose.dev.yml up -d db redis` 均成功，且 `docker ps` 显示为不同 project 容器。
+- 任一 worktree 在其 `.env.local` 口径下执行 `docker compose --env-file .env.local -f compose.dev.yml down -v` 仅清理自身的 volumes，不影响其它 worktree。
 - `DB_PORT/DB_NAME` 与 compose 的端口/容器实例一致，迁移与测试不再出现“连接到错误实例/端口占用”类问题。
 
 ## 8. 回滚策略 (Rollback)
-- 回滚 `compose.dev.yml` 的端口与 volume 修改（恢复固定端口与固定卷名）。
-- 清理由新策略创建的 project-scoped volumes（按 `docker volume ls | grep <project>` 定位后删除）。
+- 回到 `DEV-PLAN-011C` 默认共享模式：移除/恢复各 worktree 的 `.env.local` 覆写（`COMPOSE_PROJECT_NAME=iota-sdk-dev`、`PG_PORT=5438`、`REDIS_PORT=6379`、`DB_NAME=iota_erp`）。
+- 如需清理某个隔离实例的数据：在对应 worktree 使用其 `.env.local` 口径执行 `docker compose --env-file .env.local -f compose.dev.yml down -v`（破坏性操作）。
 
 ## 9. 合并提示 (PR Notes)
 实施本方案的 PR 描述中必须显式提示：
