@@ -17,39 +17,39 @@ type SubnavProps struct {
 templ Subnav(props SubnavProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	<div class="flex items-center gap-2">
-			<a
-				href={ templ.SafeURL(fmt.Sprintf("/org/nodes?effective_date=%s", props.EffectiveDate)) }
-				class={
-					"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
-					templ.KV("border-primary bg-primary/10 text-100", props.Active == "nodes"),
-					templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "nodes"),
-				}
-			>
+		<a
+			href={ templ.SafeURL(fmt.Sprintf("/org/nodes?effective_date=%s", props.EffectiveDate)) }
+			class={
+				"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+				templ.KV("border-primary bg-primary/10 text-100", props.Active == "nodes"),
+				templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "nodes"),
+			}
+		>
 			@icons.TreeStructure(icons.Props{Size: "18"})
 			{ pageCtx.T("Org.UI.Tabs.Structure") }
 		</a>
 		if props.CanAssignments {
-				<a
-					href={ templ.SafeURL(fmt.Sprintf("/org/assignments?effective_date=%s", props.EffectiveDate)) }
-					class={
-						"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
-						templ.KV("border-primary bg-primary/10 text-100", props.Active == "assignments"),
-						templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "assignments"),
-					}
-				>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/org/assignments?effective_date=%s", props.EffectiveDate)) }
+				class={
+					"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+					templ.KV("border-primary bg-primary/10 text-100", props.Active == "assignments"),
+					templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "assignments"),
+				}
+			>
 				@icons.Users(icons.Props{Size: "18"})
 				{ pageCtx.T("Org.UI.Tabs.Assignments") }
 			</a>
 		}
 		if props.CanPositions {
-				<a
-					href={ templ.SafeURL(fmt.Sprintf("/org/positions?effective_date=%s", props.EffectiveDate)) }
-					class={
-						"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
-						templ.KV("border-primary bg-primary/10 text-100", props.Active == "positions"),
-						templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "positions"),
-					}
-				>
+			<a
+				href={ templ.SafeURL(fmt.Sprintf("/org/positions?effective_date=%s", props.EffectiveDate)) }
+				class={
+					"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+					templ.KV("border-primary bg-primary/10 text-100", props.Active == "positions"),
+					templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "positions"),
+				}
+			>
 				@icons.Briefcase(icons.Props{Size: "18"})
 				{ pageCtx.T("Org.UI.Tabs.Positions") }
 			</a>

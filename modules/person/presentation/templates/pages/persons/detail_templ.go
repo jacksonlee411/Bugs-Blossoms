@@ -345,7 +345,7 @@ func Detail(props *viewmodels.PersonDetailPageProps) templ.Component {
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Person.UI.Assignments.Timeline.Title"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/person/presentation/templates/pages/persons/detail.templ`, Line: 92, Col: 89}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/person/presentation/templates/pages/persons/detail.templ`, Line: 92, Col: 88}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
@@ -372,7 +372,7 @@ func Detail(props *viewmodels.PersonDetailPageProps) templ.Component {
 					var templ_7745c5c3_Var23 string
 					templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Actions.OpenFullPage"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/person/presentation/templates/pages/persons/detail.templ`, Line: 98, Col: 62}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/person/presentation/templates/pages/persons/detail.templ`, Line: 98, Col: 61}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 					if templ_7745c5c3_Err != nil {

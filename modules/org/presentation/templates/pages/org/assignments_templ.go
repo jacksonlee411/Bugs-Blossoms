@@ -69,7 +69,7 @@ func AssignmentsPage(props AssignmentsPageProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Title"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 33, Col: 88}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 33, Col: 87}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -82,7 +82,7 @@ func AssignmentsPage(props AssignmentsPageProps) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Shared.AsOf"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 34, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 34, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -95,7 +95,7 @@ func AssignmentsPage(props AssignmentsPageProps) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(props.EffectiveDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 34, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 34, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -122,7 +122,7 @@ func AssignmentsPage(props AssignmentsPageProps) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Actions.OpenPerson"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 40, Col: 60}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 40, Col: 59}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {
@@ -153,7 +153,7 @@ func AssignmentsPage(props AssignmentsPageProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.EffectiveDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 50, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/assignments.templ`, Line: 50, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {

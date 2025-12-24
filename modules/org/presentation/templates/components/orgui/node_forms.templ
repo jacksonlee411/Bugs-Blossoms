@@ -11,8 +11,8 @@ import (
 	"github.com/iota-uz/iota-sdk/components/base/input"
 	"github.com/iota-uz/iota-sdk/components/multilang"
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
-	"github.com/iota-uz/iota-sdk/pkg/crud/models"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
+	"github.com/iota-uz/iota-sdk/pkg/crud/models"
 )
 
 type NodeFormMode string
@@ -76,14 +76,14 @@ templ NodeForm(props NodeFormProps) {
 			{{ showMoveParent = true }}
 			{{ submitLabel = pageCtx.T("Org.UI.Actions.Move") }}
 	}
-		<div class="space-y-3">
-			<div class="flex items-center justify-between gap-3">
-				<div class="text-sm font-semibold text-100">{ title }</div>
-				if props.Node != nil && props.Mode != NodeFormCreate {
-					@button.Ghost(button.Props{
-						Size: button.SizeSM,
-						Icon: icons.X(icons.Props{Size: "18"}),
-						Attrs: templ.Attributes{
+	<div class="space-y-3">
+		<div class="flex items-center justify-between gap-3">
+			<div class="text-sm font-semibold text-100">{ title }</div>
+			if props.Node != nil && props.Mode != NodeFormCreate {
+				@button.Ghost(button.Props{
+					Size: button.SizeSM,
+					Icon: icons.X(icons.Props{Size: "18"}),
+					Attrs: templ.Attributes{
 						"hx-get":    fmt.Sprintf("/org/nodes/%s?effective_date=%s", props.Node.ID.String(), props.EffectiveDate),
 						"hx-target": "#org-node-panel",
 						"hx-swap":   "innerHTML",
@@ -96,34 +96,34 @@ templ NodeForm(props NodeFormProps) {
 		if props.FormError != "" {
 			<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
 		}
-			<form
-				class="space-y-3"
-				hx-target="#org-node-panel"
-				hx-swap="innerHTML"
+		<form
+			class="space-y-3"
+			hx-target="#org-node-panel"
+			hx-swap="innerHTML"
 			if method == "patch" {
 				hx-patch={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
-				} else {
-					hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
-				}
-			>
-				<div>
-					<label class="block text-xs font-medium text-200" for="org-node-effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
-					<input
-						id="org-node-effective-date"
-						type="date"
-						name="effective_date"
-						value={ props.EffectiveDate }
-						class="mt-1 w-full rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
-					/>
-					<div class="mt-1 text-xs text-400">{ pageCtx.T("Org.UI.Node.EffectiveDate.Help") }</div>
+			} else {
+				hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+			}
+		>
+			<div>
+				<label class="block text-xs font-medium text-200" for="org-node-effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
+				<input
+					id="org-node-effective-date"
+					type="date"
+					name="effective_date"
+					value={ props.EffectiveDate }
+					class="mt-1 w-full rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
+				/>
+				<div class="mt-1 text-xs text-400">{ pageCtx.T("Org.UI.Node.EffectiveDate.Help") }</div>
+			</div>
+			if props.ParentID != nil {
+				<input type="hidden" name="parent_id" value={ props.ParentID.String() }/>
+				<div class="rounded-md border border-surface-400 bg-surface-300 p-3 text-xs text-200">
+					<div class="text-400">{ pageCtx.T("Org.UI.Node.Fields.Parent") }</div>
+					<div class="mt-1">{ props.ParentID.String() }</div>
 				</div>
-				if props.ParentID != nil {
-					<input type="hidden" name="parent_id" value={ props.ParentID.String() }/>
-					<div class="rounded-md border border-surface-400 bg-surface-300 p-3 text-xs text-200">
-						<div class="text-400">{ pageCtx.T("Org.UI.Node.Fields.Parent") }</div>
-						<div class="mt-1">{ props.ParentID.String() }</div>
-					</div>
-				}
+			}
 			if showCode {
 				@input.Text(&input.Props{
 					Label: pageCtx.T("Org.UI.Node.Fields.Code"),
@@ -153,29 +153,29 @@ templ NodeForm(props NodeFormProps) {
 					<option value="active" selected?={ statusValue == "active" }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
 					<option value="inactive" selected?={ statusValue == "inactive" }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
 				}
-					@input.Text(&input.Props{
-						Label: pageCtx.T("Org.UI.Node.Fields.DisplayOrder"),
-						Error: props.Errors["display_order"],
-						Attrs: templ.Attributes{
+				@input.Text(&input.Props{
+					Label: pageCtx.T("Org.UI.Node.Fields.DisplayOrder"),
+					Error: props.Errors["display_order"],
+					Attrs: templ.Attributes{
 						"name":  "display_order",
 						"type":  "number",
-							"value": displayOrderValue,
-						},
-					})
-					{{ ml := models.NewMultiLang("", "", "") }}
-					if strings.TrimSpace(i18nNamesValue) != "" {
-						{{ parsed, err := models.MultiLangFromString(i18nNamesValue) }}
-						if err == nil && parsed != nil {
-							{{ ml = parsed }}
-						}
-					}
-					@multilang.FormInputWithJSAndLabelName(ctx, "i18n_names", ml, pageCtx.T("Org.UI.Node.Fields.I18nNames"))
-					if strings.TrimSpace(props.Errors["i18n_names"]) != "" {
-						<div class="mt-1 text-xs text-red-200">{ props.Errors["i18n_names"] }</div>
+						"value": displayOrderValue,
+					},
+				})
+				{{ ml := models.NewMultiLang("", "", "") }}
+				if strings.TrimSpace(i18nNamesValue) != "" {
+					{{ parsed, err := models.MultiLangFromString(i18nNamesValue) }}
+					if err == nil && parsed != nil {
+						{{ ml = parsed }}
 					}
 				}
-				if showParent {
-					<div>
+				@multilang.FormInputWithJSAndLabelName(ctx, "i18n_names", ml, pageCtx.T("Org.UI.Node.Fields.I18nNames"))
+				if strings.TrimSpace(props.Errors["i18n_names"]) != "" {
+					<div class="mt-1 text-xs text-red-200">{ props.Errors["i18n_names"] }</div>
+				}
+			}
+			if showParent {
+				<div>
 					<div data-testid="org-node-parent-combobox">
 						@base.Combobox(base.ComboboxProps{
 							Searchable:   true,

@@ -87,21 +87,21 @@ templ Detail(props *viewmodels.PersonDetailPageProps) {
 					</div>
 				</div>
 			}
-				@card.Card(card.Props{}) {
-					<div class="flex items-center justify-between gap-3">
-						<h2 class="text-lg font-medium">{ pageCtx.T("Person.UI.Assignments.Timeline.Title") }</h2>
-						if pageCtx.CanAuthz("org.assignments", "read") {
-							<a
-								class="inline-flex items-center gap-2 rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-200 hover:bg-surface-300"
-								href={ templ.SafeURL(fmt.Sprintf("/org/assignments?effective_date=%s&pernr=%s", props.EffectiveDate, props.Person.Pernr)) }
-							>
-								{ pageCtx.T("Org.UI.Assignments.Actions.OpenFullPage") }
-							</a>
-						}
-						if pageCtx.CanAuthz("org.assignments", "assign") {
-							@button.Secondary(button.Props{
-								Size: button.SizeSM,
-								Attrs: templ.Attributes{
+			@card.Card(card.Props{}) {
+				<div class="flex items-center justify-between gap-3">
+					<h2 class="text-lg font-medium">{ pageCtx.T("Person.UI.Assignments.Timeline.Title") }</h2>
+					if pageCtx.CanAuthz("org.assignments", "read") {
+						<a
+							class="inline-flex items-center gap-2 rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-200 hover:bg-surface-300"
+							href={ templ.SafeURL(fmt.Sprintf("/org/assignments?effective_date=%s&pernr=%s", props.EffectiveDate, props.Person.Pernr)) }
+						>
+							{ pageCtx.T("Org.UI.Assignments.Actions.OpenFullPage") }
+						</a>
+					}
+					if pageCtx.CanAuthz("org.assignments", "assign") {
+						@button.Secondary(button.Props{
+							Size: button.SizeSM,
+							Attrs: templ.Attributes{
 								"type":      "button",
 								"hx-get":    fmt.Sprintf("/org/assignments/form?effective_date=%s&pernr=%s&include_summary=1", props.EffectiveDate, props.Person.Pernr),
 								"hx-target": "#org-assignment-form",

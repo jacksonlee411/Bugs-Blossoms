@@ -32,20 +32,20 @@ templ NodesPage(props NodesPageProps) {
 				</div>
 				<div class="flex items-center gap-2">
 					<label class="text-xs font-medium text-200" for="effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
-						<input
-							id="effective-date"
-							type="date"
-							name="effective_date"
-							value={ props.EffectiveDate }
-							class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
-							hx-get="/org/nodes"
-							hx-trigger="change"
-							hx-target="#org-nodes-page"
-							hx-select="#org-nodes-page"
-							hx-swap="outerHTML"
-							hx-push-url="true"
-							hx-include="[name='effective_date']"
-						/>
+					<input
+						id="effective-date"
+						type="date"
+						name="effective_date"
+						value={ props.EffectiveDate }
+						class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
+						hx-get="/org/nodes"
+						hx-trigger="change"
+						hx-target="#org-nodes-page"
+						hx-select="#org-nodes-page"
+						hx-swap="outerHTML"
+						hx-push-url="true"
+						hx-include="[name='effective_date']"
+					/>
 				</div>
 			</div>
 			@orgui.Subnav(orgui.SubnavProps{
