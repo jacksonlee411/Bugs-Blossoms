@@ -132,6 +132,10 @@ test.describe('HTMX Error UX (DEV-PLAN-043)', () => {
 		await effectiveDateInput.fill(invalidEffectiveDateStr);
 		await effectiveDateInput.dispatchEvent('change');
 		expect((await effectiveDateChangeResp).status()).toBe(200);
+		await expect(page.locator('#org-assignment-form form')).toHaveAttribute(
+			'hx-post',
+			new RegExp(`effective_date=${invalidEffectiveDateStr}`)
+		);
 
 		await page.getByLabel('Pernr').fill('0001');
 		await expect(page.locator('#org-pernr')).toHaveValue('0001');
@@ -210,4 +214,3 @@ test.describe('HTMX Error UX (DEV-PLAN-043)', () => {
 		await expect(alertToast).toContainText('Something broke');
 	});
 });
-

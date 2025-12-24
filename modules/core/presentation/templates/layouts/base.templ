@@ -70,15 +70,15 @@ templ Base(props *BaseProps) {
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			@MustUseHead(ctx)
 		</head>
-	<body
-		class="antialiased overflow-y-hidden"
-		hx-ext="ws"
-		ws-connect={ props.WebsocketURL }
-		data-toast-error-title={ pageCtx.T("Toast.ErrorTitle") }
-		data-toast-default-error={ pageCtx.T("Toast.DefaultError") }
-		data-toast-network-error={ pageCtx.T("Toast.NetworkError") }
-	>
-		{ children... }
-	</body>
-</html>
+		<body
+			class="antialiased overflow-y-hidden"
+			hx-ext="ws"
+			ws-connect={ props.WebsocketURL }
+			data-toast-error-title={ pageCtx.T("Toast.ErrorTitle") }
+			data-toast-default-error={ pageCtx.T("Toast.DefaultError") }
+			data-toast-network-error={ pageCtx.T("Toast.NetworkError") }
+		>
+			{ children... }
+		</body>
+	</html>
 }
