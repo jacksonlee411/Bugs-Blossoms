@@ -16,7 +16,10 @@
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
 - [ ] 在“创建任职/编辑任职”表单中增加可编辑的 `生效日期 (effective_date)` 输入（date）。
-- [ ] 在“创建任职/编辑任职”表单中增加必填 `操作类型 (event_type)` 输入：`hire` / `transfer` / `termination`（UI 文案：雇用/调动/离职）。
+- [ ] 在表单中增加必填 `操作类型 (event_type)` 输入：`hire` / `transfer` / `termination`（UI 文案：雇用/调动/离职）。
+- [ ] 语义收敛：
+  - [ ] “创建任职”只支持 `event_type=hire`（雇用/入职任职）。
+  - [ ] “变更任职”只支持 `event_type in (transfer, termination)`（调动/离职）。
 - [ ] 前端根据 `event_type` 显示/校验必要字段（例如离职需要结束当前任职）。
 - [ ] 后端在成功写入任职变更后，写入 `org_personnel_events`（`event_type` 与 `effective_date` 对齐），并补齐 `reason_code`（默认策略参考 `ReasonCodeMode`）。
 - [ ] 对冻结窗口导致的 409 冲突，在 UI 给出可理解的错误信息，并在可行范围内提供预防性提示。
@@ -96,6 +99,9 @@
 
 - **Endpoint**: `POST /org/assignments`
 - **Query**: `effective_date=YYYY-MM-DD`（仍保留，兼容现有路由与搜索联动；但以 Form Data 为准）
+- **Source of Truth（必须避免歧义）**:
+  - 如 Form Data 里有 `effective_date`，必须以 Form Data 为准；URL Query 仅用于“可分享/可回退”的页面状态。
+  - 否则用户在表单里改了日期，但后端仍用 URL 上的旧日期，会导致“看起来保存不成功”。
 - **Form Data（字段与校验）**:
   - `effective_date` (required, date)：用户可编辑，必须 `>= cutoff`（freeze enforce 时）
   - `event_type` (required, enum)：必须为 `hire`
@@ -139,6 +145,8 @@
   - `409 Conflict`: 冻结窗口/时间线冲突
   - `422 Unprocessable Entity`: event_type 不允许/字段缺失/目标职位在该日期不存在等
 
+> 行业常见约定：`Hire/Termination` 通常属于“雇佣关系（Employment）”生命周期；本系统当前以“任职（Assignment）+ 人事事件（Personnel Event）”表达，合理但需避免把“终止雇佣”误实现成“只结束某一条任职”。因此 termination 的后端语义建议为“结束该人员在生效日的所有有效任职”（见 6.3）。
+
 ### 5.3 兼容与保留：编辑（Correct / Patch）
 - 现有 `POST /org/assignments/{id}:correct` 与 `PATCH /org/assignments/{id}` 保留，但 UI 文案改为：
   - `correct`：更正（管理员/特权用）
@@ -163,9 +171,19 @@
 ### 6.3 离职（Termination）
 1. 校验冻结窗口：`effective_date >= cutoff`。
 2. 读取并锁定“被操作的 assignment_id”（即 UI 传入的 `{id}`），并校验其为 `primary` 且 pernr 匹配。
-3. 将当前 assignment 的 `end_date` 截断到 `effective_date`。
-4. 写入 `org_personnel_events(event_type=termination, payload.previous_*)`。
+3. 将该人员在生效日仍有效的任职全部截断到 `effective_date`（建议至少包含：primary + 其他扩展任职类型）。
+4. 写入 `org_personnel_events(event_type=termination, payload.previous_*)`：至少记录被操作的 primary assignment 作为 “anchor”，其余被关闭任职可追加到 `payload.terminated_assignment_ids`（数组）用于审计。
 5. 本计划不强制联动 `persons.status`；如 HR 需要“离职=人员不可用”，另起计划做人员状态与权限联动。
+
+### 6.4 时间语义与边界条件（行业通常做法）
+> 采用 Postgres 时间区间的常见约定：任职区间是半开区间 `[effective_date, end_date)`，因此“调动/离职的生效日”是新状态开始的第一天，旧状态在该日 00:00 即失效。
+
+- **禁止零长度区间**：由于 DB check `effective_date < end_date`，当 `effective_date == old.effective_date` 时无法通过“截断 end_date=effective_date”。
+  - 处理建议：
+    - 对 `transfer/termination`：若 `effective_date == current.effective_date`，提示用户使用“更正（correct）/撤销（rescind）”而不是“调动/离职”。
+    - 对 `hire`：若当天错误录入，应走 `correct/rescind` 而非再次 hire。
+- **有效范围校验**：`transfer/termination` 的 `effective_date` 必须满足 `current.effective_date < effective_date <= current.end_date`（上界按实现决定是否允许等于 end_date）。
+- **重入/再雇用（rehire）**：若该人员已存在有效 primary assignment，则 `hire` 应返回冲突并引导走 `transfer`；若人员曾离职且当前无有效任职，则允许再次 `hire`。
 
 ## 7. 安全与鉴权 (Security & Authz)
 - 页面能力：`org.assignments:assign` 仍为主门槛。
@@ -200,6 +218,8 @@
 - `ORG_FROZEN_WINDOW`（409）：提示“生效日期早于系统冻结窗口，最早可选：{cutoff}”，并将 date input 的 `min` 设置为 `cutoff`。
 - `ORG_OVERLAP`（409）：提示“该人员在该日期已有任职（时间线冲突）”，引导使用“更正/调动”而非重复创建。
 - `ORG_POSITION_NOT_FOUND_AT_DATE`（422）：提示“该职位在生效日无效，请调整生效日期或选择其他职位”。
+- `ORG_INVALID_BODY`（422/400）：提示“请补齐生效日期/操作类型/部门/职位”。
+- `ORG_ASSIGNMENT_TYPE_DISABLED`（422）：提示“该任职类型未启用”。
 
 #### 7.1.5 i18n 契约（最小集）
 - 字段标签：
