@@ -179,6 +179,7 @@ func (c *PersonUIController) Detail(w http.ResponseWriter, r *http.Request) {
 	if !ensurePersonAuthz(w, r, personPersonsAuthzObject, "view") {
 		return
 	}
+	ensurePageCapabilities(r, "org.assignments", "read", "assign")
 
 	raw := mux.Vars(r)["person_uuid"]
 	personUUID, err := uuid.Parse(raw)

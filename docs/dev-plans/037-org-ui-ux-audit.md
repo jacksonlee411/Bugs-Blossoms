@@ -1,6 +1,6 @@
 # DEV-PLAN-037：Org 模块页面交互问题调查与改进建议
 
-**状态**: 草拟中（2025-12-24 11:08 UTC）
+**状态**: 已完成（2025-12-24 13:16 UTC）
 
 > 本文档定位：对当前 Org UI（`/org/nodes`、`/org/positions`、`/org/assignments`）的可用性问题做调查与根因分析，并给出可执行的改进建议与验收标准。
 >
@@ -14,9 +14,9 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] 明确每个问题的**现象 → 根因 → 影响面**（以代码证据为准，避免“猜 UI”）。
-- [ ] 给出**可落地的修复路径**（优先最小改动、可渐进发布）。
-- [ ] 明确“人员分配”页面在 Org vs Person 的归属与关系，减少信息架构混乱。
+- [X] 明确每个问题的**现象 → 根因 → 影响面**（以代码证据为准，避免“猜 UI”）。
+- [X] 给出**可落地的修复路径**（优先最小改动、可渐进发布）。
+- [X] 明确“人员分配”页面在 Org vs Person 的归属与关系，减少信息架构混乱。
 
 ### 2.2 非目标
 - 不在本计划内直接引入新的 Org 业务能力/数据契约（例如新增复杂审批流、批量调整等）。
@@ -290,19 +290,19 @@ graph TD
 
 ## 10. 测试与验收标准 (Acceptance Criteria)
 - 生效日期：
-  - [ ] 新建/编辑节点时，用户可明确输入/确认“本次变更生效日期”，且不会被隐藏的全局状态误导。
-  - [ ] 当写入生效日期 ≠ 当前浏览 as-of 日期时，提交成功后用户不会出现“创建成功但列表看不到”的困惑（自动切换或明确引导）。
+  - [X] 新建/编辑节点时，用户可明确输入/确认“本次变更生效日期”，且不会被隐藏的全局状态误导。
+  - [X] 当写入生效日期 ≠ 当前浏览 as-of 日期时，提交成功后用户不会出现“创建成功但列表看不到”的困惑（自动切换或明确引导）。
 - i18n：
-  - [ ] `i18n_names` 不再要求手写 JSON；普通用户可通过多语言输入控件完成填写，且输入错误不会破坏整页提交体验。
+  - [X] `i18n_names` 不再要求手写 JSON；普通用户可通过多语言输入控件完成填写，且输入错误不会破坏整页提交体验。
 - HTMX：
-  - [ ] 切换 Org 页面的 `effective_date` 不会产生 layout 嵌套；多次切换后 DOM 结构保持稳定。
-  - [ ] date 切换在错误/权限不足等边界响应下仍能稳定呈现可理解的反馈（不会 swap 成空白/碎片化 DOM）。
+  - [X] 切换 Org 页面的 `effective_date` 不会产生 layout 嵌套；多次切换后 DOM 结构保持稳定。
+  - [X] date 切换在错误/权限不足等边界响应下仍能稳定呈现可理解的反馈（不会 swap 成空白/碎片化 DOM）。
 - 样式：
-  - [ ] 浅色主题下，非活动 Tab 与 `effective_date` 输入框可读（对比度足够），不出现黑底黑字。
+  - [X] 浅色主题下，非活动 Tab 与 `effective_date` 输入框可读（对比度足够），不出现黑底黑字。
 - IA：
-  - [ ] 文档/页面上明确 “Org 分配页” 与 “Person 详情分配区”是同一套数据/能力的不同入口，并提供互链。
+  - [X] 文档/页面上明确 “Org 分配页” 与 “Person 详情分配区”是同一套数据/能力的不同入口，并提供互链。
 - 职位详情：
-  - [ ] “汇报给（ReportsTo）”在职位详情与表单中展示为业务可读 label（非 UUID），且在解析失败时有可理解的兜底。
+  - [X] “汇报给（ReportsTo）”在职位详情与表单中展示为业务可读 label（非 UUID），且在解析失败时有可理解的兜底。
 
 ## 11. 运维与发布（灰度 / 回滚 / 观测）
 - Feature Flag：默认不引入；若线上风险评估需要灰度开关，应单独补充契约与实现计划。
@@ -314,14 +314,51 @@ graph TD
   - 关注 `effective_date` 相关 400/422/403 的错误率；确保错误态仍能渲染在目标 fragment 内（避免用户看到空白）。
 
 ## 12. 待办清单（实施任务草案）
-1. [ ] 为 Org 三个页面的 date input 增加 `hx-select`（或切到 partial 渲染），并补充回归用例。
-2. [ ] 调整 Org subnav 与 effective_date 输入的背景/文字 token 使用（浅色主题可读）。
-3. [ ] 为 Org Node 表单增加可编辑的“生效日期”字段（并明确语义文案）。
-4. [ ] 将 `i18n_names` 替换为可视化多语言输入（复用/抽取组件）。
-5. [ ] 补充 Person ↔ Org 分配页互链与定位说明（文案/i18n keys）。
-6. [ ] 明确并实现“写入生效日期 ≠ as-of”时的成功后导航策略（push-url/提示 + 一键切换）。
-7. [ ] 为 date 切换补齐边界响应策略：确保响应包含 `#org-*-page` 或落到 `HX-Request` partial 渲染。
-8. [ ] 职位详情与表单的 “ReportsTo” 显示改为业务 label（复用 `positionLabelFor`），并在必要处增加跳转互链。
+1. [X] 为 Org 三个页面的 date input 增加 `hx-select`（或切到 partial 渲染），并补充回归用例。
+2. [X] 调整 Org subnav 与 effective_date 输入的背景/文字 token 使用（浅色主题可读）。
+3. [X] 为 Org Node 表单增加可编辑的“生效日期”字段（并明确语义文案）。
+4. [X] 将 `i18n_names` 替换为可视化多语言输入（复用/抽取组件）。
+5. [X] 补充 Person ↔ Org 分配页互链与定位说明（文案/i18n keys）。
+6. [X] 明确并实现“写入生效日期 ≠ as-of”时的成功后导航策略（push-url/提示 + 一键切换）。
+7. [X] 为 date 切换补齐边界响应策略：确保响应包含 `#org-*-page` 或落到 `HX-Request` partial 渲染。
+8. [X] 职位详情与表单的 “ReportsTo” 显示改为业务 label（复用 `positionLabelFor`），并在必要处增加跳转互链。
+
+## 14. 验证记录（可复现）
+> 说明：此处记录的是可自动化/可复现的门禁验证。交互式“登录后点 UI”无法在无浏览器/无人工操作的环境中逐项截图复核，但已通过 E2E 与门禁覆盖核心回归面。
+
+- [X] `make generate && make css` —— 2025-12-24 13:16 UTC
+- [X] `make check tr` —— 2025-12-24 13:16 UTC
+- [X] `go fmt ./... && go vet ./...` —— 2025-12-24 13:16 UTC
+- [X] `make check lint && make test` —— 2025-12-24 13:16 UTC
+- [X] `make check doc` —— 2025-12-24 13:16 UTC
+
+### 14.1 本次复核执行记录（系统内自动化）
+- [X] `make generate && make css` —— 2025-12-24 21:18 UTC
+- [X] `make check tr` —— 2025-12-24 21:18 UTC
+- [X] `go fmt ./... && go vet ./...` —— 2025-12-24 21:18 UTC
+- [X] `make check lint && make test` —— 2025-12-24 21:18 UTC
+- [X] `make check doc` —— 2025-12-24 21:18 UTC
+
+### 14.2 交互式验证说明（登录/点击路径）
+- 受限于当前执行环境（无 GUI/无法打开浏览器），无法逐一完成“人工点选 + 截图”的验收。
+- 替代验证（方案 B）：使用 `curl` 进行 HTTP smoke，并**模拟 HTMX 请求头**（`HX-Request`/`HX-Target`）来复现关键交互路径与 swap 行为；详见 14.3。
+- 如需人工复核，建议按 037 的验收标准逐项在 `/org/nodes`、`/org/positions`、`/org/assignments` 以及 Person 详情页点击验证。
+
+### 14.3 HTTP smoke 验证记录（curl）
+> 目标：在无浏览器环境下，验证“壳套壳”修复、边界响应兜底、互链与关键字段展示（含 ReportsTo label）。
+
+- [X] 登录会话：`POST /login` 获取 `sid` cookie（不在日志中记录凭据）。—— 2025-12-24 21:56 UTC
+- [X] Org 三页正常渲染（`id` 唯一、无嵌套）：
+  - `GET /org/nodes?effective_date=2025-12-24` → `200` 且 `id="org-nodes-page"` 仅出现一次
+  - `GET /org/assignments?effective_date=2025-12-24` → `200` 且 `id="org-assignments-page"` 仅出现一次
+  - `GET /org/positions?effective_date=2025-12-24` → `200` 且 `id="org-positions-page"` 仅出现一次
+- [X] 无效 `effective_date` 边界兜底（仍能渲染 fragment，便于 HTMX `hx-select` 抽取）：
+  - `GET /org/{nodes|assignments|positions}?effective_date=bad` → `400` 且对应 `id="org-*-page"` 仍存在
+- [X] Node 新建表单：`GET /org/nodes/new?effective_date=2025-12-24` → `200` 且包含可编辑 `type="date" name="effective_date"` 与 multilang `i18n_names` 输入
+- [X] Person ↔ Org 分配互链：
+  - `GET /person/persons/{uuid}` 页面“任职经历”区可见“打开完整页面”（指向 `/org/assignments?effective_date=...&pernr=...`）与“创建”按钮（具备 `org.assignments.assign`）
+  - `GET /org/assignments?effective_date=...&pernr=...` 顶部可见“打开人员详情”链接（指向 `/person/persons:by-pernr?pernr=...`）
+- [X] 职位详情 ReportsTo：选择 `reports_to_position_id` 非空的职位样本，请求 `/org/positions/{id}?effective_date=...&node_id=...`，确认“汇报给”显示业务 label（例如 `01 — 总经理`），不以 `font-mono` 形式直接渲染 UUID。
 
 ## 13. 附录：关键证据索引
 - Org 页面 effective date（HTMX swap 全页）：  
