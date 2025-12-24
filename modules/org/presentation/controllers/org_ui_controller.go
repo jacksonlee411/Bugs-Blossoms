@@ -130,7 +130,7 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 
 	statusCode := http.StatusOK
 	var errs []string
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		errs = append(errs, "invalid effective_date")
@@ -153,6 +153,7 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 		errs = append(errs, err.Error())
 	}
 	tree := mappers.HierarchyToTree(nodes, selectedNodeID)
+	parentLabelByID := hierarchyNodeLabelMap(nodes)
 
 	var selected *viewmodels.OrgNodeDetails
 	if selectedNodeID != nil {
@@ -160,6 +161,13 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errs = append(errs, err.Error())
 		} else {
+			if details != nil && details.ParentHint != nil && *details.ParentHint != uuid.Nil {
+				if label, ok := parentLabelByID[*details.ParentHint]; ok && strings.TrimSpace(label) != "" {
+					details.ParentLabel = label
+				} else {
+					details.ParentLabel = c.orgNodeLabelFor(r, tenantID, *details.ParentHint, effectiveDate)
+				}
+			}
 			selected = details
 		}
 	}
@@ -189,7 +197,7 @@ func (c *OrgUIController) HierarchyPartial(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("effective_date is required"))
@@ -234,7 +242,7 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 
 	statusCode := http.StatusOK
 	var pageErrs []string
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		pageErrs = append(pageErrs, "invalid effective_date")
@@ -318,7 +326,7 @@ func positionsQueryFromRequest(r *http.Request) (positionsQuery, []string) {
 	out.effectiveDateProvided = rawEffective != ""
 
 	var errs []string
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil {
 		errs = append(errs, "invalid effective_date")
 		effectiveDate = time.Now().UTC()
@@ -483,7 +491,7 @@ func positionsTreeProps(tree *viewmodels.OrgTree, effectiveDateStr string) orgui
 		},
 		Target:  "#org-positions-panel",
 		Swap:    "innerHTML",
-		Include: "#org-positions-filters, [name='effective_date']",
+		Include: "#org-positions-filters, #effective-date",
 		PushURL: "true",
 	}
 }
@@ -626,7 +634,7 @@ func (c *OrgUIController) PositionSearchOptions(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("effective_date is required"))
@@ -701,7 +709,7 @@ func (c *OrgUIController) NewPositionForm(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("effective_date is required"))
@@ -740,8 +748,10 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "write") {
 		return
 	}
+	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromWriteForm(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -829,6 +839,8 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 	}
 
 	q, _ := positionsQueryFromRequest(r)
+	q.effectiveDate = effectiveDate.UTC()
+	q.effectiveDateStr = effectiveDateStr
 	q.nodeID = &orgNodeID
 	htmx.PushUrl(w, canonicalPositionsURL(q, &res.PositionID))
 
@@ -849,6 +861,12 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 	panelProps.Timeline = timeline
 
 	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
+		if err := orgtemplates.PositionsHeader(orgtemplates.PositionsHeaderProps{
+			EffectiveDate: effectiveDateStr,
+			SwapOOB:       true,
+		}).Render(ctx, ww); err != nil {
+			return err
+		}
 		if err := orgui.PositionDetails(orgui.PositionDetailsProps{
 			EffectiveDate: effectiveDateStr,
 			NodeID:        orgNodeID.String(),
@@ -883,7 +901,7 @@ func (c *OrgUIController) EditPositionForm(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -948,8 +966,10 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgPositionsAuthzObject, "write") {
 		return
 	}
+	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromWriteForm(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -1051,6 +1071,8 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 	}
 
 	q, _ := positionsQueryFromRequest(r)
+	q.effectiveDate = effectiveDate.UTC()
+	q.effectiveDateStr = effectiveDateStr
 	q.nodeID = &orgNodeID
 	htmx.PushUrl(w, canonicalPositionsURL(q, &positionID))
 
@@ -1071,6 +1093,12 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 	panelProps.Timeline = timeline
 
 	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
+		if err := orgtemplates.PositionsHeader(orgtemplates.PositionsHeaderProps{
+			EffectiveDate: effectiveDateStr,
+			SwapOOB:       true,
+		}).Render(ctx, ww); err != nil {
+			return err
+		}
 		if err := orgui.PositionDetails(orgui.PositionDetailsProps{
 			EffectiveDate: effectiveDateStr,
 			NodeID:        orgNodeID.String(),
@@ -1285,7 +1313,7 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromWriteForm(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -1427,7 +1455,7 @@ func (c *OrgUIController) AssignmentForm(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -1492,7 +1520,7 @@ func (c *OrgUIController) TransitionAssignmentForm(w http.ResponseWriter, r *htt
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -1596,7 +1624,7 @@ func (c *OrgUIController) TransitionAssignment(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromWriteForm(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -1756,7 +1784,7 @@ func (c *OrgUIController) EditAssignmentForm(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -1840,7 +1868,7 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
 	}
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromWriteForm(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -1965,7 +1993,17 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 }
 
 func (c *OrgUIController) writeAssignmentsFormWithOOBTimeline(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID, effectiveDateStr string, pernr string, timeline *viewmodels.OrgAssignmentsTimeline) {
+	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
+
 	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
+		if err := orgtemplates.AssignmentsHeader(orgtemplates.AssignmentsHeaderProps{
+			EffectiveDate: effectiveDateStr,
+			Pernr:         pernr,
+			SwapOOB:       true,
+		}).Render(ctx, ww); err != nil {
+			return err
+		}
 		includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
 		if includeSummary {
 			if _, err := io.WriteString(ww, `<div id="org-assignment-form" class="mt-3"></div>`); err != nil {
@@ -2010,7 +2048,7 @@ func (c *OrgUIController) NodeSearchOptions(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("effective_date is required"))
@@ -2064,7 +2102,7 @@ func (c *OrgUIController) NewNodeForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte("effective_date is required"))
@@ -2078,11 +2116,16 @@ func (c *OrgUIController) NewNodeForm(w http.ResponseWriter, r *http.Request) {
 			parentID = &parsed
 		}
 	}
+	parentLabel := ""
+	if parentID != nil && *parentID != uuid.Nil {
+		parentLabel = c.orgNodeLabelFor(r, tenantID, *parentID, effectiveDate)
+	}
 
 	templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
 		Mode:                 orgui.NodeFormCreate,
 		EffectiveDate:        effectiveDateStr,
 		ParentID:             parentID,
+		ParentLabel:          parentLabel,
 		Errors:               map[string]string{},
 		SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
 	}), templ.WithStreaming()).ServeHTTP(w, r)
@@ -2107,7 +2150,7 @@ func (c *OrgUIController) NodePanel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromQuery(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -2176,7 +2219,7 @@ func (c *OrgUIController) CreateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromWriteForm(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -2194,6 +2237,10 @@ func (c *OrgUIController) CreateNode(w http.ResponseWriter, r *http.Request) {
 			parentID = &parsed
 		}
 	}
+	parentLabel := ""
+	if parentID != nil && *parentID != uuid.Nil {
+		parentLabel = c.orgNodeLabelFor(r, tenantID, *parentID, effectiveDate)
+	}
 
 	i18nNames, i18nErr := parseI18nNames(strings.TrimSpace(r.FormValue("i18n_names")))
 	if i18nErr != nil {
@@ -2203,6 +2250,7 @@ func (c *OrgUIController) CreateNode(w http.ResponseWriter, r *http.Request) {
 			EffectiveDate:        effectiveDateStr,
 			Node:                 &viewmodels.OrgNodeDetails{Code: code, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: strings.TrimSpace(r.FormValue("i18n_names"))},
 			ParentID:             parentID,
+			ParentLabel:          parentLabel,
 			Errors:               map[string]string{"i18n_names": i18nErr.Error()},
 			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
 		}), templ.WithStreaming()).ServeHTTP(w, r)
@@ -2228,6 +2276,7 @@ func (c *OrgUIController) CreateNode(w http.ResponseWriter, r *http.Request) {
 			EffectiveDate:        effectiveDateStr,
 			Node:                 &viewmodels.OrgNodeDetails{Code: code, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: strings.TrimSpace(r.FormValue("i18n_names"))},
 			ParentID:             parentID,
+			ParentLabel:          parentLabel,
 			Errors:               fieldErrs,
 			FormError:            formErr,
 			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
@@ -2263,7 +2312,7 @@ func (c *OrgUIController) UpdateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromWriteForm(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -2340,7 +2389,7 @@ func (c *OrgUIController) MoveNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	effectiveDate, err := effectiveDateFromRequest(r)
+	effectiveDate, err := effectiveDateFromWriteForm(r)
 	if err != nil || effectiveDate.IsZero() {
 		http.Error(w, "effective_date is required", http.StatusBadRequest)
 		return
@@ -2389,6 +2438,8 @@ func (c *OrgUIController) MoveNode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *OrgUIController) writeNodePanelWithOOBTree(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID, nodeID uuid.UUID, effectiveDateStr string, effectiveDate time.Time) {
+	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
+	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
 	ensureOrgPageCapabilities(r, orgNodesAuthzObject, "write")
 	ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "write")
 
@@ -2402,9 +2453,23 @@ func (c *OrgUIController) writeNodePanelWithOOBTree(w http.ResponseWriter, r *ht
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	parentLabelByID := hierarchyNodeLabelMap(nodes)
+	if details != nil && details.ParentHint != nil && *details.ParentHint != uuid.Nil {
+		if label, ok := parentLabelByID[*details.ParentHint]; ok && strings.TrimSpace(label) != "" {
+			details.ParentLabel = label
+		} else {
+			details.ParentLabel = c.orgNodeLabelFor(r, tenantID, *details.ParentHint, effectiveDate)
+		}
+	}
 	selected := nodeID
 	tree := mappers.HierarchyToTree(nodes, &selected)
 	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
+		if err := orgtemplates.NodesHeader(orgtemplates.NodesHeaderProps{
+			EffectiveDate: effectiveDateStr,
+			SwapOOB:       true,
+		}).Render(ctx, ww); err != nil {
+			return err
+		}
 		if err := orgui.NodeDetails(orgui.NodeDetailsProps{EffectiveDate: effectiveDateStr, Node: details}).Render(ctx, ww); err != nil {
 			return err
 		}
@@ -2434,6 +2499,23 @@ func (c *OrgUIController) orgNodeLabelFor(r *http.Request, tenantID uuid.UUID, n
 		return strings.TrimSpace(details.Name)
 	}
 	return label
+}
+
+func hierarchyNodeLabelMap(nodes []services.HierarchyNode) map[uuid.UUID]string {
+	out := make(map[uuid.UUID]string, len(nodes))
+	for _, n := range nodes {
+		label := strings.TrimSpace(n.Name)
+		code := strings.TrimSpace(n.Code)
+		if label != "" && code != "" {
+			label = fmt.Sprintf("%s (%s)", label, code)
+		} else if label == "" && code != "" {
+			label = code
+		} else if label == "" {
+			label = n.ID.String()
+		}
+		out[n.ID] = label
+	}
+	return out
 }
 
 func (c *OrgUIController) positionLabelFor(r *http.Request, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time, fallbackCode string) string {
@@ -2474,8 +2556,17 @@ func tenantAndUserFromContext(r *http.Request) (uuid.UUID, coreuser.User, bool) 
 	return tenantID, currentUser, true
 }
 
-func effectiveDateFromRequest(r *http.Request) (time.Time, error) {
-	v := strings.TrimSpace(r.FormValue("effective_date"))
+func effectiveDateFromQuery(r *http.Request) (time.Time, error) {
+	v := strings.TrimSpace(r.URL.Query().Get("effective_date"))
+	t, err := parseEffectiveDate(v)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return t, nil
+}
+
+func effectiveDateFromWriteForm(r *http.Request) (time.Time, error) {
+	v := strings.TrimSpace(r.PostFormValue("effective_date"))
 	t, err := parseEffectiveDate(v)
 	if err != nil {
 		return time.Time{}, err

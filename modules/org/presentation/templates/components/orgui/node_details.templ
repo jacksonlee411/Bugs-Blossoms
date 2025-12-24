@@ -2,6 +2,7 @@ package orgui
 
 import (
 	"fmt"
+	"strings"
 
 	icons "github.com/iota-uz/icons/phosphor"
 	"github.com/iota-uz/iota-sdk/components/base/button"
@@ -83,7 +84,21 @@ templ NodeDetails(props NodeDetailsProps) {
 						if props.Node.ParentHint == nil {
 							<span class="text-400">—</span>
 						} else {
-							{ props.Node.ParentHint.String() }
+							{{ parentID := props.Node.ParentHint.String() }}
+							if strings.TrimSpace(props.Node.ParentLabel) == "" {
+								<span class="font-mono text-xs">{ parentID }</span>
+							} else {
+								<button
+									type="button"
+									class="text-primary hover:underline"
+									hx-get={ fmt.Sprintf("/org/nodes/%s?effective_date=%s", parentID, props.EffectiveDate) }
+									hx-target="#org-node-panel"
+									hx-swap="innerHTML"
+									hx-push-url={ fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", props.EffectiveDate, parentID) }
+								>
+									{ strings.TrimSpace(props.Node.ParentLabel) }
+								</button>
+							}
 						}
 					</div>
 				</div>

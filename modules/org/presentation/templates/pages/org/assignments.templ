@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	icons "github.com/iota-uz/icons/phosphor"
 	"github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
@@ -20,14 +21,16 @@ type AssignmentsPageProps struct {
 	Errors        []string
 }
 
-templ AssignmentsPage(props AssignmentsPageProps) {
+type AssignmentsHeaderProps struct {
+	EffectiveDate string
+	Pernr         string
+	SwapOOB       bool
+}
+
+templ AssignmentsHeader(props AssignmentsHeaderProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	@layouts.Authenticated(layouts.AuthenticatedProps{
-		BaseProps: layouts.BaseProps{
-			Title: pageCtx.T("Org.UI.Assignments.MetaTitle"),
-		},
-	}) {
-		<div id="org-assignments-page" class="p-6 space-y-4">
+	if props.SwapOOB {
+		<div id="org-assignments-header" hx-swap-oob="true" class="space-y-3">
 			<div class="flex items-center justify-between gap-4 flex-wrap">
 				<div class="flex items-center gap-3">
 					<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.Assignments.Title") }</h1>
@@ -55,7 +58,7 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 						hx-select="#org-assignments-page"
 						hx-swap="outerHTML"
 						hx-push-url="true"
-						hx-include="#org-pernr, [name='effective_date']"
+						hx-include="#org-pernr, #effective-date"
 					/>
 				</div>
 			</div>
@@ -65,6 +68,59 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
 				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
 			})
+		</div>
+	} else {
+		<div id="org-assignments-header" class="space-y-3">
+			<div class="flex items-center justify-between gap-4 flex-wrap">
+				<div class="flex items-center gap-3">
+					<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.Assignments.Title") }</h1>
+					<span class="text-xs text-300">{ pageCtx.T("Org.UI.Shared.AsOf") }: { props.EffectiveDate }</span>
+					if strings.TrimSpace(props.Pernr) != "" {
+						<a
+							class="text-xs text-primary hover:underline"
+							href={ templ.SafeURL(fmt.Sprintf("/person/persons:by-pernr?pernr=%s", props.Pernr)) }
+						>
+							{ pageCtx.T("Org.UI.Assignments.Actions.OpenPerson") }
+						</a>
+					}
+				</div>
+				<div class="flex items-center gap-2">
+					<label class="text-xs font-medium text-200" for="effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
+					<input
+						id="effective-date"
+						type="date"
+						name="effective_date"
+						value={ props.EffectiveDate }
+						class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
+						hx-get="/org/assignments"
+						hx-trigger="change"
+						hx-target="#org-assignments-page"
+						hx-select="#org-assignments-page"
+						hx-swap="outerHTML"
+						hx-push-url="true"
+						hx-include="#org-pernr, #effective-date"
+					/>
+				</div>
+			</div>
+			@orgui.Subnav(orgui.SubnavProps{
+				EffectiveDate:  props.EffectiveDate,
+				Active:         "assignments",
+				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
+				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
+			})
+		</div>
+	}
+}
+
+templ AssignmentsPage(props AssignmentsPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{
+			Title: pageCtx.T("Org.UI.Assignments.MetaTitle"),
+		},
+	}) {
+		<div id="org-assignments-page" class="p-6 space-y-4">
+			@AssignmentsHeader(AssignmentsHeaderProps{EffectiveDate: props.EffectiveDate, Pernr: props.Pernr})
 			if len(props.Errors) > 0 {
 				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
 					<ul class="list-disc pl-5 space-y-1">
@@ -104,13 +160,14 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 							}
 							@button.Secondary(button.Props{
 								Size: button.SizeSM,
+								Icon: icons.ArrowClockwise(icons.Props{Size: "18"}),
 								Attrs: templ.Attributes{
 									"type":        "button",
 									"hx-get":      "/org/assignments",
 									"hx-target":   "#org-assignments-timeline",
 									"hx-swap":     "innerHTML",
 									"hx-push-url": "true",
-									"hx-include":  "#org-pernr, [name='effective_date']",
+									"hx-include":  "#org-pernr, #effective-date",
 								},
 							}) {
 								{ pageCtx.T("Org.UI.Assignments.Actions.Refresh") }

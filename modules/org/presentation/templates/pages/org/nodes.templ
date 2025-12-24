@@ -17,14 +17,15 @@ type NodesPageProps struct {
 	Errors        []string
 }
 
-templ NodesPage(props NodesPageProps) {
+type NodesHeaderProps struct {
+	EffectiveDate string
+	SwapOOB       bool
+}
+
+templ NodesHeader(props NodesHeaderProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	@layouts.Authenticated(layouts.AuthenticatedProps{
-		BaseProps: layouts.BaseProps{
-			Title: pageCtx.T("Org.UI.Nodes.MetaTitle"),
-		},
-	}) {
-		<div id="org-nodes-page" class="p-6 space-y-4">
+	if props.SwapOOB {
+		<div id="org-nodes-header" hx-swap-oob="true" class="space-y-3">
 			<div class="flex items-center justify-between gap-4 flex-wrap">
 				<div class="flex items-center gap-3">
 					<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.Nodes.Title") }</h1>
@@ -44,7 +45,7 @@ templ NodesPage(props NodesPageProps) {
 						hx-select="#org-nodes-page"
 						hx-swap="outerHTML"
 						hx-push-url="true"
-						hx-include="[name='effective_date']"
+						hx-include="#effective-date"
 					/>
 				</div>
 			</div>
@@ -54,6 +55,51 @@ templ NodesPage(props NodesPageProps) {
 				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
 				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
 			})
+		</div>
+	} else {
+		<div id="org-nodes-header" class="space-y-3">
+			<div class="flex items-center justify-between gap-4 flex-wrap">
+				<div class="flex items-center gap-3">
+					<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.Nodes.Title") }</h1>
+					<span class="text-xs text-300">{ pageCtx.T("Org.UI.Shared.AsOf") }: { props.EffectiveDate }</span>
+				</div>
+				<div class="flex items-center gap-2">
+					<label class="text-xs font-medium text-200" for="effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
+					<input
+						id="effective-date"
+						type="date"
+						name="effective_date"
+						value={ props.EffectiveDate }
+						class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
+						hx-get="/org/nodes"
+						hx-trigger="change"
+						hx-target="#org-nodes-page"
+						hx-select="#org-nodes-page"
+						hx-swap="outerHTML"
+						hx-push-url="true"
+						hx-include="#effective-date"
+					/>
+				</div>
+			</div>
+			@orgui.Subnav(orgui.SubnavProps{
+				EffectiveDate:  props.EffectiveDate,
+				Active:         "nodes",
+				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
+				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
+			})
+		</div>
+	}
+}
+
+templ NodesPage(props NodesPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{
+			Title: pageCtx.T("Org.UI.Nodes.MetaTitle"),
+		},
+	}) {
+		<div id="org-nodes-page" class="p-6 space-y-4">
+			@NodesHeader(NodesHeaderProps{EffectiveDate: props.EffectiveDate})
 			if len(props.Errors) > 0 {
 				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
 					<ul class="list-disc pl-5 space-y-1">
