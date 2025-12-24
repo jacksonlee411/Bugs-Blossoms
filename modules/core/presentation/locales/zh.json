@@ -34,6 +34,11 @@
     "invalidTIN": "无效的 TIN 格式：{{.Details}}",
     "invalidPIN": "无效的 PIN 格式：{{.Details}}"
   },
+  "Toast": {
+    "ErrorTitle": "错误",
+    "DefaultError": "请求失败，请重试",
+    "NetworkError": "网络异常，请重试"
+  },
   "Import": {
     "UploadLabel": "上传文件",
     "UploadPlaceholder": "选择文件",

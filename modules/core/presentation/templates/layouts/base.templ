@@ -24,6 +24,7 @@ var (
 	htmxWS         = "/assets/" + assets.HashFS.HashName("js/lib/htmx.ws.js")
 	alpineTooltip  = "/assets/" + assets.HashFS.HashName("js/lib/alpine-tooltip.min.js")
 	htmxAlpineInit = "/assets/" + assets.HashFS.HashName("js/lib/htmx-alpine-init.js")
+	htmxErrorUX    = "/assets/" + assets.HashFS.HashName("js/lib/htmx-error-ux.js")
 	permissionsJs  = "/assets/" + assets.HashFS.HashName("js/permissions.js")
 )
 
@@ -41,6 +42,7 @@ templ DefaultHead() {
 	<script src={ permissionsJs }></script>
 	<script defer type="module" src={ alpine }></script>
 	<script src={ htmx }></script>
+	<script src={ htmxErrorUX }></script>
 	<script src={ htmxPreload }></script>
 	<script src={ htmxSSE }></script>
 	<script src={ htmxStream }></script>
@@ -56,9 +58,10 @@ type BaseProps struct {
 }
 
 templ Base(props *BaseProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	<!DOCTYPE html>
 	<html
-		lang={ composables.UsePageCtx(ctx).GetLocale().String() }
+		lang={ pageCtx.GetLocale().String() }
 		class="system bg-surface-100 text-100"
 	>
 		<head>
@@ -67,12 +70,15 @@ templ Base(props *BaseProps) {
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			@MustUseHead(ctx)
 		</head>
-		<body
-			class="antialiased overflow-y-hidden"
-			hx-ext="ws"
-			ws-connect={ props.WebsocketURL }
-		>
-			{ children... }
-		</body>
-	</html>
+	<body
+		class="antialiased overflow-y-hidden"
+		hx-ext="ws"
+		ws-connect={ props.WebsocketURL }
+		data-toast-error-title={ pageCtx.T("Toast.ErrorTitle") }
+		data-toast-default-error={ pageCtx.T("Toast.DefaultError") }
+		data-toast-network-error={ pageCtx.T("Toast.NetworkError") }
+	>
+		{ children... }
+	</body>
+</html>
 }
