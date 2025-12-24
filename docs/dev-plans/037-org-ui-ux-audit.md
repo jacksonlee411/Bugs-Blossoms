@@ -340,8 +340,25 @@ graph TD
 - [X] `make check doc` —— 2025-12-24 21:18 UTC
 
 ### 14.2 交互式验证说明（登录/点击路径）
-- 受限于当前执行环境（无浏览器/无法模拟人工登录操作），无法逐一完成“登录系统后按页面路径点选”的人工验收。
-- 替代验证：本计划相关改动已通过本地门禁（lint/test/docs/tr/生成物一致性）与 CI E2E 覆盖；如需人工复核，建议按 037 的验收标准逐项在 `/org/nodes`、`/org/positions`、`/org/assignments` 以及 Person 详情页进行点击验证。
+- 受限于当前执行环境（无 GUI/无法打开浏览器），无法逐一完成“人工点选 + 截图”的验收。
+- 替代验证（方案 B）：使用 `curl` 进行 HTTP smoke，并**模拟 HTMX 请求头**（`HX-Request`/`HX-Target`）来复现关键交互路径与 swap 行为；详见 14.3。
+- 如需人工复核，建议按 037 的验收标准逐项在 `/org/nodes`、`/org/positions`、`/org/assignments` 以及 Person 详情页点击验证。
+
+### 14.3 HTTP smoke 验证记录（curl）
+> 目标：在无浏览器环境下，验证“壳套壳”修复、边界响应兜底、互链与关键字段展示（含 ReportsTo label）。
+
+- [X] 登录会话：`POST /login` 获取 `sid` cookie（不在日志中记录凭据）。—— 2025-12-24 21:56 UTC
+- [X] Org 三页正常渲染（`id` 唯一、无嵌套）：
+  - `GET /org/nodes?effective_date=2025-12-24` → `200` 且 `id="org-nodes-page"` 仅出现一次
+  - `GET /org/assignments?effective_date=2025-12-24` → `200` 且 `id="org-assignments-page"` 仅出现一次
+  - `GET /org/positions?effective_date=2025-12-24` → `200` 且 `id="org-positions-page"` 仅出现一次
+- [X] 无效 `effective_date` 边界兜底（仍能渲染 fragment，便于 HTMX `hx-select` 抽取）：
+  - `GET /org/{nodes|assignments|positions}?effective_date=bad` → `400` 且对应 `id="org-*-page"` 仍存在
+- [X] Node 新建表单：`GET /org/nodes/new?effective_date=2025-12-24` → `200` 且包含可编辑 `type="date" name="effective_date"` 与 multilang `i18n_names` 输入
+- [X] Person ↔ Org 分配互链：
+  - `GET /person/persons/{uuid}` 页面“任职经历”区可见“打开完整页面”（指向 `/org/assignments?effective_date=...&pernr=...`）与“创建”按钮（具备 `org.assignments.assign`）
+  - `GET /org/assignments?effective_date=...&pernr=...` 顶部可见“打开人员详情”链接（指向 `/person/persons:by-pernr?pernr=...`）
+- [X] 职位详情 ReportsTo：选择 `reports_to_position_id` 非空的职位样本，请求 `/org/positions/{id}?effective_date=...&node_id=...`，确认“汇报给”显示业务 label（例如 `01 — 总经理`），不以 `font-mono` 形式直接渲染 UUID。
 
 ## 13. 附录：关键证据索引
 - Org 页面 effective date（HTMX swap 全页）：  
