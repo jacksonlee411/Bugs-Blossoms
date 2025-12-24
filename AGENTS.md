@@ -158,6 +158,7 @@ modules/{module}/
 - Org 模块功能目录（DEV-PLAN-020L）：`docs/dev-plans/020L-org-feature-catalog.md`
 - Org 测试缺口补齐方案（DEV-PLAN-020T1）：`docs/dev-plans/020T1-org-test-gap-closure-plan.md`
 - 制造示例组织树数据集（DEV-PLAN-036）：`docs/dev-plans/036-org-sample-tree-data.md`
+- Org UI 页面交互问题调查与改进（DEV-PLAN-037）：`docs/dev-plans/037-org-ui-ux-audit.md`
 - Org Atlas+Goose 工具链与门禁（DEV-PLAN-021A）：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
 - Org UI（DEV-PLAN-035）：`docs/dev-plans/035-org-ui.md`
 - Org UI IA 与侧栏集成（DEV-PLAN-035A）：`docs/dev-plans/035A-org-ui-ia-and-sidebar-integration.md`
