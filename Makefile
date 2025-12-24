@@ -2,6 +2,8 @@
 -include .env
 -include .env.local
 
+COMPOSE_PROJECT_NAME ?= iota-sdk-dev
+
 PG_PORT ?= 5438
 REDIS_PORT ?= 6379
 

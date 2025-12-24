@@ -73,24 +73,22 @@ Ensure these tools are installed before you begin:
 
 ### 多 Worktree 本地开发（可选，但推荐）
 
-如果你在同一台机器上用 `git worktree` 同时维护多个工作目录，建议为每个 worktree 单独隔离 Docker Compose 的 project/端口/数据卷，避免出现：
-- Redis/Postgres 端口冲突（例如 `6379` 被占用导致 `docker compose up redis` 失败）
-- 不同 worktree 共享同一份 named volume 导致数据互相污染
+如果你在同一台机器上用 `git worktree` 同时维护多个工作目录，当前推荐做法是：**所有 worktree 共用一套本地 Postgres/Redis（固定端口）**，减少端口/配置管理成本与资源占用。
 
-推荐做法（详见 `docs/dev-plans/011B-worktree-local-dev-docker-isolation.md`）：
+推荐做法（详见 `docs/dev-plans/011C-worktree-shared-local-dev-infra.md`）：
 
-1. 在每个 worktree 生成/补齐 `.env.local`（不提交）：
+1. 在任意 worktree 启动共享 DB/Redis：
    ```bash
-   make dev-env
+   docker compose -f compose.dev.yml up -d db redis
    ```
-2. 启动 DB/Redis（按 `.env.local` 隔离端口与 project）：
-   ```bash
-   docker compose --env-file .env.local -f compose.dev.yml up -d db redis
-   ```
-3. 初始化数据库：
+2. 初始化数据库（通常只需要做一次）：
    ```bash
    make db migrate up && make db seed
    ```
+
+> 高级模式：如果你需要“每个 worktree 独立一套 DB/Redis 并行运行（端口/数据隔离）”，请参考 `docs/dev-plans/011B-worktree-local-dev-docker-isolation.md`。
+
+> 注意：不要在任意 worktree 随意执行 `docker compose -f compose.dev.yml down -v`，它会清理共享数据卷。
 
 4. **Run PostgreSQL**:
    ```bash

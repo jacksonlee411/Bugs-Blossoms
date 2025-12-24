@@ -112,7 +112,7 @@ flowchart TD
 ### 8.1 依赖
 - 011A：HRM Atlas+Goose 基线作为样板（工具/CI 结构已存在）。
 - 021：Org schema/约束合同（本计划只落地其工具链执行面）。
-- 011B（可选）：多 worktree 本地 DB 隔离，降低本地验证互相污染风险。
+- 011C（默认推荐）：多 worktree 共享本地开发基础设施（Postgres/Redis），降低端口/资源管理成本。
 
 ### 8.2 里程碑
 1. [x] 新增 Org 目录与最小 stub（`modules/org/.../core_deps.sql`、`.../org-schema.sql`）。
