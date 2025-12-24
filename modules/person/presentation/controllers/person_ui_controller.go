@@ -60,6 +60,7 @@ func (c *PersonUIController) Register(r *mux.Router) {
 	router.HandleFunc("/persons", c.List).Methods(http.MethodGet)
 	router.HandleFunc("/persons/new", c.NewForm).Methods(http.MethodGet)
 	router.HandleFunc("/persons/{person_uuid}", c.Detail).Methods(http.MethodGet)
+	router.HandleFunc("/persons:by-pernr", c.RedirectByPernr).Methods(http.MethodGet)
 
 	writeRouter := r.PathPrefix(c.basePath).Subrouter()
 	writeRouter.Use(commonMiddleware...)
@@ -202,4 +203,24 @@ func (c *PersonUIController) Detail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templ.Handler(persontemplates.Detail(props), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *PersonUIController) RedirectByPernr(w http.ResponseWriter, r *http.Request) {
+	if !ensurePersonAuthz(w, r, personPersonsAuthzObject, "view") {
+		return
+	}
+
+	pernr := strings.TrimSpace(r.URL.Query().Get("pernr"))
+	if pernr == "" {
+		http.Error(w, "pernr is required", http.StatusBadRequest)
+		return
+	}
+
+	entity, err := c.persons.GetByPernr(r.Context(), pernr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	http.Redirect(w, r, fmt.Sprintf("/person/persons/%s", entity.PersonUUID().String()), http.StatusFound)
 }

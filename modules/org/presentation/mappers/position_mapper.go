@@ -43,6 +43,7 @@ func PositionDetailsFrom(row services.PositionViewRow, reportsToID *uuid.UUID) *
 	return &viewmodels.OrgPositionDetails{
 		Row:                 items[0],
 		ReportsToPositionID: reportsToID,
+		ReportsToLabel:      "",
 	}
 }
 

@@ -40,7 +40,9 @@
           "Create": "Create",
           "Edit": "Edit",
           "Transition": "Change",
-          "Refresh": "Refresh timeline"
+          "Refresh": "Refresh timeline",
+          "OpenPerson": "Open person",
+          "OpenFullPage": "Open full page"
         },
         "Fields": {
           "EffectiveDate": "Effective date",
@@ -158,6 +160,9 @@
         "CreateTitle": "Create node",
         "EditTitle": "Edit node",
         "MoveTitle": "Move node",
+        "EffectiveDate": {
+          "Help": "This change takes effect on this date (different from the page as-of date)."
+        },
         "Parent": {
           "Placeholder": "Search nodes…",
           "Help": "Search by name or code"
@@ -180,7 +185,7 @@
           "ParentHint": "Parent hint",
           "Parent": "Parent",
           "NewParent": "New parent",
-          "I18nNames": "i18n names (JSON)"
+          "I18nNames": "i18n names"
         }
       }
     }
