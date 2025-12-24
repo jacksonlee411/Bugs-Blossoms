@@ -19,15 +19,16 @@
 				"MetaTitle": "组织结构",
 				"Title": "组织结构"
 			},
-				"Assignments": {
-					"MetaTitle": "人员分配",
-					"Title": "人员分配",
-					"CreateTitle": "创建分配",
-					"EditTitle": "编辑分配",
-					"TimelineTitle": "时间线",
-					"Empty": "请输入 pernr 后刷新查看时间线。",
-					"EmptyForPerson": "暂无任职记录。",
-					"Unassigned": "未分配",
+					"Assignments": {
+						"MetaTitle": "人员分配",
+						"Title": "人员分配",
+						"CreateTitle": "创建分配",
+						"EditTitle": "编辑分配",
+						"TransitionTitle": "变更任职",
+						"TimelineTitle": "时间线",
+						"Empty": "请输入 pernr 后刷新查看时间线。",
+						"EmptyForPerson": "暂无任职记录。",
+						"Unassigned": "未分配",
 					"Callout": {
 						"Unassigned": {
 							"Title": "部门与职位尚未设置",
@@ -35,19 +36,29 @@
 							"Action": "创建任职"
 						}
 					},
-					"Actions": {
-						"Create": "创建",
-						"Edit": "编辑",
-						"Refresh": "刷新时间线"
-					},
-					"Fields": {
-						"Pernr": "工号（Pernr）",
-						"OrgNode": "部门",
-					"PositionID": "职位"
-				},
-					"Position": {
-						"Placeholder": "请先选择部门，再搜索职位"
-					},
+						"Actions": {
+							"Create": "创建",
+							"Edit": "编辑",
+							"Transition": "调动/离职",
+							"Refresh": "刷新时间线"
+						},
+						"Fields": {
+							"EffectiveDate": "生效日期",
+							"FreezeCutoff": "冻结窗口最早日期：",
+							"EventType": "操作类型",
+							"Pernr": "工号（Pernr）",
+							"OrgNode": "部门",
+							"PositionID": "职位"
+						},
+						"EventType": {
+							"Hire": "雇用",
+							"Transfer": "调动",
+							"Termination": "离职"
+						},
+						"TerminationHint": "离职将结束该人员在生效日仍有效的全部任职。",
+						"Position": {
+							"Placeholder": "请先选择部门，再搜索职位"
+						},
 					"Table": {
 						"Pernr": "工号",
 						"Effective": "生效区间",

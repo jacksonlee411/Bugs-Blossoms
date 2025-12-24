@@ -79,6 +79,8 @@ func (c *OrgUIController) Register(r *mux.Router) {
 
 	router.HandleFunc("/assignments/form", c.AssignmentForm).Methods(http.MethodGet)
 	router.HandleFunc("/assignments", c.CreateAssignment).Methods(http.MethodPost)
+	router.HandleFunc("/assignments/{id}/transition", c.TransitionAssignmentForm).Methods(http.MethodGet)
+	router.HandleFunc("/assignments/{id}:transition", c.TransitionAssignment).Methods(http.MethodPost)
 	router.HandleFunc("/assignments/{id}/edit", c.EditAssignmentForm).Methods(http.MethodGet)
 	router.HandleFunc("/assignments/{id}", c.UpdateAssignment).Methods(http.MethodPatch)
 
@@ -1257,12 +1259,18 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
 	includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
 
+	eventType := strings.TrimSpace(r.FormValue("event_type"))
 	pernr := strings.TrimSpace(r.FormValue("pernr"))
 	orgNodeRaw := strings.TrimSpace(r.FormValue("org_node_id"))
 	positionRaw := strings.TrimSpace(r.FormValue("position_id"))
 
 	var orgNodeID *uuid.UUID
 	fieldErrs := map[string]string{}
+	if eventType == "" {
+		fieldErrs["event_type"] = "required"
+	} else if eventType != "hire" {
+		fieldErrs["event_type"] = "invalid"
+	}
 	if pernr == "" {
 		fieldErrs["pernr"] = "required"
 	}
@@ -1284,7 +1292,7 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 			positionID = &parsed
 		}
 	}
-	if orgNodeID == nil && positionID == nil {
+	if orgNodeID == nil {
 		fieldErrs["org_node_id"] = "required"
 	}
 	if len(fieldErrs) > 0 {
@@ -1301,6 +1309,8 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 			Mode:           orgui.AssignmentFormCreate,
 			EffectiveDate:  effectiveDateStr,
+			FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+			EventType:      eventType,
 			Pernr:          pernr,
 			OrgNodeID:      orgNodeIDStr,
 			OrgNodeLabel:   orgNodeLabel,
@@ -1314,12 +1324,11 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 
 	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	requestID := ensureRequestID(r)
-	_, err = c.org.CreateAssignment(r.Context(), tenantID, requestID, initiatorID, services.CreateAssignmentInput{
-		Pernr:          pernr,
-		EffectiveDate:  effectiveDate,
-		PositionID:     positionID,
-		OrgNodeID:      orgNodeID,
-		AssignmentType: "primary",
+	_, err = c.org.HirePersonnelEvent(r.Context(), tenantID, requestID, initiatorID, services.HirePersonnelEventInput{
+		Pernr:         pernr,
+		OrgNodeID:     *orgNodeID,
+		PositionID:    positionID,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1336,6 +1345,8 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 			Mode:           orgui.AssignmentFormCreate,
 			EffectiveDate:  effectiveDateStr,
+			FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+			EventType:      eventType,
 			Pernr:          pernr,
 			OrgNodeID:      orgNodeIDStr,
 			OrgNodeLabel:   orgNodeLabel,
@@ -1366,7 +1377,7 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
 		}
 	}
-	c.writeAssignmentsFormWithOOBTimeline(w, r, effectiveDateStr, pernr, timeline)
+	c.writeAssignmentsFormWithOOBTimeline(w, r, tenantID, effectiveDateStr, pernr, timeline)
 }
 
 func (c *OrgUIController) AssignmentForm(w http.ResponseWriter, r *http.Request) {
@@ -1393,14 +1404,304 @@ func (c *OrgUIController) AssignmentForm(w http.ResponseWriter, r *http.Request)
 		pernr = strings.TrimSpace(r.FormValue("pernr"))
 	}
 	includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
+
+	eventType := strings.TrimSpace(param(r, "event_type"))
+	if eventType == "" {
+		eventType = "hire"
+	}
+
+	orgNodeIDStr := strings.TrimSpace(param(r, "org_node_id"))
+	orgNodeLabel := ""
+	if orgNodeIDStr != "" {
+		if parsed, err := uuid.Parse(orgNodeIDStr); err == nil {
+			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, parsed, effectiveDate)
+		}
+	}
+	positionIDStr := strings.TrimSpace(param(r, "position_id"))
+	positionLabel := ""
+	if positionIDStr != "" {
+		if parsed, err := uuid.Parse(positionIDStr); err == nil {
+			positionLabel = c.positionLabelFor(r, tenantID, parsed, effectiveDate, "")
+		}
+	}
+
 	templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 		Mode:           orgui.AssignmentFormCreate,
 		EffectiveDate:  effectiveDateStr,
+		FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+		EventType:      eventType,
 		Pernr:          pernr,
-		PositionLabel:  "",
+		OrgNodeID:      orgNodeIDStr,
+		OrgNodeLabel:   orgNodeLabel,
+		PositionID:     positionIDStr,
+		PositionLabel:  positionLabel,
 		IncludeSummary: includeSummary,
 		Errors:         map[string]string{},
 	}), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) TransitionAssignmentForm(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgAssignmentsAuthzObject, "assign")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "assign") {
+		return
+	}
+
+	assignmentID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	effectiveDate, err := effectiveDateFromRequest(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+	includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
+
+	pernr := strings.TrimSpace(r.URL.Query().Get("pernr"))
+	if pernr == "" {
+		http.Error(w, "pernr is required", http.StatusBadRequest)
+		return
+	}
+
+	subject := fmt.Sprintf("person:%s", pernr)
+	_, rows, _, err := c.org.GetAssignments(r.Context(), tenantID, subject, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	timeline := mappers.AssignmentsToTimeline(subject, rows)
+
+	var selected *viewmodels.OrgAssignmentRow
+	if timeline != nil {
+		for i := range timeline.Rows {
+			if timeline.Rows[i].ID == assignmentID {
+				selected = &timeline.Rows[i]
+				break
+			}
+		}
+	}
+	if selected == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	orgNodeID := selected.OrgNodeID
+	orgNodeLabel := selected.OrgNodeID.String()
+	if details, err := c.getNodeDetails(r, tenantID, selected.OrgNodeID, effectiveDate); err == nil && details != nil {
+		if strings.TrimSpace(details.Code) != "" {
+			orgNodeLabel = fmt.Sprintf("%s (%s)", strings.TrimSpace(details.Name), strings.TrimSpace(details.Code))
+		} else if strings.TrimSpace(details.Name) != "" {
+			orgNodeLabel = strings.TrimSpace(details.Name)
+		}
+	}
+	if raw := strings.TrimSpace(param(r, "org_node_id")); raw != "" {
+		if parsed, err := uuid.Parse(raw); err == nil {
+			orgNodeID = parsed
+			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, parsed, effectiveDate)
+		}
+	}
+
+	positionID := selected.PositionID
+	positionLabel := c.positionLabelFor(r, tenantID, selected.PositionID, effectiveDate, strings.TrimSpace(selected.PositionCode))
+	if raw := strings.TrimSpace(param(r, "position_id")); raw != "" {
+		if parsed, err := uuid.Parse(raw); err == nil {
+			positionID = parsed
+			positionLabel = c.positionLabelFor(r, tenantID, parsed, effectiveDate, "")
+		}
+	}
+
+	eventType := strings.TrimSpace(param(r, "event_type"))
+	if eventType == "" {
+		eventType = "transfer"
+	}
+	templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
+		Mode:           orgui.AssignmentFormTransition,
+		EffectiveDate:  effectiveDateStr,
+		FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+		EventType:      eventType,
+		Pernr:          strings.TrimSpace(selected.Pernr),
+		AssignmentID:   selected.ID.String(),
+		OrgNodeID:      orgNodeID.String(),
+		OrgNodeLabel:   orgNodeLabel,
+		PositionID:     positionID.String(),
+		PositionLabel:  positionLabel,
+		IncludeSummary: includeSummary,
+		Errors:         map[string]string{},
+	}), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) TransitionAssignment(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgAssignmentsAuthzObject, "assign")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "assign") {
+		return
+	}
+
+	assignmentID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromRequest(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+	includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
+
+	eventType := strings.TrimSpace(r.FormValue("event_type"))
+	pernr := strings.TrimSpace(r.FormValue("pernr"))
+
+	orgNodeRaw := strings.TrimSpace(r.FormValue("org_node_id"))
+	positionRaw := strings.TrimSpace(r.FormValue("position_id"))
+	reasonNote := strings.TrimSpace(r.FormValue("reason_note"))
+
+	var orgNodeID *uuid.UUID
+	fieldErrs := map[string]string{}
+	if eventType == "" {
+		fieldErrs["event_type"] = "required"
+	} else if eventType != "transfer" && eventType != "termination" {
+		fieldErrs["event_type"] = "invalid"
+	}
+	if pernr == "" {
+		fieldErrs["pernr"] = "required"
+	}
+	if strings.TrimSpace(eventType) == "transfer" && orgNodeRaw == "" {
+		fieldErrs["org_node_id"] = "required"
+	}
+	if orgNodeRaw != "" {
+		parsed, err := uuid.Parse(orgNodeRaw)
+		if err != nil {
+			fieldErrs["org_node_id"] = "invalid uuid"
+		} else {
+			orgNodeID = &parsed
+		}
+	}
+
+	var positionID *uuid.UUID
+	if positionRaw != "" {
+		parsed, err := uuid.Parse(positionRaw)
+		if err != nil {
+			fieldErrs["position_id"] = "invalid uuid"
+		} else {
+			positionID = &parsed
+		}
+	}
+	if len(fieldErrs) > 0 {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+
+		var orgNodeIDStr, orgNodeLabel string
+		if orgNodeID != nil {
+			orgNodeIDStr = orgNodeID.String()
+			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
+		}
+		positionLabel := ""
+		if positionID != nil {
+			positionLabel = c.positionLabelFor(r, tenantID, *positionID, effectiveDate, "")
+		}
+		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
+			Mode:           orgui.AssignmentFormTransition,
+			EffectiveDate:  effectiveDateStr,
+			FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+			EventType:      eventType,
+			Pernr:          pernr,
+			AssignmentID:   assignmentID.String(),
+			OrgNodeID:      orgNodeIDStr,
+			OrgNodeLabel:   orgNodeLabel,
+			PositionID:     positionRaw,
+			PositionLabel:  positionLabel,
+			IncludeSummary: includeSummary,
+			Errors:         fieldErrs,
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	var reasonNotePtr *string
+	if reasonNote != "" {
+		reasonNotePtr = &reasonNote
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	requestID := ensureRequestID(r)
+	_, err = c.org.TransitionAssignment(r.Context(), tenantID, requestID, initiatorID, services.TransitionAssignmentInput{
+		AssignmentID:  assignmentID,
+		EventType:     eventType,
+		EffectiveDate: effectiveDate,
+		OrgNodeID:     orgNodeID,
+		PositionID:    positionID,
+		ReasonNote:    reasonNotePtr,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		w.WriteHeader(statusCode)
+
+		var orgNodeIDStr, orgNodeLabel string
+		if orgNodeID != nil {
+			orgNodeIDStr = orgNodeID.String()
+			orgNodeLabel = c.orgNodeLabelFor(r, tenantID, *orgNodeID, effectiveDate)
+		}
+		positionLabel := ""
+		if positionID != nil {
+			positionLabel = c.positionLabelFor(r, tenantID, *positionID, effectiveDate, "")
+		}
+		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
+			Mode:           orgui.AssignmentFormTransition,
+			EffectiveDate:  effectiveDateStr,
+			FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+			EventType:      eventType,
+			Pernr:          pernr,
+			AssignmentID:   assignmentID.String(),
+			OrgNodeID:      orgNodeIDStr,
+			OrgNodeLabel:   orgNodeLabel,
+			PositionID:     positionRaw,
+			PositionLabel:  positionLabel,
+			IncludeSummary: includeSummary,
+			Errors:         map[string]string{},
+			FormError:      formErr,
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	if includeSummary {
+		replaceStepInCurrentURL(w, r)
+	} else {
+		htmx.PushUrl(w, fmt.Sprintf("/org/assignments?effective_date=%s&pernr=%s", effectiveDateStr, pernr))
+	}
+	subject := fmt.Sprintf("person:%s", pernr)
+	_, rows, _, err := c.org.GetAssignments(r.Context(), tenantID, subject, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	timeline := mappers.AssignmentsToTimeline(subject, rows)
+	if timeline != nil {
+		for i := range timeline.Rows {
+			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, effectiveDate)
+			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
+		}
+	}
+	c.writeAssignmentsFormWithOOBTimeline(w, r, tenantID, effectiveDateStr, pernr, timeline)
 }
 
 func (c *OrgUIController) EditAssignmentForm(w http.ResponseWriter, r *http.Request) {
@@ -1470,6 +1771,8 @@ func (c *OrgUIController) EditAssignmentForm(w http.ResponseWriter, r *http.Requ
 	templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 		Mode:           orgui.AssignmentFormEdit,
 		EffectiveDate:  effectiveDateStr,
+		FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+		EventType:      strings.TrimSpace(param(r, "event_type")),
 		Pernr:          strings.TrimSpace(selected.Pernr),
 		AssignmentID:   selected.ID.String(),
 		OrgNodeID:      selected.OrgNodeID.String(),
@@ -1537,7 +1840,7 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 			positionID = &parsed
 		}
 	}
-	if orgNodeID == nil && positionID == nil {
+	if orgNodeID == nil {
 		fieldErrs["org_node_id"] = "required"
 	}
 	if len(fieldErrs) > 0 {
@@ -1554,6 +1857,8 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 			Mode:           orgui.AssignmentFormEdit,
 			EffectiveDate:  effectiveDateStr,
+			FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+			EventType:      strings.TrimSpace(param(r, "event_type")),
 			Pernr:          pernr,
 			AssignmentID:   assignmentID.String(),
 			OrgNodeID:      orgNodeIDStr,
@@ -1589,6 +1894,8 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 		templ.Handler(orgui.AssignmentForm(orgui.AssignmentFormProps{
 			Mode:           orgui.AssignmentFormEdit,
 			EffectiveDate:  effectiveDateStr,
+			FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+			EventType:      strings.TrimSpace(param(r, "event_type")),
 			Pernr:          pernr,
 			AssignmentID:   assignmentID.String(),
 			OrgNodeID:      orgNodeIDStr,
@@ -1620,10 +1927,10 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
 		}
 	}
-	c.writeAssignmentsFormWithOOBTimeline(w, r, effectiveDateStr, pernr, timeline)
+	c.writeAssignmentsFormWithOOBTimeline(w, r, tenantID, effectiveDateStr, pernr, timeline)
 }
 
-func (c *OrgUIController) writeAssignmentsFormWithOOBTimeline(w http.ResponseWriter, r *http.Request, effectiveDateStr string, pernr string, timeline *viewmodels.OrgAssignmentsTimeline) {
+func (c *OrgUIController) writeAssignmentsFormWithOOBTimeline(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID, effectiveDateStr string, pernr string, timeline *viewmodels.OrgAssignmentsTimeline) {
 	component := templ.ComponentFunc(func(ctx context.Context, ww io.Writer) error {
 		includeSummary := strings.TrimSpace(param(r, "include_summary")) == "1"
 		if includeSummary {
@@ -1634,6 +1941,8 @@ func (c *OrgUIController) writeAssignmentsFormWithOOBTimeline(w http.ResponseWri
 			if err := orgui.AssignmentForm(orgui.AssignmentFormProps{
 				Mode:           orgui.AssignmentFormCreate,
 				EffectiveDate:  effectiveDateStr,
+				FreezeCutoff:   c.freezeCutoffFor(r, tenantID),
+				EventType:      "hire",
 				Pernr:          pernr,
 				PositionLabel:  "",
 				IncludeSummary: includeSummary,
@@ -2130,15 +2439,26 @@ func tenantAndUserFromContext(r *http.Request) (uuid.UUID, coreuser.User, bool) 
 }
 
 func effectiveDateFromRequest(r *http.Request) (time.Time, error) {
-	v := strings.TrimSpace(r.URL.Query().Get("effective_date"))
-	if v == "" {
-		v = strings.TrimSpace(r.FormValue("effective_date"))
-	}
+	v := strings.TrimSpace(r.FormValue("effective_date"))
 	t, err := parseEffectiveDate(v)
 	if err != nil {
 		return time.Time{}, err
 	}
 	return t, nil
+}
+
+func (c *OrgUIController) freezeCutoffFor(r *http.Request, tenantID uuid.UUID) string {
+	info, err := c.org.GetFreezeInfo(r.Context(), tenantID, time.Now().UTC())
+	if err != nil {
+		return ""
+	}
+	if strings.TrimSpace(info.Mode) == "disabled" {
+		return ""
+	}
+	if info.CutoffUTC.IsZero() {
+		return ""
+	}
+	return info.CutoffUTC.UTC().Format("2006-01-02")
 }
 
 func parseI18nNames(raw string) (map[string]string, error) {

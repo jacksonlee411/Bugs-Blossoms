@@ -78,8 +78,8 @@ func (s *OrgService) HirePersonnelEvent(ctx context.Context, tenantID uuid.UUID,
 	txTime := time.Now().UTC()
 
 	pernr := strings.TrimSpace(in.Pernr)
-	if pernr == "" || in.OrgNodeID == uuid.Nil || in.EffectiveDate.IsZero() || strings.TrimSpace(in.ReasonCode) == "" {
-		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr/org_node_id/effective_date/reason_code are required", nil)
+	if pernr == "" || in.OrgNodeID == uuid.Nil || in.EffectiveDate.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr/org_node_id/effective_date are required", nil)
 	}
 	allocatedFTE := in.AllocatedFTE
 	if allocatedFTE <= 0 {
@@ -87,6 +87,20 @@ func (s *OrgService) HirePersonnelEvent(ctx context.Context, tenantID uuid.UUID,
 	}
 
 	return inTx(ctx, tenantID, func(txCtx context.Context) (*PersonnelEventApplyResult, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "personnel_event.hire", reasonInfo, svcErr)
+			return nil, svcErr
+		}
+		if reasonInfo.OriginalMissing && strings.TrimSpace(reasonCode) == "" {
+			reasonCode = "legacy"
+			reasonInfo.Filled = true
+		}
+
 		personUUID, err := s.repo.ResolvePersonUUIDByPernr(txCtx, tenantID, pernr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -101,7 +115,7 @@ func (s *OrgService) HirePersonnelEvent(ctx context.Context, tenantID uuid.UUID,
 			"position_id":    uuidOrEmpty(in.PositionID),
 			"effective_date": in.EffectiveDate.UTC().Format(time.RFC3339Nano),
 			"allocated_fte":  allocatedFTE,
-			"reason_code":    strings.TrimSpace(in.ReasonCode),
+			"reason_code":    reasonCode,
 		})
 		if err != nil {
 			return nil, newServiceError(http.StatusInternalServerError, "ORG_INVALID_BODY", "failed to encode payload", err)
@@ -114,7 +128,7 @@ func (s *OrgService) HirePersonnelEvent(ctx context.Context, tenantID uuid.UUID,
 			PersonUUID:    personUUID,
 			Pernr:         pernr,
 			EffectiveDate: in.EffectiveDate,
-			ReasonCode:    strings.TrimSpace(in.ReasonCode),
+			ReasonCode:    reasonCode,
 			Payload:       payload,
 		})
 		if err != nil {
@@ -127,7 +141,7 @@ func (s *OrgService) HirePersonnelEvent(ctx context.Context, tenantID uuid.UUID,
 		_, err = s.CreateAssignment(txCtx, tenantID, requestID, initiatorID, CreateAssignmentInput{
 			Pernr:         pernr,
 			EffectiveDate: in.EffectiveDate,
-			ReasonCode:    strings.TrimSpace(in.ReasonCode),
+			ReasonCode:    reasonCode,
 			AllocatedFTE:  allocatedFTE,
 			PositionID:    in.PositionID,
 			OrgNodeID:     &in.OrgNodeID,
@@ -163,8 +177,8 @@ func (s *OrgService) TransferPersonnelEvent(ctx context.Context, tenantID uuid.U
 	txTime := time.Now().UTC()
 
 	pernr := strings.TrimSpace(in.Pernr)
-	if pernr == "" || in.OrgNodeID == uuid.Nil || in.EffectiveDate.IsZero() || strings.TrimSpace(in.ReasonCode) == "" {
-		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr/org_node_id/effective_date/reason_code are required", nil)
+	if pernr == "" || in.OrgNodeID == uuid.Nil || in.EffectiveDate.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr/org_node_id/effective_date are required", nil)
 	}
 	allocatedFTE := in.AllocatedFTE
 	if allocatedFTE <= 0 {
@@ -172,6 +186,20 @@ func (s *OrgService) TransferPersonnelEvent(ctx context.Context, tenantID uuid.U
 	}
 
 	return inTx(ctx, tenantID, func(txCtx context.Context) (*PersonnelEventApplyResult, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "personnel_event.transfer", reasonInfo, svcErr)
+			return nil, svcErr
+		}
+		if reasonInfo.OriginalMissing && strings.TrimSpace(reasonCode) == "" {
+			reasonCode = "legacy"
+			reasonInfo.Filled = true
+		}
+
 		personUUID, err := s.repo.ResolvePersonUUIDByPernr(txCtx, tenantID, pernr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -186,7 +214,7 @@ func (s *OrgService) TransferPersonnelEvent(ctx context.Context, tenantID uuid.U
 			"position_id":    uuidOrEmpty(in.PositionID),
 			"effective_date": in.EffectiveDate.UTC().Format(time.RFC3339Nano),
 			"allocated_fte":  allocatedFTE,
-			"reason_code":    strings.TrimSpace(in.ReasonCode),
+			"reason_code":    reasonCode,
 		})
 		if err != nil {
 			return nil, newServiceError(http.StatusInternalServerError, "ORG_INVALID_BODY", "failed to encode payload", err)
@@ -199,7 +227,7 @@ func (s *OrgService) TransferPersonnelEvent(ctx context.Context, tenantID uuid.U
 			PersonUUID:    personUUID,
 			Pernr:         pernr,
 			EffectiveDate: in.EffectiveDate,
-			ReasonCode:    strings.TrimSpace(in.ReasonCode),
+			ReasonCode:    reasonCode,
 			Payload:       payload,
 		})
 		if err != nil {
@@ -218,7 +246,7 @@ func (s *OrgService) TransferPersonnelEvent(ctx context.Context, tenantID uuid.U
 		_, err = s.UpdateAssignment(txCtx, tenantID, requestID, initiatorID, UpdateAssignmentInput{
 			AssignmentID:  primary.ID,
 			EffectiveDate: in.EffectiveDate,
-			ReasonCode:    strings.TrimSpace(in.ReasonCode),
+			ReasonCode:    reasonCode,
 			AllocatedFTE:  &fte,
 			PositionID:    in.PositionID,
 			OrgNodeID:     &in.OrgNodeID,
@@ -254,11 +282,25 @@ func (s *OrgService) TerminationPersonnelEvent(ctx context.Context, tenantID uui
 	txTime := time.Now().UTC()
 
 	pernr := strings.TrimSpace(in.Pernr)
-	if pernr == "" || in.EffectiveDate.IsZero() || strings.TrimSpace(in.ReasonCode) == "" {
-		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr/effective_date/reason_code are required", nil)
+	if pernr == "" || in.EffectiveDate.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "pernr/effective_date are required", nil)
 	}
 
 	return inTx(ctx, tenantID, func(txCtx context.Context) (*PersonnelEventApplyResult, error) {
+		settings, err := s.repo.GetOrgSettings(txCtx, tenantID)
+		if err != nil {
+			return nil, err
+		}
+		reasonCode, reasonInfo, svcErr := normalizeReasonCode(settings, in.ReasonCode)
+		if svcErr != nil {
+			logReasonCodeRejected(txCtx, tenantID, requestID, "personnel_event.termination", reasonInfo, svcErr)
+			return nil, svcErr
+		}
+		if reasonInfo.OriginalMissing && strings.TrimSpace(reasonCode) == "" {
+			reasonCode = "legacy"
+			reasonInfo.Filled = true
+		}
+
 		personUUID, err := s.repo.ResolvePersonUUIDByPernr(txCtx, tenantID, pernr)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -267,10 +309,32 @@ func (s *OrgService) TerminationPersonnelEvent(ctx context.Context, tenantID uui
 			return nil, err
 		}
 
+		assignments, err := s.repo.ListAssignmentsAsOf(txCtx, tenantID, personUUID, in.EffectiveDate)
+		if err != nil {
+			return nil, err
+		}
+		if len(assignments) == 0 {
+			return nil, newServiceError(http.StatusNotFound, "ORG_ASSIGNMENT_NOT_FOUND", "no assignments found at effective_date", nil)
+		}
+
+		var primaryID string
+		terminatedIDs := make([]string, 0, len(assignments))
+		for _, a := range assignments {
+			if a.IsPrimary {
+				primaryID = a.ID.String()
+			}
+			if !in.EffectiveDate.After(a.EffectiveDate) {
+				return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_USE_CORRECT", "use correct for in-place updates", nil)
+			}
+			terminatedIDs = append(terminatedIDs, a.ID.String())
+		}
+
 		payload, err := json.Marshal(map[string]any{
-			"pernr":          pernr,
-			"effective_date": in.EffectiveDate.UTC().Format(time.RFC3339Nano),
-			"reason_code":    strings.TrimSpace(in.ReasonCode),
+			"pernr":                     pernr,
+			"effective_date":            in.EffectiveDate.UTC().Format(time.RFC3339Nano),
+			"reason_code":               reasonCode,
+			"anchor_assignment_id":      primaryID,
+			"terminated_assignment_ids": terminatedIDs,
 		})
 		if err != nil {
 			return nil, newServiceError(http.StatusInternalServerError, "ORG_INVALID_BODY", "failed to encode payload", err)
@@ -283,7 +347,7 @@ func (s *OrgService) TerminationPersonnelEvent(ctx context.Context, tenantID uui
 			PersonUUID:    personUUID,
 			Pernr:         pernr,
 			EffectiveDate: in.EffectiveDate,
-			ReasonCode:    strings.TrimSpace(in.ReasonCode),
+			ReasonCode:    reasonCode,
 			Payload:       payload,
 		})
 		if err != nil {
@@ -293,17 +357,14 @@ func (s *OrgService) TerminationPersonnelEvent(ctx context.Context, tenantID uui
 			return &PersonnelEventApplyResult{Event: row, Created: false}, nil
 		}
 
-		primary, err := s.findPrimaryAssignmentAt(txCtx, tenantID, personUUID, in.EffectiveDate)
-		if err != nil {
-			return nil, err
-		}
-		_, err = s.RescindAssignment(txCtx, tenantID, requestID, initiatorID, RescindAssignmentInput{
-			AssignmentID:  primary.ID,
-			EffectiveDate: in.EffectiveDate,
-			ReasonCode:    strings.TrimSpace(in.ReasonCode),
-		})
-		if err != nil {
-			return nil, err
+		for _, a := range assignments {
+			if _, err := s.RescindAssignment(txCtx, tenantID, requestID, initiatorID, RescindAssignmentInput{
+				AssignmentID:  a.ID,
+				EffectiveDate: in.EffectiveDate,
+				ReasonCode:    reasonCode,
+			}); err != nil {
+				return nil, err
+			}
 		}
 
 		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "personnel_event.created", "org_personnel_event", row.ID, in.EffectiveDate, endOfTime)
