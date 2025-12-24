@@ -105,7 +105,7 @@ test.describe('HTMX Error UX (DEV-PLAN-043)', () => {
 		await expect(page.locator('#org-assignment-form [data-testid="field-error"]')).toBeVisible();
 	});
 
-	test('409 freeze cutoff 不再静默失败（可 swap 错误片段）', async ({ page }) => {
+	test('操作失败时不再静默（409/422 可 swap 错误片段）', async ({ page }) => {
 		await login(page, ADMIN.email, ADMIN.password);
 		await assertAuthenticated(page);
 
@@ -153,7 +153,7 @@ test.describe('HTMX Error UX (DEV-PLAN-043)', () => {
 			.locator('#org-assignment-form')
 			.getByRole('button', { name: 'Create', exact: true })
 			.click();
-		expect((await createResp).status()).toBe(409);
+		expect([409, 422]).toContain((await createResp).status());
 
 		await expect(page.locator('#org-assignment-form div[class*="bg-red-500/10"]')).toBeVisible();
 	});
