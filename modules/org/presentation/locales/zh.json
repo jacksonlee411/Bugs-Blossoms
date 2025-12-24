@@ -36,12 +36,14 @@
 							"Action": "创建任职"
 						}
 					},
-						"Actions": {
-							"Create": "创建",
-							"Edit": "编辑",
-							"Transition": "调动/离职",
-							"Refresh": "刷新时间线"
-						},
+							"Actions": {
+								"Create": "创建",
+								"Edit": "编辑",
+								"Transition": "调动/离职",
+								"Refresh": "刷新时间线",
+								"OpenPerson": "打开人员详情",
+								"OpenFullPage": "打开完整页面"
+							},
 						"Fields": {
 							"EffectiveDate": "生效日期",
 							"FreezeCutoff": "冻结窗口最早日期：",
@@ -154,14 +156,17 @@
 					"Next": "下一页"
 				}
 			},
-			"Node": {
-				"CreateTitle": "新建节点",
-				"EditTitle": "编辑节点",
-				"MoveTitle": "变更上级",
-				"Parent": {
-					"Placeholder": "搜索节点…",
-					"Help": "可按名称或编码搜索"
-				},
+				"Node": {
+					"CreateTitle": "新建节点",
+					"EditTitle": "编辑节点",
+					"MoveTitle": "变更上级",
+					"EffectiveDate": {
+						"Help": "本次变更从该日期起生效（与页面右上角“生效视图”不同）。"
+					},
+					"Parent": {
+						"Placeholder": "搜索节点…",
+						"Help": "可按名称或编码搜索"
+					},
 				"Status": {
 					"Active": "启用",
 					"Inactive": "停用"
@@ -171,18 +176,18 @@
 					"Edit": "编辑",
 					"Move": "变更上级"
 				},
-				"Fields": {
-					"Code": "编码",
-					"Name": "名称",
-					"Status": "状态",
-					"DisplayOrder": "排序",
-					"EffectiveWindow": "生效区间",
-					"ParentHint": "上级提示",
-					"Parent": "上级",
-					"NewParent": "新上级",
-					"I18nNames": "多语言名称（JSON）"
+					"Fields": {
+						"Code": "编码",
+						"Name": "名称",
+						"Status": "状态",
+						"DisplayOrder": "排序",
+						"EffectiveWindow": "生效区间",
+						"ParentHint": "上级提示",
+						"Parent": "上级",
+						"NewParent": "新上级",
+						"I18nNames": "多语言名称"
+					}
 				}
 			}
 		}
 	}
-}

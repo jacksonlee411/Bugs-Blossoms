@@ -37,10 +37,11 @@ templ NodesPage(props NodesPageProps) {
 						type="date"
 						name="effective_date"
 						value={ props.EffectiveDate }
-						class="rounded-md border border-surface-400 bg-surface-200 px-3 py-2 text-sm text-100"
+						class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
 						hx-get="/org/nodes"
 						hx-trigger="change"
 						hx-target="#org-nodes-page"
+						hx-select="#org-nodes-page"
 						hx-swap="outerHTML"
 						hx-push-url="true"
 						hx-include="[name='effective_date']"

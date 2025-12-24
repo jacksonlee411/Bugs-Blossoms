@@ -128,10 +128,13 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 	ensureOrgPageCapabilities(r, orgNodesAuthzObject, "write")
 	ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "write")
 
+	statusCode := http.StatusOK
+	var errs []string
 	effectiveDate, err := effectiveDateFromRequest(r)
 	if err != nil {
-		http.Error(w, "invalid effective_date", http.StatusBadRequest)
-		return
+		statusCode = http.StatusBadRequest
+		errs = append(errs, "invalid effective_date")
+		effectiveDate = time.Now().UTC()
 	}
 	if effectiveDate.IsZero() {
 		effectiveDate = time.Now().UTC()
@@ -145,7 +148,6 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var errs []string
 	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", effectiveDate)
 	if err != nil {
 		errs = append(errs, err.Error())
@@ -167,6 +169,9 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 		Tree:          tree,
 		SelectedNode:  selected,
 		Errors:        errs,
+	}
+	if statusCode != http.StatusOK {
+		w.WriteHeader(statusCode)
 	}
 	templ.Handler(orgtemplates.NodesPage(props), templ.WithStreaming()).ServeHTTP(w, r)
 }
@@ -227,10 +232,13 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "assign")
 	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
 
+	statusCode := http.StatusOK
+	var pageErrs []string
 	effectiveDate, err := effectiveDateFromRequest(r)
 	if err != nil {
-		http.Error(w, "invalid effective_date", http.StatusBadRequest)
-		return
+		statusCode = http.StatusBadRequest
+		pageErrs = append(pageErrs, "invalid effective_date")
+		effectiveDate = time.Now().UTC()
 	}
 	if effectiveDate.IsZero() {
 		effectiveDate = time.Now().UTC()
@@ -280,6 +288,10 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 		EffectiveDate: effectiveDateStr,
 		Pernr:         pernr,
 		Timeline:      timeline,
+		Errors:        pageErrs,
+	}
+	if statusCode != http.StatusOK {
+		w.WriteHeader(statusCode)
 	}
 	templ.Handler(orgtemplates.AssignmentsPage(props), templ.WithStreaming()).ServeHTTP(w, r)
 }
@@ -299,15 +311,17 @@ type positionsQuery struct {
 	includeDesc bool
 }
 
-func positionsQueryFromRequest(r *http.Request) (positionsQuery, error) {
+func positionsQueryFromRequest(r *http.Request) (positionsQuery, []string) {
 	var out positionsQuery
 
 	rawEffective := strings.TrimSpace(r.URL.Query().Get("effective_date"))
 	out.effectiveDateProvided = rawEffective != ""
 
+	var errs []string
 	effectiveDate, err := effectiveDateFromRequest(r)
 	if err != nil {
-		return positionsQuery{}, err
+		errs = append(errs, "invalid effective_date")
+		effectiveDate = time.Now().UTC()
 	}
 	if effectiveDate.IsZero() {
 		effectiveDate = time.Now().UTC()
@@ -346,7 +360,7 @@ func positionsQueryFromRequest(r *http.Request) (positionsQuery, error) {
 			out.limit = n
 		}
 	}
-	return out, nil
+	return out, errs
 }
 
 func canonicalPositionsURL(q positionsQuery, positionID *uuid.UUID) string {
@@ -400,10 +414,10 @@ func (c *OrgUIController) PositionsPage(w http.ResponseWriter, r *http.Request) 
 	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
 	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "write", "admin")
 
-	q, err := positionsQueryFromRequest(r)
-	if err != nil {
-		http.Error(w, "invalid query", http.StatusBadRequest)
-		return
+	statusCode := http.StatusOK
+	q, qErrs := positionsQueryFromRequest(r)
+	if len(qErrs) > 0 {
+		statusCode = http.StatusBadRequest
 	}
 	if !q.effectiveDateProvided && !htmx.IsHxRequest(r) {
 		http.Redirect(w, r, canonicalPositionsURL(q, nil), http.StatusFound)
@@ -418,7 +432,7 @@ func (c *OrgUIController) PositionsPage(w http.ResponseWriter, r *http.Request) 
 		selectedNodeID = q.nodeID
 	}
 
-	var errs []string
+	errs := append([]string{}, qErrs...)
 	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", q.effectiveDate)
 	if err != nil {
 		errs = append(errs, err.Error())
@@ -452,6 +466,9 @@ func (c *OrgUIController) PositionsPage(w http.ResponseWriter, r *http.Request) 
 		Tree:          tree,
 		Panel:         panelProps,
 		Errors:        errs,
+	}
+	if statusCode != http.StatusOK {
+		w.WriteHeader(statusCode)
 	}
 	templ.Handler(orgtemplates.PositionsPage(props), templ.WithStreaming()).ServeHTTP(w, r)
 }
@@ -489,12 +506,15 @@ func (c *OrgUIController) PositionsPanel(w http.ResponseWriter, r *http.Request)
 	ensureOrgPageCapabilities(r, orgAssignmentsAuthzObject, "read")
 	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "write", "admin")
 
-	q, err := positionsQueryFromRequest(r)
-	if err != nil {
-		http.Error(w, "invalid query", http.StatusBadRequest)
-		return
+	statusCode := http.StatusOK
+	q, qErrs := positionsQueryFromRequest(r)
+	if len(qErrs) > 0 {
+		statusCode = http.StatusBadRequest
 	}
 	htmx.PushUrl(w, canonicalPositionsURL(q, nil))
+	if statusCode != http.StatusOK {
+		w.WriteHeader(statusCode)
+	}
 
 	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", q.effectiveDate)
 	if err != nil {
@@ -539,12 +559,15 @@ func (c *OrgUIController) PositionDetails(w http.ResponseWriter, r *http.Request
 		http.Error(w, "invalid id", http.StatusBadRequest)
 		return
 	}
-	q, err := positionsQueryFromRequest(r)
-	if err != nil {
-		http.Error(w, "invalid query", http.StatusBadRequest)
-		return
+	statusCode := http.StatusOK
+	q, qErrs := positionsQueryFromRequest(r)
+	if len(qErrs) > 0 {
+		statusCode = http.StatusBadRequest
 	}
 	htmx.PushUrl(w, canonicalPositionsURL(q, &positionID))
+	if statusCode != http.StatusOK {
+		w.WriteHeader(statusCode)
+	}
 
 	panelProps, _, timeline, details, err := c.buildPositionsPanel(r, tenantID, q, positionID, nil)
 	if err != nil {
@@ -887,7 +910,7 @@ func (c *OrgUIController) EditPositionForm(w http.ResponseWriter, r *http.Reques
 	reportsToLabel := ""
 	if sliceAt != nil && sliceAt.ReportsToPositionID != nil && *sliceAt.ReportsToPositionID != uuid.Nil {
 		reportsToID = sliceAt.ReportsToPositionID.String()
-		reportsToLabel = reportsToID
+		reportsToLabel = c.positionLabelFor(r, tenantID, *sliceAt.ReportsToPositionID, effectiveDate, reportsToID)
 	}
 	nodeLabel := c.orgNodeLabelFor(r, tenantID, row.OrgNodeID, effectiveDate)
 	title := ""
@@ -999,6 +1022,13 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 		formErr = attachRequestID(formErr, requestID)
 		w.WriteHeader(statusCode)
 		nodeLabel := c.orgNodeLabelFor(r, tenantID, orgNodeID, effectiveDate)
+		reportsToIDRaw := strings.TrimSpace(param(r, "reports_to_position_id"))
+		reportsToLabel := reportsToIDRaw
+		if reportsToIDRaw != "" {
+			if parsed, err := uuid.Parse(reportsToIDRaw); err == nil && parsed != uuid.Nil {
+				reportsToLabel = c.positionLabelFor(r, tenantID, parsed, effectiveDate, reportsToIDRaw)
+			}
+		}
 		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
 			Mode:            orgui.PositionFormEdit,
 			EffectiveDate:   effectiveDateStr,
@@ -1010,8 +1040,8 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 			Title:           titleRaw,
 			LifecycleStatus: lifecycleRaw,
 			CapacityFTE:     capacityRaw,
-			ReportsToID:     strings.TrimSpace(param(r, "reports_to_position_id")),
-			ReportsToLabel:  strings.TrimSpace(param(r, "reports_to_position_id")),
+			ReportsToID:     reportsToIDRaw,
+			ReportsToLabel:  reportsToLabel,
 			ReasonCode:      reasonCode,
 			ReasonNote:      reasonNoteRaw,
 			Errors:          map[string]string{},
@@ -1160,7 +1190,11 @@ func (c *OrgUIController) getPositionDetails(r *http.Request, tenantID uuid.UUID
 	if sliceAt != nil {
 		reportsTo = sliceAt.ReportsToPositionID
 	}
-	return mappers.PositionDetailsFrom(row, reportsTo), mappers.PositionTimelineToViewModels(slices), nil
+	details := mappers.PositionDetailsFrom(row, reportsTo)
+	if details != nil && details.ReportsToPositionID != nil && *details.ReportsToPositionID != uuid.Nil {
+		details.ReportsToLabel = c.positionLabelFor(r, tenantID, *details.ReportsToPositionID, asOf, details.ReportsToPositionID.String())
+	}
+	return details, mappers.PositionTimelineToViewModels(slices), nil
 }
 
 func descendantNodeIDs(nodes []services.HierarchyNode, root uuid.UUID) []uuid.UUID {
@@ -2167,6 +2201,7 @@ func (c *OrgUIController) CreateNode(w http.ResponseWriter, r *http.Request) {
 		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
 			Mode:                 orgui.NodeFormCreate,
 			EffectiveDate:        effectiveDateStr,
+			Node:                 &viewmodels.OrgNodeDetails{Code: code, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: strings.TrimSpace(r.FormValue("i18n_names"))},
 			ParentID:             parentID,
 			Errors:               map[string]string{"i18n_names": i18nErr.Error()},
 			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
@@ -2191,6 +2226,7 @@ func (c *OrgUIController) CreateNode(w http.ResponseWriter, r *http.Request) {
 		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
 			Mode:                 orgui.NodeFormCreate,
 			EffectiveDate:        effectiveDateStr,
+			Node:                 &viewmodels.OrgNodeDetails{Code: code, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: strings.TrimSpace(r.FormValue("i18n_names"))},
 			ParentID:             parentID,
 			Errors:               fieldErrs,
 			FormError:            formErr,
@@ -2244,7 +2280,7 @@ func (c *OrgUIController) UpdateNode(w http.ResponseWriter, r *http.Request) {
 		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
 			Mode:                 orgui.NodeFormEdit,
 			EffectiveDate:        effectiveDateStr,
-			Node:                 &viewmodels.OrgNodeDetails{ID: nodeID},
+			Node:                 &viewmodels.OrgNodeDetails{ID: nodeID, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: strings.TrimSpace(r.FormValue("i18n_names"))},
 			Errors:               map[string]string{"i18n_names": i18nErr.Error()},
 			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
 		}), templ.WithStreaming()).ServeHTTP(w, r)

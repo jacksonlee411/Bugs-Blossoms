@@ -22,7 +22,7 @@ templ Subnav(props SubnavProps) {
 			class={
 				"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
 				templ.KV("border-primary bg-primary/10 text-100", props.Active == "nodes"),
-				templ.KV("border-surface-400 bg-surface-200 text-200 hover:bg-surface-100", props.Active != "nodes"),
+				templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "nodes"),
 			}
 		>
 			@icons.TreeStructure(icons.Props{Size: "18"})
@@ -34,7 +34,7 @@ templ Subnav(props SubnavProps) {
 				class={
 					"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
 					templ.KV("border-primary bg-primary/10 text-100", props.Active == "assignments"),
-					templ.KV("border-surface-400 bg-surface-200 text-200 hover:bg-surface-100", props.Active != "assignments"),
+					templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "assignments"),
 				}
 			>
 				@icons.Users(icons.Props{Size: "18"})
@@ -47,7 +47,7 @@ templ Subnav(props SubnavProps) {
 				class={
 					"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
 					templ.KV("border-primary bg-primary/10 text-100", props.Active == "positions"),
-					templ.KV("border-surface-400 bg-surface-200 text-200 hover:bg-surface-100", props.Active != "positions"),
+					templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "positions"),
 				}
 			>
 				@icons.Briefcase(icons.Props{Size: "18"})

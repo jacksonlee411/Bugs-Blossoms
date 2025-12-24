@@ -220,7 +220,7 @@ templ PositionsList(props PositionsListProps) {
 				<tbody class="divide-y divide-surface-400">
 					for _, p := range props.Positions {
 						{{ rowSelected := props.SelectedPositionID != "" && p.ID.String() == props.SelectedPositionID }}
-						<tr class={ templ.KV("bg-surface-200", rowSelected) }>
+						<tr class={ templ.KV("bg-surface-300", rowSelected) }>
 							<td class="py-2 pr-3">
 								<button
 									type="button"
@@ -343,13 +343,28 @@ templ PositionDetails(props PositionDetailsProps) {
 						if props.Position.ReportsToPositionID == nil || *props.Position.ReportsToPositionID == uuid.Nil {
 							<span class="text-400">—</span>
 						} else {
-							{ props.Position.ReportsToPositionID.String() }
+							{{ reportsToID := props.Position.ReportsToPositionID.String() }}
+							if strings.TrimSpace(props.Position.ReportsToLabel) == "" {
+								<span class="font-mono text-xs">{ reportsToID }</span>
+							} else if strings.TrimSpace(props.NodeID) != "" {
+								<button
+									type="button"
+									class="text-primary hover:underline"
+									hx-get={ fmt.Sprintf("/org/positions/%s?effective_date=%s&node_id=%s", reportsToID, props.EffectiveDate, props.NodeID) }
+									hx-target="#org-position-details"
+									hx-swap="innerHTML"
+								>
+									{ props.Position.ReportsToLabel }
+								</button>
+							} else {
+								{ props.Position.ReportsToLabel }
+							}
 						}
 					</div>
 				</div>
 			</div>
 			if props.Position.Row.IsAutoCreated {
-				<div class="rounded-md border border-surface-400 bg-surface-200 p-3 text-xs text-300">
+				<div class="rounded-md border border-surface-400 bg-surface-300 p-3 text-xs text-300">
 					{ pageCtx.T("Org.UI.Positions.SystemReadonly") }
 				</div>
 			}
@@ -368,7 +383,7 @@ templ PositionTimeline(props PositionTimelineProps) {
 	} else {
 		<ul class="space-y-2">
 			for _, it := range props.Items {
-				<li class="rounded-md border border-surface-400 bg-surface-200 p-3">
+				<li class="rounded-md border border-surface-400 bg-surface-300 p-3">
 					<div class="flex items-center justify-between gap-3">
 						<div class="text-sm text-100">{ it.EffectiveDate.UTC().Format("2006-01-02") } → { it.EndDate.UTC().Format("2006-01-02") }</div>
 						<div class="text-xs text-400">{ it.LifecycleStatus }</div>

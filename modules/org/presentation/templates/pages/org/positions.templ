@@ -36,10 +36,11 @@ templ PositionsPage(props PositionsPageProps) {
 						type="date"
 						name="effective_date"
 						value={ props.EffectiveDate }
-						class="rounded-md border border-surface-400 bg-surface-200 px-3 py-2 text-sm text-100"
+						class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
 						hx-get="/org/positions"
 						hx-trigger="change"
 						hx-target="#org-positions-page"
+						hx-select="#org-positions-page"
 						hx-swap="outerHTML"
 						hx-push-url="true"
 						hx-include="#org-positions-filters, [name='effective_date']"

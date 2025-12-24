@@ -1,6 +1,9 @@
 package org
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/iota-uz/iota-sdk/components/authorization"
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
@@ -29,6 +32,14 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 				<div class="flex items-center gap-3">
 					<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.Assignments.Title") }</h1>
 					<span class="text-xs text-300">{ pageCtx.T("Org.UI.Shared.AsOf") }: { props.EffectiveDate }</span>
+					if strings.TrimSpace(props.Pernr) != "" {
+						<a
+							class="text-xs text-primary hover:underline"
+							href={ templ.SafeURL(fmt.Sprintf("/person/persons:by-pernr?pernr=%s", props.Pernr)) }
+						>
+							{ pageCtx.T("Org.UI.Assignments.Actions.OpenPerson") }
+						</a>
+					}
 				</div>
 				<div class="flex items-center gap-2">
 					<label class="text-xs font-medium text-200" for="effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
@@ -37,10 +48,11 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 						type="date"
 						name="effective_date"
 						value={ props.EffectiveDate }
-						class="rounded-md border border-surface-400 bg-surface-200 px-3 py-2 text-sm text-100"
+						class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
 						hx-get="/org/assignments"
 						hx-trigger="change"
 						hx-target="#org-assignments-page"
+						hx-select="#org-assignments-page"
 						hx-swap="outerHTML"
 						hx-push-url="true"
 						hx-include="#org-pernr, [name='effective_date']"
@@ -81,7 +93,7 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 										name="pernr"
 										type="text"
 										value={ props.Pernr }
-										class="w-full rounded-md border border-surface-400 bg-surface-200 px-3 py-2 text-sm text-100"
+										class="w-full rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
 									/>
 								</div>
 								@authorization.Unauthorized(&authorization.UnauthorizedProps{

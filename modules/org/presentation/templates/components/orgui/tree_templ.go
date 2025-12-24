@@ -141,7 +141,7 @@ func TreeContent(props TreeProps) templ.Component {
 				var templ_7745c5c3_Var4 = []any{
 					"w-full text-left rounded-md px-2 py-1.5 text-sm flex items-center justify-between gap-2",
 					templ.KV("bg-surface-100 text-100", n.Selected),
-					templ.KV("hover:bg-surface-200 text-200", !n.Selected),
+					templ.KV("hover:bg-surface-300 text-200", !n.Selected),
 				}
 				templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var4...)
 				if templ_7745c5c3_Err != nil {

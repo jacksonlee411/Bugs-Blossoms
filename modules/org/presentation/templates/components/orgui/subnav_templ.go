@@ -51,7 +51,7 @@ func Subnav(props SubnavProps) templ.Component {
 		var templ_7745c5c3_Var2 = []any{
 			"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
 			templ.KV("border-primary bg-primary/10 text-100", props.Active == "nodes"),
-			templ.KV("border-surface-400 bg-surface-200 text-200 hover:bg-surface-100", props.Active != "nodes"),
+			templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "nodes"),
 		}
 		templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var2...)
 		if templ_7745c5c3_Err != nil {
@@ -104,7 +104,7 @@ func Subnav(props SubnavProps) templ.Component {
 			var templ_7745c5c3_Var6 = []any{
 				"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
 				templ.KV("border-primary bg-primary/10 text-100", props.Active == "assignments"),
-				templ.KV("border-surface-400 bg-surface-200 text-200 hover:bg-surface-100", props.Active != "assignments"),
+				templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "assignments"),
 			}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var6...)
 			if templ_7745c5c3_Err != nil {
@@ -158,7 +158,7 @@ func Subnav(props SubnavProps) templ.Component {
 			var templ_7745c5c3_Var10 = []any{
 				"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
 				templ.KV("border-primary bg-primary/10 text-100", props.Active == "positions"),
-				templ.KV("border-surface-400 bg-surface-200 text-200 hover:bg-surface-100", props.Active != "positions"),
+				templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Active != "positions"),
 			}
 			templ_7745c5c3_Err = templ.RenderCSSItems(ctx, templ_7745c5c3_Buffer, templ_7745c5c3_Var10...)
 			if templ_7745c5c3_Err != nil {

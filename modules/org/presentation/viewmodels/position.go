@@ -24,6 +24,7 @@ type OrgPositionRow struct {
 type OrgPositionDetails struct {
 	Row                 OrgPositionRow
 	ReportsToPositionID *uuid.UUID
+	ReportsToLabel      string
 }
 
 type OrgPositionTimelineItem struct {
