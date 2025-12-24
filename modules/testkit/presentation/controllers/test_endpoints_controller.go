@@ -2,8 +2,11 @@ package controllers
 
 import (
 	"encoding/json"
+	"html"
 	"io"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/iota-uz/iota-sdk/modules/testkit/domain/schemas"
@@ -42,6 +45,9 @@ func (c *TestEndpointsController) Register(r *mux.Router) {
 	// Seed endpoint - applies preset scenarios
 	r.HandleFunc("/__test__/seed", c.handleSeed).Methods(http.MethodPost)
 	r.HandleFunc("/__test__/seed", c.handleListSeedScenarios).Methods(http.MethodGet)
+
+	// Utility endpoint - returns a deterministic error response for UI/e2e testing
+	r.HandleFunc("/__test__/http_error", c.handleHTTPError).Methods(http.MethodGet)
 
 	// Health check for test endpoints
 	r.HandleFunc("/__test__/health", c.handleHealth).Methods(http.MethodGet)
@@ -194,6 +200,57 @@ func (c *TestEndpointsController) handleSeed(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		logger.WithError(err).Error("Failed to encode response")
+	}
+}
+
+func (c *TestEndpointsController) handleHTTPError(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	logger := composables.UseLogger(r.Context())
+
+	status := http.StatusInternalServerError
+	if rawStatus := strings.TrimSpace(query.Get("status")); rawStatus != "" {
+		if parsed, err := strconv.Atoi(rawStatus); err == nil {
+			status = parsed
+		}
+	}
+	if status < 400 || status > 599 {
+		status = http.StatusInternalServerError
+	}
+
+	format := strings.ToLower(strings.TrimSpace(query.Get("format")))
+	if format == "" {
+		format = "json"
+	}
+
+	code := strings.TrimSpace(query.Get("code"))
+	if code == "" {
+		code = "TEST_HTTP_ERROR"
+	}
+
+	message := strings.TrimSpace(query.Get("message"))
+	if message == "" {
+		message = "Test endpoint error"
+	}
+
+	switch format {
+	case "text":
+		http.Error(w, message, status)
+		return
+	case "html":
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(`<div data-testid="test-http-error">` + html.EscapeString(message) + `</div>`))
+		return
+	default:
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		if err := json.NewEncoder(w).Encode(map[string]string{
+			"code":    code,
+			"message": message,
+		}); err != nil {
+			logger.WithError(err).Error("Failed to encode http_error response")
+		}
+		return
 	}
 }
 

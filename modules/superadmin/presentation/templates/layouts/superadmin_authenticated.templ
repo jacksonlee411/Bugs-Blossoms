@@ -1,6 +1,7 @@
 package layouts
 
 import (
+	"github.com/iota-uz/iota-sdk/components/base/toast"
 	"github.com/iota-uz/iota-sdk/components/sidebar"
 	corelayouts "github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
@@ -23,21 +24,22 @@ templ SuperAdminSidebarHeader() {
 templ SuperAdminAuthenticated(props SuperAdminAuthenticatedProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{
-		// Read sidebar items from middleware (registered via app.RegisterNavItems)
-		sidebarProps := corelayouts.MustUseSidebarProps(ctx)
-		// Override header and footer with SuperAdmin-specific styling
-		sidebarProps.Header = SuperAdminSidebarHeader()
-		sidebarProps.Footer = corelayouts.DefaultSidebarFooter()
+			// Read sidebar items from middleware (registered via app.RegisterNavItems)
+			sidebarProps := corelayouts.MustUseSidebarProps(ctx)
+			// Override header and footer with SuperAdmin-specific styling
+			sidebarProps.Header = SuperAdminSidebarHeader()
+			sidebarProps.Footer = corelayouts.DefaultSidebarFooter()
 	}}
 	if props.WebsocketURL == "" {
 		{{ props.WebsocketURL = "/ws" }}
 	}
 	@corelayouts.Base(&props.BaseProps) {
+		@toast.Container()
 		@corelayouts.MobileSidebar(sidebarProps)
 		<div
 			x-data="{
-				sidebarCollapsed: localStorage.getItem('sidebar-collapsed') === 'true',
-				init() {
+					sidebarCollapsed: localStorage.getItem('sidebar-collapsed') === 'true',
+					init() {
 					this.$nextTick(() => {
 						window.addEventListener('storage', (e) => {
 							if (e.key === 'sidebar-collapsed') {

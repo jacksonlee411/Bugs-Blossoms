@@ -34,6 +34,11 @@
     "invalidTIN": "Invalid TIN format: {{.Details}}",
     "invalidPIN": "Invalid PIN format: {{.Details}}"
   },
+  "Toast": {
+    "ErrorTitle": "Error",
+    "DefaultError": "Request failed, please try again",
+    "NetworkError": "Network error, please try again"
+  },
   "Import": {
     "UploadLabel": "Upload file",
     "UploadPlaceholder": "Choose a file",
