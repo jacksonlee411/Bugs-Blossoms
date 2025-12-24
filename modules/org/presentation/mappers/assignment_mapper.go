@@ -18,6 +18,14 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 		if r.PositionCode != nil {
 			code = *r.PositionCode
 		}
+		startEventType := ""
+		if r.StartEventType != nil {
+			startEventType = strings.TrimSpace(*r.StartEventType)
+		}
+		endEventType := ""
+		if r.EndEventType != nil {
+			endEventType = strings.TrimSpace(*r.EndEventType)
+		}
 		p := pernr
 		if r.Pernr != nil && strings.TrimSpace(*r.Pernr) != "" {
 			p = strings.TrimSpace(*r.Pernr)
@@ -29,6 +37,8 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 			Pernr:         p,
 			PositionCode:  code,
 			PositionLabel: strings.TrimSpace(code),
+			OperationType: startEventType,
+			EndEventType:  endEventType,
 			EffectiveDate: r.EffectiveDate,
 			EndDate:       r.EndDate,
 		})

@@ -62,6 +62,7 @@
         "Table": {
           "Pernr": "Pernr",
           "Effective": "Effective",
+          "EventType": "Event type",
           "OrgNodeID": "Department",
           "Position": "Position"
         }

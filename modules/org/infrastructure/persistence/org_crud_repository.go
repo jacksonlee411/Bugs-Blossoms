@@ -688,7 +688,27 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 		a.is_primary,
 		a.allocated_fte,
 		a.effective_date,
-		a.end_date
+		a.end_date,
+		(
+			SELECT e.event_type
+			FROM org_personnel_events e
+			WHERE e.tenant_id=a.tenant_id
+				AND e.person_uuid=a.subject_id
+				AND e.event_type IN ('hire', 'transfer')
+				AND e.effective_date::date = a.effective_date::date
+			ORDER BY e.created_at DESC
+			LIMIT 1
+		) AS start_event_type,
+		(
+			SELECT e.event_type
+			FROM org_personnel_events e
+			WHERE e.tenant_id=a.tenant_id
+				AND e.person_uuid=a.subject_id
+				AND e.event_type = 'termination'
+				AND e.effective_date::date = a.end_date::date
+			ORDER BY e.created_at DESC
+			LIMIT 1
+		) AS end_event_type
 	FROM org_assignments a
 	JOIN org_position_slices s
 		ON s.tenant_id=a.tenant_id
@@ -706,9 +726,24 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 	out := make([]services.AssignmentViewRow, 0, 16)
 	for rows.Next() {
 		var v services.AssignmentViewRow
-		if err := rows.Scan(&v.ID, &v.PositionID, &v.OrgNodeID, &v.AssignmentType, &v.IsPrimary, &v.AllocatedFTE, &v.EffectiveDate, &v.EndDate); err != nil {
+		var startEventType pgtype.Text
+		var endEventType pgtype.Text
+		if err := rows.Scan(
+			&v.ID,
+			&v.PositionID,
+			&v.OrgNodeID,
+			&v.AssignmentType,
+			&v.IsPrimary,
+			&v.AllocatedFTE,
+			&v.EffectiveDate,
+			&v.EndDate,
+			&startEventType,
+			&endEventType,
+		); err != nil {
 			return nil, err
 		}
+		v.StartEventType = nullableText(startEventType)
+		v.EndEventType = nullableText(endEventType)
 		out = append(out, v)
 	}
 	return out, rows.Err()
@@ -729,7 +764,27 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 		a.is_primary,
 		a.allocated_fte,
 		a.effective_date,
-		a.end_date
+		a.end_date,
+		(
+			SELECT e.event_type
+			FROM org_personnel_events e
+			WHERE e.tenant_id=a.tenant_id
+				AND e.person_uuid=a.subject_id
+				AND e.event_type IN ('hire', 'transfer')
+				AND e.effective_date::date = a.effective_date::date
+			ORDER BY e.created_at DESC
+			LIMIT 1
+		) AS start_event_type,
+		(
+			SELECT e.event_type
+			FROM org_personnel_events e
+			WHERE e.tenant_id=a.tenant_id
+				AND e.person_uuid=a.subject_id
+				AND e.event_type = 'termination'
+				AND e.effective_date::date = a.end_date::date
+			ORDER BY e.created_at DESC
+			LIMIT 1
+		) AS end_event_type
 	FROM org_assignments a
 	JOIN org_position_slices s
 		ON s.tenant_id=a.tenant_id
@@ -747,9 +802,24 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 	out := make([]services.AssignmentViewRow, 0, 16)
 	for rows.Next() {
 		var v services.AssignmentViewRow
-		if err := rows.Scan(&v.ID, &v.PositionID, &v.OrgNodeID, &v.AssignmentType, &v.IsPrimary, &v.AllocatedFTE, &v.EffectiveDate, &v.EndDate); err != nil {
+		var startEventType pgtype.Text
+		var endEventType pgtype.Text
+		if err := rows.Scan(
+			&v.ID,
+			&v.PositionID,
+			&v.OrgNodeID,
+			&v.AssignmentType,
+			&v.IsPrimary,
+			&v.AllocatedFTE,
+			&v.EffectiveDate,
+			&v.EndDate,
+			&startEventType,
+			&endEventType,
+		); err != nil {
 			return nil, err
 		}
+		v.StartEventType = nullableText(startEventType)
+		v.EndEventType = nullableText(endEventType)
 		out = append(out, v)
 	}
 	return out, rows.Err()
