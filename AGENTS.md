@@ -159,6 +159,7 @@ modules/{module}/
 - Org 测试缺口补齐方案（DEV-PLAN-020T1）：`docs/dev-plans/020T1-org-test-gap-closure-plan.md`
 - 制造示例组织树数据集（DEV-PLAN-036）：`docs/dev-plans/036-org-sample-tree-data.md`
 - Org UI 页面交互问题调查与改进（DEV-PLAN-037）：`docs/dev-plans/037-org-ui-ux-audit.md`
+- Org UI 可视化验收与交互验证（DEV-PLAN-037A）：`docs/dev-plans/037A-org-ui-verification-and-optimization.md`
 - Org Atlas+Goose 工具链与门禁（DEV-PLAN-021A）：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
 - Org UI（DEV-PLAN-035）：`docs/dev-plans/035-org-ui.md`
 - Org UI IA 与侧栏集成（DEV-PLAN-035A）：`docs/dev-plans/035A-org-ui-ia-and-sidebar-integration.md`
@@ -166,6 +167,7 @@ modules/{module}/
 - 移除 warehouse（仓库）模块（DEV-PLAN-041）：`docs/dev-plans/041-remove-warehouse-module.md`
 - 移除 ru/uz 多语言（DEV-PLAN-042）：`docs/dev-plans/042-remove-ru-uz-locales.md`
 - HTMX 操作异常统一反馈（DEV-PLAN-043）：`docs/dev-plans/043-ui-action-error-feedback.md`
+- UI 可视化验收与交互验证工具链（DEV-PLAN-044）：`docs/dev-plans/044-frontend-ui-verification-playbook.md`
 - 职位管理业务需求（DEV-PLAN-050）：`docs/dev-plans/050-position-management-business-requirements.md`
 - 职位管理实施蓝图（DEV-PLAN-051）：`docs/dev-plans/051-position-management-implementation-blueprint.md`
 - DEV-PLAN-051 Readiness：`docs/dev-records/DEV-PLAN-051-READINESS.md`

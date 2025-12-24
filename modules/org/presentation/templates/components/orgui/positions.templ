@@ -11,6 +11,7 @@ import (
 	"github.com/iota-uz/iota-sdk/components/base/input"
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
+	"github.com/iota-uz/iota-sdk/pkg/types"
 )
 
 type PositionsPanelProps struct {
@@ -30,6 +31,40 @@ type PositionsPanelProps struct {
 	Timeline           []viewmodels.OrgPositionTimelineItem
 }
 
+func positionLifecycleLabel(pageCtx types.PageContextProvider, code string) string {
+	code = strings.TrimSpace(code)
+	switch code {
+	case "":
+		return "—"
+	case "planned":
+		return pageCtx.T("Org.UI.Positions.Lifecycle.Planned")
+	case "active":
+		return pageCtx.T("Org.UI.Positions.Lifecycle.Active")
+	case "inactive":
+		return pageCtx.T("Org.UI.Positions.Lifecycle.Inactive")
+	case "rescinded":
+		return pageCtx.T("Org.UI.Positions.Lifecycle.Rescinded")
+	default:
+		return code
+	}
+}
+
+func positionStaffingLabel(pageCtx types.PageContextProvider, code string) string {
+	code = strings.TrimSpace(code)
+	switch code {
+	case "":
+		return "—"
+	case "empty":
+		return pageCtx.T("Org.UI.Positions.Staffing.Empty")
+	case "partially_filled":
+		return pageCtx.T("Org.UI.Positions.Staffing.PartiallyFilled")
+	case "filled":
+		return pageCtx.T("Org.UI.Positions.Staffing.Filled")
+	default:
+		return code
+	}
+}
+
 templ PositionsPanel(props PositionsPanelProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	<div class="space-y-4">
@@ -38,34 +73,34 @@ templ PositionsPanel(props PositionsPanelProps) {
 			<input type="hidden" name="page" value={ fmt.Sprintf("%d", maxInt(props.Page, 1)) }/>
 			<input type="hidden" name="limit" value={ fmt.Sprintf("%d", clampInt(props.Limit, 1, 200)) }/>
 			<div class="flex-1 min-w-[220px]">
-				@input.Text(&input.Props{
-					Label: pageCtx.T("Org.UI.Positions.Filters.Query"),
-					Attrs: templ.Attributes{
-						"name":        "q",
-						"value":       props.Q,
-						"placeholder": pageCtx.T("Org.UI.Positions.Filters.QueryPlaceholder"),
-						"hx-get":      "/org/positions/panel",
-						"hx-trigger":  "keyup changed delay:300ms",
-						"hx-target":   "#org-positions-panel",
-						"hx-swap":     "innerHTML",
-						"hx-push-url": "true",
-						"hx-include":  "#org-positions-filters, [name='effective_date']",
-					},
-				})
-			</div>
+					@input.Text(&input.Props{
+						Label: pageCtx.T("Org.UI.Positions.Filters.Query"),
+						Attrs: templ.Attributes{
+							"name":        "q",
+							"value":       props.Q,
+							"placeholder": pageCtx.T("Org.UI.Positions.Filters.QueryPlaceholder"),
+							"hx-get":      "/org/positions/panel",
+							"hx-trigger":  "keyup changed delay:300ms",
+							"hx-target":   "#org-positions-panel",
+							"hx-swap":     "innerHTML",
+							"hx-push-url": "true",
+							"hx-include":  "#org-positions-filters, #effective-date",
+						},
+					})
+				</div>
 			<div class="min-w-[160px]">
-				@base.Select(&base.SelectProps{
-					Label: pageCtx.T("Org.UI.Positions.Filters.Lifecycle"),
-					Attrs: templ.Attributes{
-						"name":        "lifecycle_status",
-						"hx-get":      "/org/positions/panel",
-						"hx-trigger":  "change",
-						"hx-target":   "#org-positions-panel",
-						"hx-swap":     "innerHTML",
-						"hx-push-url": "true",
-						"hx-include":  "#org-positions-filters, [name='effective_date']",
-					},
-				}) {
+					@base.Select(&base.SelectProps{
+						Label: pageCtx.T("Org.UI.Positions.Filters.Lifecycle"),
+						Attrs: templ.Attributes{
+							"name":        "lifecycle_status",
+							"hx-get":      "/org/positions/panel",
+							"hx-trigger":  "change",
+							"hx-target":   "#org-positions-panel",
+							"hx-swap":     "innerHTML",
+							"hx-push-url": "true",
+							"hx-include":  "#org-positions-filters, #effective-date",
+						},
+					}) {
 					<option value="" selected?={ strings.TrimSpace(props.LifecycleStatus) == "" }>{ pageCtx.T("Org.UI.Positions.Filters.LifecycleAll") }</option>
 					<option value="planned" selected?={ props.LifecycleStatus == "planned" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Planned") }</option>
 					<option value="active" selected?={ props.LifecycleStatus == "active" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Active") }</option>
@@ -74,18 +109,18 @@ templ PositionsPanel(props PositionsPanelProps) {
 				}
 			</div>
 			<div class="min-w-[170px]">
-				@base.Select(&base.SelectProps{
-					Label: pageCtx.T("Org.UI.Positions.Filters.StaffingState"),
-					Attrs: templ.Attributes{
-						"name":        "staffing_state",
-						"hx-get":      "/org/positions/panel",
-						"hx-trigger":  "change",
-						"hx-target":   "#org-positions-panel",
-						"hx-swap":     "innerHTML",
-						"hx-push-url": "true",
-						"hx-include":  "#org-positions-filters, [name='effective_date']",
-					},
-				}) {
+					@base.Select(&base.SelectProps{
+						Label: pageCtx.T("Org.UI.Positions.Filters.StaffingState"),
+						Attrs: templ.Attributes{
+							"name":        "staffing_state",
+							"hx-get":      "/org/positions/panel",
+							"hx-trigger":  "change",
+							"hx-target":   "#org-positions-panel",
+							"hx-swap":     "innerHTML",
+							"hx-push-url": "true",
+							"hx-include":  "#org-positions-filters, #effective-date",
+						},
+					}) {
 					<option value="" selected?={ strings.TrimSpace(props.StaffingState) == "" }>{ pageCtx.T("Org.UI.Positions.Filters.StaffingAll") }</option>
 					<option value="empty" selected?={ props.StaffingState == "empty" }>{ pageCtx.T("Org.UI.Positions.Staffing.Empty") }</option>
 					<option value="partially_filled" selected?={ props.StaffingState == "partially_filled" }>{ pageCtx.T("Org.UI.Positions.Staffing.PartiallyFilled") }</option>
@@ -93,35 +128,35 @@ templ PositionsPanel(props PositionsPanelProps) {
 				}
 			</div>
 			<div class="min-w-[150px]">
-				@base.Select(&base.SelectProps{
-					Label: pageCtx.T("Org.UI.Positions.Filters.IncludeDescendants"),
-					Attrs: templ.Attributes{
-						"name":        "include_descendants",
-						"hx-get":      "/org/positions/panel",
-						"hx-trigger":  "change",
-						"hx-target":   "#org-positions-panel",
-						"hx-swap":     "innerHTML",
-						"hx-push-url": "true",
-						"hx-include":  "#org-positions-filters, [name='effective_date']",
-					},
-				}) {
+					@base.Select(&base.SelectProps{
+						Label: pageCtx.T("Org.UI.Positions.Filters.IncludeDescendants"),
+						Attrs: templ.Attributes{
+							"name":        "include_descendants",
+							"hx-get":      "/org/positions/panel",
+							"hx-trigger":  "change",
+							"hx-target":   "#org-positions-panel",
+							"hx-swap":     "innerHTML",
+							"hx-push-url": "true",
+							"hx-include":  "#org-positions-filters, #effective-date",
+						},
+					}) {
 					<option value="1" selected?={ props.IncludeDescendants }>{ pageCtx.T("Org.UI.Positions.Filters.IncludeDescendantsYes") }</option>
 					<option value="0" selected?={ !props.IncludeDescendants }>{ pageCtx.T("Org.UI.Positions.Filters.IncludeDescendantsNo") }</option>
 				}
 			</div>
 			<div class="min-w-[140px]">
-				@base.Select(&base.SelectProps{
-					Label: pageCtx.T("Org.UI.Positions.Filters.ShowSystem"),
-					Attrs: templ.Attributes{
-						"name":        "show_system",
-						"hx-get":      "/org/positions/panel",
-						"hx-trigger":  "change",
-						"hx-target":   "#org-positions-panel",
-						"hx-swap":     "innerHTML",
-						"hx-push-url": "true",
-						"hx-include":  "#org-positions-filters, [name='effective_date']",
-					},
-				}) {
+					@base.Select(&base.SelectProps{
+						Label: pageCtx.T("Org.UI.Positions.Filters.ShowSystem"),
+						Attrs: templ.Attributes{
+							"name":        "show_system",
+							"hx-get":      "/org/positions/panel",
+							"hx-trigger":  "change",
+							"hx-target":   "#org-positions-panel",
+							"hx-swap":     "innerHTML",
+							"hx-push-url": "true",
+							"hx-include":  "#org-positions-filters, #effective-date",
+						},
+					}) {
 					<option value="0" selected?={ !props.ShowSystem }>{ pageCtx.T("Org.UI.Positions.Filters.ShowSystemNo") }</option>
 					<option value="1" selected?={ props.ShowSystem }>{ pageCtx.T("Org.UI.Positions.Filters.ShowSystemYes") }</option>
 				}
@@ -230,7 +265,7 @@ templ PositionsList(props PositionsListProps) {
 									hx-target="#org-position-details"
 									hx-swap="innerHTML"
 									hx-push-url="true"
-									hx-include="#org-positions-filters, [name='effective_date']"
+									hx-include="#org-positions-filters, #effective-date"
 								>
 									{ p.Code }
 								</button>
@@ -245,8 +280,8 @@ templ PositionsList(props PositionsListProps) {
 									{ p.Title }
 								}
 							</td>
-							<td class="py-2 pr-3 text-200">{ p.LifecycleStatus }</td>
-							<td class="py-2 pr-3 text-200">{ p.StaffingState }</td>
+							<td class="py-2 pr-3 text-200">{ positionLifecycleLabel(pageCtx, p.LifecycleStatus) }</td>
+							<td class="py-2 pr-3 text-200">{ positionStaffingLabel(pageCtx, p.StaffingState) }</td>
 							<td class="py-2 text-right text-200">{ fmt.Sprintf("%.2f / %.2f", p.OccupiedFTE, p.CapacityFTE) }</td>
 						</tr>
 					}
@@ -257,34 +292,34 @@ templ PositionsList(props PositionsListProps) {
 			<div>{ pageCtx.T("Org.UI.Positions.Pagination.Page") }: { fmt.Sprintf("%d", maxInt(props.Page, 1)) }</div>
 			<div class="flex items-center gap-2">
 				if props.Page > 1 {
-					@button.Secondary(button.Props{
-						Size: button.SizeSM,
-						Attrs: templ.Attributes{
-							"type":        "button",
-							"hx-get":      fmt.Sprintf("/org/positions/panel?page=%d", props.Page-1),
-							"hx-target":   "#org-positions-panel",
-							"hx-swap":     "innerHTML",
-							"hx-push-url": "true",
-							"hx-include":  "#org-positions-filters, [name='effective_date']",
-						},
-					}) {
-						{ pageCtx.T("Org.UI.Positions.Pagination.Prev") }
-					}
+						@button.Secondary(button.Props{
+							Size: button.SizeSM,
+							Attrs: templ.Attributes{
+								"type":        "button",
+								"hx-get":      fmt.Sprintf("/org/positions/panel?page=%d", props.Page-1),
+								"hx-target":   "#org-positions-panel",
+								"hx-swap":     "innerHTML",
+								"hx-push-url": "true",
+								"hx-include":  "#org-positions-filters, #effective-date",
+							},
+						}) {
+							{ pageCtx.T("Org.UI.Positions.Pagination.Prev") }
+						}
 				}
 				if len(props.Positions) >= clampInt(props.Limit, 1, 200) {
-					@button.Secondary(button.Props{
-						Size: button.SizeSM,
-						Attrs: templ.Attributes{
-							"type":        "button",
-							"hx-get":      fmt.Sprintf("/org/positions/panel?page=%d", maxInt(props.Page, 1)+1),
-							"hx-target":   "#org-positions-panel",
-							"hx-swap":     "innerHTML",
-							"hx-push-url": "true",
-							"hx-include":  "#org-positions-filters, [name='effective_date']",
-						},
-					}) {
-						{ pageCtx.T("Org.UI.Positions.Pagination.Next") }
-					}
+						@button.Secondary(button.Props{
+							Size: button.SizeSM,
+							Attrs: templ.Attributes{
+								"type":        "button",
+								"hx-get":      fmt.Sprintf("/org/positions/panel?page=%d", maxInt(props.Page, 1)+1),
+								"hx-target":   "#org-positions-panel",
+								"hx-swap":     "innerHTML",
+								"hx-push-url": "true",
+								"hx-include":  "#org-positions-filters, #effective-date",
+							},
+						}) {
+							{ pageCtx.T("Org.UI.Positions.Pagination.Next") }
+						}
 				}
 			</div>
 		</div>
@@ -325,14 +360,14 @@ templ PositionDetails(props PositionDetailsProps) {
 					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.Title") }</div>
 					<div class="text-200">{ ternaryString(strings.TrimSpace(props.Position.Row.Title) == "", "—", props.Position.Row.Title) }</div>
 				</div>
-				<div>
-					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.Lifecycle") }</div>
-					<div class="text-200">{ props.Position.Row.LifecycleStatus }</div>
-				</div>
-				<div>
-					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.Staffing") }</div>
-					<div class="text-200">{ props.Position.Row.StaffingState }</div>
-				</div>
+					<div>
+						<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.Lifecycle") }</div>
+						<div class="text-200">{ positionLifecycleLabel(pageCtx, props.Position.Row.LifecycleStatus) }</div>
+					</div>
+					<div>
+						<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.Staffing") }</div>
+						<div class="text-200">{ positionStaffingLabel(pageCtx, props.Position.Row.StaffingState) }</div>
+					</div>
 				<div>
 					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.FTE") }</div>
 					<div class="text-200">{ fmt.Sprintf("%.2f / %.2f", props.Position.Row.OccupiedFTE, props.Position.Row.CapacityFTE) }</div>
@@ -383,13 +418,13 @@ templ PositionTimeline(props PositionTimelineProps) {
 	} else {
 		<ul class="space-y-2">
 			for _, it := range props.Items {
-				<li class="rounded-md border border-surface-400 bg-surface-300 p-3">
-					<div class="flex items-center justify-between gap-3">
-						<div class="text-sm text-100">{ it.EffectiveDate.UTC().Format("2006-01-02") } → { it.EndDate.UTC().Format("2006-01-02") }</div>
-						<div class="text-xs text-400">{ it.LifecycleStatus }</div>
-					</div>
-					<div class="mt-1 text-xs text-300">
-						{ pageCtx.T("Org.UI.Positions.Fields.Capacity") }: { fmt.Sprintf("%.2f", it.CapacityFTE) }
+					<li class="rounded-md border border-surface-400 bg-surface-300 p-3">
+						<div class="flex items-center justify-between gap-3">
+							<div class="text-sm text-100">{ it.EffectiveDate.UTC().Format("2006-01-02") } → { it.EndDate.UTC().Format("2006-01-02") }</div>
+							<div class="text-xs text-400">{ positionLifecycleLabel(pageCtx, it.LifecycleStatus) }</div>
+						</div>
+						<div class="mt-1 text-xs text-300">
+							{ pageCtx.T("Org.UI.Positions.Fields.Capacity") }: { fmt.Sprintf("%.2f", it.CapacityFTE) }
 					</div>
 				</li>
 			}
@@ -463,30 +498,30 @@ templ PositionForm(props PositionFormProps) {
 			@button.Ghost(button.Props{
 				Size: button.SizeSM,
 				Icon: icons.X(icons.Props{Size: "18"}),
-				Attrs: templ.Attributes{
-					"type":        "button",
-					"hx-get":      cancelGet,
-					"hx-target":   cancelTarget,
-					"hx-swap":     "innerHTML",
-					"hx-push-url": "true",
-					"hx-include":  "#org-positions-filters, [name='effective_date']",
-				},
-			}) {
-				{ pageCtx.T("Cancel") }
-			}
+					Attrs: templ.Attributes{
+						"type":        "button",
+						"hx-get":      cancelGet,
+						"hx-target":   cancelTarget,
+						"hx-swap":     "innerHTML",
+						"hx-push-url": "true",
+						"hx-include":  "#org-positions-filters, #effective-date",
+					},
+				}) {
+					{ pageCtx.T("Cancel") }
+				}
 		</div>
 		if props.FormError != "" {
 			<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
 		}
-		<form
-			class="space-y-3"
-			hx-target="#org-position-details"
-			hx-swap="innerHTML"
-			hx-include="#org-positions-filters, [name='effective_date']"
-			if method == "patch" {
-				hx-patch={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
-			} else {
-				hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+			<form
+				class="space-y-3"
+				hx-target="#org-position-details"
+				hx-swap="innerHTML"
+				hx-include="#org-positions-filters"
+				if method == "patch" {
+					hx-patch={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+				} else {
+					hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
 			}
 		>
 			<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>

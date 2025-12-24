@@ -13,6 +13,7 @@ type OrgNodeDetails struct {
 	Status        string
 	DisplayOrder  int
 	ParentHint    *uuid.UUID
+	ParentLabel   string
 	LegalEntityID *uuid.UUID
 	CompanyCode   *string
 	LocationID    *uuid.UUID

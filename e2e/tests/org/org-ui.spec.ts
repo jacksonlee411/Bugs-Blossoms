@@ -221,19 +221,19 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		});
 		await expect(moveParentSelect).toHaveValue(itIDValue);
 
-		const moveNodeResp = page.waitForResponse(
-			(resp) =>
-				resp.request().method() === 'POST' &&
-				resp.url().includes(`/org/nodes/${hrIDValue}:move`) &&
-				resp.url().includes(`effective_date=${nodesMoveDateStr}`),
-			{ timeout: 30_000 }
-		);
-		await page.getByRole('button', { name: 'Move', exact: true }).click();
-		expect((await moveNodeResp).status()).toBe(200);
-		await expect(page.locator('#org-node-panel')).toContainText(itIDValue, { timeout: 15_000 });
+			const moveNodeResp = page.waitForResponse(
+				(resp) =>
+					resp.request().method() === 'POST' &&
+					resp.url().includes(`/org/nodes/${hrIDValue}:move`) &&
+					resp.url().includes(`effective_date=${nodesMoveDateStr}`),
+				{ timeout: 30_000 }
+			);
+			await page.getByRole('button', { name: 'Move', exact: true }).click();
+			expect((await moveNodeResp).status()).toBe(200);
+			await expect(page.locator('#org-node-panel')).toContainText('IT Team (IT)', { timeout: 15_000 });
 
-		await page.getByRole('link', { name: 'Assignments' }).click();
-		await expect(page).toHaveURL(/\/org\/assignments/);
+			await page.getByRole('link', { name: 'Assignments' }).click();
+			await expect(page).toHaveURL(/\/org\/assignments/);
 
 		const assignmentsBaseEffectiveDateStr = await page.locator('#effective-date').inputValue();
 		expect(assignmentsBaseEffectiveDateStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -296,15 +296,117 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 			const updateAssignmentResponse = page.waitForResponse((resp) => {
 				return resp.request().method() === 'POST' && resp.url().includes('/org/assignments/') && resp.url().includes(':transition');
 			});
-				await page.getByRole('button', { name: 'Save' }).click();
-				expect((await updateAssignmentResponse).status()).toBe(200);
-				await expect(page.locator('#org-assignments-timeline tbody tr')).toHaveCount(2);
-				await expect(page.locator('#org-assignments-timeline')).toContainText('Company (ROOT)');
+					await page.getByRole('button', { name: 'Save' }).click();
+					expect((await updateAssignmentResponse).status()).toBe(200);
+					await expect(page.locator('#org-assignments-timeline tbody tr')).toHaveCount(2);
+					await expect(page.locator('#org-assignments-timeline')).toContainText('Company (ROOT)');
+			});
+
+		test('写操作 effective_date 以表单为准且同步 header/URL（DEV-PLAN-037A）', async ({ page }) => {
+			await login(page, ADMIN.email, ADMIN.password);
+			await assertAuthenticated(page);
+
+			await createPerson({ page, pernr: '0001', displayName: 'E2E Person 0001' });
+
+			await page.goto('/org/nodes', { waitUntil: 'domcontentloaded' });
+			await page.waitForFunction(() => typeof (window as any).htmx !== 'undefined', { timeout: 10_000 });
+
+			const baseEffectiveDateStr = await page.locator('#effective-date').inputValue();
+			expect(baseEffectiveDateStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+			const baseEffectiveDate = parseUTCDateString(baseEffectiveDateStr);
+			const nodesFuture = addUTCDays(baseEffectiveDate, 5);
+			const nodesFutureStr = formatUTCDate(nodesFuture);
+
+			await page.locator('[data-testid="org-new-node"]').click();
+			await expect(page.getByText('Create node', { exact: true })).toBeVisible();
+			await page.locator('#org-node-effective-date').fill(nodesFutureStr);
+			await page.locator('input[name="code"]').fill('ROOT');
+			await page.locator('input[name="name"]').fill('Company');
+
+			const createNodeResp = page.waitForResponse(
+				(resp) => resp.request().method() === 'POST' && resp.url().includes('/org/nodes'),
+				{ timeout: 30_000 }
+			);
+			await page.getByRole('button', { name: 'Create' }).click();
+			expect((await createNodeResp).status()).toBe(200);
+			await page.waitForURL(new RegExp(`effective_date=${nodesFutureStr}`));
+			await expect(page.locator('#effective-date')).toHaveValue(nodesFutureStr);
+
+			const newChildBtnFromRoot = page.locator('[data-testid="org-new-child"]');
+			await expect(newChildBtnFromRoot).toBeVisible();
+			const newChildHxGet = await newChildBtnFromRoot.getAttribute('hx-get');
+			expect(newChildHxGet).toMatch(/parent_id=/);
+			const companyID = new URL(`http://local${newChildHxGet}`).searchParams.get('parent_id');
+			expect(companyID).toBeTruthy();
+			const companyIDValue = companyID!;
+
+			await page.getByRole('link', { name: 'Assignments' }).click();
+			await expect(page).toHaveURL(new RegExp(`\\/org\\/assignments\\?effective_date=${nodesFutureStr}`));
+
+			await page.getByLabel('Pernr').fill('0001');
+			await expect(page.locator('#org-pernr')).toHaveValue('0001');
+
+			const orgNodeCombobox = page.locator('[data-testid="org-assignment-orgnode-combobox"]');
+			const orgNodeSelect = orgNodeCombobox.locator('select[name="org_node_id"]');
+			await setComboboxValue({
+				combobox: orgNodeCombobox,
+				query: 'Company',
+				value: companyIDValue,
+			});
+			await expect(orgNodeSelect).toHaveValue(companyIDValue);
+
+			const assignmentsFuture = addUTCDays(nodesFuture, 7);
+			const assignmentsFutureStr = formatUTCDate(assignmentsFuture);
+			const formRefreshResp = page.waitForResponse(
+				(resp) =>
+					resp.request().method() === 'GET' &&
+					resp.url().includes('/org/assignments/form') &&
+					resp.url().includes(`effective_date=${assignmentsFutureStr}`),
+				{ timeout: 30_000 }
+			);
+			await page.locator('[data-testid="org-assignment-effective-date"]').fill(assignmentsFutureStr);
+			await page.locator('[data-testid="org-assignment-effective-date"]').dispatchEvent('change');
+			expect((await formRefreshResp).status()).toBe(200);
+			await expect(page.locator('[data-testid="org-assignment-effective-date"]')).toHaveValue(assignmentsFutureStr);
+
+			const createAssignmentResponse = page.waitForResponse(
+				(resp) => resp.request().method() === 'POST' && resp.url().includes('/org/assignments'),
+				{ timeout: 30_000 }
+			);
+			await page.getByRole('button', { name: 'Create' }).click();
+			expect((await createAssignmentResponse).status()).toBe(200);
+			await page.waitForURL(new RegExp(`effective_date=${assignmentsFutureStr}`));
+			await expect(page.locator('#effective-date')).toHaveValue(assignmentsFutureStr);
+
+			await page.getByRole('link', { name: 'Positions' }).click();
+			await expect(page).toHaveURL(new RegExp(`\\/org\\/positions\\?effective_date=${assignmentsFutureStr}`));
+
+			const positionsTree = page.locator('#org-tree');
+			const panelResp = page.waitForResponse(
+				(resp) => resp.request().method() === 'GET' && resp.url().includes('/org/positions/panel'),
+				{ timeout: 30_000 }
+			);
+			await positionsTree.getByRole('button', { name: /Company/ }).click();
+			expect((await panelResp).status()).toBe(200);
+
+			await page.getByRole('button', { name: 'Create position', exact: true }).click();
+			await expect(page.locator('#org-position-details').getByText('Create position', { exact: true })).toBeVisible();
+
+			await page.locator('input[name="code"]').fill('POS-001');
+			await page.locator('input[name="title"]').fill('HR Specialist');
+			const createResp = page.waitForResponse(
+				(resp) => resp.request().method() === 'POST' && resp.url().includes('/org/positions'),
+				{ timeout: 30_000 }
+			);
+			await page.locator('#org-position-details').getByRole('button', { name: 'Create', exact: true }).click();
+			expect((await createResp).status()).toBe(200);
+			await page.waitForURL(new RegExp(`effective_date=${assignmentsFutureStr}`));
+			await expect(page.locator('#effective-date')).toHaveValue(assignmentsFutureStr);
 		});
 
-	test('无 Org 权限账号访问 /org/nodes 返回 Unauthorized', async ({ page }) => {
-		await login(page, READONLY.email, READONLY.password);
-		await assertAuthenticated(page);
+		test('无 Org 权限账号访问 /org/nodes 返回 Unauthorized', async ({ page }) => {
+			await login(page, READONLY.email, READONLY.password);
+			await assertAuthenticated(page);
 
 		await page.goto('/org/nodes', { waitUntil: 'domcontentloaded' });
 		const response = await page.request.get('/org/nodes', {
@@ -312,13 +414,27 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		});
 		expect([401, 403]).toContain(response.status());
 
-		await expect(page.getByRole('heading', { name: /Permission required/i, level: 2 })).toBeVisible();
-		await expect(page.locator('section[data-authz-container]')).toBeVisible();
-	});
+			await expect(page.getByRole('heading', { name: /Permission required/i, level: 2 })).toBeVisible();
+			await expect(page.locator('section[data-authz-container]')).toBeVisible();
+		});
 
-	test('管理员可创建 Position 并 Transfer 组织归属（DEV-PLAN-055）', async ({ page }) => {
-		await login(page, ADMIN.email, ADMIN.password);
-		await assertAuthenticated(page);
+		test('无 Org 权限账号访问 /org/assignments 返回 Unauthorized', async ({ page }) => {
+			await login(page, READONLY.email, READONLY.password);
+			await assertAuthenticated(page);
+
+			await page.goto('/org/assignments', { waitUntil: 'domcontentloaded' });
+			const response = await page.request.get('/org/assignments', {
+				headers: { Accept: 'application/json', 'X-Request-ID': 'e2e-org-assignments-deny' },
+			});
+			expect([401, 403]).toContain(response.status());
+
+			await expect(page.getByRole('heading', { name: /Permission required/i, level: 2 })).toBeVisible();
+			await expect(page.locator('section[data-authz-container]')).toBeVisible();
+		});
+
+		test('管理员可创建 Position 并 Transfer 组织归属（DEV-PLAN-055）', async ({ page }) => {
+			await login(page, ADMIN.email, ADMIN.password);
+			await assertAuthenticated(page);
 
 		await page.goto('/org/nodes', { waitUntil: 'domcontentloaded' });
 		await expect(page).toHaveURL(/\/org\/nodes/);

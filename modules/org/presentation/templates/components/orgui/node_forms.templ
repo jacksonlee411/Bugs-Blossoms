@@ -28,6 +28,7 @@ type NodeFormProps struct {
 	EffectiveDate        string
 	Node                 *viewmodels.OrgNodeDetails
 	ParentID             *uuid.UUID
+	ParentLabel          string
 	Errors               map[string]string
 	FormError            string
 	SearchParentEndpoint string
@@ -117,16 +118,22 @@ templ NodeForm(props NodeFormProps) {
 				/>
 				<div class="mt-1 text-xs text-400">{ pageCtx.T("Org.UI.Node.EffectiveDate.Help") }</div>
 			</div>
-			if props.ParentID != nil {
-				<input type="hidden" name="parent_id" value={ props.ParentID.String() }/>
-				<div class="rounded-md border border-surface-400 bg-surface-300 p-3 text-xs text-200">
-					<div class="text-400">{ pageCtx.T("Org.UI.Node.Fields.Parent") }</div>
-					<div class="mt-1">{ props.ParentID.String() }</div>
-				</div>
-			}
-			if showCode {
-				@input.Text(&input.Props{
-					Label: pageCtx.T("Org.UI.Node.Fields.Code"),
+				if props.ParentID != nil {
+					<input type="hidden" name="parent_id" value={ props.ParentID.String() }/>
+					<div class="rounded-md border border-surface-400 bg-surface-300 p-3 text-xs text-200">
+						<div class="text-400">{ pageCtx.T("Org.UI.Node.Fields.Parent") }</div>
+						<div class="mt-1">
+							if strings.TrimSpace(props.ParentLabel) != "" {
+								{ strings.TrimSpace(props.ParentLabel) }
+							} else {
+								<span class="font-mono text-xs">{ props.ParentID.String() }</span>
+							}
+						</div>
+					</div>
+				}
+				if showCode {
+					@input.Text(&input.Props{
+						Label: pageCtx.T("Org.UI.Node.Fields.Code"),
 					Error: props.Errors["code"],
 					Attrs: templ.Attributes{
 						"name":  "code",
