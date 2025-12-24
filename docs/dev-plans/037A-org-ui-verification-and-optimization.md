@@ -1,6 +1,6 @@
 # DEV-PLAN-037A：Org UI 可视化验收与交互验证与优化实施方案（基于 DEV-PLAN-044）
 
-**状态**: 草拟中（2025-12-24 15:43 UTC）
+**状态**: 已完成（2025-12-24；已合并 [PR #128](https://github.com/jacksonlee411/Bugs-Blossoms/pull/128)）
 
 > 本文档定位：按 `docs/dev-plans/044-frontend-ui-verification-playbook.md` 的规范，对 Org 模块 UI（`/org/nodes`、`/org/positions`、`/org/assignments`）进行验证，并将“发现问题 → 解决方案（可编码）→ 测试与验收标准”以 `docs/dev-plans/001-technical-design-template.md` 的技术规格粒度落地。
 >
@@ -22,11 +22,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
-  - [ ] `ParentHint/ParentID` 统一显示为可读 label（`Name (Code)`），并提供“回到父节点”的可点击导航（NodePanel + Tree 同步）。
-  - [ ] 明确 `effective_date` 的**契约与优先级**：写操作以 **form body** 的 `effective_date` 为准；成功后同步页面 as-of 控件与 URL（避免“URL 已变但页面仍显示旧日期”）。
-  - [ ] 补齐 `/org/assignments` Unauthorized E2E 覆盖（与 nodes/positions 对齐）。
-  - [ ] Positions 的 `LifecycleStatus/StaffingState` 在 list/detail/timeline 统一用 i18n label 展示（未知值回退到原始 code）。
-  - [ ] 通过相关门禁并保证 E2E 可复现（本地/CI）。
+  - [X] `ParentHint/ParentID` 统一显示为可读 label（`Name (Code)`），并提供“回到父节点”的可点击导航（NodePanel + Tree 同步）。
+  - [X] 明确 `effective_date` 的**契约与优先级**：写操作以 **form body** 的 `effective_date` 为准；成功后同步页面 as-of 控件与 URL（避免“URL 已变但页面仍显示旧日期”）。
+  - [X] 补齐 `/org/assignments` Unauthorized E2E 覆盖（与 nodes/positions 对齐）。
+  - [X] Positions 的 `LifecycleStatus/StaffingState` 在 list/detail/timeline 统一用 i18n label 展示（未知值回退到原始 code）。
+  - [X] 通过相关门禁并保证 E2E 可复现（本地/CI）。
 
 - **非目标（Out of Scope）**：
   - 不考虑多浏览器适配：以 Chrome/Chromium 为准（见 044）。
@@ -213,28 +213,31 @@ graph TD
 - 证据产物脱敏：不在仓库提交 HAR/trace；在 PR/Readiness 引用 CI artifact 时注意去除 cookie/个人信息。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
-1. [ ] Nodes：父节点 label + 导航（UI + controller 计算）
-2. [ ] effective_date：写入优先级显式化 + header OOB 同步（nodes/assignments/positions）
-3. [ ] Positions：状态字段 i18n label 统一
-4. [ ] E2E：补齐 `/org/assignments` Unauthorized 用例；补齐 “future-dated 写入后 header/URL/树一致” 用例
-5. [ ] Readiness：记录执行命令与结果（必要时迁移到 `docs/dev-records/`）
+1. [X] Nodes：父节点 label + 导航（UI + controller 计算）
+2. [X] effective_date：写入优先级显式化 + header OOB 同步（nodes/assignments/positions）
+3. [X] Positions：状态字段 i18n label 统一
+4. [X] E2E：补齐 `/org/assignments` Unauthorized 用例；补齐 “future-dated 写入后 header/URL/树一致” 用例
+5. [X] Readiness：记录执行命令与结果（必要时迁移到 `docs/dev-records/`）
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 ### 9.1 自动化验证记录（已执行）
-- [X] 2025-12-24：运行 `e2e/tests/org/org-ui.spec.ts`（Chromium，headless）结果 4 passed。
+- [X] 2025-12-24：运行 `make generate && make css`（生成物已提交）。
+- [X] 2025-12-24：运行 `go fmt ./... && go vet ./... && make check lint && make test`。
+- [X] 2025-12-24：运行 `make check doc`。
+- [X] 2025-12-24：运行 `e2e/tests/org/org-ui.spec.ts`（Chromium，headless）结果 6 passed。
 
 ### 9.2 必须新增/更新的自动化用例
-- [ ] `e2e/tests/org/org-ui.spec.ts` 增加：无 Org 权限账号访问 `/org/assignments` 返回 Unauthorized（与 nodes/positions 断言一致）。
-- [ ] `e2e/tests/org/org-ui.spec.ts` 增加：在 NodeForm/AssignmentForm/PositionForm 中把 `effective_date` 改为 future date 提交成功后：
+- [X] `e2e/tests/org/org-ui.spec.ts` 增加：无 Org 权限账号访问 `/org/assignments` 返回 Unauthorized（与 nodes/positions 断言一致）。
+- [X] `e2e/tests/org/org-ui.spec.ts` 增加：在 NodeForm/AssignmentForm/PositionForm 中把 `effective_date` 改为 future date 提交成功后：
   - URL 包含 `effective_date=<future>`
   - 页面顶部 `#effective-date` 值为 `<future>`
   - 树/面板/时间线与 `<future>` 一致（不出现“URL 已变但页面仍显示旧日期”）
 
 ### 9.3 验收清单（完成定义）
-- [ ] ParentHint/ParentID 不再以 UUID 作为唯一展示，且可一键回到父节点。
-- [ ] 写操作 effective_date 以 body 为准，成功后页面日期控件与文案同步，HTMX 不出现空白 swap。
-- [ ] Positions 的 Lifecycle/Staffing 在 list/detail/timeline 均展示为 i18n label。
-- [ ] E2E 覆盖补齐并通过；`make check doc`、相关 lint/test 门禁可通过。
+- [X] ParentHint/ParentID 不再以 UUID 作为唯一展示，且可一键回到父节点。
+- [X] 写操作 effective_date 以 body 为准，成功后页面日期控件与文案同步，HTMX 不出现空白 swap。
+- [X] Positions 的 Lifecycle/Staffing 在 list/detail/timeline 均展示为 i18n label。
+- [X] E2E 覆盖补齐并通过；`make check doc`、相关 lint/test 门禁可通过。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - 本计划不新增 runtime 依赖与监控指标；如需排障，使用现有 request-id 关联与 Playwright trace/录像（不入库）。
