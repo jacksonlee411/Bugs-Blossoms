@@ -158,21 +158,21 @@ templ AssignmentsPage(props AssignmentsPageProps) {
 									Operation: pageCtx.T("Org.UI.Assignments.CreateTitle"),
 								})
 							}
-								@button.Secondary(button.Props{
-									Size: button.SizeSM,
-									Icon: icons.ArrowClockwise(icons.Props{Size: "18"}),
-									Attrs: templ.Attributes{
-										"type":        "button",
-										"hx-get":      "/org/assignments",
-										"hx-target":   "#org-assignments-timeline",
-										"hx-swap":     "innerHTML",
-										"hx-push-url": "true",
-										"hx-include":  "#org-pernr, #effective-date",
-									},
-								}) {
-									{ pageCtx.T("Org.UI.Assignments.Actions.Refresh") }
-								}
-							</div>
+							@button.Secondary(button.Props{
+								Size: button.SizeSM,
+								Icon: icons.ArrowClockwise(icons.Props{Size: "18"}),
+								Attrs: templ.Attributes{
+									"type":        "button",
+									"hx-get":      "/org/assignments",
+									"hx-target":   "#org-assignments-timeline",
+									"hx-swap":     "innerHTML",
+									"hx-push-url": "true",
+									"hx-include":  "#org-pernr, #effective-date",
+								},
+							}) {
+								{ pageCtx.T("Org.UI.Assignments.Actions.Refresh") }
+							}
+						</div>
 					</div>
 				</div>
 				<div class="col-span-12 lg:col-span-8">

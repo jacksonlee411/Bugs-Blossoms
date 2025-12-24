@@ -115,21 +115,21 @@ templ PositionsPage(props PositionsPageProps) {
 							<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.Tree.Title") }</div>
 						</div>
 						<div class="p-2">
-								@orgui.Tree(orgui.TreeProps{
-									Tree:          props.Tree,
-									EffectiveDate: props.EffectiveDate,
-									SwapOOB:       false,
-									NodeGetURL: func(nodeID, effectiveDate string) string {
-										return fmt.Sprintf("/org/positions/panel?node_id=%s", nodeID)
-									},
-									Target:  "#org-positions-panel",
-									Swap:    "innerHTML",
-									Include: "#org-positions-filters, #effective-date",
-									PushURL: "true",
-								})
-							</div>
+							@orgui.Tree(orgui.TreeProps{
+								Tree:          props.Tree,
+								EffectiveDate: props.EffectiveDate,
+								SwapOOB:       false,
+								NodeGetURL: func(nodeID, effectiveDate string) string {
+									return fmt.Sprintf("/org/positions/panel?node_id=%s", nodeID)
+								},
+								Target:  "#org-positions-panel",
+								Swap:    "innerHTML",
+								Include: "#org-positions-filters, #effective-date",
+								PushURL: "true",
+							})
 						</div>
 					</div>
+				</div>
 				<div class="col-span-12 lg:col-span-8">
 					<div id="org-positions-panel">
 						@orgui.PositionsPanel(props.Panel)
