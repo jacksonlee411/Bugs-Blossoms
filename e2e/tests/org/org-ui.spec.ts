@@ -273,16 +273,16 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 
 		const editButton = page.locator('[data-testid^="org-assignment-edit-"]').first();
 		await expect(editButton).toBeVisible();
-		const editResp = page.waitForResponse((resp) => {
-			return (
-				resp.request().method() === 'GET' &&
-				resp.url().includes('/org/assignments/') &&
-				resp.url().includes('/edit')
-			);
-		});
-		await editButton.click();
-		expect((await editResp).status()).toBe(200);
-		await expect(page.locator('[data-testid="org-assignment-cancel-edit"]')).toBeVisible();
+			const editResp = page.waitForResponse((resp) => {
+				return (
+					resp.request().method() === 'GET' &&
+					resp.url().includes('/org/assignments/') &&
+					resp.url().includes('/transition')
+				);
+			});
+			await editButton.click();
+			expect((await editResp).status()).toBe(200);
+			await expect(page.locator('[data-testid="org-assignment-cancel-edit"]')).toBeVisible();
 
 		const editOrgNodeCombobox = page.locator('[data-testid="org-assignment-orgnode-combobox"]');
 		const editOrgNodeSelect = editOrgNodeCombobox.locator('select[name="org_node_id"]');
@@ -293,13 +293,13 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		});
 		await expect(editOrgNodeSelect).toHaveValue(companyIDValue);
 
-		const updateAssignmentResponse = page.waitForResponse((resp) => {
-			return resp.request().method() === 'PATCH' && resp.url().includes('/org/assignments/');
-		});
-			await page.getByRole('button', { name: 'Save' }).click();
-			expect((await updateAssignmentResponse).status()).toBe(200);
-			await expect(page.locator('#org-assignments-timeline tbody tr')).toHaveCount(2);
-			await expect(page.locator('#org-assignments-timeline')).toContainText('Company (ROOT)');
+			const updateAssignmentResponse = page.waitForResponse((resp) => {
+				return resp.request().method() === 'POST' && resp.url().includes('/org/assignments/') && resp.url().includes(':transition');
+			});
+				await page.getByRole('button', { name: 'Save' }).click();
+				expect((await updateAssignmentResponse).status()).toBe(200);
+				await expect(page.locator('#org-assignments-timeline tbody tr')).toHaveCount(2);
+				await expect(page.locator('#org-assignments-timeline')).toContainText('Company (ROOT)');
 		});
 
 	test('无 Org 权限账号访问 /org/nodes 返回 Unauthorized', async ({ page }) => {
