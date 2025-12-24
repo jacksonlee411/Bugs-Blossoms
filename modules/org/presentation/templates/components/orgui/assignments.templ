@@ -15,8 +15,8 @@ import (
 type AssignmentFormMode string
 
 const (
-	AssignmentFormCreate AssignmentFormMode = "create"
-	AssignmentFormEdit   AssignmentFormMode = "edit"
+	AssignmentFormCreate     AssignmentFormMode = "create"
+	AssignmentFormEdit       AssignmentFormMode = "edit"
 	AssignmentFormTransition AssignmentFormMode = "transition"
 )
 
@@ -55,7 +55,10 @@ templ AssignmentForm(props AssignmentFormProps) {
 			{{ submitLabel = pageCtx.T("Org.UI.Actions.Save") }}
 			{{ pernrReadonly = true }}
 			{{ refreshURL = fmt.Sprintf("/org/assignments/%s/transition", strings.TrimSpace(props.AssignmentID)) }}
-			{{ if eventType == "" { eventType = "transfer" } }}
+			{{if eventType == "" {
+	eventType = "transfer"
+}
+			}}
 		case AssignmentFormEdit:
 			{{ title = pageCtx.T("Org.UI.Assignments.EditTitle") }}
 			{{ action = fmt.Sprintf("/org/assignments/%s", strings.TrimSpace(props.AssignmentID)) }}
@@ -63,13 +66,19 @@ templ AssignmentForm(props AssignmentFormProps) {
 			{{ submitLabel = pageCtx.T("Org.UI.Actions.Save") }}
 			{{ pernrReadonly = true }}
 			{{ refreshURL = fmt.Sprintf("/org/assignments/%s/edit", strings.TrimSpace(props.AssignmentID)) }}
-			{{ if eventType == "" { eventType = "transfer" } }}
+			{{if eventType == "" {
+	eventType = "transfer"
+}
+			}}
 		default:
 			{{ title = pageCtx.T("Org.UI.Assignments.CreateTitle") }}
 			{{ action = "/org/assignments" }}
 			{{ method = "post" }}
 			{{ submitLabel = pageCtx.T("Org.UI.Assignments.Actions.Create") }}
-			{{ if eventType == "" { eventType = "hire" } }}
+			{{if eventType == "" {
+	eventType = "hire"
+}
+			}}
 	}
 	{{pernrAttrs := templ.Attributes{
 	"id":    "org-pernr",
@@ -98,83 +107,82 @@ templ AssignmentForm(props AssignmentFormProps) {
 				}
 			}
 		</div>
-			<form
-				class="space-y-3"
-				x-data={ fmt.Sprintf("{ eventType: '%s' }", eventType) }
-				hx-target="#org-assignment-form"
-				hx-swap="outerHTML"
-				if method == "patch" {
-					hx-patch={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
-				} else {
-					hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
-				}
-			>
-				{{
+		<form
+			class="space-y-3"
+			x-data={ fmt.Sprintf("{ eventType: '%s' }", eventType) }
+			hx-target="#org-assignment-form"
+			hx-swap="outerHTML"
+			if method == "patch" {
+				hx-patch={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+			} else {
+				hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
+			}
+		>
+			{{
 					effectiveDateAttrs := templ.Attributes{
-						"id":         "org-assignment-effective-date",
-						"name":       "effective_date",
-						"value":      props.EffectiveDate,
+						"id":          "org-assignment-effective-date",
+						"name":        "effective_date",
+						"value":       props.EffectiveDate,
 						"data-testid": "org-assignment-effective-date",
-						"hx-get":     refreshURL,
-						"hx-trigger": "change",
-						"hx-target":  "#org-assignment-form",
-						"hx-swap":    "outerHTML",
-						"hx-include": "closest form",
+						"hx-get":      refreshURL,
+						"hx-trigger":  "change",
+						"hx-target":   "#org-assignment-form",
+						"hx-swap":     "outerHTML",
+						"hx-include":  "closest form",
 					}
 					if strings.TrimSpace(props.FreezeCutoff) != "" {
 						effectiveDateAttrs["min"] = strings.TrimSpace(props.FreezeCutoff)
 					}
-				}}
-				@input.Date(&input.Props{
-					Label: pageCtx.T("Org.UI.Assignments.Fields.EffectiveDate"),
-					Error: props.Errors["effective_date"],
-					Attrs: effectiveDateAttrs,
-				})
-				if strings.TrimSpace(props.FreezeCutoff) != "" {
-					<div class="text-xs text-400">
-						{ pageCtx.T("Org.UI.Assignments.Fields.FreezeCutoff") } { strings.TrimSpace(props.FreezeCutoff) }
-					</div>
-				}
-
-				@base.Select(&base.SelectProps{
-					Label: pageCtx.T("Org.UI.Assignments.Fields.EventType"),
-					Error: props.Errors["event_type"],
-					Placeholder: "",
-					Attrs: templ.Attributes{
-						"name":       "event_type",
-						"data-testid": "org-assignment-event-type",
-						"x-model":    "eventType",
-						"hx-get":     refreshURL,
-						"hx-trigger": "change",
-						"hx-target":  "#org-assignment-form",
-						"hx-swap":    "outerHTML",
-						"hx-include": "closest form",
-					},
-				}) {
-					if props.Mode == AssignmentFormCreate {
-						<option value="hire" selected?={ eventType == "hire" }>{ pageCtx.T("Org.UI.Assignments.EventType.Hire") }</option>
-					} else {
-						<option value="transfer" selected?={ eventType == "transfer" }>{ pageCtx.T("Org.UI.Assignments.EventType.Transfer") }</option>
-						<option value="termination" selected?={ eventType == "termination" }>{ pageCtx.T("Org.UI.Assignments.EventType.Termination") }</option>
-					}
-				}
-				if props.IncludeSummary {
-					<input type="hidden" name="include_summary" value="1"/>
-				}
-				if props.FormError != "" {
-					<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
+			}}
+			@input.Date(&input.Props{
+				Label: pageCtx.T("Org.UI.Assignments.Fields.EffectiveDate"),
+				Error: props.Errors["effective_date"],
+				Attrs: effectiveDateAttrs,
+			})
+			if strings.TrimSpace(props.FreezeCutoff) != "" {
+				<div class="text-xs text-400">
+					{ pageCtx.T("Org.UI.Assignments.Fields.FreezeCutoff") } { strings.TrimSpace(props.FreezeCutoff) }
+				</div>
 			}
-				@input.Text(&input.Props{
-					Label: pageCtx.T("Org.UI.Assignments.Fields.Pernr"),
-					Error: props.Errors["pernr"],
-					Attrs: pernrAttrs,
-				})
-				<div data-testid="org-assignment-orgnode-combobox" x-show={ "eventType !== 'termination'" }>
-					@base.Combobox(base.ComboboxProps{
-						Searchable:   true,
-						Label:        pageCtx.T("Org.UI.Assignments.Fields.OrgNode"),
-						Name:         "org_node_id",
-						Endpoint:     fmt.Sprintf("/org/nodes/search?effective_date=%s", props.EffectiveDate),
+			@base.Select(&base.SelectProps{
+				Label:       pageCtx.T("Org.UI.Assignments.Fields.EventType"),
+				Error:       props.Errors["event_type"],
+				Placeholder: "",
+				Attrs: templ.Attributes{
+					"name":        "event_type",
+					"data-testid": "org-assignment-event-type",
+					"x-model":     "eventType",
+					"hx-get":      refreshURL,
+					"hx-trigger":  "change",
+					"hx-target":   "#org-assignment-form",
+					"hx-swap":     "outerHTML",
+					"hx-include":  "closest form",
+				},
+			}) {
+				if props.Mode == AssignmentFormCreate {
+					<option value="hire" selected?={ eventType == "hire" }>{ pageCtx.T("Org.UI.Assignments.EventType.Hire") }</option>
+				} else {
+					<option value="transfer" selected?={ eventType == "transfer" }>{ pageCtx.T("Org.UI.Assignments.EventType.Transfer") }</option>
+					<option value="termination" selected?={ eventType == "termination" }>{ pageCtx.T("Org.UI.Assignments.EventType.Termination") }</option>
+				}
+			}
+			if props.IncludeSummary {
+				<input type="hidden" name="include_summary" value="1"/>
+			}
+			if props.FormError != "" {
+				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
+			}
+			@input.Text(&input.Props{
+				Label: pageCtx.T("Org.UI.Assignments.Fields.Pernr"),
+				Error: props.Errors["pernr"],
+				Attrs: pernrAttrs,
+			})
+			<div data-testid="org-assignment-orgnode-combobox" x-show={ "eventType !== 'termination'" }>
+				@base.Combobox(base.ComboboxProps{
+					Searchable:   true,
+					Label:        pageCtx.T("Org.UI.Assignments.Fields.OrgNode"),
+					Name:         "org_node_id",
+					Endpoint:     fmt.Sprintf("/org/nodes/search?effective_date=%s", props.EffectiveDate),
 					Placeholder:  pageCtx.T("Org.UI.Node.Parent.Placeholder"),
 					NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
 				}) {
@@ -182,17 +190,17 @@ templ AssignmentForm(props AssignmentFormProps) {
 						<option value={ props.OrgNodeID } selected>{ props.OrgNodeLabel }</option>
 					}
 					<!-- options loaded via HTMX -->
-					}
-				</div>
-				if props.Errors["org_node_id"] != "" {
-					<div class="text-xs text-red-200">{ props.Errors["org_node_id"] }</div>
 				}
-				<div data-testid="org-assignment-position-combobox" x-show={ "eventType !== 'termination'" }>
-					@base.Combobox(base.ComboboxProps{
-						Searchable:   true,
-						Label:        pageCtx.T("Org.UI.Assignments.Fields.PositionID"),
-						Name:         "position_id",
-						Endpoint:     fmt.Sprintf("/org/positions/search?effective_date=%s&lifecycle_status=active&org_node_required=1", props.EffectiveDate),
+			</div>
+			if props.Errors["org_node_id"] != "" {
+				<div class="text-xs text-red-200">{ props.Errors["org_node_id"] }</div>
+			}
+			<div data-testid="org-assignment-position-combobox" x-show={ "eventType !== 'termination'" }>
+				@base.Combobox(base.ComboboxProps{
+					Searchable:   true,
+					Label:        pageCtx.T("Org.UI.Assignments.Fields.PositionID"),
+					Name:         "position_id",
+					Endpoint:     fmt.Sprintf("/org/positions/search?effective_date=%s&lifecycle_status=active&org_node_required=1", props.EffectiveDate),
 					Placeholder:  pageCtx.T("Org.UI.Assignments.Position.Placeholder"),
 					NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
 					Trigger: &base.Trigger{
@@ -230,16 +238,16 @@ templ AssignmentForm(props AssignmentFormProps) {
 					}
 					<!-- options loaded via HTMX -->
 				}
+			</div>
+			if eventType == "termination" {
+				<div class="text-xs text-400">
+					{ pageCtx.T("Org.UI.Assignments.TerminationHint") }
 				</div>
-				if eventType == "termination" {
-					<div class="text-xs text-400">
-						{ pageCtx.T("Org.UI.Assignments.TerminationHint") }
-					</div>
-				}
-				<div class="flex items-center justify-end">
-					@button.Primary(button.Props{
-						Size: button.SizeSM,
-						Attrs: templ.Attributes{
+			}
+			<div class="flex items-center justify-end">
+				@button.Primary(button.Props{
+					Size: button.SizeSM,
+					Attrs: templ.Attributes{
 						"type": "submit",
 					},
 				}) {
@@ -511,24 +519,24 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 							{ posLabel }
 						</td>
 						if pageCtx.CanAuthz("org.assignments", "assign") {
-								<td class="py-2 pr-2">
-									if canEdit {
-										@button.Secondary(button.Props{
-											Size:  button.SizeSM,
-											Class: "px-2 py-1",
-											Attrs: templ.Attributes{
-												"data-testid": fmt.Sprintf("org-assignment-edit-%s", row.ID.String()),
-												"type":        "button",
-												"hx-get":      fmt.Sprintf("/org/assignments/%s/transition?effective_date=%s&pernr=%s", row.ID.String(), props.EffectiveDate, row.Pernr),
-												"hx-target":   "#org-assignment-form",
-												"hx-swap":     "outerHTML",
-											},
-										}) {
-											{ pageCtx.T("Org.UI.Assignments.Actions.Transition") }
-										}
-									} else {
-										<span class="text-xs text-400">—</span>
+							<td class="py-2 pr-2">
+								if canEdit {
+									@button.Secondary(button.Props{
+										Size:  button.SizeSM,
+										Class: "px-2 py-1",
+										Attrs: templ.Attributes{
+											"data-testid": fmt.Sprintf("org-assignment-edit-%s", row.ID.String()),
+											"type":        "button",
+											"hx-get":      fmt.Sprintf("/org/assignments/%s/transition?effective_date=%s&pernr=%s", row.ID.String(), props.EffectiveDate, row.Pernr),
+											"hx-target":   "#org-assignment-form",
+											"hx-swap":     "outerHTML",
+										},
+									}) {
+										{ pageCtx.T("Org.UI.Assignments.Actions.Transition") }
 									}
+								} else {
+									<span class="text-xs text-400">—</span>
+								}
 							</td>
 						}
 					</tr>
