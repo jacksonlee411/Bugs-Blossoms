@@ -339,6 +339,10 @@ graph TD
 - [X] `make check lint && make test` —— 2025-12-24 21:18 UTC
 - [X] `make check doc` —— 2025-12-24 21:18 UTC
 
+### 14.2 交互式验证说明（登录/点击路径）
+- 受限于当前执行环境（无浏览器/无法模拟人工登录操作），无法逐一完成“登录系统后按页面路径点选”的人工验收。
+- 替代验证：本计划相关改动已通过本地门禁（lint/test/docs/tr/生成物一致性）与 CI E2E 覆盖；如需人工复核，建议按 037 的验收标准逐项在 `/org/nodes`、`/org/positions`、`/org/assignments` 以及 Person 详情页进行点击验证。
+
 ## 13. 附录：关键证据索引
 - Org 页面 effective date（HTMX swap 全页）：  
   - `modules/org/presentation/templates/pages/org/nodes.templ`  
