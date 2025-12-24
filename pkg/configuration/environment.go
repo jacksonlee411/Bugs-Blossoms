@@ -302,11 +302,10 @@ func (c *Configuration) load(envFiles []string) error {
 	c.logger = logger
 
 	c.Database.Opts = c.Database.ConnectionString()
-	if c.GoAppEnvironment == Production {
-		c.SocketAddress = fmt.Sprintf(":%d", c.ServerPort)
-	} else {
-		c.SocketAddress = fmt.Sprintf("localhost:%d", c.ServerPort)
-	}
+	// In development, binding to "localhost" may resolve to IPv6-only (::1) on some systems,
+	// while clients may attempt IPv4 or vice versa, causing "localhost:PORT unreachable".
+	// Binding to all interfaces avoids this mismatch for local development.
+	c.SocketAddress = fmt.Sprintf(":%d", c.ServerPort)
 
 	// Update Domain and Origin dynamically if they weren't explicitly set via environment variables
 	// This ensures logs show the correct port when PORT is set via environment
