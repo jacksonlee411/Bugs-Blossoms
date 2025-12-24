@@ -235,6 +235,7 @@ func applyAllOrgMigrationsFor033(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251219195000_org_security_group_mappings_and_links.sql",
 		"20251219220000_org_reporting_nodes_and_view.sql",
 		"20251220160000_org_position_slices_and_fte.sql",
+		"20251222120000_org_personnel_events.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

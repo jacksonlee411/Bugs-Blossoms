@@ -62,6 +62,7 @@
 					"Table": {
 						"Pernr": "工号",
 						"Effective": "生效区间",
+						"EventType": "操作类型",
 						"OrgNodeID": "部门",
 						"Position": "职位"
 					}

@@ -478,6 +478,7 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 				<tr>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Pernr") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Effective") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.EventType") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
 					if pageCtx.CanAuthz("org.assignments", "assign") {
@@ -496,6 +497,43 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 								{ pageCtx.T("Org.UI.Shared.Present") }
 							} else {
 								{ row.EndDate.UTC().Format("2006-01-02") }
+							}
+						</td>
+						<td class="py-2 pr-2 text-200">
+							{{ startCode := strings.TrimSpace(row.OperationType) }}
+							{{ endCode := strings.TrimSpace(row.EndEventType) }}
+							{{ startLabel := "" }}
+							{{ endLabel := "" }}
+							{{if startCode != "" {
+	switch startCode {
+	case "hire":
+		startLabel = pageCtx.T("Org.UI.Assignments.EventType.Hire")
+	case "transfer":
+		startLabel = pageCtx.T("Org.UI.Assignments.EventType.Transfer")
+	case "termination":
+		startLabel = pageCtx.T("Org.UI.Assignments.EventType.Termination")
+	}
+}
+							}}
+							{{if endCode != "" {
+	switch endCode {
+	case "hire":
+		endLabel = pageCtx.T("Org.UI.Assignments.EventType.Hire")
+	case "transfer":
+		endLabel = pageCtx.T("Org.UI.Assignments.EventType.Transfer")
+	case "termination":
+		endLabel = pageCtx.T("Org.UI.Assignments.EventType.Termination")
+	}
+}
+							}}
+							if strings.TrimSpace(startLabel) == "" && strings.TrimSpace(endLabel) == "" {
+								<span class="text-xs text-400">—</span>
+							} else if strings.TrimSpace(startLabel) != "" && strings.TrimSpace(endLabel) != "" && startLabel != endLabel {
+								{ startLabel } → { endLabel }
+							} else if strings.TrimSpace(startLabel) != "" {
+								{ startLabel }
+							} else {
+								{ endLabel }
 							}
 						</td>
 						<td class="py-2 pr-2 text-200">

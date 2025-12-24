@@ -291,6 +291,8 @@ type AssignmentViewRow struct {
 	PositionCode   *string    `json:"position_code,omitempty"`
 	Pernr          *string    `json:"pernr,omitempty"`
 	SubjectID      *uuid.UUID `json:"subject_id,omitempty"`
+	StartEventType *string    `json:"start_event_type,omitempty"`
+	EndEventType   *string    `json:"end_event_type,omitempty"`
 }
 
 type OrgService struct {

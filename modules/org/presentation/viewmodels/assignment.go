@@ -14,6 +14,8 @@ type OrgAssignmentRow struct {
 	PositionCode  string
 	OrgNodeLabel  string
 	PositionLabel string
+	OperationType string
+	EndEventType  string
 	EffectiveDate time.Time
 	EndDate       time.Time
 }
