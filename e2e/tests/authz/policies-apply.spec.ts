@@ -43,8 +43,8 @@ test.describe('authz policies apply', () => {
 		});
 		await page.getByTestId('authz-user-stage-open-direct').click();
 
-		const stageDialog = page.locator('#stage-policy-direct');
-		await expect(stageDialog).toBeVisible();
+			const stageDialog = page.locator('#stage-policy-direct dialog');
+			await expect(stageDialog).toBeVisible();
 
 		await stageDialog.locator('input[name="object"]').fill('logging.logs');
 		await stageDialog.locator('input[name="action"]').fill('view');
