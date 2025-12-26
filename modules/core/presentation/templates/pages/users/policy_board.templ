@@ -203,11 +203,11 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 		hx-target="#user-policy-board"
 		hx-swap="outerHTML"
 	>
-			<div class="flex items-start justify-between flex-wrap gap-3">
-				<div class="space-y-1">
-					<h3 class="text-lg font-semibold">{ pageCtx.T("Users.Tabs.Permissions") }</h3>
-					<div class="flex flex-wrap gap-2 text-sm text-secondary-300">
-						@UserPolicyBoardMeta(pageCtx.T("Authz.Subject"), props.Subject)
+		<div class="flex items-start justify-between flex-wrap gap-3">
+			<div class="space-y-1">
+				<h3 class="text-lg font-semibold">{ pageCtx.T("Users.Tabs.Permissions") }</h3>
+				<div class="flex flex-wrap gap-2 text-sm text-secondary-300">
+					@UserPolicyBoardMeta(pageCtx.T("Authz.Subject"), props.Subject)
 					@UserPolicyBoardMeta(pageCtx.T("Authz.Domain"), props.Domain)
 				</div>
 			</div>
@@ -221,16 +221,16 @@ templ UserPolicyBoard(props *UserPolicyBoardProps) {
 					@UserPolicyBoardAddMenu(props.CanStage)
 				} else {
 					<span class="text-xs text-secondary-200">{ pageCtx.T("Authz.Unauthorized.ReadOnlyHint") }</span>
-					}
-				</div>
+				}
 			</div>
-			@UserPolicyStageDrawer(&props.Direct)
-			@UserPolicyStageDrawer(&props.Overrides)
-			<form
-				class="flex flex-wrap items-center gap-2 rounded-lg border border-primary bg-surface-400 p-3 text-sm"
-				hx-get={ props.BaseURL }
-				hx-target="#user-policy-board"
-				hx-swap="outerHTML"
+		</div>
+		@UserPolicyStageDrawer(&props.Direct)
+		@UserPolicyStageDrawer(&props.Overrides)
+		<form
+			class="flex flex-wrap items-center gap-2 rounded-lg border border-primary bg-surface-400 p-3 text-sm"
+			hx-get={ props.BaseURL }
+			hx-target="#user-policy-board"
+			hx-swap="outerHTML"
 			hx-push-url="true"
 			hx-trigger="change from:(form select), keyup delay:400ms from:(form input)"
 		>
@@ -628,7 +628,7 @@ templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 			</div>
 		</div>
 	</div>
-	}
+}
 
 templ UserPolicyStageDrawer(props *UserPolicyColumnProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
@@ -812,15 +812,15 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 			aria-live="polite"
 		>
 			<span x-text="undoText()"></span>
-				<button class="btn btn-xs" type="button" @click="undoBulkRemove()">
-					{ pageCtx.T("Authz.Stage.BulkRemoveUndo") }
-				</button>
-			</div>
-			<div class="border border-primary rounded-lg overflow-hidden">
-				{{ columns := []*base.TableColumn{} }}
-				if canEdit {
-					{{ columns = append(columns, &base.TableColumn{Label: "", Key: "select", Class: "w-10"}) }}
-				}
+			<button class="btn btn-xs" type="button" @click="undoBulkRemove()">
+				{ pageCtx.T("Authz.Stage.BulkRemoveUndo") }
+			</button>
+		</div>
+		<div class="border border-primary rounded-lg overflow-hidden">
+			{{ columns := []*base.TableColumn{} }}
+			if canEdit {
+				{{ columns = append(columns, &base.TableColumn{Label: "", Key: "select", Class: "w-10"}) }}
+			}
 			if props.Type == "g" {
 				{{columns = append(columns,
 	&base.TableColumn{Label: pageCtx.T("Authz.Role"), Key: "role"},
