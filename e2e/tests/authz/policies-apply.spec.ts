@@ -30,9 +30,12 @@ test.describe('authz policies apply', () => {
 		await expect(page.locator('#user-policy-board')).toBeVisible();
 
 		const domainInput = page.locator('#user-policy-board form input[name="domain"]').first();
-		await domainInput.fill('logging');
-		await domainInput.dispatchEvent('change');
-		await expect(page.locator('[title="logging"]').first()).toBeVisible();
+		await domainInput.click();
+		await domainInput.press('Control+A');
+		await domainInput.press('Backspace');
+		await domainInput.pressSequentially('logging');
+		await expect(domainInput).toHaveValue('logging');
+		await expect(page).toHaveURL(/domain=logging/, { timeout: 15_000 });
 
 		await page.getByTestId('authz-user-stage-menu').click();
 		await page.getByTestId('authz-user-stage-open-direct').click();
@@ -72,9 +75,12 @@ test.describe('authz policies apply', () => {
 		await page.locator('button', { hasText: /permissions/i }).first().click();
 		await expect(page.locator('#user-policy-board')).toBeVisible();
 		const domainInput2 = page.locator('#user-policy-board form input[name="domain"]').first();
-		await domainInput2.fill('logging');
-		await domainInput2.dispatchEvent('change');
-		await expect(page.locator('[title="logging"]').first()).toBeVisible();
+		await domainInput2.click();
+		await domainInput2.press('Control+A');
+		await domainInput2.press('Backspace');
+		await domainInput2.pressSequentially('logging');
+		await expect(domainInput2).toHaveValue('logging');
+		await expect(page).toHaveURL(/domain=logging/, { timeout: 15_000 });
 
 		const directColumn = page.locator('#user-policy-direct');
 		const ruleRow = directColumn.locator('tr', { hasText: 'logging.logs' }).filter({ hasText: 'view' }).first();
