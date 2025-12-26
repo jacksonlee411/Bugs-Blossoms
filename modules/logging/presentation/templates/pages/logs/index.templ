@@ -42,11 +42,11 @@ templ Content(props *viewmodels.LogsPageProps) {
 	<div class="m-6 space-y-4">
 		if props.CanDebug {
 			@authzcomponents.PolicyInspector(&authzcomponents.PolicyInspectorProps{
-				State:      pageCtx.AuthzState(),
-				Object:     "logging.logs",
-				Action:     "view",
-				Domain:     "logging",
-				CanDebug:   props.CanDebug,
+				State:    pageCtx.AuthzState(),
+				Object:   "logging.logs",
+				Action:   "view",
+				Domain:   "logging",
+				CanDebug: props.CanDebug,
 			})
 		}
 		<div class="flex items-center justify-between">

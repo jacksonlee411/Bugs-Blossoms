@@ -47,14 +47,14 @@ func shortenSubject(value string) string {
 	return strings.Join(parts, ":")
 }
 
-	type UserPolicyEntry struct {
-		dtos.PolicyEntryResponse
-		StageID         string
-		StageKind       string
-		Staged          bool
-		StageOnly       bool
-		RolePoliciesURL string
-	}
+type UserPolicyEntry struct {
+	dtos.PolicyEntryResponse
+	StageID         string
+	StageKind       string
+	Staged          bool
+	StageOnly       bool
+	RolePoliciesURL string
+}
 
 type UserPolicyColumnProps struct {
 	Title         string
@@ -104,21 +104,21 @@ type UserEffectivePoliciesProps struct {
 	BaseURL       string
 }
 
-	type UserPolicyBoardProps struct {
-		Subject       string
-		Domain        string
-		DefaultDomain string
-		StageTotal    int
-		StageSummary  viewmodels.AuthzChangesSummary
-		StagePreview  viewmodels.AuthzWorkspacePreview
-		Effective     UserEffectivePoliciesProps
-		Inherited     UserPolicyColumnProps
-		Direct        UserPolicyColumnProps
-		Overrides     UserPolicyColumnProps
-		BaseURL       string
-		CanStage      bool
-		CanDebug      bool
-	}
+type UserPolicyBoardProps struct {
+	Subject       string
+	Domain        string
+	DefaultDomain string
+	StageTotal    int
+	StageSummary  viewmodels.AuthzChangesSummary
+	StagePreview  viewmodels.AuthzWorkspacePreview
+	Effective     UserEffectivePoliciesProps
+	Inherited     UserPolicyColumnProps
+	Direct        UserPolicyColumnProps
+	Overrides     UserPolicyColumnProps
+	BaseURL       string
+	CanStage      bool
+	CanDebug      bool
+}
 
 var userPolicyBoardScriptOnce = templ.NewOnceHandle()
 
@@ -152,78 +152,78 @@ templ UserPolicyBoardMeta(label string, value string) {
 	</div>
 }
 
-	templ UserPolicyBoardAddMenu(canStage bool) {
-		{{ pageCtx := composables.UsePageCtx(ctx) }}
-		if !canStage {
-			return
-		}
-		<details class="relative">
-			<summary class="list-none">
-				<button class="btn btn-xs btn-primary" type="button" data-testid="authz-user-stage-menu">
-					{ pageCtx.T("Create") }
-				</button>
-			</summary>
-			<ul class="absolute right-0 mt-2 w-56 rounded-md border border-primary bg-surface-300 p-1 text-sm shadow-sm">
-				<li>
-					<button
-						type="button"
-						class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
-						@click="$dispatch('open-stage-policy-direct')"
-						data-testid="authz-user-stage-open-direct"
-					>
-						{ pageCtx.T("Users.Permissions.Direct") }
-					</button>
-				</li>
-				<li>
-					<button
-						type="button"
-						class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
-						@click="$dispatch('open-stage-policy-overrides')"
-						data-testid="authz-user-stage-open-overrides"
-					>
-						{ pageCtx.T("Users.Permissions.Overrides") }
-					</button>
-				</li>
-			</ul>
-		</details>
+templ UserPolicyBoardAddMenu(canStage bool) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if !canStage {
+		return
 	}
+	<details class="relative">
+		<summary class="list-none">
+			<button class="btn btn-xs btn-primary" type="button" data-testid="authz-user-stage-menu">
+				{ pageCtx.T("Create") }
+			</button>
+		</summary>
+		<ul class="absolute right-0 mt-2 w-56 rounded-md border border-primary bg-surface-300 p-1 text-sm shadow-sm">
+			<li>
+				<button
+					type="button"
+					class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
+					@click="$dispatch('open-stage-policy-direct')"
+					data-testid="authz-user-stage-open-direct"
+				>
+					{ pageCtx.T("Users.Permissions.Direct") }
+				</button>
+			</li>
+			<li>
+				<button
+					type="button"
+					class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
+					@click="$dispatch('open-stage-policy-overrides')"
+					data-testid="authz-user-stage-open-overrides"
+				>
+					{ pageCtx.T("Users.Permissions.Overrides") }
+				</button>
+			</li>
+		</ul>
+	</details>
+}
 
-	templ UserPolicyBoard(props *UserPolicyBoardProps) {
-		{{ pageCtx := composables.UsePageCtx(ctx) }}
-		{{ clearURL := fmt.Sprintf("/core/api/authz/policies/stage?subject=%s&domain=%s", url.QueryEscape(props.Subject), url.QueryEscape(props.Domain)) }}
-		{{ filterDomain := props.Effective.DomainFilter }}
-		if strings.TrimSpace(filterDomain) == "" {
-			{{ filterDomain = props.DefaultDomain }}
-		}
+templ UserPolicyBoard(props *UserPolicyBoardProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	{{ clearURL := fmt.Sprintf("/core/api/authz/policies/stage?subject=%s&domain=%s", url.QueryEscape(props.Subject), url.QueryEscape(props.Domain)) }}
+	{{ filterDomain := props.Effective.DomainFilter }}
+	if strings.TrimSpace(filterDomain) == "" {
+		{{ filterDomain = props.DefaultDomain }}
+	}
 	<div
 		class="space-y-4"
 		id="user-policy-board"
-			hx-get={ props.BaseURL }
-			hx-trigger="policies:staged from:body"
-			hx-target="#user-policy-board"
-			hx-swap="outerHTML"
-		>
+		hx-get={ props.BaseURL }
+		hx-trigger="policies:staged from:body"
+		hx-target="#user-policy-board"
+		hx-swap="outerHTML"
+	>
 		<div class="flex items-start justify-between flex-wrap gap-3">
 			<div class="space-y-1">
 				<h3 class="text-lg font-semibold">{ pageCtx.T("Users.Tabs.Permissions") }</h3>
-					<div class="flex flex-wrap gap-2 text-sm text-secondary-300">
-						@UserPolicyBoardMeta(pageCtx.T("Authz.Subject"), props.Subject)
-						@UserPolicyBoardMeta(pageCtx.T("Authz.Domain"), props.Domain)
-					</div>
-			</div>
-			<div class="flex items-center gap-2 flex-wrap">
-					if props.StageTotal > 0 {
-						<span class="text-xs px-2 py-1 rounded-full bg-primary text-primary-foreground border border-primary/70">
-							{ fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal) }
-						</span>
-					}
-					if props.CanStage {
-						@UserPolicyBoardAddMenu(props.CanStage)
-					} else {
-						<span class="text-xs text-secondary-200">{ pageCtx.T("Authz.Unauthorized.ReadOnlyHint") }</span>
-					}
+				<div class="flex flex-wrap gap-2 text-sm text-secondary-300">
+					@UserPolicyBoardMeta(pageCtx.T("Authz.Subject"), props.Subject)
+					@UserPolicyBoardMeta(pageCtx.T("Authz.Domain"), props.Domain)
 				</div>
 			</div>
+			<div class="flex items-center gap-2 flex-wrap">
+				if props.StageTotal > 0 {
+					<span class="text-xs px-2 py-1 rounded-full bg-primary text-primary-foreground border border-primary/70">
+						{ fmt.Sprintf(pageCtx.T("Authz.Stage.Badge"), props.StageTotal) }
+					</span>
+				}
+				if props.CanStage {
+					@UserPolicyBoardAddMenu(props.CanStage)
+				} else {
+					<span class="text-xs text-secondary-200">{ pageCtx.T("Authz.Unauthorized.ReadOnlyHint") }</span>
+				}
+			</div>
+		</div>
 		<form
 			class="flex flex-wrap items-center gap-2 rounded-lg border border-primary bg-surface-400 p-3 text-sm"
 			hx-get={ props.BaseURL }
@@ -257,11 +257,11 @@ templ UserPolicyBoardMeta(label string, value string) {
 				{ pageCtx.T("Clear") }
 			</button>
 		</form>
-			if !props.CanDebug {
-				<div class="rounded-lg border border-dashed border-secondary-400 p-4 text-sm text-secondary-200">
-					{ pageCtx.T("Authz.Unauthorized.ReadOnlyHint") }
-				</div>
-			} else {
+		if !props.CanDebug {
+			<div class="rounded-lg border border-dashed border-secondary-400 p-4 text-sm text-secondary-200">
+				{ pageCtx.T("Authz.Unauthorized.ReadOnlyHint") }
+			</div>
+		} else {
 			@tab.Root(tab.Props{
 				DefaultValue: "effective",
 			}) {
@@ -298,20 +298,20 @@ templ UserPolicyBoardMeta(label string, value string) {
 				</div>
 			}
 		}
-			@corecomponents.AuthzWorkspace(corecomponents.AuthzWorkspaceProps{
-				Subject:       props.Subject,
-				Domain:        props.Domain,
-				DisplayDomain: props.Domain,
-				StagedCount:   props.StageTotal,
-				Summary:       props.StageSummary,
-				Preview:       props.StagePreview,
-				SubmitURL:     "/core/api/authz/policies/apply",
-				ClearURL:      clearURL,
-				DefaultReason: pageCtx.T("Authz.Policies.DefaultReason.Users"),
-			})
-		</div>
-		@userPolicyBoardScriptOnce.Once() {
-			<script>
+		@corecomponents.AuthzWorkspace(corecomponents.AuthzWorkspaceProps{
+			Subject:       props.Subject,
+			Domain:        props.Domain,
+			DisplayDomain: props.Domain,
+			StagedCount:   props.StageTotal,
+			Summary:       props.StageSummary,
+			Preview:       props.StagePreview,
+			SubmitURL:     "/core/api/authz/policies/apply",
+			ClearURL:      clearURL,
+			DefaultReason: pageCtx.T("Authz.Policies.DefaultReason.Users"),
+		})
+	</div>
+	@userPolicyBoardScriptOnce.Once() {
+		<script>
 				function userPolicyColumnState() {
 						const bulkUndoKey = "__authzBulkUndo";
 
@@ -440,8 +440,8 @@ templ UserPolicyBoardMeta(label string, value string) {
 					};
 				}
 			</script>
-		}
 	}
+}
 
 templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
@@ -801,15 +801,15 @@ templ UserPolicyColumn(props *UserPolicyColumnProps) {
 					}) {
 						{ pageCtx.T("Cancel") }
 					}
-						@button.Primary(button.Props{
-							Size: button.SizeSM,
-							Attrs: templ.Attributes{
-								"type":         "submit",
-								"data-testid":  fmt.Sprintf("authz-user-stage-save-%s", props.Column),
-							},
-						}) {
-							{ pageCtx.T("Save") }
-						}
+					@button.Primary(button.Props{
+						Size: button.SizeSM,
+						Attrs: templ.Attributes{
+							"type":        "submit",
+							"data-testid": fmt.Sprintf("authz-user-stage-save-%s", props.Column),
+						},
+					}) {
+						{ pageCtx.T("Save") }
+					}
 				</div>
 			</form>
 		}

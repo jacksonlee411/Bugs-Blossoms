@@ -46,8 +46,8 @@ type PolicyMatrixProps struct {
 	Type    string
 	Search  string
 
-	CanDebug   bool
-	CanStage   bool
+	CanDebug bool
+	CanStage bool
 }
 
 func totalPages(total, limit int) int {
@@ -93,8 +93,8 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						@button.Primary(button.Props{
 							Size: button.SizeSM,
 							Attrs: templ.Attributes{
-								"type":   "button",
-								"@click": "$dispatch('open-stage-policy')",
+								"type":        "button",
+								"@click":      "$dispatch('open-stage-policy')",
 								"data-testid": "authz-role-stage-open",
 							},
 						}) {
@@ -251,7 +251,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 					@button.Primary(button.Props{
 						Size: button.SizeSM,
 						Attrs: templ.Attributes{
-							"type": "submit",
+							"type":        "submit",
 							"data-testid": "authz-role-stage-save",
 						},
 					}) {
