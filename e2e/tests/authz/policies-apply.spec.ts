@@ -49,12 +49,17 @@ test.describe('authz policies apply', () => {
 		await stageDialog.locator('input[name="object"]').fill('logging.logs');
 		await stageDialog.locator('input[name="action"]').fill('view');
 
-		await page.getByTestId('authz-user-stage-save-direct').click();
-		await expect(page.locator('#authz-workspace')).toBeVisible();
+			await page.getByTestId('authz-user-stage-save-direct').click();
+			await expect(page.locator('#authz-workspace')).toBeVisible({ timeout: 15_000 });
+			await expect(page.locator('#user-policy-board')).toBeVisible({ timeout: 15_000 });
+			await page.waitForFunction(() => {
+				const el = document.getElementById('user-policy-board');
+				return !!el && !el.classList.contains('htmx-request');
+			});
 
-		await page.getByTestId('authz-workspace-apply').click();
-		await page.getByRole('button', { name: /apply now/i }).last().click();
-		await expect(page.locator('#authz-workspace')).toHaveCount(0);
+			await page.getByTestId('authz-workspace-apply').click();
+			await page.getByRole('button', { name: /apply now/i }).last().click();
+			await expect(page.locator('#authz-workspace')).toHaveCount(0);
 
 		const appliedScreenshot = test.info().outputPath('authz-apply-admin.png');
 		await page.screenshot({ path: appliedScreenshot, fullPage: true });
@@ -89,11 +94,16 @@ test.describe('authz policies apply', () => {
 		const ruleRow = directColumn.locator('tr', { hasText: 'logging.logs' }).filter({ hasText: 'view' }).first();
 		await expect(ruleRow).toBeVisible();
 
-		await ruleRow.getByRole('button', { name: /delete/i }).click();
-		await expect(page.locator('#authz-workspace')).toBeVisible();
+			await ruleRow.getByRole('button', { name: /delete/i }).click();
+			await expect(page.locator('#authz-workspace')).toBeVisible({ timeout: 15_000 });
+			await expect(page.locator('#user-policy-board')).toBeVisible({ timeout: 15_000 });
+			await page.waitForFunction(() => {
+				const el = document.getElementById('user-policy-board');
+				return !!el && !el.classList.contains('htmx-request');
+			});
 
-		await page.getByTestId('authz-workspace-apply').click();
-		await page.getByRole('button', { name: /apply now/i }).last().click();
-		await expect(page.locator('#authz-workspace')).toHaveCount(0);
+			await page.getByTestId('authz-workspace-apply').click();
+			await page.getByRole('button', { name: /apply now/i }).last().click();
+			await expect(page.locator('#authz-workspace')).toHaveCount(0);
 	});
 });
