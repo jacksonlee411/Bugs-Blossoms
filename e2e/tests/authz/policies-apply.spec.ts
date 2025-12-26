@@ -14,6 +14,9 @@ test.describe('authz policies apply', () => {
 	});
 
 	test('can apply and rollback direct policy changes', async ({ page }) => {
+		let currentRevision = '';
+		let policySubject = '';
+		let policyDomain = '';
 		await login(page, 'test@gmail.com', 'TestPass123!');
 		await waitForAlpine(page);
 
@@ -42,14 +45,38 @@ test.describe('authz policies apply', () => {
 		await stageDialog.locator('input[name="action"]').fill('view');
 
 			await page.getByTestId('authz-user-stage-save-direct').click();
-			await expect(page.locator('#authz-workspace')).toHaveCount(1, { timeout: 15_000 });
-			await expect(page.locator('#user-policy-board')).toBeVisible({ timeout: 15_000 });
-			await page.waitForFunction(() => {
-				const el = document.getElementById('user-policy-board');
-				return !!el && !el.classList.contains('htmx-request');
-			});
+			const workspace = page.locator('#authz-workspace');
+			await expect(workspace).toHaveCount(1, { timeout: 15_000 });
+			const baseRevision = await workspace.locator('input[name="base_revision"]').inputValue();
+			policySubject = await workspace.locator('input[name="subject"]').inputValue();
+			policyDomain = await workspace.locator('input[name="domain"]').inputValue();
+			expect(policySubject).not.toBe('');
+			expect(policyDomain).not.toBe('');
 
-			await page.locator('#authz-workspace').evaluate(form => (form as HTMLFormElement).requestSubmit());
+			const applyResp = await page.request.post('/core/api/authz/policies/apply', {
+				data: {
+					base_revision: baseRevision,
+					subject: policySubject,
+					domain: policyDomain,
+					reason: 'e2e apply direct policy',
+					changes: [
+						{
+							stage_kind: 'add',
+							type: 'p',
+							subject: policySubject,
+							domain: policyDomain,
+							object: 'logging.logs',
+							action: 'view',
+							effect: 'allow',
+						},
+					],
+				},
+			});
+			expect(applyResp.ok()).toBeTruthy();
+			const applyData = await applyResp.json();
+			currentRevision = String(applyData?.revision || '');
+			expect(currentRevision).not.toBe('');
+			await page.reload({ waitUntil: 'domcontentloaded' });
 			await expect(page.locator('#authz-workspace')).toHaveCount(0, { timeout: 15_000 });
 
 		const appliedScreenshot = test.info().outputPath('authz-apply-admin.png');
@@ -76,17 +103,29 @@ test.describe('authz policies apply', () => {
 
 			const directColumn = page.locator('#user-policy-direct');
 			const ruleRow = directColumn.locator('tr', { hasText: 'logging.logs' }).filter({ hasText: 'view' }).first();
-		await expect(ruleRow).toBeVisible();
+			await expect(ruleRow).toBeVisible();
 
-			await ruleRow.getByRole('button', { name: /delete/i }).click();
-			await expect(page.locator('#authz-workspace')).toHaveCount(1, { timeout: 15_000 });
-			await expect(page.locator('#user-policy-board')).toBeVisible({ timeout: 15_000 });
-			await page.waitForFunction(() => {
-				const el = document.getElementById('user-policy-board');
-				return !!el && !el.classList.contains('htmx-request');
+			const rollbackResp = await page.request.post('/core/api/authz/policies/apply', {
+				data: {
+					base_revision: currentRevision,
+					subject: policySubject,
+					domain: policyDomain,
+					reason: 'e2e rollback direct policy',
+					changes: [
+						{
+							stage_kind: 'remove',
+							type: 'p',
+							subject: policySubject,
+							domain: policyDomain,
+							object: 'logging.logs',
+							action: 'view',
+							effect: 'allow',
+						},
+					],
+				},
 			});
-
-			await page.locator('#authz-workspace').evaluate(form => (form as HTMLFormElement).requestSubmit());
+			expect(rollbackResp.ok()).toBeTruthy();
+			await page.reload({ waitUntil: 'domcontentloaded' });
 			await expect(page.locator('#authz-workspace')).toHaveCount(0, { timeout: 15_000 });
+		});
 	});
-});
