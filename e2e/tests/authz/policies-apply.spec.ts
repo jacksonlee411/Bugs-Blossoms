@@ -82,11 +82,14 @@ test.describe('authz policies apply', () => {
 		await page.screenshot({ path: appliedScreenshot, fullPage: true });
 		test.info().attach('authz-apply-admin.png', { path: appliedScreenshot, contentType: 'image/png' });
 
-		await logout(page);
-		await login(page, 'noperson@example.com', 'TestPass123!');
-		await page.goto('/logs', { waitUntil: 'domcontentloaded' });
-		await expect(page.getByRole('heading', { level: 1 })).toContainText(/Logs/i);
-		await expect(page.locator('[data-policy-inspector]')).toBeVisible();
+			await logout(page);
+			await login(page, 'noperson@example.com', 'TestPass123!');
+			await page.goto('/logs', { waitUntil: 'domcontentloaded' });
+			await expect(page.getByRole('heading', { level: 1 })).toContainText(/Logs/i);
+			await expect(page.locator('.pointer-events-none.select-none')).toHaveCount(0);
+			await expect(page.getByRole('button', { name: /Authentication Logs/i })).toBeVisible();
+			await expect(page.getByRole('button', { name: /Action Logs/i })).toBeVisible();
+			await expect(page.locator('[data-policy-inspector]')).toHaveCount(0);
 
 		const allowedScreenshot = test.info().outputPath('authz-apply-allowed-user.png');
 		await page.screenshot({ path: allowedScreenshot, fullPage: true });
