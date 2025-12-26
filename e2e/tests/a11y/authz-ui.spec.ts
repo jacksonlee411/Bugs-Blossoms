@@ -88,13 +88,6 @@ test.describe('a11y smoke - authz ui', () => {
 				await expect(page).toHaveURL(/\/roles\/[0-9]+\/policies/);
 				await expect(page.locator('#policy-matrix')).toBeVisible();
 				await expect(page.locator('[data-testid="authz-role-stage-open"]')).toBeVisible();
-
-				const screenshotPath = test.info().outputPath(`viewport-${vp.name}-roles-policy-matrix.png`);
-				await page.screenshot({ path: screenshotPath, fullPage: true });
-				test.info().attach(`viewport-${vp.name}-roles-policy-matrix.png`, {
-					path: screenshotPath,
-					contentType: 'image/png',
-				});
 			}
 
 			await page.goto('/users', { waitUntil: 'domcontentloaded' });
@@ -104,13 +97,6 @@ test.describe('a11y smoke - authz ui', () => {
 				await expect(page).toHaveURL(/\/users\/[0-9]+\/policies/);
 				await expect(page.locator('#user-policy-board')).toBeVisible();
 				await expect(page.locator('[data-testid="authz-user-stage-menu"]')).toBeVisible();
-
-				const screenshotPath = test.info().outputPath(`viewport-${vp.name}-users-policy-board.png`);
-				await page.screenshot({ path: screenshotPath, fullPage: true });
-				test.info().attach(`viewport-${vp.name}-users-policy-board.png`, {
-					path: screenshotPath,
-					contentType: 'image/png',
-				});
 			}
 		}
 	});
