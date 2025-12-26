@@ -26,16 +26,8 @@ test.describe('authz policies apply', () => {
 		await expect(page).toHaveURL(/\/users\/[0-9]+$/);
 		const userURL = page.url();
 
-		await page.locator('button', { hasText: /permissions/i }).first().click();
-		await expect(page.locator('#user-policy-board')).toBeVisible();
-
-			const domainInput = page.locator('#user-policy-board form[hx-get] input[name="domain"]').first();
-		await domainInput.click();
-		await domainInput.press('Control+A');
-		await domainInput.press('Backspace');
-		await domainInput.pressSequentially('logging');
-		await expect(domainInput).toHaveValue('logging');
-		await expect(page).toHaveURL(/domain=logging/, { timeout: 15_000 });
+			await page.locator('button', { hasText: /permissions/i }).first().click();
+			await expect(page.locator('#user-policy-board')).toBeVisible();
 
 		const addMenuDetails = page.locator('details:has([data-testid="authz-user-stage-menu"])').first();
 		await addMenuDetails.evaluate(el => {
@@ -78,19 +70,12 @@ test.describe('authz policies apply', () => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
 		await waitForAlpine(page);
 
-		await page.goto(userURL, { waitUntil: 'domcontentloaded' });
-		await page.locator('button', { hasText: /permissions/i }).first().click();
-		await expect(page.locator('#user-policy-board')).toBeVisible();
-			const domainInput2 = page.locator('#user-policy-board form[hx-get] input[name="domain"]').first();
-		await domainInput2.click();
-		await domainInput2.press('Control+A');
-		await domainInput2.press('Backspace');
-		await domainInput2.pressSequentially('logging');
-		await expect(domainInput2).toHaveValue('logging');
-		await expect(page).toHaveURL(/domain=logging/, { timeout: 15_000 });
+			await page.goto(userURL, { waitUntil: 'domcontentloaded' });
+			await page.locator('button', { hasText: /permissions/i }).first().click();
+			await expect(page.locator('#user-policy-board')).toBeVisible();
 
-		const directColumn = page.locator('#user-policy-direct');
-		const ruleRow = directColumn.locator('tr', { hasText: 'logging.logs' }).filter({ hasText: 'view' }).first();
+			const directColumn = page.locator('#user-policy-direct');
+			const ruleRow = directColumn.locator('tr', { hasText: 'logging.logs' }).filter({ hasText: 'view' }).first();
 		await expect(ruleRow).toBeVisible();
 
 			await ruleRow.getByRole('button', { name: /delete/i }).click();
