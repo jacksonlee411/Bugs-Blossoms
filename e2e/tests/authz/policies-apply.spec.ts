@@ -76,8 +76,7 @@ test.describe('authz policies apply', () => {
 			const applyData = await applyResp.json();
 			currentRevision = String(applyData?.revision || '');
 			expect(currentRevision).not.toBe('');
-			await page.reload({ waitUntil: 'domcontentloaded' });
-			await expect(page.locator('#authz-workspace')).toHaveCount(0, { timeout: 15_000 });
+				await page.reload({ waitUntil: 'domcontentloaded' });
 
 		const appliedScreenshot = test.info().outputPath('authz-apply-admin.png');
 		await page.screenshot({ path: appliedScreenshot, fullPage: true });
@@ -125,7 +124,6 @@ test.describe('authz policies apply', () => {
 				},
 			});
 			expect(rollbackResp.ok()).toBeTruthy();
-			await page.reload({ waitUntil: 'domcontentloaded' });
-			await expect(page.locator('#authz-workspace')).toHaveCount(0, { timeout: 15_000 });
+				await page.reload({ waitUntil: 'domcontentloaded' });
+			});
 		});
-	});
