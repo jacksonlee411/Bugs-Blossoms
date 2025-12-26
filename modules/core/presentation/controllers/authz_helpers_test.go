@@ -33,7 +33,6 @@ func TestEnsureAuthz_ForbiddenJSONContract(t *testing.T) {
 	require.Equal(t, "forbidden", payload.Error)
 	require.Equal(t, "core.users", payload.Object)
 	require.Equal(t, "list", payload.Action)
-	require.Equal(t, "/core/api/authz/requests", payload.RequestURL)
 	require.NotEmpty(t, payload.DebugURL)
 	require.Equal(t, "global", payload.Domain)
 	require.NotEmpty(t, payload.Subject)
@@ -111,7 +110,7 @@ func TestEnsureAuthz_ForbiddenHTMLFallbackRendersUnauthorized(t *testing.T) {
 	require.False(t, allowed)
 	require.Equal(t, http.StatusForbidden, rr.Code)
 	require.Contains(t, rr.Body.String(), "data-authz-container")
-	require.Contains(t, rr.Body.String(), "data-request-url=\"/core/api/authz/requests\"")
+	require.Contains(t, rr.Body.String(), "data-debug-url=")
 }
 
 func TestEnsureAuthz_ForbiddenHTMLFallbackWithoutPageCtxReturnsPlainText(t *testing.T) {

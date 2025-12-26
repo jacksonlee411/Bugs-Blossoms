@@ -35,7 +35,7 @@
 - **触发器清单（本计划预计命中）**：
   - [X] Go 代码（`go fmt ./... && go vet ./... && make check lint && make test`）
   - [X] DB 迁移 / Schema（Org Atlas+Goose；见 `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`）
-  - [X] Authz（新增/调整 Job Catalog/Profile/Restrictions 维护权限；见 `docs/runbooks/AUTHZ-BOT.md` 与 `docs/dev-plans/054-position-authz-policy-and-gates.md`）
+  - [X] Authz（新增/调整 Job Catalog/Profile/Restrictions 维护权限；见 `docs/runbooks/authz-policy-apply-api.md` 与 `docs/dev-plans/054-position-authz-policy-and-gates.md`）
   - [X] 路由治理（新增 `/org/api/job-*` 等路由；见 `docs/dev-plans/018-routing-strategy.md`）
   - [ ] `.templ` / Tailwind（仅当新增维护 UI 时触发；`make generate && make css` 且生成物需提交）
   - [ ] 多语言 JSON（仅当新增文案时触发；`make check tr`）
@@ -374,7 +374,7 @@ flowchart TD
 > 说明：v1 暂不引入“雇佣类型/地点/成本中心”等跨域限制的强校验；这些维度保留在 restrictions 结构中作为扩展点，后续以独立计划补齐落地与门禁。
 
 ## 7. 安全与鉴权 (Security & Authz)
-- Authz SSOT：以 `docs/dev-plans/054-position-authz-policy-and-gates.md` 的 object/action 为准；本计划新增端点需与 054 的映射表对齐，并按 `docs/runbooks/AUTHZ-BOT.md` 流程生成聚合产物（不要手改聚合文件）。
+- Authz SSOT：以 `docs/dev-plans/054-position-authz-policy-and-gates.md` 的 object/action 为准；本计划新增端点需与 054 的映射表对齐，并按 `docs/runbooks/authz-policy-apply-api.md` 口径进行在线变更或通过 `make authz-pack` 生成聚合产物（不要手改聚合文件）。
 - 最小权限拆分建议：
   - 只读：可查询 Job Catalog/Profile（用于选择与过滤）。
   - 管理：可创建/启停/编辑 Job Catalog/Profile；可编辑 Position Restrictions（高风险，建议仅 admin）。

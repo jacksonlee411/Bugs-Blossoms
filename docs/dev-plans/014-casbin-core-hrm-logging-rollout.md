@@ -68,9 +68,9 @@
    - 在 `pkg/middleware/sidebar`、`pkg/types/navigation` 中按照 Casbin 判定过滤导航项，并将可见性布尔值纳入 `authz.ViewState`。
    - **接口契约**（聚焦 015B 复用）：
      - `authz.ViewState` 至少包含 `Subject`, `Tenant`, `CanView*` 布尔值、`MissingPolicies` 列表以及 `SuggestDiff()` 等 helper，确保 015B 能直接渲染 Unauthorized/PolicyInspector。
-     - 当 015B 组件尚未交付时，014 仅提供临时占位（如简单 403 文案），并通过按钮跳转到 015A 已提供的 `/core/api/authz/requests` 列表；一旦 015B 可用，替换为其模板而无需后端调整。
+     - 当统一组件尚未交付时，014 仅提供临时占位（如简单 403 文案）与 Debug 串联（`/core/api/authz/debug`）；015C 之后策略变更通过 `POST /core/api/authz/policies/apply` 直接生效。
      - PolicyInspector 相关数据全部来自 `/core/api/authz/debug`，controller 只需注入请求参数与调用入口，严禁自建重复逻辑。
-   - README/CONTRIBUTING/AGENTS 已补充 controller 注入、`authz.ViewState` 结构说明、403 JSON 示例及 `/core/api/authz/requests|debug` 调用示例。
+   - README/CONTRIBUTING/AGENTS 已补充 controller 注入、`authz.ViewState` 结构说明、403 JSON 示例及 Debug 调用示例（`/core/api/authz/debug`）。
    - `docs/dev-records` 中记录与 015B 联调的关键命令与结论，证明接口可复用。
 5. **[x] 分批灰度、Parity 与回滚**
    - 仍按“模块 × 租户”规划启停，但早期可在本地/单租户验证通过后直接切换，不必维护复杂矩阵；Core/HRM/Logging enforce 记录已写入 dev-records。

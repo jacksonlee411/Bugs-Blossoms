@@ -20,7 +20,7 @@
 | --- | --- | --- | --- |
 | 数据访问（sqlc） | SQL-first、编译期类型安全、避免 ORM 运行期开销 | `docs/dev-plans/010-sqlc-baseline.md`、`sqlc.yaml`、`modules/person/infrastructure/sqlc/**`、`scripts/db/export_person_schema.sh`、`make sqlc-generate` | ✅ Person 已落地 |
 | Schema/迁移（Atlas + Goose） | schema drift 可见、迁移链路可 lint/plan、Person 独立迁移闭环 | `docs/dev-plans/011A-atlas-goose-baseline-gapfix.md`、`atlas.hcl`、`migrations/person/**`、`scripts/db/run_goose.sh`、`make db plan/lint`、`PERSON_MIGRATIONS=1 make db migrate ...` | ✅ Person 已落地 |
-| 授权（Casbin + 策略平台） | 统一 RBAC/ABAC、策略可审计/可回滚、UI→草稿→Bot→PR 闭环 | `docs/dev-plans/013-015*.md`、`pkg/authz/**`、`config/access/**`、`scripts/authz/**`、`cmd/authzbot/**`、`make authz-test/authz-lint/authz-pack` | ✅ 基础设施/首批模块已落地，UI 体验持续完善 |
+| 授权（Casbin + 策略平台） | 统一 RBAC/ABAC、策略可审计/可回滚、UI→stage→apply 直接生效（015C） | `docs/dev-plans/013-015*.md`、`pkg/authz/**`、`config/access/**`、`scripts/authz/**`、`docs/runbooks/authz-policy-apply-api.md`、`make authz-test/authz-lint/authz-pack` | ✅ 基础设施/首批模块已落地，UI 体验持续完善 |
 | 可靠事件（Transactional Outbox） | 业务写入与事件入队同事务、可重试/可观测、避免 ad-hoc 异步 | `docs/dev-plans/017-transactional-outbox.md`、`pkg/outbox/**`、`docs/runbooks/transactional-outbox.md` | 🚧 M1 基础设施已落地 |
 | 后台作业队列（Asynq） | 报表/导入/通知类长耗时任务的可靠执行与重试 | `docs/dev-plans/009-r200-tooling-alignment.md`（路线图） | ⏸️ 尚未落地（优先复用 Outbox；如需队列化再立项引入） |
 | 路由治理（Routing Strategy + Gates） | UI/HTMX/API/Webhooks/Ops 命名空间与错误契约统一、门禁可阻断漂移 | `docs/dev-plans/018-routing-strategy.md`、`config/routing/allowlist.yaml`、`make check routing` | ✅ 已落地并纳入门禁 |
@@ -69,7 +69,7 @@
     - 回滚与既有环境接入策略（baseline/bootstrap）
     - 对应 runbook（便于协作与排障）
 
-### 3.3 Authz：统一走 `pkg/authz` + `config/access` + Bot 工作流
+### 3.3 Authz：统一走 `pkg/authz` + `config/access` + stage/apply（015C）
 
 - **新增业务能力时的标准动作**：
   1. **控制器/服务层鉴权**：调用 `pkg/authz`（不要在模板里直接做 ad-hoc 判定）。
@@ -77,7 +77,7 @@
      - 策略碎片：`config/access/policies/**`
      - 聚合产物：`config/access/policy.csv` + `config/access/policy.csv.rev`（只能通过 `make authz-pack` 生成，禁止手改）
   3. **门禁**：改动 Authz 相关内容必须跑 `make authz-test && make authz-lint`（CI 的 `authz` 过滤器会强制）。
-  4. **变更通道**：需要可审计的策略变更时，优先走草稿 API/Bot（见 `DEV-PLAN-015A` 与 `docs/runbooks/authz-policy-draft-api.md`、`docs/runbooks/AUTHZ-BOT.md`）。
+  4. **变更通道**：管理员在线变更优先走 stage/apply（见 `docs/runbooks/authz-policy-apply-api.md`）；变更策略碎片仍需执行 `make authz-pack` 并通过 `make authz-test && make authz-lint`。
 
 ### 3.4 事件发布：跨模块/异步一致性优先 outbox
 

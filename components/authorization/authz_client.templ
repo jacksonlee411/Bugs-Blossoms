@@ -7,50 +7,17 @@ templ AuthzClient() {
 	<div
 		hidden
 		data-authz-container
-		data-sla-unknown={ pageCtx.T("Authz.SLA.Unknown") }
-		data-sla-countdown-prefix={ pageCtx.T("Authz.SLA.CountdownPrefix") }
-		data-status-unknown-label={ pageCtx.T("Unknown") }
-		data-status-pending-review={ pageCtx.T("Authz.Status.PendingReview") }
-		data-status-approved={ pageCtx.T("Authz.Status.Approved") }
-		data-status-merged={ pageCtx.T("Authz.Status.Merged") }
-		data-status-failed={ pageCtx.T("Authz.Status.Failed") }
-		data-status-rejected={ pageCtx.T("Authz.Status.Rejected") }
-		data-status-canceled={ pageCtx.T("Authz.Status.Canceled") }
-		data-status-draft={ pageCtx.T("Authz.Status.Draft") }
 		data-toast-error-title={ pageCtx.T("Authz.Toast.ErrorTitle") }
 		data-toast-default-error={ pageCtx.T("Authz.Toast.DefaultError") }
 		data-toast-stale-title={ pageCtx.T("Authz.Toast.StaleRevisionTitle") }
 		data-toast-stale-message={ pageCtx.T("Authz.Toast.StaleRevisionMessage") }
-		data-toast-submit-title={ pageCtx.T("Authz.Unauthorized.SubmitSuccess") }
-		data-toast-submitted-prefix={ pageCtx.T("Authz.Toast.SubmittedPrefix") }
+		data-toast-applied-title={ pageCtx.T("Authz.Toast.AppliedTitle") }
+		data-toast-applied-prefix={ pageCtx.T("Authz.Toast.AppliedPrefix") }
 	></div>
 	@authzClientScriptOnce.Once() {
 		<script>
 			(function () {
-				if (window.authzRequestWatcher) {
-					return;
-				}
-				const terminalStatuses = new Set(["merged", "failed", "rejected", "canceled"]);
-				const cache = new Map();
-				const watchers = new Map();
-
-				function isTerminal(status) {
-					return terminalStatuses.has((status || "").toLowerCase());
-				}
-
-	function statusLabel(status, container) {
-		const labels = {
-			pending_review: container?.dataset?.statusPendingReview,
-			approved: container?.dataset?.statusApproved,
-			merged: container?.dataset?.statusMerged,
-			failed: container?.dataset?.statusFailed,
-			rejected: container?.dataset?.statusRejected,
-			canceled: container?.dataset?.statusCanceled,
-			draft: container?.dataset?.statusDraft,
-		};
-		const key = (status || "").toLowerCase();
-		return labels[key] || key || container?.dataset?.statusUnknownLabel || "";
-	}
+				if (window.authzClient) return;
 
 				function toastLabels(container) {
 					const el = container || document.querySelector("[data-authz-container]");
@@ -60,8 +27,8 @@ templ AuthzClient() {
 						defaultError: (ds.toastDefaultError || "").trim(),
 						staleTitle: (ds.toastStaleTitle || "").trim(),
 						staleMessage: (ds.toastStaleMessage || "").trim(),
-						submitTitle: (ds.toastSubmitTitle || "").trim(),
-						submittedPrefix: (ds.toastSubmittedPrefix || "").trim(),
+						appliedTitle: (ds.toastAppliedTitle || "").trim(),
+						appliedPrefix: (ds.toastAppliedPrefix || "").trim(),
 					};
 				}
 
@@ -74,372 +41,62 @@ templ AuthzClient() {
 							data = {};
 						}
 					}
-					if (data && data.value) {
-						return parseDetail(data.value);
-					}
+					if (data && data.value) return parseDetail(data.value);
 					return data || {};
 				}
 
-				function normalize(detail) {
-					const data = parseDetail(detail);
-					if (!data) {
-						return null;
-					}
-					const id = data.id || data.ID || "";
-					const status = (data.status || data.Status || "").toLowerCase();
-					return {
-						id: id,
-						status: status,
-						updatedAt: data.updated_at || data.updatedAt || data.UpdatedAt,
-						estimatedSLA: data.estimated_sla_expires_at || data.EstimatedSLAExpiresAt,
-						canRetry: !!(data.can_retry_bot || data.CanRetryBot),
-						retryToken: data.retry_token || data.RetryToken,
-						viewUrl: data.view_url || data.ViewURL || (id ? "/core/authz/requests/" + id : ""),
-					};
-				}
-
-				function formatSLA(container, isoString) {
-					const unknown = (container?.dataset?.slaUnknown || "").trim();
-					const prefix = (container?.dataset?.slaCountdownPrefix || "").trim();
-					if (!isoString) {
-						return unknown;
-					}
-					const date = new Date(isoString);
-					if (Number.isNaN(date.getTime())) {
-						return unknown;
-					}
-					const diff = date.getTime() - Date.now();
-					if (diff <= 0) {
-						return unknown;
-					}
-					const mins = Math.floor(diff / 60000);
-					const secs = Math.floor((diff % 60000) / 1000);
-					const countdown = String(mins).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
-					return prefix ? prefix + " " + countdown : countdown;
-				}
-
-				function findContainer(id) {
-					if (!id) {
-						return null;
-					}
-					return document.querySelector('[data-authz-container][data-request-id="' + id + '"]');
-				}
-
-				function render(container, data) {
-					if (!container) {
-						return;
-					}
-					const statusEl = container.querySelector("[data-authz-status]");
-					if (statusEl) {
-			statusEl.textContent = data
-				? statusLabel(data.status, container) || container.dataset.statusUnknownLabel || ""
-				: container.dataset.statusUnknownLabel || "";
-					}
-					const slaEl = container.querySelector("[data-authz-sla]");
-					if (slaEl) {
-						slaEl.textContent = data
-							? formatSLA(container, data.estimatedSLA)
-							: container.dataset.slaUnknown || "";
-					}
-					const viewLink = container.querySelector("[data-authz-view]");
-					if (viewLink) {
-						if (data && data.id) {
-							viewLink.href = data.viewUrl || "#";
-							viewLink.classList.remove("hidden");
-							viewLink.dataset.requestId = data.id;
-						} else {
-							viewLink.classList.add("hidden");
-						}
-					}
-					const retryBtn = container.querySelector("[data-authz-retry-bot]");
-					if (retryBtn) {
-						if (data && data.status === "failed" && data.canRetry && data.retryToken) {
-							retryBtn.dataset.requestId = data.id;
-							retryBtn.dataset.retryToken = data.retryToken;
-							retryBtn.classList.remove("hidden");
-						} else {
-							retryBtn.classList.add("hidden");
-						}
-					}
-					const idEl = container.querySelector("[data-authz-request-id]");
-					if (idEl && data && data.id) {
-						idEl.textContent = data.id;
-					}
-				}
-
-				async function fetchRequest(id, opts) {
-					const now = Date.now();
-					const cached = cache.get(id);
-					if (!opts?.force && cached && !isTerminal(cached.status) && now-cached.fetchedAt < 30000) {
-						return cached.data;
-					}
-					const resp = await fetch("/core/api/authz/requests/" + id);
-					let payload = null;
-					try {
-						payload = await resp.json();
-					} catch (_) {
-						payload = null;
-					}
-					if (!resp.ok) {
-						const labels = toastLabels(null);
-						throw payload || { code: resp.status, message: labels.defaultError };
-					}
-					const data = normalize(payload);
-					cache.set(id, { data, fetchedAt: Date.now(), status: data?.status || "" });
-					return data;
-				}
-
 				function dispatchToast(variant, title, message) {
-					window.dispatchEvent(
-						new CustomEvent("notify", {
-							detail: { variant, title, message },
-						}),
-					);
+					window.dispatchEvent(new CustomEvent("notify", { detail: { variant, title, message } }));
+				}
+
+				function updateBaseRevision(newRev) {
+					if (!newRev) return;
+					document.querySelectorAll("[data-authz-container]").forEach(function (container) {
+						container.dataset.baseRevision = newRev;
+						container.querySelectorAll("[data-authz-base-revision]").forEach(function (el) {
+							el.textContent = newRev;
+						});
+						container.querySelectorAll('input[name="base_revision"]').forEach(function (el) {
+							el.value = newRev;
+						});
+					});
 				}
 
 				function handleError(err) {
-					const detail = normalize(err) || parseDetail(err) || {};
+					const detail = parseDetail(err) || {};
 					const code = detail.code || detail.Code || "";
-					const container = (detail.meta && detail.meta.request_id) ? findContainer(detail.meta.request_id) : null;
-					const labels = toastLabels(container);
+					const labels = toastLabels(null);
 					const message = detail.message || detail.Message || labels.defaultError;
 					dispatchToast("error", code || labels.errorTitle, message);
-					if (detail.meta && detail.meta.base_revision) {
+					const baseRev = detail?.meta?.base_revision || detail?.meta?.baseRevision;
+					if (baseRev) {
+						updateBaseRevision(baseRev);
 						dispatchToast("warning", labels.staleTitle, labels.staleMessage);
 					}
-					if (detail.meta && detail.meta.request_id) {
-						const retry = container?.querySelector("[data-authz-retry-bot]");
-						if (retry) {
-							retry.classList.add("hidden");
-						}
-					}
 				}
 
-				function tick(state, force) {
-					if (!state || !state.id || state.paused) {
-						return;
-					}
-					const now = Date.now();
-					const forceFetch = !!force || state.forceNext || (state.lastFetched > 0 && now - state.lastFetched > 120000);
-					state.forceNext = false;
-					fetchRequest(state.id, { force: forceFetch })
-						.then(function (data) {
-							state.lastFetched = Date.now();
-							render(state.container, data);
-							if (data && isTerminal(data.status) && state.timer) {
-								clearInterval(state.timer);
-								state.timer = null;
-							}
-						})
-						.catch(handleError);
-				}
-
-				function attach(container, id) {
-					if (!container || !id) {
-						return;
-					}
-					container.dataset.requestId = id;
-					const existing = watchers.get(container) || { lastFetched: 0, paused: false, forceNext: true };
-					existing.id = id;
-					existing.container = container;
-					existing.forceNext = true;
-					if (existing.timer) {
-						clearInterval(existing.timer);
-					}
-					existing.timer = setInterval(function () {
-						tick(existing, false);
-					}, 15000);
-					watchers.set(container, existing);
-					tick(existing, true);
-				}
-
-				function handleUpdate(id, payload) {
-					const data = normalize(payload);
-					if (data && data.id) {
-						cache.set(data.id, { data, fetchedAt: Date.now(), status: data.status || "" });
-					}
-					const container = findContainer(id);
-					if (container) {
-						render(container, data);
-						attach(container, data?.id || id);
-					}
-				}
-
-				function handleCreated(event) {
-					const detail = normalize(event?.detail);
-					if (!detail || !detail.id) {
-						return;
-					}
+				function handleApplied(event) {
+					const detail = parseDetail(event?.detail);
+					if (!detail) return;
+					const rev = detail.revision || detail.Revision || "";
+					const added = detail.added ?? detail.Added ?? 0;
+					const removed = detail.removed ?? detail.Removed ?? 0;
 					const labels = toastLabels(null);
-					const container = findContainer(detail.id) || document.querySelector("[data-authz-container]");
-					const slaMsg = detail.estimatedSLA ? formatSLA(container, detail.estimatedSLA) : "";
-					const prefix = labels.submittedPrefix;
-					const message = slaMsg ? prefix + " " + detail.id + " · " + slaMsg : prefix + " " + detail.id;
-					dispatchToast("success", labels.submitTitle, message);
-					handleUpdate(detail.id, detail);
+					const prefix = labels.appliedPrefix || "Applied";
+					const title = labels.appliedTitle || "Policies updated";
+					const message = rev ? `${prefix} +${added}/-${removed} · ${rev}` : `${prefix} +${added}/-${removed}`;
+					updateBaseRevision(rev);
+					dispatchToast("success", title, message);
 				}
 
-				function scan() {
-					document.querySelectorAll("[data-authz-container]").forEach(function (container) {
-						const id = container.dataset.requestId;
-						if (id) {
-							attach(container, id);
-						}
-					});
-				}
-
-				window.addEventListener("focus", function () {
-					watchers.forEach(function (state) {
-						state.paused = false;
-						state.forceNext = true;
-						tick(state, true);
-					});
-				});
-				window.addEventListener("blur", function () {
-					watchers.forEach(function (state) {
-						state.paused = true;
-					});
-				});
-				document.addEventListener("authz:request-created", handleCreated);
 				document.addEventListener("showErrorToast", function (evt) {
 					handleError(parseDetail(evt.detail));
 				});
-				document.addEventListener("htmx:load", function () {
-					scan();
-				});
-				scan();
+				document.addEventListener("authz:policies-applied", handleApplied);
 
-				window.authzRequestWatcher = {
-					attach: attach,
-					handleUpdate: handleUpdate,
-					scan: scan,
-					handleCreated: handleCreated,
-				};
+				window.authzClient = { handleError, handleApplied };
 			})();
-		</script>
-		<script>
-			if (!window.handleAuthzRequest) {
-				window.handleAuthzRequest = function (evt) {
-					if (!evt || !evt.detail || !evt.detail.xhr) {
-						return;
-					}
-					var form = evt.target;
-					var xhr = evt.detail.xhr;
-					var container = form.closest("[data-authz-container]");
-					if (!container) {
-						return;
-					}
-					var baseRev = xhr.getResponseHeader("X-Authz-Base-Revision");
-					if (baseRev) {
-						container.dataset.baseRevision = baseRev;
-						var revInput = form.querySelector('input[name="base_revision"]');
-						if (revInput) {
-							revInput.value = baseRev;
-						}
-						var revDisplay = container.querySelector("[data-authz-base-revision]");
-						if (revDisplay) {
-							revDisplay.textContent = baseRev;
-						}
-					}
-					if (xhr.status < 200 || xhr.status >= 300) {
-						return;
-					}
-					var payload = {};
-					try {
-						payload = JSON.parse(xhr.responseText || "{}");
-					} catch (e) {
-						payload = {};
-					}
-					var requestId = payload.id || payload.request_id || xhr.getResponseHeader("X-Request-ID") || "";
-					if (!requestId) {
-						return;
-					}
-					container.dataset.requestId = requestId;
-					var requestIdEl = container.querySelector("[data-authz-request-id]");
-					if (requestIdEl) {
-						requestIdEl.textContent = requestId;
-					}
-					if (window.authzRequestWatcher) {
-						window.authzRequestWatcher.handleUpdate(requestId, payload);
-						window.authzRequestWatcher.attach(container, requestId);
-					}
-				};
-				document.addEventListener("click", function (evt) {
-					var btn = evt.target.closest("[data-authz-copy-request-id]");
-					if (!btn) {
-						return;
-					}
-					var container = btn.closest("[data-authz-container]");
-					if (!container) {
-						return;
-					}
-					var requestIdEl = container.querySelector("[data-authz-request-id]");
-					if (!requestIdEl) {
-						return;
-					}
-					var text = (requestIdEl.textContent || "").trim();
-					if (!text) {
-						return;
-					}
-					if (navigator.clipboard && navigator.clipboard.writeText) {
-						navigator.clipboard.writeText(text);
-					}
-				});
-				document.addEventListener("click", function (evt) {
-					var retryBtn = evt.target.closest("[data-authz-retry-bot]");
-					if (!retryBtn) {
-						return;
-					}
-					var reqId = retryBtn.dataset.requestId;
-					var token = retryBtn.dataset.retryToken;
-					if (!reqId || !token) {
-						return;
-					}
-					var container = retryBtn.closest("[data-authz-container]");
-					var defaultErrorMsg = (container && container.dataset && container.dataset.toastDefaultError) || "";
-					retryBtn.disabled = true;
-					fetch("/core/api/authz/requests/" + reqId + "/trigger-bot?retry_token=" + encodeURIComponent(token), {
-						method: "POST",
-					})
-						.then(function (resp) {
-							return resp
-								.json()
-								.catch(function () {
-									return {};
-								})
-								.then(function (body) {
-									return { ok: resp.ok, body: body };
-								});
-						})
-						.then(function (result) {
-							if (!result || !result.ok) {
-								if (window.dispatchEvent) {
-									window.dispatchEvent(
-										new CustomEvent("showErrorToast", {
-											detail: result?.body || { code: "E_INTERNAL", message: defaultErrorMsg, meta: { request_id: reqId } },
-										}),
-									);
-								}
-								return;
-							}
-							if (window.authzRequestWatcher) {
-								window.authzRequestWatcher.handleUpdate(reqId, result.body);
-							}
-						})
-						.catch(function () {
-							if (window.dispatchEvent) {
-								window.dispatchEvent(
-									new CustomEvent("showErrorToast", {
-										detail: { code: "E_INTERNAL", message: defaultErrorMsg, meta: { request_id: reqId } },
-									}),
-								);
-							}
-						})
-						.finally(function () {
-							retryBtn.disabled = false;
-						});
-				});
-			}
 		</script>
 	}
 }
+

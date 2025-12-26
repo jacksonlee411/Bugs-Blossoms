@@ -1,69 +1,10 @@
 package dtos
 
-import (
-	"encoding/json"
-	"fmt"
-	"time"
-
-	"github.com/google/uuid"
-
-	"github.com/iota-uz/iota-sdk/modules/core/services"
-)
-
 // APIError standardizes JSON error responses.
 type APIError struct {
 	Message string            `json:"message"`
 	Code    string            `json:"code"`
 	Meta    map[string]string `json:"meta,omitempty"`
-}
-
-// PolicyDraftRequest captures incoming payloads for draft creation.
-type PolicyDraftRequest struct {
-	Object        string          `json:"object"`
-	Action        string          `json:"action"`
-	Reason        string          `json:"reason"`
-	Diff          json.RawMessage `json:"diff"`
-	BaseRevision  string          `json:"base_revision"`
-	Domain        string          `json:"domain"`
-	Subject       string          `json:"subject"`
-	RequestAccess bool            `json:"request_access"`
-}
-
-// PolicyDraftResponse serializes drafts for API responses.
-type PolicyDraftResponse struct {
-	ID                    uuid.UUID       `json:"id"`
-	Status                string          `json:"status"`
-	RequesterID           uuid.UUID       `json:"requester_id"`
-	ApproverID            *uuid.UUID      `json:"approver_id,omitempty"`
-	TenantID              uuid.UUID       `json:"tenant_id"`
-	Subject               string          `json:"subject"`
-	Domain                string          `json:"domain"`
-	Action                string          `json:"action"`
-	Object                string          `json:"object"`
-	Reason                string          `json:"reason"`
-	Diff                  json.RawMessage `json:"diff"`
-	BasePolicyRevision    string          `json:"base_policy_revision"`
-	AppliedPolicyRevision *string         `json:"applied_policy_revision,omitempty"`
-	AppliedPolicySnapshot json.RawMessage `json:"applied_policy_snapshot,omitempty"`
-	PRLink                *string         `json:"pr_link,omitempty"`
-	BotJobID              *string         `json:"bot_job_id,omitempty"`
-	BotLock               *string         `json:"bot_lock,omitempty"`
-	BotLockedAt           *time.Time      `json:"bot_locked_at,omitempty"`
-	BotAttempts           int             `json:"bot_attempts"`
-	ErrorLog              *string         `json:"error_log,omitempty"`
-	CreatedAt             time.Time       `json:"created_at"`
-	UpdatedAt             time.Time       `json:"updated_at"`
-	ReviewedAt            *time.Time      `json:"reviewed_at,omitempty"`
-	EstimatedSLAExpiresAt *time.Time      `json:"estimated_sla_expires_at,omitempty"`
-	ViewURL               string          `json:"view_url,omitempty"`
-	CanRetryBot           bool            `json:"can_retry_bot"`
-	RetryToken            string          `json:"retry_token,omitempty"`
-}
-
-// PolicyDraftListResponse wraps paginated drafts.
-type PolicyDraftListResponse struct {
-	Data  []PolicyDraftResponse `json:"data"`
-	Total int64                 `json:"total"`
 }
 
 // PolicyEntryResponse mirrors services.PolicyEntry for JSON responses.
@@ -130,35 +71,4 @@ type DebugRequestDTO struct {
 	Domain  string `json:"domain"`
 	Object  string `json:"object"`
 	Action  string `json:"action"`
-}
-
-// NewPolicyDraftResponse converts a service draft into a DTO.
-func NewPolicyDraftResponse(d services.PolicyDraft) PolicyDraftResponse {
-	return PolicyDraftResponse{
-		ID:                    d.ID,
-		Status:                string(d.Status),
-		RequesterID:           d.RequesterID,
-		ApproverID:            d.ApproverID,
-		TenantID:              d.TenantID,
-		Subject:               d.Subject,
-		Domain:                d.Domain,
-		Action:                d.Action,
-		Object:                d.Object,
-		Reason:                d.Reason,
-		Diff:                  d.Diff,
-		BasePolicyRevision:    d.BasePolicyRevision,
-		AppliedPolicyRevision: d.AppliedPolicyRevision,
-		AppliedPolicySnapshot: d.AppliedPolicySnapshot,
-		PRLink:                d.PRLink,
-		BotJobID:              d.BotJobID,
-		BotLock:               d.BotLock,
-		BotLockedAt:           d.BotLockedAt,
-		BotAttempts:           d.BotAttempts,
-		ErrorLog:              d.ErrorLog,
-		CreatedAt:             d.CreatedAt,
-		UpdatedAt:             d.UpdatedAt,
-		ReviewedAt:            d.ReviewedAt,
-		EstimatedSLAExpiresAt: services.EstimatedSLAExpiresAt(d),
-		ViewURL:               fmt.Sprintf("/core/authz/requests/%s", d.ID),
-	}
 }

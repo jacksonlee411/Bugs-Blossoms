@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/iota-uz/iota-sdk/components/base/dialog"
+	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
 	"github.com/iota-uz/iota-sdk/modules/core/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
@@ -18,8 +19,6 @@ type AuthzWorkspaceProps struct {
 	Preview       viewmodels.AuthzWorkspacePreview
 	SubmitURL     string
 	ClearURL      string
-	RequestObject string
-	RequestAction string
 	DefaultReason string
 }
 
@@ -34,6 +33,7 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 	if displayDomain == "" {
 		{{ displayDomain = props.Domain }}
 	}
+	{{ baseRevision := authzutil.BaseRevision(ctx) }}
 	{{ confirmAction := "open-authz-workspace-confirmation" }}
 	<form
 		id="authz-workspace"
@@ -46,12 +46,7 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 		if strings.TrimSpace(props.Domain) != "" {
 			<input type="hidden" name="domain" value={ props.Domain }/>
 		}
-		if strings.TrimSpace(props.RequestObject) != "" {
-			<input type="hidden" name="object" value={ props.RequestObject }/>
-		}
-		if strings.TrimSpace(props.RequestAction) != "" {
-			<input type="hidden" name="action" value={ props.RequestAction }/>
-		}
+		<input type="hidden" name="base_revision" value={ baseRevision }/>
 		<div class="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between">
 			<div class="flex items-center gap-6">
 				<div class="flex flex-col">
@@ -78,7 +73,6 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 					name="reason"
 					value={ props.DefaultReason }
 					placeholder={ pageCtx.T("Authz.Unauthorized.Reason") }
-					required
 					class="input input-sm w-full min-w-64 bg-surface-600/60 border border-surface-400/60 text-surface-50 placeholder:text-surface-200"
 				/>
 				<button
@@ -87,6 +81,7 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 					hx-swap="none"
 					class="rounded-md border border-surface-400/80 bg-transparent px-3 py-2 text-sm font-medium text-surface-50 hover:bg-surface-500/60"
 					type="button"
+					data-testid="authz-workspace-discard"
 				>
 					{ pageCtx.T("Authz.Workspace.Discard") }
 				</button>
@@ -94,8 +89,9 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 					class="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90"
 					type="button"
 					@click={ fmt.Sprintf("$dispatch('%s')", confirmAction) }
+					data-testid="authz-workspace-apply"
 				>
-					{ pageCtx.T("Authz.Stage.SubmitDraft") }
+					{ pageCtx.T("Authz.Stage.ApplyNow") }
 				</button>
 			</div>
 		</div>
@@ -105,7 +101,7 @@ templ AuthzWorkspace(props AuthzWorkspaceProps) {
 		Text:        pageCtx.T("Authz.Workspace.ConfirmDescription"),
 		Action:      confirmAction,
 		CancelText:  pageCtx.T("Cancel"),
-		ConfirmText: pageCtx.T("Authz.Stage.SubmitDraft"),
+		ConfirmText: pageCtx.T("Authz.Stage.ApplyNow"),
 		Attrs: templ.Attributes{
 			"@closing": `({target}) => {
 				if (target.returnValue === "confirm") {

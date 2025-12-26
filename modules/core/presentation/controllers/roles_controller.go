@@ -174,7 +174,7 @@ func (c *RolesController) GetEdit(
 	w http.ResponseWriter,
 	logger *logrus.Entry,
 	roleService *services.RoleService,
-	policyService *services.PolicyDraftService,
+	policyService *services.AuthzPolicyService,
 ) {
 	if !ensureRolesAuthz(w, r, "view") {
 		return
@@ -358,7 +358,7 @@ func (c *RolesController) GetPolicies(
 	w http.ResponseWriter,
 	logger *logrus.Entry,
 	roleService *services.RoleService,
-	policyService *services.PolicyDraftService,
+	policyService *services.AuthzPolicyService,
 ) {
 	if !ensureRolesAuthz(w, r, "view") {
 		return
@@ -393,7 +393,7 @@ func (c *RolesController) GetPolicies(
 func (c *RolesController) buildPolicyMatrixProps(
 	ctx context.Context,
 	r *http.Request,
-	policyService *services.PolicyDraftService,
+	policyService *services.AuthzPolicyService,
 	roleEntity role.Role,
 	params PolicyListParams,
 ) (*roles.PolicyMatrixProps, error) {
@@ -415,7 +415,6 @@ func (c *RolesController) buildPolicyMatrixProps(
 	}
 	var stagedEntries []dtos.StagedPolicyEntry
 	var canStage bool
-	var canRequest bool
 	if currentUser, err := composables.UseUser(ctx); err == nil && currentUser != nil {
 		if tenantID, tenantErr := composables.UseTenantID(ctx); tenantErr == nil {
 			stagedEntries = c.stageStore.List(
@@ -425,12 +424,8 @@ func (c *RolesController) buildPolicyMatrixProps(
 			)
 		}
 	}
-	if err := composables.CanUser(ctx, permissions.AuthzRequestsWrite); err == nil {
-		canRequest = true
-	}
-	if canRequest {
-		canStage = composables.CanUser(ctx, permissions.RoleUpdate) == nil
-	}
+	canStage = composables.CanUser(ctx, permissions.AuthzRequestsWrite) == nil &&
+		composables.CanUser(ctx, permissions.RoleUpdate) == nil
 	opts := buildAuthzSelectorOptions(entries)
 	matrixEntries, total := mergePolicyMatrixEntries(entries, stagedEntries, params)
 	return &roles.PolicyMatrixProps{
@@ -448,7 +443,6 @@ func (c *RolesController) buildPolicyMatrixProps(
 		Search:        params.Search,
 		CanDebug:      true,
 		CanStage:      canStage,
-		CanRequest:    canRequest,
 		StageTotal: func() int {
 			if stagedEntries == nil {
 				return 0

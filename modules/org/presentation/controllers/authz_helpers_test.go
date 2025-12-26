@@ -40,7 +40,6 @@ func TestEnsureOrgAuthz_ForbiddenJSONContract(t *testing.T) {
 	require.Equal(t, "forbidden", payload.Error)
 	require.Equal(t, orgPositionsAuthzObject, payload.Object)
 	require.Equal(t, "read", payload.Action)
-	require.Equal(t, "/core/api/authz/requests", payload.RequestURL)
 	require.NotEmpty(t, payload.DebugURL)
 	require.Equal(t, authz.DomainFromTenant(tenantID), payload.Domain)
 	require.NotEmpty(t, payload.Subject)
@@ -326,11 +325,13 @@ func setAuthzEnv(t *testing.T) {
 	cfg.Authz.PolicyPath = policyPath
 
 	authz.Reset()
+	authzutil.ResetRevisionProvider()
 
 	t.Cleanup(func() {
 		cfg.Authz.ModelPath = origModelPath
 		cfg.Authz.PolicyPath = origPolicyPath
 		authz.Reset()
+		authzutil.ResetRevisionProvider()
 	})
 }
 
@@ -363,10 +364,12 @@ func withAuthzPolicy(t *testing.T, lines []string) {
 	origPolicyPath := cfg.Authz.PolicyPath
 	cfg.Authz.PolicyPath = policyPath
 	authz.Reset()
+	authzutil.ResetRevisionProvider()
 
 	t.Cleanup(func() {
 		cfg.Authz.PolicyPath = origPolicyPath
 		authz.Reset()
+		authzutil.ResetRevisionProvider()
 	})
 }
 

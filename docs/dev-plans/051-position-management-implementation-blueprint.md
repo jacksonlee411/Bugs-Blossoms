@@ -43,7 +43,7 @@
 - 路由治理：`docs/dev-plans/018-routing-strategy.md`
 - Org 事件契约（SSOT）：`docs/dev-plans/022-org-placeholders-and-event-contracts.md`
 - Org API/Authz/Outbox 门禁（SSOT）：`docs/dev-plans/026-org-api-authz-and-events.md`
-- Authz：`docs/runbooks/AUTHZ-BOT.md`（流程）与 015/016 系列计划（体验/契约）
+- Authz（015C）：`docs/runbooks/authz-policy-apply-api.md`（流程）与 015/016 系列计划（体验/契约）
 - Outbox：`docs/dev-plans/017-transactional-outbox.md`
 
 ## 4. 实施拆分（阶段/里程碑）

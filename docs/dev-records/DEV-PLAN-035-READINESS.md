@@ -22,7 +22,7 @@
 - [X] 结论：满足
 - 证据点（代码/组件）：
   - 统一 403 输出（JSON/HTMX/Full page）：`modules/core/presentation/templates/layouts/authz_forbidden_responder.go`
-  - Unauthorized 组件（含申请入口 `/core/api/authz/requests`）：`components/authorization/unauthorized.templ`
+  - Unauthorized 组件（提供 Debug 串联）：`components/authorization/unauthorized.templ`
   - 模板 capability 判断：`pkg/types/pagecontext.go`（`CanAuthz`）
 
 ### 2.3 templ + Tailwind 工具链可用

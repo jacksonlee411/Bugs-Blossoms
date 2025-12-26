@@ -10,7 +10,7 @@
   - 长 Subject/Domain/UUID 破坏可读性，表格横向滚动与可扫描性差。
   - 只读/可编辑边界不清：Inherited（继承语义）与可编辑列混在同一栅格，用户容易误以为可直接改继承。
 - **业务价值**:
-  - 降低权限排查与变更的理解成本，提高“看清楚来源 → 做变更 → 提交草稿”的完成率。
+  - 降低权限排查与变更的理解成本，提高“看清楚来源 → 做变更 → 立即生效”的完成率。
   - 统一 UI 交互范式，向主流 IAM/RBAC 控制台（AWS/Azure/GCP/Okta/GitHub 类）靠拢。
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
@@ -39,8 +39,7 @@ graph TD
   EP --> API1[GET /users/{id}/policies?column=effective&domain&q&page&limit]
   CP --> API2[GET /users/{id}/policies?column=direct|overrides|inherited&domain&q&page&limit]
   PB --> API3[POST/DELETE /core/api/authz/policies/stage]
-  AW --> API4[POST /core/api/authz/requests]
-  PB --> API5[GET /core/api/authz/requests (polling)]
+	  AW --> API4[POST /core/api/authz/policies/apply]
 ```
 
 ### 3.2 关键设计决策 (ADR 摘要)
@@ -73,8 +72,7 @@ graph TD
 
 ### 5.3 Stage 与提交
 - **Stage**: `POST /core/api/authz/policies/stage`（JSON/表单），`DELETE /core/api/authz/policies/stage`（按 id/ids）。
-- **Submit Draft**: `POST /core/api/authz/requests`（由 `AuthzWorkspace` sticky footer 提交，必须带 reason）。
-- **SLA 轮询**: `GET /core/api/authz/requests?...`，最长 5 分钟，超时显示提示并支持复制 request_id 与重试。
+- **Apply Now**: `POST /core/api/authz/policies/apply`（由 `AuthzWorkspace` sticky footer 触发，直接写入生效策略并 `ReloadPolicy`）。
 
 ## 6. 核心逻辑与交互 (UI Contracts)
 ### 6.1 页面信息架构（Permissions 二级 Tab）

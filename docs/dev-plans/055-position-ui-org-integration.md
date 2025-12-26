@@ -227,7 +227,7 @@ graph TD
 
 ### 7.5 强治理：Correct / Rescind / ShiftBoundary（admin）
 - v1 UI 不提供强治理表单入口（避免在 UI 端引入高风险写操作与额外交互复杂度）；但必须满足：
-  - API 返回的 403/409 能在 UI 中被清晰展示（含 `request_id`，并指向 `/core/api/authz/requests` 与 `/core/api/authz/debug`）。
+  - API 返回的 403/409 能在 UI 中被清晰展示（含 `request_id`，并指向 `/core/api/authz/policies/apply` 与 `/core/api/authz/debug`）。
   - 当服务层提示“需改用 Correct/ShiftBoundary”时，UI 给出明确引导（对齐 025 的 `USE_CORRECT` 类错误口径）。
 
 ### 7.6 占编（Assignment）最小闭环（用于演示派生口径）

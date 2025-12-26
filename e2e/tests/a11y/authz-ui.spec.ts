@@ -6,6 +6,12 @@ import * as fs from 'fs';
 
 type AxeImpact = 'minor' | 'moderate' | 'serious' | 'critical' | undefined;
 
+const viewports = [
+	{ name: 'mobile', width: 390, height: 844 },
+	{ name: 'laptop', width: 1280, height: 720 },
+	{ name: 'desktop', width: 1728, height: 1117 },
+] as const;
+
 function countViolationsByImpact(impacts: AxeImpact[]) {
 	return impacts.reduce(
 		(acc, impact) => {
@@ -69,6 +75,46 @@ test.describe('a11y smoke - authz ui', () => {
 		await logout(page);
 	});
 
+	test('authz pages render across common viewports', async ({ page }) => {
+		await login(page, 'test@gmail.com', 'TestPass123!');
+
+		for (const vp of viewports) {
+			await page.setViewportSize({ width: vp.width, height: vp.height });
+
+			await page.goto('/roles', { waitUntil: 'domcontentloaded' });
+			const firstRolePoliciesLink = page.locator('a[href^="/roles/"][href$="/policies"]').first();
+			if (await firstRolePoliciesLink.count()) {
+				await firstRolePoliciesLink.click();
+				await expect(page).toHaveURL(/\/roles\/[0-9]+\/policies/);
+				await expect(page.locator('#policy-matrix')).toBeVisible();
+				await expect(page.locator('[data-testid="authz-role-stage-open"]')).toBeVisible();
+
+				const screenshotPath = test.info().outputPath(`viewport-${vp.name}-roles-policy-matrix.png`);
+				await page.screenshot({ path: screenshotPath, fullPage: true });
+				test.info().attach(`viewport-${vp.name}-roles-policy-matrix.png`, {
+					path: screenshotPath,
+					contentType: 'image/png',
+				});
+			}
+
+			await page.goto('/users', { waitUntil: 'domcontentloaded' });
+			const firstUserPoliciesLink = page.locator('a[href^="/users/"][href$="/policies"]').first();
+			if (await firstUserPoliciesLink.count()) {
+				await firstUserPoliciesLink.click();
+				await expect(page).toHaveURL(/\/users\/[0-9]+\/policies/);
+				await expect(page.locator('#user-policy-board')).toBeVisible();
+				await expect(page.locator('[data-testid="authz-user-stage-menu"]')).toBeVisible();
+
+				const screenshotPath = test.info().outputPath(`viewport-${vp.name}-users-policy-board.png`);
+				await page.screenshot({ path: screenshotPath, fullPage: true });
+				test.info().attach(`viewport-${vp.name}-users-policy-board.png`, {
+					path: screenshotPath,
+					contentType: 'image/png',
+				});
+			}
+		}
+	});
+
 	test('core authz pages have no critical/serious violations', async ({ page }) => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
 
@@ -80,19 +126,6 @@ test.describe('a11y smoke - authz ui', () => {
 			minor: number;
 			unknown: number;
 		}> = [];
-
-		await page.goto('/core/authz/requests', { waitUntil: 'domcontentloaded' });
-		results.push({ page: 'requests-list', ...(await runAxeSmoke('requests-list', page)) });
-
-		const firstRequestDetailLink = page
-			.locator('a[href^="/core/authz/requests/"]')
-			.filter({ hasText: /.+/ })
-			.first();
-		if (await firstRequestDetailLink.count()) {
-			await firstRequestDetailLink.click();
-			await expect(page).toHaveURL(/\/core\/authz\/requests\/.+/);
-			results.push({ page: 'requests-detail', ...(await runAxeSmoke('requests-detail', page)) });
-		}
 
 		await page.goto('/roles', { waitUntil: 'domcontentloaded' });
 		const firstRolePoliciesLink = page.locator('a[href^="/roles/"][href$="/policies"]').first();

@@ -40,8 +40,7 @@
   - 触发器矩阵与本地必跑：`AGENTS.md`
   - 命令入口：`Makefile`
   - CI 门禁：`.github/workflows/quality-gates.yml`
-  - Authz Bot：`docs/runbooks/AUTHZ-BOT.md`
-  - Authz Draft API：`docs/runbooks/authz-policy-draft-api.md`
+  - Authz Apply API（015C）：`docs/runbooks/authz-policy-apply-api.md`
   - Org API 鉴权/403 契约：`docs/dev-plans/026-org-api-authz-and-events.md`
   - 路由治理（如命中）：`docs/dev-plans/018-routing-strategy.md`
 
@@ -52,7 +51,7 @@ flowchart TD
   UI[UI/脚本/集成] --> API[/org/api/positions & assignments/]
   API --> Authz[ensureOrgAuthz<br/>ForbiddenPayload]
   Authz --> Casbin[pkg/authz + policy.csv]
-  Authz --> Draft[/core/api/authz/requests<br/>/core/api/authz/debug/]
+  Authz --> Draft[/core/api/authz/policies/apply<br/>/core/api/authz/debug/]
   API --> S[Org Staffing Services (053)]
   S --> DB[(org_positions/org_assignments)]
   S --> Audit[(org_audit_logs)]

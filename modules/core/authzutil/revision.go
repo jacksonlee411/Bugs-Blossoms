@@ -13,6 +13,12 @@ var (
 	revisionProv *authzVersion.FileProvider
 )
 
+// ResetRevisionProvider clears the cached revision provider; intended for tests.
+func ResetRevisionProvider() {
+	revisionOnce = sync.Once{}
+	revisionProv = nil
+}
+
 // BaseRevision returns the current aggregated policy revision string for UI rendering.
 func BaseRevision(ctx context.Context) string {
 	revisionOnce.Do(func() {

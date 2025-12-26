@@ -2,8 +2,6 @@ package core
 
 import (
 	icons "github.com/iota-uz/icons/phosphor"
-	"github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
-	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
 	"github.com/iota-uz/iota-sdk/pkg/types"
 )
@@ -42,18 +40,6 @@ var GroupsLink = types.NavigationItem{
 	Children:    nil,
 }
 
-var AuthzRequestsLink = types.NavigationItem{
-	Name:        "NavigationLinks.AuthzRequests",
-	Icon:        nil,
-	Href:        "/core/authz/requests",
-	AuthzObject: authz.ObjectName("core", "authz"),
-	AuthzAction: "read",
-	Permissions: []*permission.Permission{
-		permissions.AuthzRequestsRead,
-	},
-	Children: nil,
-}
-
 var SettingsLink = types.NavigationItem{
 	Name:     "NavigationLinks.Settings",
 	Icon:     nil,
@@ -69,7 +55,6 @@ var AdministrationLink = types.NavigationItem{
 		UsersLink,
 		RolesLink,
 		GroupsLink,
-		AuthzRequestsLink,
 		SettingsLink,
 	},
 }

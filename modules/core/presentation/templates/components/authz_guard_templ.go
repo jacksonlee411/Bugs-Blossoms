@@ -10,7 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 // AuthzGuard renders its children if allowed is true.
 // Otherwise, it renders the fallback component if provided.
-// Usage: @components.AuthzGuard(pageCtx.CanAuthz("resource", "action"), components.RequestPermissionPlaceholder())
+// Usage: @components.AuthzGuard(pageCtx.CanAuthz("resource", "action"), components.Unauthorized(&authorization.UnauthorizedProps{...}))
 func AuthzGuard(allowed bool, fallback templ.Component) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

@@ -31,12 +31,6 @@ templ PolicyInspector(props *PolicyInspectorProps) {
 }
 	}}
 	{{ policies := normalizePolicies(state, object, normalizedAction) }}
-	{{ diffJSON := suggestedDiff(state, policies) }}
-	{{ reason := strings.TrimSpace(props.Reason) }}
-	{{if reason == "" {
-	reason = pageCtx.T("Authz.PolicyInspector.ReasonDefault", map[string]interface{}{"Object": object, "Action": normalizedAction})
-}
-	}}
 	{{ operation := strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction)) }}
 	{{ bodyID := fmt.Sprintf("policy-inspector-%s-%s", strings.ReplaceAll(object, ".", "-"), normalizedAction) }}
 	<section
@@ -46,7 +40,6 @@ templ PolicyInspector(props *PolicyInspectorProps) {
 		data-action={ normalizedAction }
 		data-domain={ domain }
 		data-object={ object }
-		data-request-url="/core/api/authz/requests"
 		data-subject={ subject }
 		data-debug-url={ debug }
 		data-base-revision={ baseRevision }
@@ -55,15 +48,6 @@ templ PolicyInspector(props *PolicyInspectorProps) {
 		data-denied-label={ pageCtx.T("No") }
 		data-empty-label={ pageCtx.T("Empty") }
 		data-loading-label={ pageCtx.T("Authz.PolicyInspector.Loading") }
-		data-sla-unknown={ pageCtx.T("Authz.SLA.Unknown") }
-		data-status-unknown-label={ pageCtx.T("Unknown") }
-		data-status-pending-review={ pageCtx.T("Authz.Status.PendingReview") }
-		data-status-approved={ pageCtx.T("Authz.Status.Approved") }
-		data-status-merged={ pageCtx.T("Authz.Status.Merged") }
-		data-status-failed={ pageCtx.T("Authz.Status.Failed") }
-		data-status-rejected={ pageCtx.T("Authz.Status.Rejected") }
-		data-status-canceled={ pageCtx.T("Authz.Status.Canceled") }
-		data-status-draft={ pageCtx.T("Authz.Status.Draft") }
 	>
 		<div class="flex items-center justify-between gap-3">
 			<div>
@@ -156,46 +140,10 @@ templ PolicyInspector(props *PolicyInspectorProps) {
 					<dt class="col-span-2 text-surface-200">{ pageCtx.T("Empty") }</dt>
 				</dl>
 			</div>
-			<div class="flex items-center gap-2 text-xs text-surface-200">
-				{ pageCtx.T("Authz.Unauthorized.BaseRevision") }: <span class="font-mono" data-authz-base-revision>{ baseRevision }</span>
-			</div>
-			<div class="space-y-2 text-xs text-surface-100" data-authz-status-block>
-				<div class="flex items-center gap-2 flex-wrap">
-					<span>{ pageCtx.T("Status") }:</span>
-					<span class="font-semibold text-white" data-authz-status>{ pageCtx.T("Unknown") }</span>
-					<span class="text-surface-200" data-authz-sla>{ pageCtx.T("Authz.SLA.Unknown") }</span>
-				</div>
-				<div class="flex items-center gap-3 flex-wrap">
-					<a
-						class="text-primary hover:underline hidden"
-						target="_blank"
-						rel="noreferrer"
-						data-authz-view
-					>
-						{ pageCtx.T("Authz.Unauthorized.ViewRequest") }
-					</a>
-					<button
-						type="button"
-						class="hidden inline-flex items-center rounded-md border border-primary/70 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10"
-						data-authz-retry-bot
-					>
-						{ pageCtx.T("Authz.Unauthorized.RetryBot") }
-					</button>
+				<div class="flex items-center gap-2 text-xs text-surface-200">
+					{ pageCtx.T("Authz.Unauthorized.BaseRevision") }: <span class="font-mono" data-authz-base-revision>{ baseRevision }</span>
 				</div>
 			</div>
-			@requestForm(RequestFormProps{
-				RequestURL:   props.RequestURL,
-				Object:       object,
-				Action:       normalizedAction,
-				Domain:       domain,
-				Subject:      subject,
-				BaseRevision: baseRevision,
-				RequestID:    requestID,
-				Diff:         diffJSON,
-				Reason:       reason,
-				SubmitLabel:  pageCtx.T("Authz.PolicyInspector.GenerateDraft"),
-			})
-		</div>
 		<script>
 			if (!window.authzInspector) {
 				window.authzInspector = {

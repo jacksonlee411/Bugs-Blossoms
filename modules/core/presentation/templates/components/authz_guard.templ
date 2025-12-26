@@ -2,7 +2,7 @@ package components
 
 // AuthzGuard renders its children if allowed is true.
 // Otherwise, it renders the fallback component if provided.
-// Usage: @components.AuthzGuard(pageCtx.CanAuthz("resource", "action"), components.RequestPermissionPlaceholder())
+// Usage: @components.AuthzGuard(pageCtx.CanAuthz("resource", "action"), components.Unauthorized(&authorization.UnauthorizedProps{...}))
 templ AuthzGuard(allowed bool, fallback templ.Component) {
 	if allowed {
 		{ children... }

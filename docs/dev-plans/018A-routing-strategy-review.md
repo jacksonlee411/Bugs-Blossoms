@@ -31,7 +31,7 @@
 
 ## 3. 现状盘点（证据导向）(Findings)
 ### 3.1 已存在的“统一 403 契约”雏形（可复用）
-- forbidden payload 结构已集中在 `modules/core/authzutil/forbidden_response.go`，并使用 `/core/api/authz/requests`、`/core/api/authz/debug` 作为标准调试/申请入口。
+- forbidden payload 结构已集中在 `modules/core/authzutil/forbidden_response.go`，并使用 `/core/api/authz/policies/apply`（管理员维护生效）与 `/core/api/authz/debug` 作为标准入口。
 - UI 侧对 403 的分流已体现 018 的协商优先级思想：
   - 显式 `Accept: application/json` 返回 JSON；
   - HTMX 请求设置 `Hx-Retarget: body`、`Hx-Reswap: innerHTML` 返回 Unauthorized partial；

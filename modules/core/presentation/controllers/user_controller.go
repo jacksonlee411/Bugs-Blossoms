@@ -27,12 +27,10 @@ import (
 	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
 	"github.com/iota-uz/iota-sdk/pkg/authz"
-	authzPersistence "github.com/iota-uz/iota-sdk/pkg/authz/persistence"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 	"github.com/iota-uz/iota-sdk/pkg/di"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
-	"github.com/iota-uz/iota-sdk/pkg/intl"
 	"github.com/iota-uz/iota-sdk/pkg/mapping"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
 	"github.com/iota-uz/iota-sdk/pkg/rbac"
@@ -393,7 +391,7 @@ func (c *UsersController) GetEdit(
 	userService *services.UserService,
 	roleService *services.RoleService,
 	groupQueryService *services.GroupQueryService,
-	policyService *services.PolicyDraftService,
+	policyService *services.AuthzPolicyService,
 ) {
 	if !ensureUsersAuthz(w, r, "view") {
 		return
@@ -485,7 +483,7 @@ func (c *UsersController) GetPolicies(
 	logger *logrus.Entry,
 	userService *services.UserService,
 	roleService *services.RoleService,
-	policyService *services.PolicyDraftService,
+	policyService *services.AuthzPolicyService,
 ) {
 	if !ensureUsersAuthz(w, r, "view") {
 		return
@@ -927,13 +925,17 @@ func canAuthzCapability(ctx context.Context, object, action string) bool {
 func (c *UsersController) buildUserPolicyBoardProps(
 	ctx context.Context,
 	r *http.Request,
-	policyService *services.PolicyDraftService,
+	policyService *services.AuthzPolicyService,
 	us user.User,
 	values url.Values,
 	roleNameToID map[string]uint,
 ) (*users.UserPolicyBoardProps, error) {
 	subject := authzSubjectForUser(us.TenantID(), us)
 	defaultDomain := authz.DomainFromTenant(us.TenantID())
+	activeDomain := strings.TrimSpace(values.Get("domain"))
+	if activeDomain == "" {
+		activeDomain = defaultDomain
+	}
 
 	entries, err := policyService.Policies(ctx)
 	if err != nil {
@@ -945,22 +947,12 @@ func (c *UsersController) buildUserPolicyBoardProps(
 	tenantID := us.TenantID()
 	var stagedEntries []dtos.StagedPolicyEntry
 	if currentUser, err := composables.UseUser(ctx); err == nil && currentUser != nil {
-		stagedEntries = c.stageStore.List(policyStageKey(currentUser.ID(), tenantID), subject, "")
+		stagedEntries = c.stageStore.List(policyStageKey(currentUser.ID(), tenantID), subject, activeDomain)
 	}
-
-	drafts, _, err := policyService.List(ctx, tenantID, services.ListPolicyDraftsParams{
-		Subject: subject,
-		Domain:  "",
-		Limit:   50,
-	})
-	if err != nil {
-		return nil, err
-	}
-	requestStatuses, requestMap := mapDraftStatuses(ctx, drafts)
 
 	baseURL := fmt.Sprintf("%s/%d/policies", c.basePath, us.ID())
-	canRequest := composables.CanUser(ctx, permissions.AuthzRequestsWrite) == nil
-	canStage := canRequest && composables.CanUser(ctx, permissions.UserUpdate) == nil
+	canStage := composables.CanUser(ctx, permissions.AuthzRequestsWrite) == nil &&
+		composables.CanUser(ctx, permissions.UserUpdate) == nil
 	canDebug := composables.CanUser(ctx, permissions.AuthzDebug) == nil
 
 	inheritedParams := parseUserPolicyParams(values, 20)
@@ -973,12 +965,12 @@ func (c *UsersController) buildUserPolicyBoardProps(
 
 	inheritedParams.Type = "g"
 	if inheritedParams.Domain == "" {
-		inheritedParams.Domain = defaultDomain
+		inheritedParams.Domain = activeDomain
 	}
 
 	directParams.Type = "p"
 	if directParams.Domain == "" {
-		directParams.Domain = defaultDomain
+		directParams.Domain = activeDomain
 	}
 
 	overrideParams.Type = "p"
@@ -990,7 +982,6 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		userPolicyColumnInherited,
 		defaultDomain,
 		baseURL,
-		requestMap,
 		selectorOpts,
 		canStage,
 		canDebug,
@@ -1006,7 +997,6 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		userPolicyColumnDirect,
 		defaultDomain,
 		baseURL,
-		requestMap,
 		selectorOpts,
 		canStage,
 		canDebug,
@@ -1022,7 +1012,6 @@ func (c *UsersController) buildUserPolicyBoardProps(
 		userPolicyColumnOverrides,
 		defaultDomain,
 		baseURL,
-		requestMap,
 		selectorOpts,
 		canStage,
 		canDebug,
@@ -1037,21 +1026,17 @@ func (c *UsersController) buildUserPolicyBoardProps(
 
 	return &users.UserPolicyBoardProps{
 		Subject:       subject,
+		Domain:        activeDomain,
 		DefaultDomain: defaultDomain,
 		StageTotal:    len(stagedEntries),
 		StageSummary:  summarizeStagedEntries(stagedEntries),
 		StagePreview:  buildWorkspacePreview(stagedEntries),
-		Requests:      requestStatuses,
 		Effective:     effectiveProps,
 		Inherited:     inheritedColumn,
 		Direct:        directColumn,
 		Overrides:     overrideColumn,
 		BaseURL:       baseURL,
-		RequestObject: "core.users",
-		RequestAction: "update",
-		RequestReason: intl.MustT(ctx, "Authz.Requests.DefaultReason.Users"),
 		CanStage:      canStage,
-		CanRequest:    canRequest,
 		CanDebug:      canDebug,
 	}, nil
 }
@@ -1063,7 +1048,6 @@ func (c *UsersController) buildUserPolicyColumnProps(
 	column string,
 	defaultDomain string,
 	baseURL string,
-	requestMap map[string]requestStatusInfo,
 	selectorOpts authzSelectorOptions,
 	canStage bool,
 	canDebug bool,
@@ -1075,13 +1059,6 @@ func (c *UsersController) buildUserPolicyColumnProps(
 	matrixEntries, total := mergePolicyMatrixEntries(filteredBase, filteredStage, params)
 	entries := make([]users.UserPolicyEntry, 0, len(matrixEntries))
 	for _, entry := range matrixEntries {
-		statusKey := requestStatusKey(entry.Domain, entry.Object, entry.Action)
-		statusInfo, ok := requestMap[statusKey]
-		var requestID, requestStatus string
-		if ok {
-			requestID = statusInfo.ID
-			requestStatus = statusInfo.Label
-		}
 		rolePoliciesURL := ""
 		if entry.Type == "g" && roleNameToID != nil {
 			roleName := strings.TrimPrefix(strings.TrimSpace(entry.Object), "role:")
@@ -1097,8 +1074,6 @@ func (c *UsersController) buildUserPolicyColumnProps(
 			StageKind:           entry.StageKind,
 			Staged:              entry.Staged,
 			StageOnly:           entry.StageOnly,
-			RequestID:           requestID,
-			RequestStatus:       requestStatus,
 			RolePoliciesURL:     rolePoliciesURL,
 		})
 	}
@@ -1253,60 +1228,4 @@ func filterUserStagedEntriesByColumn(
 		filtered = append(filtered, entry)
 	}
 	return filtered
-}
-
-type requestStatusInfo struct {
-	ID    string
-	Label string
-}
-
-func mapDraftStatuses(
-	ctx context.Context,
-	drafts []services.PolicyDraft,
-) ([]users.UserPolicyRequestStatus, map[string]requestStatusInfo) {
-	statuses := make([]users.UserPolicyRequestStatus, 0, len(drafts))
-	lookup := make(map[string]requestStatusInfo, len(drafts))
-	for _, draft := range drafts {
-		label := displayDraftStatus(ctx, draft.Status)
-		id := draft.ID.String()
-		status := users.UserPolicyRequestStatus{
-			ID:     id,
-			Status: label,
-			Domain: draft.Domain,
-			Object: draft.Object,
-			Action: draft.Action,
-			State:  string(draft.Status),
-		}
-		statuses = append(statuses, status)
-		key := requestStatusKey(draft.Domain, draft.Object, draft.Action)
-		if _, ok := lookup[key]; !ok {
-			lookup[key] = requestStatusInfo{ID: id, Label: label}
-		}
-	}
-	return statuses, lookup
-}
-
-func requestStatusKey(domain, object, action string) string {
-	return fmt.Sprintf("%s|%s|%s", domain, object, action)
-}
-
-func displayDraftStatus(ctx context.Context, status authzPersistence.PolicyChangeStatus) string {
-	switch status {
-	case authzPersistence.PolicyChangeStatusPendingReview:
-		return intl.MustT(ctx, "Authz.Status.PendingReview")
-	case authzPersistence.PolicyChangeStatusApproved:
-		return intl.MustT(ctx, "Authz.Status.Approved")
-	case authzPersistence.PolicyChangeStatusMerged:
-		return intl.MustT(ctx, "Authz.Status.Merged")
-	case authzPersistence.PolicyChangeStatusDraft:
-		return intl.MustT(ctx, "Authz.Status.Draft")
-	case authzPersistence.PolicyChangeStatusRejected:
-		return intl.MustT(ctx, "Authz.Status.Rejected")
-	case authzPersistence.PolicyChangeStatusFailed:
-		return intl.MustT(ctx, "Authz.Status.Failed")
-	case authzPersistence.PolicyChangeStatusCanceled:
-		return intl.MustT(ctx, "Authz.Status.Canceled")
-	default:
-		return string(status)
-	}
 }

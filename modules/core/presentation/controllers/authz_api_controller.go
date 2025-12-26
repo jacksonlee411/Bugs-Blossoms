@@ -1,45 +1,35 @@
 package controllers
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	jsondiff "github.com/wI2L/jsondiff"
 
 	"github.com/iota-uz/iota-sdk/modules/core/authzutil"
-	"github.com/iota-uz/iota-sdk/modules/core/domain/aggregates/user"
 	permissionEntity "github.com/iota-uz/iota-sdk/modules/core/domain/entities/permission"
+	"github.com/iota-uz/iota-sdk/modules/core/permissions"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
+	"github.com/iota-uz/iota-sdk/modules/core/services"
 	"github.com/iota-uz/iota-sdk/pkg/application"
 	authz "github.com/iota-uz/iota-sdk/pkg/authz"
-	authzPersistence "github.com/iota-uz/iota-sdk/pkg/authz/persistence"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/di"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
-
-	"github.com/iota-uz/iota-sdk/modules/core/permissions"
-	"github.com/iota-uz/iota-sdk/modules/core/presentation/controllers/dtos"
-	"github.com/iota-uz/iota-sdk/modules/core/services"
 )
 
-// AuthzAPIController exposes REST APIs for policy drafts and policy listings.
+// AuthzAPIController exposes REST APIs for policy listings and direct apply.
 type AuthzAPIController struct {
 	app        application.Application
 	basePath   string
 	stageStore *policyStageStore
 }
-
-const botRetryCooldown = time.Minute
 
 // NewAuthzAPIController wires the controller into the router.
 func NewAuthzAPIController(app application.Application) application.Controller {
@@ -66,15 +56,15 @@ func (c *AuthzAPIController) Register(r *mux.Router) {
 	)
 
 	router.HandleFunc("/policies", di.H(c.listPolicies)).Methods(http.MethodGet)
-	router.HandleFunc("/requests", di.H(c.listRequests)).Methods(http.MethodGet)
-	router.HandleFunc("/requests", di.H(c.createRequest)).Methods(http.MethodPost)
-	router.HandleFunc("/requests/{id}", di.H(c.getRequest)).Methods(http.MethodGet)
-	router.HandleFunc("/requests/{id}/approve", di.H(c.approveRequest)).Methods(http.MethodPost)
-	router.HandleFunc("/requests/{id}/reject", di.H(c.rejectRequest)).Methods(http.MethodPost)
-	router.HandleFunc("/requests/{id}/cancel", di.H(c.cancelRequest)).Methods(http.MethodPost)
-	router.HandleFunc("/requests/{id}/trigger-bot", di.H(c.triggerBot)).Methods(http.MethodPost)
-	router.HandleFunc("/requests/{id}/revert", di.H(c.revertRequest)).Methods(http.MethodPost)
 	router.HandleFunc("/policies/stage", di.H(c.stagePolicy)).Methods(http.MethodPost, http.MethodDelete)
+	router.Handle(
+		"/policies/apply",
+		middleware.RateLimit(middleware.RateLimitConfig{
+			RequestsPerPeriod: 20,
+			Period:            time.Minute,
+			KeyFunc:           middleware.EndpointKeyFunc("core.api.authz.policies.apply"),
+		})(di.H(c.applyPolicies)),
+	).Methods(http.MethodPost)
 	router.Handle(
 		"/debug",
 		middleware.RateLimit(middleware.RateLimitConfig{
@@ -89,7 +79,7 @@ func (c *AuthzAPIController) listPolicies(
 	w http.ResponseWriter,
 	r *http.Request,
 	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
+	svc *services.AuthzPolicyService,
 ) {
 	if !c.ensurePermission(w, r, permissions.AuthzDebug) {
 		return
@@ -125,144 +115,12 @@ func (c *AuthzAPIController) listPolicies(
 	})
 }
 
-func (c *AuthzAPIController) listRequests(
-	w http.ResponseWriter,
-	r *http.Request,
-	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
-) {
-	if !c.ensurePermission(w, r, permissions.AuthzRequestsRead) {
-		return
-	}
-	params, err := parseListParams(r)
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "AUTHZ_INVALID_QUERY", err.Error())
-		return
-	}
-	tenantID := tenantIDFromContext(r)
-	drafts, total, err := svc.List(r.Context(), tenantID, params)
-	if err != nil {
-		logger.WithError(err).Error("authz api: list requests failed")
-		writeJSONError(w, http.StatusInternalServerError, "AUTHZ_LIST_ERROR", "failed to list requests")
-		return
-	}
-	resp := dtos.PolicyDraftListResponse{
-		Data:  make([]dtos.PolicyDraftResponse, 0, len(drafts)),
-		Total: total,
-	}
-	for _, draft := range drafts {
-		resp.Data = append(resp.Data, c.decorateDraftResponse(r, draft))
-	}
-	writeJSON(w, http.StatusOK, resp)
-}
-
-func (c *AuthzAPIController) getRequest(
-	w http.ResponseWriter,
-	r *http.Request,
-	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
-) {
-	if !c.ensurePermission(w, r, permissions.AuthzRequestsRead) {
-		return
-	}
-	id, err := parseUUID(mux.Vars(r)["id"])
-	if err != nil {
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
-		return
-	}
-	tenantID := tenantIDFromContext(r)
-	draft, err := svc.Get(r.Context(), tenantID, id)
-	if err != nil {
-		c.respondServiceError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, c.decorateDraftResponse(r, draft))
-}
-
-func (c *AuthzAPIController) createRequest(
-	w http.ResponseWriter,
-	r *http.Request,
-	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
-	currentUser user.User,
-) {
-	if !c.ensurePermission(w, r, permissions.AuthzRequestsWrite) {
-		return
-	}
-	payload, err := decodePolicyDraftRequest(r)
-	if err != nil {
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
-		return
-	}
-	tenantID := tenantIDFromContext(r)
-	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
-	logger.WithFields(logrus.Fields{
-		"diff_len": len(payload.Diff),
-		"subject":  payload.Subject,
-		"domain":   payload.Domain,
-		"object":   payload.Object,
-		"action":   payload.Action,
-	}).Debug("authz api: create draft payload")
-	diffStr := strings.TrimSpace(string(payload.Diff))
-	if !payload.RequestAccess && (diffStr == "" || strings.EqualFold(diffStr, "null")) {
-		payload, err = c.buildDraftFromStage(r.Context(), tenantID, currentUser, payload, svc)
-		if err != nil {
-			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_EMPTY", err.Error())
-			return
-		}
-	}
-	if payload.RequestAccess && len(payload.Diff) == 0 {
-		payload.Diff = json.RawMessage("[]")
-		if strings.TrimSpace(payload.Reason) == "" {
-			payload.Reason = "请求编辑角色策略"
-		}
-	}
-	if strings.TrimSpace(payload.Object) == "" {
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "object is required")
-		return
-	}
-	if strings.TrimSpace(payload.Action) == "" {
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "action is required")
-		return
-	}
-	params := services.CreatePolicyDraftParams{
-		RequesterID:  requesterID,
-		Object:       payload.Object,
-		Action:       payload.Action,
-		Reason:       payload.Reason,
-		Diff:         payload.Diff,
-		BaseRevision: payload.BaseRevision,
-		Domain:       payload.Domain,
-	}
-	draft, err := svc.Create(r.Context(), tenantID, params)
-	if err != nil {
-		logger.WithError(err).Error("authz api: create draft failed")
-		c.respondServiceError(w, r, err)
-		return
-	}
-	responsePayload := c.decorateDraftResponse(r, draft)
-	if htmx.IsHxRequest(r) {
-		htmx.SetTrigger(w, "policies:staged", `{"total":0}`)
-		if triggerDetail, marshalErr := json.Marshal(map[string]any{
-			"id":                       draft.ID.String(),
-			"status":                   string(draft.Status),
-			"domain":                   draft.Domain,
-			"object":                   draft.Object,
-			"action":                   draft.Action,
-			"view_url":                 responsePayload.ViewURL,
-			"estimated_sla_expires_at": responsePayload.EstimatedSLAExpiresAt,
-		}); marshalErr == nil {
-			htmx.SetTrigger(w, "authz:request-created", string(triggerDetail))
-		}
-	}
-	writeJSON(w, http.StatusCreated, responsePayload)
-}
-
 func (c *AuthzAPIController) stagePolicy(
 	w http.ResponseWriter,
 	r *http.Request,
 	logger *logrus.Entry,
 ) {
+	_ = logger
 	if !c.ensurePermission(w, r, permissions.AuthzRequestsWrite) {
 		return
 	}
@@ -352,116 +210,117 @@ func (c *AuthzAPIController) stagePolicy(
 	}
 }
 
-func (c *AuthzAPIController) approveRequest(
+func (c *AuthzAPIController) applyPolicies(
 	w http.ResponseWriter,
 	r *http.Request,
 	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
-	currentUser user.User,
-) {
-	c.reviewRequest(w, r, logger, svc, currentUser, svc.Approve)
-}
-
-func (c *AuthzAPIController) rejectRequest(
-	w http.ResponseWriter,
-	r *http.Request,
-	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
-	currentUser user.User,
-) {
-	c.reviewRequest(w, r, logger, svc, currentUser, svc.Reject)
-}
-
-func (c *AuthzAPIController) cancelRequest(
-	w http.ResponseWriter,
-	r *http.Request,
-	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
+	svc *services.AuthzPolicyService,
 ) {
 	if !c.ensurePermission(w, r, permissions.AuthzRequestsWrite) {
 		return
 	}
-	id, err := parseUUID(mux.Vars(r)["id"])
-	if err != nil {
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
-		return
-	}
-	tenantID := tenantIDFromContext(r)
-	draft, err := svc.Cancel(r.Context(), tenantID, id)
-	if err != nil {
-		c.respondServiceError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, c.decorateDraftResponse(r, draft))
-}
 
-func (c *AuthzAPIController) triggerBot(
-	w http.ResponseWriter,
-	r *http.Request,
-	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
-) {
-	if composables.CanUser(r.Context(), permissions.AuthzRequestsReview) != nil &&
-		composables.CanUser(r.Context(), permissions.AuthzRequestsWrite) != nil {
-		c.writeHTMXError(w, r, http.StatusForbidden, "AUTHZ_FORBIDDEN", "permission denied")
-		return
-	}
-	id, err := parseUUID(mux.Vars(r)["id"])
+	currentUser, err := composables.UseUser(r.Context())
 	if err != nil {
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
+		c.writeHTMXError(w, r, http.StatusUnauthorized, "AUTHZ_NO_USER", "user not found in context")
 		return
 	}
-	locker := r.URL.Query().Get("locker")
-	token := strings.TrimSpace(r.URL.Query().Get("retry_token"))
-	if token == "" {
-		if err := r.ParseForm(); err == nil {
-			token = strings.TrimSpace(r.FormValue("retry_token"))
+	tenantID, err := composables.UseTenantID(r.Context())
+	if err != nil {
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_NO_TENANT", "tenant not found in context")
+		return
+	}
+
+	payload, err := decodeApplyPolicyRequest(r)
+	if err != nil {
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", err.Error())
+		return
+	}
+	payload.BaseRevision = strings.TrimSpace(payload.BaseRevision)
+	payload.Subject = strings.TrimSpace(payload.Subject)
+	payload.Domain = strings.TrimSpace(payload.Domain)
+
+	if payload.BaseRevision == "" || payload.Subject == "" || payload.Domain == "" {
+		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_BODY", "base_revision, subject and domain are required")
+		return
+	}
+
+	key := policyStageKey(currentUser.ID(), tenantID)
+	changes := make([]services.PolicyChange, 0, len(payload.Changes))
+	if len(payload.Changes) > 0 {
+		changes = append(changes, payload.Changes...)
+	} else {
+		entries := c.stageStore.List(key, payload.Subject, payload.Domain)
+		if len(entries) == 0 {
+			c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_STAGE_EMPTY", "no staged policies found")
+			return
+		}
+		for _, entry := range entries {
+			changes = append(changes, services.PolicyChange{
+				StageKind: entry.StageKind,
+				PolicyEntry: services.PolicyEntry{
+					Type:    entry.Type,
+					Subject: entry.Subject,
+					Domain:  entry.Domain,
+					Object:  entry.Object,
+					Action:  entry.Action,
+					Effect:  entry.Effect,
+				},
+			})
 		}
 	}
-	if err := authzutil.ValidateRetryToken(token, id); err != nil {
-		c.writeHTMXErrorWithMeta(w, r, http.StatusUnauthorized, "AUTHZ_INVALID_TOKEN", "error.bot_retry_token_invalid", map[string]string{
-			"request_id": id.String(),
-		})
-		return
-	}
-	if !authzutil.AllowBotRetry(id.String(), time.Now(), botRetryCooldown) {
-		c.writeHTMXErrorWithMeta(w, r, http.StatusTooManyRequests, "E_BOT_RATE_LIMIT", "error.bot_rate_limit", map[string]string{
-			"request_id": id.String(),
-		})
-		return
-	}
-	tenantID := tenantIDFromContext(r)
-	draft, err := svc.TriggerBot(r.Context(), tenantID, id, locker)
+
+	result, err := svc.ApplyAndReload(r.Context(), payload.BaseRevision, changes, authz.Use().ReloadPolicy)
 	if err != nil {
-		c.respondServiceError(w, r, err)
+		logger.WithError(err).Warn("authz api: apply failed")
+		c.respondApplyError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, c.decorateDraftResponse(r, draft))
+
+	c.stageStore.Clear(key, payload.Subject, payload.Domain)
+	remaining := c.stageStore.List(key, "", "")
+
+	if htmx.IsHxRequest(r) {
+		htmx.SetTrigger(w, "policies:staged", fmt.Sprintf(`{"total":%d}`, len(remaining)))
+		if detail, marshalErr := json.Marshal(map[string]any{
+			"base_revision": result.BaseRevision,
+			"revision":      result.Revision,
+			"added":         result.Added,
+			"removed":       result.Removed,
+		}); marshalErr == nil {
+			htmx.SetTrigger(w, "authz:policies-applied", string(detail))
+		}
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }
 
-func (c *AuthzAPIController) revertRequest(
-	w http.ResponseWriter,
-	r *http.Request,
-	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
-	currentUser user.User,
-) {
-	if !c.ensurePermission(w, r, permissions.AuthzRequestsReview) {
-		return
+type applyPolicyPayload struct {
+	BaseRevision string                  `json:"base_revision"`
+	Subject      string                  `json:"subject"`
+	Domain       string                  `json:"domain"`
+	Reason       string                  `json:"reason"`
+	Changes      []services.PolicyChange `json:"changes"`
+}
+
+func decodeApplyPolicyRequest(r *http.Request) (applyPolicyPayload, error) {
+	contentType := strings.ToLower(r.Header.Get("Content-Type"))
+	if strings.Contains(contentType, "application/json") {
+		var payload applyPolicyPayload
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			return applyPolicyPayload{}, err
+		}
+		return payload, nil
 	}
-	id, err := parseUUID(mux.Vars(r)["id"])
-	if err != nil {
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
-		return
+	if err := r.ParseForm(); err != nil {
+		return applyPolicyPayload{}, err
 	}
-	tenantID := tenantIDFromContext(r)
-	requesterID := authzutil.NormalizedUserUUID(tenantID, currentUser)
-	draft, err := svc.Revert(r.Context(), tenantID, id, requesterID)
-	if err != nil {
-		c.respondServiceError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, c.decorateDraftResponse(r, draft))
+	return applyPolicyPayload{
+		BaseRevision: r.FormValue("base_revision"),
+		Subject:      r.FormValue("subject"),
+		Domain:       r.FormValue("domain"),
+		Reason:       r.FormValue("reason"),
+	}, nil
 }
 
 func (c *AuthzAPIController) debugRequest(
@@ -542,30 +401,19 @@ func (c *AuthzAPIController) debugRequest(
 	})
 }
 
-func (c *AuthzAPIController) reviewRequest(
-	w http.ResponseWriter,
-	r *http.Request,
-	logger *logrus.Entry,
-	svc *services.PolicyDraftService,
-	currentUser user.User,
-	reviewFunc func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (services.PolicyDraft, error),
-) {
-	if !c.ensurePermission(w, r, permissions.AuthzRequestsReview) {
-		return
+func (c *AuthzAPIController) respondApplyError(w http.ResponseWriter, r *http.Request, err error) {
+	switch {
+	case errors.Is(err, services.ErrRevisionMismatch):
+		meta := map[string]string{}
+		if rev := authzutil.BaseRevision(r.Context()); rev != "" {
+			meta["base_revision"] = rev
+		}
+		c.writeHTMXErrorWithMeta(w, r, http.StatusConflict, "AUTHZ_BASE_REVISION_MISMATCH", "Policy base revision is stale, please refresh", meta)
+	case errors.Is(err, services.ErrPolicyApply):
+		c.writeHTMXError(w, r, http.StatusUnprocessableEntity, "AUTHZ_POLICY_APPLY_FAILED", err.Error())
+	default:
+		c.writeHTMXError(w, r, http.StatusInternalServerError, "AUTHZ_POLICY_WRITE_FAILED", "failed to apply policies")
 	}
-	id, err := parseUUID(mux.Vars(r)["id"])
-	if err != nil {
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_ID", "invalid request id")
-		return
-	}
-	tenantID := tenantIDFromContext(r)
-	approverID := authzutil.NormalizedUserUUID(tenantID, currentUser)
-	draft, err := reviewFunc(r.Context(), tenantID, id, approverID)
-	if err != nil {
-		c.respondServiceError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, c.decorateDraftResponse(r, draft))
 }
 
 func (c *AuthzAPIController) ensurePermission(
@@ -616,7 +464,7 @@ func triggerErrorToast(w http.ResponseWriter, message string, code string, meta 
 		Message: message,
 		Code:    code,
 	}
-	if len(meta) > 0 {
+	if meta != nil {
 		payload.Meta = meta
 	}
 	if detail, err := json.Marshal(payload); err == nil {
@@ -627,98 +475,20 @@ func triggerErrorToast(w http.ResponseWriter, message string, code string, meta 
 
 func errorMessageKey(code string, fallback string) string {
 	switch code {
-	case "AUTHZ_NOT_FOUND", "E_REQUEST_NOT_FOUND":
-		return "Request not found"
-	case "E_BOT_RATE_LIMIT":
-		return "Bot retry is rate limited, please wait and try again"
-	case "AUTHZ_INVALID_REQUEST", "AUTHZ_INVALID_BODY", "AUTHZ_INVALID_QUERY", "AUTHZ_INVALID_STATE":
+	case "AUTHZ_INVALID_BODY", "AUTHZ_INVALID_QUERY":
 		return "Request validation failed"
+	case "AUTHZ_STAGE_EMPTY":
+		return "No staged policies to apply"
+	case "AUTHZ_BASE_REVISION_MISMATCH":
+		return "Policy base revision is stale, please refresh"
 	case "AUTHZ_FORBIDDEN":
 		return "Permission denied"
-	case "AUTHZ_INVALID_TOKEN":
-		return "Retry link expired, please refresh and try again"
 	default:
 		if strings.TrimSpace(fallback) != "" {
 			return fallback
 		}
 		return "Request failed, please try again"
 	}
-}
-
-func (c *AuthzAPIController) respondServiceError(w http.ResponseWriter, r *http.Request, err error) {
-	switch {
-	case errors.Is(err, services.ErrPolicyDraftNotFound):
-		c.writeHTMXError(w, r, http.StatusNotFound, "AUTHZ_NOT_FOUND", "request not found")
-	case errors.Is(err, services.ErrInvalidDiff):
-		c.writeHTMXError(w, r, http.StatusBadRequest, "AUTHZ_INVALID_REQUEST", err.Error())
-	case errors.Is(err, services.ErrRevisionMismatch):
-		meta := map[string]string{}
-		if rev := authzutil.BaseRevision(r.Context()); rev != "" {
-			w.Header().Set("X-Authz-Base-Revision", rev)
-			meta["base_revision"] = rev
-		}
-		c.writeHTMXErrorWithMeta(w, r, http.StatusBadRequest, "AUTHZ_INVALID_REQUEST", "Policy base revision is stale, please refresh", meta)
-	case errors.Is(err, services.ErrInvalidStatusTransition):
-		c.writeHTMXError(w, r, http.StatusConflict, "AUTHZ_INVALID_STATE", err.Error())
-	case errors.Is(err, services.ErrMissingSnapshot):
-		c.writeHTMXError(w, r, http.StatusConflict, "AUTHZ_NO_SNAPSHOT", err.Error())
-	case errors.Is(err, services.ErrTenantMismatch):
-		c.writeHTMXError(w, r, http.StatusForbidden, "AUTHZ_FORBIDDEN", "tenant mismatch")
-	default:
-		c.writeHTMXError(w, r, http.StatusInternalServerError, "AUTHZ_ERROR", "internal error")
-	}
-}
-
-func (c *AuthzAPIController) decorateDraftResponse(r *http.Request, draft services.PolicyDraft) dtos.PolicyDraftResponse {
-	resp := dtos.NewPolicyDraftResponse(draft)
-	canRetry := composables.CanUser(r.Context(), permissions.AuthzRequestsReview) == nil ||
-		composables.CanUser(r.Context(), permissions.AuthzRequestsWrite) == nil
-	if canRetry && draft.Status == authzPersistence.PolicyChangeStatusFailed {
-		resp.CanRetryBot = true
-		if token, err := authzutil.GenerateRetryToken(draft.ID, botRetryCooldown); err == nil {
-			resp.RetryToken = token
-		} else if logger := composables.UseLogger(r.Context()); logger != nil {
-			logger.WithError(err).WithField("request_id", draft.ID.String()).Warn("authz retry token generation failed")
-		}
-	}
-	return resp
-}
-
-func parseListParams(r *http.Request) (services.ListPolicyDraftsParams, error) {
-	query := r.URL.Query()
-	params := services.ListPolicyDraftsParams{}
-
-	if subject := strings.TrimSpace(query.Get("subject")); subject != "" {
-		params.Subject = subject
-	}
-	if domain := strings.TrimSpace(query.Get("domain")); domain != "" {
-		params.Domain = domain
-	}
-	if limit := query.Get("limit"); limit != "" {
-		value, err := strconv.Atoi(limit)
-		if err != nil {
-			return params, errors.New("limit must be numeric")
-		}
-		params.Limit = value
-	}
-	if offset := query.Get("offset"); offset != "" {
-		value, err := strconv.Atoi(offset)
-		if err != nil {
-			return params, errors.New("offset must be numeric")
-		}
-		params.Offset = value
-	}
-	if sort := strings.ToLower(query.Get("sort")); sort == "asc" {
-		params.SortAsc = true
-	}
-	for _, status := range query["status"] {
-		params.Statuses = append(params.Statuses, authzPersistence.PolicyChangeStatus(status))
-	}
-	return params, nil
-}
-
-func parseUUID(raw string) (uuid.UUID, error) {
-	return uuid.Parse(strings.TrimSpace(raw))
 }
 
 func decodeStagePolicyRequests(r *http.Request) ([]dtos.StagePolicyRequest, error) {
@@ -728,19 +498,16 @@ func decodeStagePolicyRequests(r *http.Request) ([]dtos.StagePolicyRequest, erro
 		if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
 			return nil, err
 		}
-		trimmed := bytes.TrimSpace(raw)
+		trimmed := bytesTrimSpace(raw)
 		if len(trimmed) == 0 {
-			return nil, errors.New("stage payload is empty")
+			return nil, errors.New("empty payload")
 		}
 		if trimmed[0] == '[' {
-			var payloads []dtos.StagePolicyRequest
-			if err := json.Unmarshal(trimmed, &payloads); err != nil {
+			var payload []dtos.StagePolicyRequest
+			if err := json.Unmarshal(trimmed, &payload); err != nil {
 				return nil, err
 			}
-			if len(payloads) == 0 {
-				return nil, errors.New("stage payload is empty")
-			}
-			return payloads, nil
+			return payload, nil
 		}
 		var payload dtos.StagePolicyRequest
 		if err := json.Unmarshal(trimmed, &payload); err != nil {
@@ -779,253 +546,6 @@ func decodeStagePolicyRequest(r *http.Request) (dtos.StagePolicyRequest, error) 
 	}, nil
 }
 
-func decodePolicyDraftRequest(r *http.Request) (dtos.PolicyDraftRequest, error) {
-	contentType := strings.ToLower(r.Header.Get("Content-Type"))
-	if strings.Contains(contentType, "application/json") {
-		var payload dtos.PolicyDraftRequest
-		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
-			return dtos.PolicyDraftRequest{}, err
-		}
-		return payload, nil
-	}
-	if err := r.ParseForm(); err != nil {
-		return dtos.PolicyDraftRequest{}, err
-	}
-	diff := strings.TrimSpace(r.FormValue("diff"))
-	var diffMsg json.RawMessage
-	if diff != "" {
-		diffMsg = json.RawMessage(diff)
-	}
-	return dtos.PolicyDraftRequest{
-		Object:        r.FormValue("object"),
-		Action:        r.FormValue("action"),
-		Reason:        r.FormValue("reason"),
-		BaseRevision:  r.FormValue("base_revision"),
-		Domain:        r.FormValue("domain"),
-		Subject:       r.FormValue("subject"),
-		Diff:          diffMsg,
-		RequestAccess: r.FormValue("request_access") == "1" || strings.EqualFold(r.FormValue("request_access"), "true"),
-	}, nil
-}
-
-func (c *AuthzAPIController) buildDraftFromStage(
-	ctx context.Context,
-	tenantID uuid.UUID,
-	currentUser user.User,
-	payload dtos.PolicyDraftRequest,
-	policyService *services.PolicyDraftService,
-) (dtos.PolicyDraftRequest, error) {
-	key := policyStageKey(currentUser.ID(), tenantID)
-	subject := strings.TrimSpace(payload.Subject)
-	domain := strings.TrimSpace(payload.Domain)
-	entries := c.stageStore.List(key, subject, domain)
-	if len(entries) == 0 {
-		return payload, errors.New("暂无可提交的暂存规则")
-	}
-	if subject == "" {
-		subject = entries[0].Subject
-	}
-	filtered := make([]dtos.StagedPolicyEntry, 0, len(entries))
-	for _, entry := range entries {
-		if entry.Subject != subject {
-			continue
-		}
-		if domain != "" && entry.Domain != domain {
-			continue
-		}
-		filtered = append(filtered, entry)
-	}
-	if len(filtered) == 0 {
-		return payload, errors.New("暂存规则与当前筛选不匹配")
-	}
-	first := filtered[0]
-	if strings.TrimSpace(first.Object) == "" || strings.TrimSpace(first.Action) == "" {
-		return payload, errors.New("暂存规则缺少对象或动作")
-	}
-
-	basePolicies, err := policyService.Policies(ctx)
-	if err != nil {
-		return payload, err
-	}
-	baseDoc := buildPolicyDocument(basePolicies)
-	updatedDoc, err := applyStageEntries(baseDoc, filtered)
-	if err != nil {
-		return payload, err
-	}
-	diffBytes, err := diffPolicyDocuments(baseDoc, updatedDoc)
-	if err != nil {
-		return payload, err
-	}
-	logrus.WithFields(logrus.Fields{
-		"stage_count": len(filtered),
-		"subject":     first.Subject,
-		"domain":      first.Domain,
-		"object":      first.Object,
-		"action":      first.Action,
-	}).Debug("authz stage draft build")
-	if logger := composables.UseLogger(ctx); logger != nil {
-		logger.WithFields(logrus.Fields{
-			"subject": first.Subject,
-			"domain":  first.Domain,
-			"object":  first.Object,
-			"action":  first.Action,
-		}).Info("authz stage draft build")
-	}
-	payload.Subject = subject
-	payload.Domain = domain
-	if strings.TrimSpace(payload.Object) == "" {
-		payload.Object = first.Object
-	}
-	if strings.TrimSpace(payload.Action) == "" {
-		payload.Action = first.Action
-	}
-	payload.Diff = diffBytes
-	c.stageStore.Clear(key, subject, domain)
-	return payload, nil
-}
-
-func buildPolicyDocument(entries []services.PolicyEntry) map[string][][]string {
-	doc := map[string][][]string{}
-	ensurePolicyType(doc, "p")
-	ensurePolicyType(doc, "g")
-	for _, entry := range entries {
-		values := policyValuesFromService(entry)
-		ensurePolicyType(doc, entry.Type)
-		doc[entry.Type] = append(doc[entry.Type], values)
-	}
-	return doc
-}
-
-func applyStageEntries(baseDoc map[string][][]string, staged []dtos.StagedPolicyEntry) (map[string][][]string, error) {
-	updated := clonePolicyDocument(baseDoc)
-	index := buildPolicyIndex(updated)
-
-	for _, entry := range staged {
-		values := policyValuesFromDTO(entry.PolicyEntryResponse)
-		typ := entry.Type
-		if typ == "" {
-			typ = "p"
-		}
-		ensurePolicyType(updated, typ)
-		ensurePolicyIndex(index, typ)
-		key := policyValueKey(values)
-
-		switch entry.StageKind {
-		case "remove":
-			idx, ok := index[typ][key]
-			if !ok {
-				return nil, errors.New("待撤销的策略不存在")
-			}
-			updated[typ] = append(updated[typ][:idx], updated[typ][idx+1:]...)
-			index[typ] = buildIndexForType(updated[typ])
-		default:
-			if _, exists := index[typ][key]; exists {
-				continue
-			}
-			updated[typ] = append(updated[typ], values)
-			index[typ][key] = len(updated[typ]) - 1
-		}
-	}
-	return updated, nil
-}
-
-func diffPolicyDocuments(baseDoc, updatedDoc map[string][][]string) (json.RawMessage, error) {
-	before, err := json.Marshal(baseDoc)
-	if err != nil {
-		return nil, err
-	}
-	after, err := json.Marshal(updatedDoc)
-	if err != nil {
-		return nil, err
-	}
-	patch, err := jsondiff.CompareJSON(before, after)
-	if err != nil {
-		return nil, err
-	}
-	if len(patch) == 0 {
-		return nil, errors.New("暂无可提交的策略变更")
-	}
-	return json.Marshal(patch)
-}
-
-func policyValuesFromService(entry services.PolicyEntry) []string {
-	switch entry.Type {
-	case "g", "g2":
-		return []string{
-			entry.Subject,
-			entry.Object,
-			entry.Domain,
-		}
-	default:
-		return []string{
-			entry.Subject,
-			entry.Domain,
-			entry.Object,
-			entry.Action,
-			entry.Effect,
-		}
-	}
-}
-
-func policyValuesFromDTO(entry dtos.PolicyEntryResponse) []string {
-	switch entry.Type {
-	case "g", "g2":
-		return []string{
-			entry.Subject,
-			entry.Object,
-			entry.Domain,
-		}
-	default:
-		return []string{
-			entry.Subject,
-			entry.Domain,
-			entry.Object,
-			entry.Action,
-			entry.Effect,
-		}
-	}
-}
-
-func ensurePolicyType(doc map[string][][]string, typ string) {
-	if _, ok := doc[typ]; !ok {
-		doc[typ] = [][]string{}
-	}
-}
-
-func ensurePolicyIndex(index map[string]map[string]int, typ string) {
-	if _, ok := index[typ]; !ok {
-		index[typ] = map[string]int{}
-	}
-}
-
-func clonePolicyDocument(doc map[string][][]string) map[string][][]string {
-	cloned := make(map[string][][]string, len(doc))
-	for typ, rows := range doc {
-		items := make([][]string, 0, len(rows))
-		for _, row := range rows {
-			items = append(items, append([]string(nil), row...))
-		}
-		cloned[typ] = items
-	}
-	return cloned
-}
-
-func buildPolicyIndex(doc map[string][][]string) map[string]map[string]int {
-	index := map[string]map[string]int{}
-	for typ, rows := range doc {
-		index[typ] = buildIndexForType(rows)
-	}
-	return index
-}
-
-func buildIndexForType(rows [][]string) map[string]int {
-	lookup := map[string]int{}
-	for i, row := range rows {
-		lookup[policyValueKey(row)] = i
-	}
-	return lookup
-}
-
-func policyValueKey(values []string) string {
-	return strings.Join(values, "|")
+func bytesTrimSpace(b []byte) []byte {
+	return []byte(strings.TrimSpace(string(b)))
 }

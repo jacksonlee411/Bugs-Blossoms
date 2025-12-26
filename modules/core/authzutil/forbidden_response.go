@@ -10,18 +10,16 @@ import (
 
 // ForbiddenPayload represents the unified forbidden response contract.
 type ForbiddenPayload struct {
-	Error           string                   `json:"error"`
-	Message         string                   `json:"message"`
-	Object          string                   `json:"object"`
-	Action          string                   `json:"action"`
-	Subject         string                   `json:"subject"`
-	Domain          string                   `json:"domain"`
-	MissingPolicies []authz.MissingPolicy    `json:"missing_policies"`
-	SuggestDiff     []authz.PolicySuggestion `json:"suggest_diff"`
-	RequestURL      string                   `json:"request_url"`
-	DebugURL        string                   `json:"debug_url"`
-	BaseRevision    string                   `json:"base_revision,omitempty"`
-	RequestID       string                   `json:"request_id,omitempty"`
+	Error           string                `json:"error"`
+	Message         string                `json:"message"`
+	Object          string                `json:"object"`
+	Action          string                `json:"action"`
+	Subject         string                `json:"subject"`
+	Domain          string                `json:"domain"`
+	MissingPolicies []authz.MissingPolicy `json:"missing_policies"`
+	DebugURL        string                `json:"debug_url"`
+	BaseRevision    string                `json:"base_revision,omitempty"`
+	RequestID       string                `json:"request_id,omitempty"`
 }
 
 // BuildForbiddenPayload constructs a forbidden payload using view state and request context.
@@ -30,7 +28,6 @@ func BuildForbiddenPayload(r *http.Request, state *authz.ViewState, object, acti
 	domain := DomainFromContext(r.Context())
 	subject := ""
 	var missingPolicies []authz.MissingPolicy
-	var suggestDiff []authz.PolicySuggestion
 	baseRevision := BaseRevision(r.Context())
 	requestID := RequestIDFromRequest(r)
 
@@ -40,9 +37,6 @@ func BuildForbiddenPayload(r *http.Request, state *authz.ViewState, object, acti
 			domain = state.Tenant
 		}
 		missingPolicies = append(missingPolicies, state.MissingPolicies...)
-		for _, policy := range state.MissingPolicies {
-			suggestDiff = append(suggestDiff, state.SuggestDiff(policy)...)
-		}
 	}
 
 	if len(missingPolicies) == 0 && object != "" && normalizedAction != "" {
@@ -67,14 +61,12 @@ func BuildForbiddenPayload(r *http.Request, state *authz.ViewState, object, acti
 
 	return ForbiddenPayload{
 		Error:           "forbidden",
-		Message:         fmt.Sprintf("Forbidden: %s %s. 如需申请权限，请访问 /core/api/authz/requests。", object, normalizedAction),
+		Message:         fmt.Sprintf("Forbidden: %s %s.", object, normalizedAction),
 		Object:          object,
 		Action:          normalizedAction,
 		Subject:         subject,
 		Domain:          domain,
 		MissingPolicies: missingPolicies,
-		SuggestDiff:     suggestDiff,
-		RequestURL:      "/core/api/authz/requests",
 		DebugURL:        debugURL,
 		BaseRevision:    baseRevision,
 		RequestID:       requestID,

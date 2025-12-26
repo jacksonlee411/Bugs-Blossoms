@@ -48,7 +48,6 @@ type PolicyMatrixProps struct {
 
 	CanDebug   bool
 	CanStage   bool
-	CanRequest bool
 }
 
 func totalPages(total, limit int) int {
@@ -96,39 +95,14 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							Attrs: templ.Attributes{
 								"type":   "button",
 								"@click": "$dispatch('open-stage-policy')",
+								"data-testid": "authz-role-stage-open",
 							},
 						}) {
 							{ pageCtx.T("Create") }
 						}
 					</div>
 				} else {
-					if props.CanRequest {
-						<form
-							class="flex items-center gap-2"
-							hx-post="/core/api/authz/requests"
-							hx-target="body"
-							hx-swap="none"
-							data-loading-label={ pageCtx.T("Authz.PolicyInspector.Loading") }
-							hx-on::before-request="this.querySelector('button').disabled=true; this.querySelector('button').dataset.originalText=this.querySelector('button').innerText; this.querySelector('button').innerText=(this.dataset.loadingLabel||this.querySelector('button').innerText);"
-							hx-on::after-request="this.querySelector('button').disabled=false; if(this.querySelector('button').dataset.originalText){this.querySelector('button').innerText=this.querySelector('button').dataset.originalText;}"
-						>
-							<input type="hidden" name="object" value="core.roles"/>
-							<input type="hidden" name="action" value="update"/>
-							<input type="hidden" name="domain" value={ props.Domain }/>
-							<input type="hidden" name="diff" value="[]"/>
-							<input type="hidden" name="request_access" value="1"/>
-							<input type="hidden" name="reason" value={ pageCtx.T("Authz.Requests.DefaultReason.Roles") }/>
-							<button class="btn btn-sm btn-primary" type="submit">
-								{ pageCtx.T("Authz.Unauthorized.Apply") }
-							</button>
-							<span class="text-xs text-secondary-300">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
-						</form>
-					} else {
-						<span class="text-sm text-secondary-300">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
-					}
-				}
-				if !props.CanDebug {
-					<span class="text-sm text-error-400">{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
+					<span class="text-sm text-secondary-300">{ pageCtx.T("Authz.Unauthorized.ReadOnlyHint") }</span>
 				}
 			</div>
 			<div class="w-full flex items-center justify-between text-xs text-secondary-300">
@@ -203,7 +177,6 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 							<label class="text-sm text-secondary-200">{ pageCtx.T("Authz.Effect") }</label>
 							<select name="effect" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
 								<option value="allow" selected>{ pageCtx.T("Authz.EffectAllow") }</option>
-								<option value="deny">{ pageCtx.T("Authz.EffectDeny") }</option>
 							</select>
 						</div>
 					</template>
@@ -279,6 +252,7 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 						Size: button.SizeSM,
 						Attrs: templ.Attributes{
 							"type": "submit",
+							"data-testid": "authz-role-stage-save",
 						},
 					}) {
 						{ pageCtx.T("Save") }
@@ -458,11 +432,9 @@ templ PolicyMatrix(props *PolicyMatrixProps) {
 			StagedCount:   props.StageTotal,
 			Summary:       props.StageSummary,
 			Preview:       props.StagePreview,
-			SubmitURL:     "/core/api/authz/requests",
+			SubmitURL:     "/core/api/authz/policies/apply",
 			ClearURL:      clearURL,
-			RequestObject: "core.roles",
-			RequestAction: "update",
-			DefaultReason: pageCtx.T("Authz.Requests.DefaultReason.Roles"),
+			DefaultReason: pageCtx.T("Authz.Policies.DefaultReason.Roles"),
 		})
 	</div>
 }

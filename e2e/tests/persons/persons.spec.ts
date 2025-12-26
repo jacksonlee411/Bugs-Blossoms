@@ -43,15 +43,9 @@ test.describe('persons list page and authz gating', () => {
 		await expect(container).toHaveAttribute('data-domain', 'person');
 		await expect(container).toHaveAttribute('data-object', 'person.persons');
 		await expect(container).toHaveAttribute('data-action', 'list');
-		await expect(container).toHaveAttribute('data-request-url', '/core/api/authz/requests');
+		await expect(container).toHaveAttribute('data-debug-url', /\\/core\\/api\\/authz\\/debug/);
 		await expect(container).toHaveAttribute('data-base-revision', /.+/);
 		await expect(page.locator('[data-policy-inspector]')).toHaveCount(0);
-		const applyButton = page.getByRole('button', { name: /Request access/i });
-		if (await applyButton.count()) {
-			await expect(applyButton).toBeVisible();
-		} else {
-			await expect(page.getByRole('link', { name: /Request access/i })).toBeVisible();
-		}
 
 		const apiResponse = await page.request.get('/person/persons', {
 			headers: { Accept: 'application/json', 'X-Request-ID': 'e2e-person-req' },

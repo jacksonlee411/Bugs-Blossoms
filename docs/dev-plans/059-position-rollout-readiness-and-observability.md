@@ -61,7 +61,7 @@
   - 命令入口：`Makefile`
   - CI 门禁：`.github/workflows/quality-gates.yml`
   - Org 工具链：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
-  - Authz 流程：`docs/runbooks/AUTHZ-BOT.md`
+  - Authz 流程（015C）：`docs/runbooks/authz-policy-apply-api.md`
   - Outbox 与排障：`docs/runbooks/transactional-outbox.md`
 
 ## 3. 架构与关键决策 (Architecture & Decisions)
