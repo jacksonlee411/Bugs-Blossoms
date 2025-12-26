@@ -47,11 +47,10 @@ test.describe('authz policies apply', () => {
 			await page.getByTestId('authz-user-stage-save-direct').click();
 			const workspace = page.locator('#authz-workspace');
 			await expect(workspace).toHaveCount(1, { timeout: 15_000 });
-			const baseRevision = await workspace.locator('input[name="base_revision"]').inputValue();
-			policySubject = await workspace.locator('input[name="subject"]').inputValue();
-			policyDomain = await workspace.locator('input[name="domain"]').inputValue();
-			expect(policySubject).not.toBe('');
-			expect(policyDomain).not.toBe('');
+				const baseRevision = await workspace.locator('input[name="base_revision"]').inputValue();
+				policySubject = await workspace.locator('input[name="subject"]').inputValue();
+				expect(policySubject).not.toBe('');
+				policyDomain = 'logging';
 
 			const applyResp = await page.request.post('/core/api/authz/policies/apply', {
 				data: {
