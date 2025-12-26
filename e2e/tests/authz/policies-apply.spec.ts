@@ -17,18 +17,19 @@ test.describe('authz policies apply', () => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
 		await waitForAlpine(page);
 
-		await page.goto('/users', { waitUntil: 'domcontentloaded' });
+		await page.goto('/users?Search=noperson@example.com', { waitUntil: 'domcontentloaded' });
+		await expect(page.locator('#users-table-body')).toBeVisible();
 
-		const row = page.locator('tr', { hasText: 'noperson@example.com' }).first();
-		await expect(row).toBeVisible();
+		const userEditLink = page.locator('#users-table-body a[href^="/users/"]').first();
+		await expect(userEditLink).toBeVisible();
+		await userEditLink.click();
+		await expect(page).toHaveURL(/\/users\/[0-9]+$/);
+		const userURL = page.url();
 
-		const policiesLink = row.locator('a[href$="/policies"]').first();
-		await expect(policiesLink).toBeVisible();
-		await policiesLink.click();
-		await expect(page).toHaveURL(/\/users\/[0-9]+\/policies/);
-		const policiesURL = page.url();
+		await page.locator('button', { hasText: /permissions/i }).first().click();
+		await expect(page.locator('#user-policy-board')).toBeVisible();
 
-		const domainInput = page.locator('form input[name="domain"]').first();
+		const domainInput = page.locator('#user-policy-board form input[name="domain"]').first();
 		await domainInput.fill('logging');
 		await domainInput.dispatchEvent('change');
 		await expect(page.locator('[title="logging"]').first()).toBeVisible();
@@ -67,7 +68,12 @@ test.describe('authz policies apply', () => {
 		await login(page, 'test@gmail.com', 'TestPass123!');
 		await waitForAlpine(page);
 
-		await page.goto(`${policiesURL}?domain=logging`, { waitUntil: 'domcontentloaded' });
+		await page.goto(userURL, { waitUntil: 'domcontentloaded' });
+		await page.locator('button', { hasText: /permissions/i }).first().click();
+		await expect(page.locator('#user-policy-board')).toBeVisible();
+		const domainInput2 = page.locator('#user-policy-board form input[name="domain"]').first();
+		await domainInput2.fill('logging');
+		await domainInput2.dispatchEvent('change');
 		await expect(page.locator('[title="logging"]').first()).toBeVisible();
 
 		const directColumn = page.locator('#user-policy-direct');
