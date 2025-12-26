@@ -37,9 +37,11 @@ test.describe('authz policies apply', () => {
 		await expect(domainInput).toHaveValue('logging');
 		await expect(page).toHaveURL(/domain=logging/, { timeout: 15_000 });
 
-		await page.evaluate(() => {
-			window.dispatchEvent(new CustomEvent('open-stage-policy-direct'));
+		const addMenuDetails = page.locator('details:has([data-testid="authz-user-stage-menu"])').first();
+		await addMenuDetails.evaluate(el => {
+			(el as unknown as { open: boolean }).open = true;
 		});
+		await page.getByTestId('authz-user-stage-open-direct').click();
 
 		const stageDialog = page.locator('#stage-policy-direct');
 		await expect(stageDialog).toBeVisible();
