@@ -29,7 +29,7 @@ test.describe('authz policies apply', () => {
 		await page.locator('button', { hasText: /permissions/i }).first().click();
 		await expect(page.locator('#user-policy-board')).toBeVisible();
 
-		const domainInput = page.locator('#user-policy-board form input[name="domain"]').first();
+			const domainInput = page.locator('#user-policy-board form[hx-get] input[name="domain"]').first();
 		await domainInput.click();
 		await domainInput.press('Control+A');
 		await domainInput.press('Backspace');
@@ -77,7 +77,7 @@ test.describe('authz policies apply', () => {
 		await page.goto(userURL, { waitUntil: 'domcontentloaded' });
 		await page.locator('button', { hasText: /permissions/i }).first().click();
 		await expect(page.locator('#user-policy-board')).toBeVisible();
-		const domainInput2 = page.locator('#user-policy-board form input[name="domain"]').first();
+			const domainInput2 = page.locator('#user-policy-board form[hx-get] input[name="domain"]').first();
 		await domainInput2.click();
 		await domainInput2.press('Control+A');
 		await domainInput2.press('Backspace');
