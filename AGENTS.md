@@ -58,6 +58,10 @@
 - 代码变更应是对文档契约的履行：文档是“意图”，代码是“实现”；若实现过程中发生范围/契约变化，应先更新计划文档再改代码。
 - 例外：仅修复拼写/格式、或不改变外部行为的极小重构，可不强制新增计划文档；但一旦涉及迁移、权限、接口、数据契约，必须按本条执行。
 
+### 3.4 AI 驱动开发：简单而非容易（Simple > Easy）
+
+使用 AI 辅助时，优先追求“简单（Simple）”而不是“容易（Easy）”：先写清边界、不变量、失败路径与验收标准（建议以 dev-plan/Spec 固化），再实现；拒绝补丁式堆叠分支、复制粘贴与相似文件增殖；任何新抽象必须可在 5 分钟内解释清楚、具备可替换性，并能对应到明确的业务约束（评审清单见 `docs/dev-plans/045-simple-not-easy-review-guide.md`）。
+
 ## 4. 架构与目录约束（DDD + CleanArchGuard）
 
 每个模块遵循 DDD 分层，依赖约束由 `.gocleanarch.yml` 定义，`make check lint` 会同时执行 golangci-lint 与 cleanarchguard。
@@ -168,6 +172,7 @@ modules/{module}/
 - 移除 ru/uz 多语言（DEV-PLAN-042）：`docs/dev-plans/042-remove-ru-uz-locales.md`
 - HTMX 操作异常统一反馈（DEV-PLAN-043）：`docs/dev-plans/043-ui-action-error-feedback.md`
 - UI 可视化验收与交互验证工具链（DEV-PLAN-044）：`docs/dev-plans/044-frontend-ui-verification-playbook.md`
+- AI 驱动开发的“简单而非容易”方案评审指引（DEV-PLAN-045）：`docs/dev-plans/045-simple-not-easy-review-guide.md`
 - 职位管理业务需求（DEV-PLAN-050）：`docs/dev-plans/050-position-management-business-requirements.md`
 - 职位管理实施蓝图（DEV-PLAN-051）：`docs/dev-plans/051-position-management-implementation-blueprint.md`
 - DEV-PLAN-051 Readiness：`docs/dev-records/DEV-PLAN-051-READINESS.md`
