@@ -143,6 +143,7 @@ modules/{module}/
 - 多 worktree 共享本地开发基础设施（DEV-PLAN-011C）：`docs/dev-plans/011C-worktree-shared-local-dev-infra.md`
 - Core 用户权限页 IA 优化：`docs/dev-plans/016A-core-users-permissions-ia.md`
 - Core 用户权限页签 UI/交互优化：`docs/dev-plans/016B-core-users-permissions-ui.md`
+- Authz（Casbin）模块“简单而非容易”评审发现与整改计划（DEV-PLAN-016C）：`docs/dev-plans/016C-authz-simple-not-easy-audit.md`
 - Transactional Outbox 工具链（DEV-PLAN-017）：`docs/dev-plans/017-transactional-outbox.md`
 - DEV-PLAN-017 Readiness：`docs/dev-records/DEV-PLAN-017-READINESS.md`
 - DEV-PLAN-029 Readiness：`docs/dev-records/DEV-PLAN-029-READINESS.md`
