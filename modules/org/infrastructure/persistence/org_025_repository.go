@@ -205,7 +205,7 @@ func (r *OrgRepository) UpdateNodeSliceEffectiveDate(ctx context.Context, tenant
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET effective_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), effectiveDate.UTC())
+	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET effective_date=$3, effective_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), effectiveDate.UTC(), pgEffectiveOnFromEffectiveDate(effectiveDate))
 	return err
 }
 
@@ -214,7 +214,7 @@ func (r *OrgRepository) UpdateNodeSliceEndDate(ctx context.Context, tenantID uui
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET end_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate.UTC())
+	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET end_date=$3, end_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate.UTC(), pgEndOnFromEndDate(endDate))
 	return err
 }
 
@@ -346,7 +346,7 @@ func (r *OrgRepository) UpdateAssignmentEndDate(ctx context.Context, tenantID uu
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), endDate.UTC())
+	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3, end_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), endDate.UTC(), pgEndOnFromEndDate(endDate))
 	return err
 }
 

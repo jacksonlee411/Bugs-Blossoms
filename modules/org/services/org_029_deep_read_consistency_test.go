@@ -37,13 +37,25 @@ func TestOrg029DeepReadConsistency(t *testing.T) {
 	pool := newPoolWithQueryTracer(t, itf.DbOpts(dbName), &queryCountTracer{})
 	t.Cleanup(pool.Close)
 
-	schemaSQL := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "00001_org_baseline.sql")))
-	_, err := pool.Exec(ctx, schemaSQL)
-	require.NoError(t, err)
-
-	m029 := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "20251219090000_org_hierarchy_closure_and_snapshots.sql")))
-	_, err = pool.Exec(ctx, m029)
-	require.NoError(t, err)
+	files := []string{
+		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
+	}
+	for _, f := range files {
+		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
+		_, err := pool.Exec(ctx, sql)
+		require.NoError(t, err, "failed migration %s", f)
+	}
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ensureTenant(t, ctx, pool, tenantID)
@@ -55,7 +67,7 @@ func TestOrg029DeepReadConsistency(t *testing.T) {
 	repo := persistence.NewOrgRepository()
 	reqCtx := composables.WithPool(ctx, pool)
 
-	_, err = repo.BuildDeepReadClosure(reqCtx, tenantID, "OrgUnit", true, "test")
+	_, err := repo.BuildDeepReadClosure(reqCtx, tenantID, "OrgUnit", true, "test")
 	require.NoError(t, err)
 	_, err = repo.BuildDeepReadSnapshot(reqCtx, tenantID, "OrgUnit", asOfDate, true, "test")
 	require.NoError(t, err)
@@ -101,17 +113,25 @@ func TestOrg029RoleAssignmentsConsistency(t *testing.T) {
 	pool := newPoolWithQueryTracer(t, itf.DbOpts(dbName), &queryCountTracer{})
 	t.Cleanup(pool.Close)
 
-	schemaSQL := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "00001_org_baseline.sql")))
-	_, err := pool.Exec(ctx, schemaSQL)
-	require.NoError(t, err)
-
-	m028 := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "20251218005114_org_placeholders_and_event_contracts.sql")))
-	_, err = pool.Exec(ctx, m028)
-	require.NoError(t, err)
-
-	m029 := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "20251219090000_org_hierarchy_closure_and_snapshots.sql")))
-	_, err = pool.Exec(ctx, m029)
-	require.NoError(t, err)
+	files := []string{
+		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
+	}
+	for _, f := range files {
+		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
+		_, err := pool.Exec(ctx, sql)
+		require.NoError(t, err, "failed migration %s", f)
+	}
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ensureTenant(t, ctx, pool, tenantID)
@@ -124,7 +144,7 @@ func TestOrg029RoleAssignmentsConsistency(t *testing.T) {
 	targetID := nodes[len(nodes)-1].ID
 
 	var roleID uuid.UUID
-	err = pool.QueryRow(ctx, `
+	err := pool.QueryRow(ctx, `
 INSERT INTO org_roles (tenant_id, code, name, description, is_system)
 VALUES ($1, 'Org.Admin', 'Org Admin', NULL, true)
 RETURNING id
@@ -134,18 +154,25 @@ RETURNING id
 	subjectID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("subject:029"))
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_role_assignments (tenant_id, role_id, subject_type, subject_id, org_node_id, effective_date, end_date)
-VALUES ($1,$2,'user',$3,$4,$5,$6)
-`, tenantID, roleID, subjectID, rootID, asOfDate, endDate)
+INSERT INTO org_role_assignments (tenant_id, role_id, subject_type, subject_id, org_node_id, effective_date, end_date, effective_on, end_on)
+VALUES (
+	$1,$2,'user',$3,$4,$5,$6,
+	($5 AT TIME ZONE 'UTC')::date,
+	CASE
+		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+	END
+)
+	`, tenantID, roleID, subjectID, rootID, asOfDate, endDate)
 	require.NoError(t, err)
 
 	repo := persistence.NewOrgRepository()
 	reqCtx := composables.WithPool(ctx, pool)
 
-	_, err = repo.BuildDeepReadClosure(reqCtx, tenantID, "OrgUnit", true, "test")
-	require.NoError(t, err)
-	_, err = repo.BuildDeepReadSnapshot(reqCtx, tenantID, "OrgUnit", asOfDate, true, "test")
-	require.NoError(t, err)
+	_, buildErr := repo.BuildDeepReadClosure(reqCtx, tenantID, "OrgUnit", true, "test")
+	require.NoError(t, buildErr)
+	_, buildErr = repo.BuildDeepReadSnapshot(reqCtx, tenantID, "OrgUnit", asOfDate, true, "test")
+	require.NoError(t, buildErr)
 
 	rowsEdges, err := repo.ListRoleAssignmentsAsOf(reqCtx, tenantID, "OrgUnit", targetID, asOfDate, true, orgsvc.DeepReadBackendEdges, nil, nil, nil)
 	require.NoError(t, err)
@@ -178,13 +205,25 @@ func TestOrg029DeepReadQueryBudget(t *testing.T) {
 	pool := newPoolWithQueryTracer(t, itf.DbOpts(dbName), tracer)
 	t.Cleanup(pool.Close)
 
-	schemaSQL := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "00001_org_baseline.sql")))
-	_, err := pool.Exec(ctx, schemaSQL)
-	require.NoError(t, err)
-
-	m029 := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "20251219090000_org_hierarchy_closure_and_snapshots.sql")))
-	_, err = pool.Exec(ctx, m029)
-	require.NoError(t, err)
+	files := []string{
+		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
+	}
+	for _, f := range files {
+		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
+		_, err := pool.Exec(ctx, sql)
+		require.NoError(t, err, "failed migration %s", f)
+	}
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ensureTenant(t, ctx, pool, tenantID)
@@ -196,7 +235,7 @@ func TestOrg029DeepReadQueryBudget(t *testing.T) {
 	repo := persistence.NewOrgRepository()
 	reqCtx := composables.WithPool(ctx, pool)
 
-	_, err = repo.BuildDeepReadClosure(reqCtx, tenantID, "OrgUnit", true, "test")
+	_, err := repo.BuildDeepReadClosure(reqCtx, tenantID, "OrgUnit", true, "test")
 	require.NoError(t, err)
 	_, err = repo.BuildDeepReadSnapshot(reqCtx, tenantID, "OrgUnit", asOfDate, true, "test")
 	require.NoError(t, err)
@@ -247,16 +286,30 @@ func seedOrgTreeFromNodes(tb testing.TB, ctx context.Context, pool *pgxpool.Pool
 	}
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_node_slices
-			(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date, effective_on, end_on)
+				VALUES (
+					$1,$2,$3,$4,$5,$6,$7,
+					($6 AT TIME ZONE 'UTC')::date,
+					CASE
+						WHEN ($7 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+						ELSE ((($7 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+					END
+				)`,
 			tenantID, n.ID, n.Code, n.DisplayOrder, n.ParentID, asOf, endDate,
 		)
 		require.NoError(tb, err)
 	}
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_edges
-			(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
-			VALUES ($1,$2,$3,$4,$5,$6)`,
+				(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
+				VALUES (
+					$1,$2,$3,$4,$5,$6,
+					($5 AT TIME ZONE 'UTC')::date,
+					CASE
+						WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+						ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+					END
+				)`,
 			tenantID, "OrgUnit", n.ParentID, n.ID, asOf, endDate,
 		)
 		require.NoError(tb, err)

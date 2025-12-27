@@ -35,6 +35,7 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251220160000_org_position_slices_and_fte.sql",
 		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
 		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -47,14 +48,28 @@ func seedOrgPosition(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, ten
 	tb.Helper()
 
 	_, err := pool.Exec(ctx, `
-INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
-VALUES ($1,$2,$3,$4,'active',false,$5,$6)
+INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date, effective_on, end_on)
+VALUES (
+	$1,$2,$3,$4,'active',false,$5,$6,
+	($5 AT TIME ZONE 'UTC')::date,
+	CASE
+		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+	END
+)
 `, tenantID, positionID, orgNodeID, code, effectiveDate, endDate)
 	require.NoError(tb, err)
 
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date)
-VALUES ($1,$2,$3,'active',$4::numeric(9,2),$5,$6)
+INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date, effective_on, end_on)
+VALUES (
+	$1,$2,$3,'active',$4::numeric(9,2),$5,$6,
+	($5 AT TIME ZONE 'UTC')::date,
+	CASE
+		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+	END
+)
 `, tenantID, positionID, orgNodeID, capacityFTE, effectiveDate, endDate)
 	require.NoError(tb, err)
 }

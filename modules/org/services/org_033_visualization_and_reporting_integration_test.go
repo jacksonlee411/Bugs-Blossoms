@@ -37,13 +37,25 @@ func TestOrg033NodePathAndExport(t *testing.T) {
 	pool := newPoolWithQueryTracer(t, itf.DbOpts(dbName), &queryCountTracer{})
 	t.Cleanup(pool.Close)
 
-	schemaSQL := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "00001_org_baseline.sql")))
-	_, err := pool.Exec(ctx, schemaSQL)
-	require.NoError(t, err)
-
-	m029 := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "20251219090000_org_hierarchy_closure_and_snapshots.sql")))
-	_, err = pool.Exec(ctx, m029)
-	require.NoError(t, err)
+	files := []string{
+		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
+	}
+	for _, f := range files {
+		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
+		_, err := pool.Exec(ctx, sql)
+		require.NoError(t, err, "failed migration %s", f)
+	}
 
 	tenantID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	ensureTenant(t, ctx, pool, tenantID)
@@ -130,15 +142,29 @@ func TestOrg033PersonPath(t *testing.T) {
 	positionID := uuid.New()
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 	_, err = pool.Exec(ctx, `
-	INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
-	VALUES ($1,$2,$3,'P-1','active',false,$4,$5)
-	`, tenantID, positionID, targetNodeID, asOf, endDate)
+		INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date, effective_on, end_on)
+		VALUES (
+			$1,$2,$3,'P-1','active',false,$4,$5,
+			($4 AT TIME ZONE 'UTC')::date,
+			CASE
+				WHEN ($5 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+				ELSE ((($5 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+			END
+		)
+		`, tenantID, positionID, targetNodeID, asOf, endDate)
 	require.NoError(t, err)
 
 	_, err = pool.Exec(ctx, `
-	INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date)
-	VALUES ($1,$2,$3,'active',1.0::numeric(9,2),$4,$5)
-	`, tenantID, positionID, targetNodeID, asOf, endDate)
+		INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date, effective_on, end_on)
+		VALUES (
+			$1,$2,$3,'active',1.0::numeric(9,2),$4,$5,
+			($4 AT TIME ZONE 'UTC')::date,
+			CASE
+				WHEN ($5 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+				ELSE ((($5 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+			END
+		)
+		`, tenantID, positionID, targetNodeID, asOf, endDate)
 	require.NoError(t, err)
 
 	personUUID := uuid.New()
@@ -150,9 +176,16 @@ VALUES ($1,$2,'000123','Test Person','active')
 
 	assignmentID := uuid.New()
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_assignments (tenant_id, id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, effective_date, end_date)
-VALUES ($1,$2,$3,'person',$4,'000123','primary',true,$5,$6)
-`, tenantID, assignmentID, positionID, personUUID, asOf, endDate)
+	INSERT INTO org_assignments (tenant_id, id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, effective_date, end_date, effective_on, end_on)
+	VALUES (
+		$1,$2,$3,'person',$4,'000123','primary',true,$5,$6,
+		($5 AT TIME ZONE 'UTC')::date,
+		CASE
+			WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+			ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+		END
+	)
+	`, tenantID, assignmentID, positionID, personUUID, asOf, endDate)
 	require.NoError(t, err)
 
 	repo := persistence.NewOrgRepository()
@@ -231,11 +264,17 @@ func applyAllOrgMigrationsFor033(tb testing.TB, ctx context.Context, pool *pgxpo
 
 	files := []string{
 		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
 		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
 		"20251219195000_org_security_group_mappings_and_links.sql",
 		"20251219220000_org_reporting_nodes_and_view.sql",
 		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

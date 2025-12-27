@@ -96,7 +96,7 @@ func (c *OrgAPIController) GetStaffingSummary(w http.ResponseWriter, r *http.Req
 	out := response{
 		TenantID:      res.TenantID.String(),
 		OrgNodeID:     res.OrgNodeID.String(),
-		EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate: formatValidDate(res.EffectiveDate),
 		Scope:         string(res.Scope),
 		Totals: totals{
 			PositionsTotal: res.Totals.PositionsTotal,
@@ -228,7 +228,7 @@ func (c *OrgAPIController) GetStaffingVacancies(w http.ResponseWriter, r *http.R
 	out := response{
 		TenantID:      res.TenantID.String(),
 		OrgNodeID:     res.OrgNodeID.String(),
-		EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate: formatValidDate(res.EffectiveDate),
 		Scope:         string(res.Scope),
 		Items:         make([]item, 0, len(res.Items)),
 		Source: source{
@@ -256,7 +256,7 @@ func (c *OrgAPIController) GetStaffingVacancies(w http.ResponseWriter, r *http.R
 			OrgNodeID:      it.OrgNodeID.String(),
 			CapacityFTE:    it.CapacityFTE,
 			OccupiedFTE:    it.OccupiedFTE,
-			VacancySince:   it.VacancySince.UTC().Format(time.RFC3339),
+			VacancySince:   formatValidDate(it.VacancySince),
 			VacancyAgeDays: it.VacancyAgeDays,
 			JobLevelID:     jobLevelID,
 			PositionType:   it.PositionType,
@@ -577,7 +577,7 @@ func (c *OrgAPIController) exportStaffingVacancies(w http.ResponseWriter, r *htt
 			it.OrgNodeID.String(),
 			floatToString(it.CapacityFTE),
 			floatToString(it.OccupiedFTE),
-			it.VacancySince.UTC().Format(time.RFC3339),
+			formatValidDate(it.VacancySince),
 			strconv.Itoa(it.VacancyAgeDays),
 			jobLevelID,
 			it.PositionType,

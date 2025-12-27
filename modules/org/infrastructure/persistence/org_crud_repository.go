@@ -60,24 +60,26 @@ func (r *OrgRepository) InsertNodeSlice(ctx context.Context, tenantID uuid.UUID,
 
 	var id uuid.UUID
 	if err := tx.QueryRow(ctx, `
-INSERT INTO org_node_slices (
-	tenant_id,
-	org_node_id,
-	name,
+	INSERT INTO org_node_slices (
+		tenant_id,
+		org_node_id,
+		name,
 	i18n_names,
 	status,
 	legal_entity_id,
 	company_code,
 	location_id,
 	display_order,
-	parent_hint,
-	manager_user_id,
-	effective_date,
-	end_date
-)
-VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-RETURNING id
-	`,
+		parent_hint,
+		manager_user_id,
+		effective_date,
+		end_date,
+		effective_on,
+		end_on
+	)
+	VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+	RETURNING id
+		`,
 		pgUUID(tenantID),
 		pgUUID(nodeID),
 		slice.Name,
@@ -91,6 +93,8 @@ RETURNING id
 		pgNullableInt8(slice.ManagerUserID),
 		slice.EffectiveDate,
 		slice.EndDate,
+		pgEffectiveOnFromEffectiveDate(slice.EffectiveDate),
+		pgEndOnFromEndDate(slice.EndDate),
 	).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
@@ -104,10 +108,10 @@ func (r *OrgRepository) InsertEdge(ctx context.Context, tenantID uuid.UUID, hier
 	}
 	var id uuid.UUID
 	if err := tx.QueryRow(ctx, `
-INSERT INTO org_edges (tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
-VALUES ($1,$2,$3,$4,$5,$6)
-RETURNING id
-`, pgUUID(tenantID), hierarchyType, pgNullableUUID(parentID), pgUUID(childID), effectiveDate, endDate).Scan(&id); err != nil {
+	INSERT INTO org_edges (tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+	RETURNING id
+	`, pgUUID(tenantID), hierarchyType, pgNullableUUID(parentID), pgUUID(childID), effectiveDate, endDate, pgEffectiveOnFromEffectiveDate(effectiveDate), pgEndOnFromEndDate(endDate)).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	return id, nil
@@ -291,7 +295,7 @@ func (r *OrgRepository) TruncateNodeSlice(ctx context.Context, tenantID uuid.UUI
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET end_date=$3 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate)
+	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET end_date=$3, end_on=$4 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate, pgEndOnFromEndDate(endDate))
 	return err
 }
 
@@ -391,7 +395,7 @@ func (r *OrgRepository) TruncateEdge(ctx context.Context, tenantID uuid.UUID, ed
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_edges SET end_date=$3 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(edgeID), endDate)
+	_, err = tx.Exec(ctx, `UPDATE org_edges SET end_date=$3, end_on=$4 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(edgeID), endDate, pgEndOnFromEndDate(endDate))
 	return err
 }
 
@@ -420,40 +424,61 @@ func (r *OrgRepository) InsertAutoPosition(ctx context.Context, tenantID uuid.UU
 	}
 
 	_, err = tx.Exec(ctx, `
-	INSERT INTO org_positions (
-		tenant_id,
-		id,
-		org_node_id,
+		INSERT INTO org_positions (
+			tenant_id,
+			id,
+			org_node_id,
 		code,
-		status,
-		is_auto_created,
-		effective_date,
-		end_date
+			status,
+			is_auto_created,
+			effective_date,
+			end_date,
+			effective_on,
+			end_on
+		)
+		VALUES ($1,$2,$3,$4,'active',true,$5,$6,$7,$8)
+		ON CONFLICT (id) DO NOTHING
+		`,
+		pgUUID(tenantID),
+		pgUUID(positionID),
+		pgUUID(orgNodeID),
+		code,
+		effectiveDate,
+		time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC),
+		pgEffectiveOnFromEffectiveDate(effectiveDate),
+		pgEndOnFromEndDate(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)),
 	)
-	VALUES ($1,$2,$3,$4,'active',true,$5,$6)
-	ON CONFLICT (id) DO NOTHING
-	`, pgUUID(tenantID), pgUUID(positionID), pgUUID(orgNodeID), code, effectiveDate, time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
 	if err != nil {
 		return err
 	}
 
 	_, err = tx.Exec(ctx, `
-	INSERT INTO org_position_slices (
+		INSERT INTO org_position_slices (
 		tenant_id,
 		position_id,
 		org_node_id,
-		lifecycle_status,
-		capacity_fte,
-		effective_date,
-		end_date
+			lifecycle_status,
+			capacity_fte,
+			effective_date,
+			end_date,
+			effective_on,
+			end_on
+		)
+		SELECT $1,$2,$3,'active',1.0,$4,$5,$6,$7
+		WHERE NOT EXISTS (
+			SELECT 1
+			FROM org_position_slices s
+			WHERE s.tenant_id=$1 AND s.position_id=$2 AND s.effective_date=$4 AND s.end_date=$5
+		)
+		`,
+		pgUUID(tenantID),
+		pgUUID(positionID),
+		pgUUID(orgNodeID),
+		effectiveDate,
+		time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC),
+		pgEffectiveOnFromEffectiveDate(effectiveDate),
+		pgEndOnFromEndDate(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)),
 	)
-	SELECT $1,$2,$3,'active',1.0,$4,$5
-	WHERE NOT EXISTS (
-		SELECT 1
-		FROM org_position_slices s
-		WHERE s.tenant_id=$1 AND s.position_id=$2 AND s.effective_date=$4 AND s.end_date=$5
-	)
-	`, pgUUID(tenantID), pgUUID(positionID), pgUUID(orgNodeID), effectiveDate, time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
 	return err
 }
 
@@ -620,7 +645,7 @@ func (r *OrgRepository) TruncateAssignment(ctx context.Context, tenantID uuid.UU
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), endDate)
+	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3, end_on=$4 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), endDate, pgEndOnFromEndDate(endDate))
 	return err
 }
 
@@ -653,21 +678,23 @@ func (r *OrgRepository) InsertAssignment(ctx context.Context, tenantID uuid.UUID
 	}
 	var id uuid.UUID
 	if err := tx.QueryRow(ctx, `
-	INSERT INTO org_assignments (
-		tenant_id,
-		position_id,
-		subject_type,
+		INSERT INTO org_assignments (
+			tenant_id,
+			position_id,
+			subject_type,
 		subject_id,
 		pernr,
 		assignment_type,
-		is_primary,
-		allocated_fte,
-		effective_date,
-		end_date
-	)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-	RETURNING id
-	`, pgUUID(tenantID), pgUUID(assignment.PositionID), assignment.SubjectType, pgUUID(assignment.SubjectID), assignment.Pernr, assignment.AssignmentType, assignment.IsPrimary, assignment.AllocatedFTE, assignment.EffectiveDate, assignment.EndDate).Scan(&id); err != nil {
+			is_primary,
+			allocated_fte,
+			effective_date,
+			end_date,
+			effective_on,
+			end_on
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		RETURNING id
+		`, pgUUID(tenantID), pgUUID(assignment.PositionID), assignment.SubjectType, pgUUID(assignment.SubjectID), assignment.Pernr, assignment.AssignmentType, assignment.IsPrimary, assignment.AllocatedFTE, assignment.EffectiveDate, assignment.EndDate, pgEffectiveOnFromEffectiveDate(assignment.EffectiveDate), pgEndOnFromEndDate(assignment.EndDate)).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	return id, nil

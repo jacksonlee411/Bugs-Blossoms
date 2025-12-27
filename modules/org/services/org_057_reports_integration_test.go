@@ -52,11 +52,18 @@ func TestOrg057StaffingSummary_ComputesTotalsAndBreakdown(t *testing.T) {
 
 	subjectID := uuid.New()
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_assignments (
-	tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, effective_date, end_date
-)
-VALUES ($1,$2,'person',$3,'pernr-057-1','primary',true,1.0,$4,$5)
-`, tenantID, p2.PositionID, subjectID, time.Date(2025, 2, 15, 0, 0, 0, 0, time.UTC), time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
+	INSERT INTO org_assignments (
+		tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, effective_date, end_date, effective_on, end_on
+	)
+	VALUES (
+		$1,$2,'person',$3,'pernr-057-1','primary',true,1.0,$4,$5,
+		($4 AT TIME ZONE 'UTC')::date,
+		CASE
+			WHEN ($5 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+			ELSE ((($5 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+		END
+	)
+	`, tenantID, p2.PositionID, subjectID, time.Date(2025, 2, 15, 0, 0, 0, 0, time.UTC), time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 
 	res, err := svc.GetStaffingSummary(ctx, tenantID, orgsvc.StaffingSummaryInput{
@@ -101,11 +108,18 @@ func TestOrg057StaffingVacancies_ComputesVacancySince(t *testing.T) {
 
 	subjectID := uuid.New()
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_assignments (
-	tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, effective_date, end_date
-)
-VALUES ($1,$2,'person',$3,'pernr-057-2','primary',true,1.0,$4,$5)
-`, tenantID, pos.PositionID, subjectID, time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC), time.Date(2025, 2, 10, 0, 0, 0, 0, time.UTC))
+	INSERT INTO org_assignments (
+		tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, effective_date, end_date, effective_on, end_on
+	)
+	VALUES (
+		$1,$2,'person',$3,'pernr-057-2','primary',true,1.0,$4,$5,
+		($4 AT TIME ZONE 'UTC')::date,
+		CASE
+			WHEN ($5 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+			ELSE ((($5 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+		END
+	)
+	`, tenantID, pos.PositionID, subjectID, time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC), time.Date(2025, 2, 10, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 
 	asOfReport := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
@@ -148,13 +162,27 @@ func TestOrg057StaffingTimeToFill_ComputesSummaryAndBreakdown(t *testing.T) {
 
 	subjectID := uuid.New()
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_assignments (
-	tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, effective_date, end_date
-)
-VALUES
-	($1,$2,'person',$3,'pernr-057-3','primary',true,1.0,$4,$5),
-	($1,$2,'person',$3,'pernr-057-3','primary',true,1.0,$6,$7)
-`, tenantID,
+	INSERT INTO org_assignments (
+		tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, effective_date, end_date, effective_on, end_on
+	)
+	VALUES
+		(
+			$1,$2,'person',$3,'pernr-057-3','primary',true,1.0,$4,$5,
+			($4 AT TIME ZONE 'UTC')::date,
+			CASE
+				WHEN ($5 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+				ELSE ((($5 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+			END
+		),
+		(
+			$1,$2,'person',$3,'pernr-057-3','primary',true,1.0,$6,$7,
+			($6 AT TIME ZONE 'UTC')::date,
+			CASE
+				WHEN ($7 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+				ELSE ((($7 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+			END
+		)
+	`, tenantID,
 		pos.PositionID,
 		subjectID,
 		time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC),

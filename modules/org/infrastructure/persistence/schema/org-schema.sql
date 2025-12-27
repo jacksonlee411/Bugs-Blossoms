@@ -38,10 +38,13 @@ CREATE TABLE org_node_slices (
     manager_user_id bigint NULL,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_node_slices_status_check CHECK (status IN ('active', 'retired', 'rescinded')),
     CONSTRAINT org_node_slices_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_node_slices_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_node_slices_parent_hint_not_self CHECK (parent_hint IS NULL OR parent_hint <> org_node_id),
     CONSTRAINT org_node_slices_org_node_fk FOREIGN KEY (tenant_id, org_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT,
     CONSTRAINT org_node_slices_parent_hint_fk FOREIGN KEY (tenant_id, parent_hint) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT
@@ -56,9 +59,22 @@ ALTER TABLE org_node_slices
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, parent_hint gist_uuid_ops WITH =, lower(name) gist_text_ops WITH =, tstzrange( effective_date, end_date, '[)'
 ) WITH &&);
 
+ALTER TABLE org_node_slices
+    ADD CONSTRAINT org_node_slices_tenant_node_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
+
+ALTER TABLE org_node_slices
+    ADD CONSTRAINT org_node_slices_sibling_name_unique_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, parent_hint gist_uuid_ops WITH =, lower(name) gist_text_ops WITH =, daterange( effective_on, end_on + 1, '[)'
+) WITH &&);
+
 CREATE INDEX org_node_slices_tenant_node_effective_idx ON org_node_slices (tenant_id, org_node_id, effective_date);
 
 CREATE INDEX org_node_slices_tenant_parent_effective_idx ON org_node_slices (tenant_id, parent_hint, effective_date);
+
+CREATE INDEX org_node_slices_tenant_node_effective_on_idx ON org_node_slices (tenant_id, org_node_id, effective_on);
+
+CREATE INDEX org_node_slices_tenant_parent_effective_on_idx ON org_node_slices (tenant_id, parent_hint, effective_on);
 
 CREATE TABLE org_edges (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
@@ -70,10 +86,13 @@ CREATE TABLE org_edges (
     depth int NOT NULL,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_edges_hierarchy_type_check CHECK (hierarchy_type IN ('OrgUnit')),
     CONSTRAINT org_edges_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_edges_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_edges_parent_not_child CHECK (parent_node_id IS NULL OR parent_node_id <> child_node_id),
     CONSTRAINT org_edges_child_fk FOREIGN KEY (tenant_id, child_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT,
     CONSTRAINT org_edges_parent_fk FOREIGN KEY (tenant_id, parent_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT
@@ -83,11 +102,19 @@ ALTER TABLE org_edges
     ADD CONSTRAINT org_edges_single_parent_no_overlap
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, child_node_id gist_uuid_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
 
+ALTER TABLE org_edges
+    ADD CONSTRAINT org_edges_tenant_child_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, child_node_id gist_uuid_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
+
 CREATE INDEX org_edges_tenant_path_gist_idx ON org_edges USING gist (tenant_id gist_uuid_ops, path);
 
 CREATE INDEX org_edges_tenant_parent_effective_idx ON org_edges (tenant_id, parent_node_id, effective_date);
 
 CREATE INDEX org_edges_tenant_child_effective_idx ON org_edges (tenant_id, child_node_id, effective_date);
+
+CREATE INDEX org_edges_tenant_child_effective_on_idx ON org_edges (tenant_id, child_node_id, effective_on);
+
+CREATE INDEX org_edges_tenant_parent_effective_on_idx ON org_edges (tenant_id, parent_node_id, effective_on);
 
 CREATE OR REPLACE FUNCTION org_edges_set_path_depth_and_prevent_cycle ()
     RETURNS TRIGGER
@@ -199,8 +226,11 @@ CREATE TABLE org_hierarchy_closure (
     depth int NOT NULL,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     CONSTRAINT org_hierarchy_closure_hierarchy_type_check CHECK (hierarchy_type IN ('OrgUnit')),
     CONSTRAINT org_hierarchy_closure_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_hierarchy_closure_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_hierarchy_closure_depth_check CHECK (depth >= 0),
     CONSTRAINT org_hierarchy_closure_build_fk FOREIGN KEY (tenant_id, hierarchy_type, build_id) REFERENCES org_hierarchy_closure_builds (tenant_id, hierarchy_type, build_id) ON DELETE CASCADE,
     CONSTRAINT org_hierarchy_closure_ancestor_fk FOREIGN KEY (tenant_id, ancestor_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT,
@@ -210,6 +240,10 @@ CREATE TABLE org_hierarchy_closure (
 ALTER TABLE org_hierarchy_closure
     ADD CONSTRAINT org_hierarchy_closure_pair_window_no_overlap
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, hierarchy_type gist_text_ops WITH =, build_id gist_uuid_ops WITH =, ancestor_node_id gist_uuid_ops WITH =, descendant_node_id gist_uuid_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+
+ALTER TABLE org_hierarchy_closure
+    ADD CONSTRAINT org_hierarchy_closure_tenant_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, hierarchy_type gist_text_ops WITH =, build_id gist_uuid_ops WITH =, ancestor_node_id gist_uuid_ops WITH =, descendant_node_id gist_uuid_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
 
 CREATE INDEX org_hierarchy_closure_ancestor_range_gist_idx ON org_hierarchy_closure USING gist (tenant_id gist_uuid_ops, hierarchy_type gist_text_ops, build_id gist_uuid_ops, ancestor_node_id gist_uuid_ops, tstzrange(effective_date, end_date, '[)'));
 
@@ -315,12 +349,15 @@ CREATE TABLE org_positions (
     is_auto_created boolean NOT NULL DEFAULT FALSE,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_positions_tenant_id_id_key UNIQUE (tenant_id, id),
     CONSTRAINT org_positions_tenant_id_code_key UNIQUE (tenant_id, code),
     CONSTRAINT org_positions_status_check CHECK (status IN ('active', 'retired', 'rescinded')),
     CONSTRAINT org_positions_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_positions_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_positions_org_node_fk FOREIGN KEY (tenant_id, org_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT
 );
 
@@ -328,9 +365,17 @@ ALTER TABLE org_positions
     ADD CONSTRAINT org_positions_code_unique_in_time
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, code WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
 
+ALTER TABLE org_positions
+    ADD CONSTRAINT org_positions_tenant_code_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, code WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
+
 CREATE INDEX org_positions_tenant_node_effective_idx ON org_positions (tenant_id, org_node_id, effective_date);
 
 CREATE INDEX org_positions_tenant_code_effective_idx ON org_positions (tenant_id, code, effective_date);
+
+CREATE INDEX org_positions_tenant_node_effective_on_idx ON org_positions (tenant_id, org_node_id, effective_on);
+
+CREATE INDEX org_positions_tenant_code_effective_on_idx ON org_positions (tenant_id, code, effective_on);
 
 CREATE TABLE org_position_slices (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
@@ -353,10 +398,13 @@ CREATE TABLE org_position_slices (
     profile jsonb NOT NULL DEFAULT '{}' ::jsonb,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_position_slices_tenant_id_id_key UNIQUE (tenant_id, id),
     CONSTRAINT org_position_slices_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_position_slices_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_position_slices_lifecycle_status_check CHECK (lifecycle_status IN ('planned', 'active', 'inactive', 'rescinded')),
     CONSTRAINT org_position_slices_capacity_fte_check CHECK (capacity_fte > 0),
     CONSTRAINT org_position_slices_capacity_headcount_check CHECK (capacity_headcount IS NULL OR capacity_headcount >= 0),
@@ -371,11 +419,17 @@ ALTER TABLE org_position_slices
     ADD CONSTRAINT org_position_slices_no_overlap
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, position_id gist_uuid_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
 
+ALTER TABLE org_position_slices
+    ADD CONSTRAINT org_position_slices_tenant_position_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, position_id gist_uuid_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
+
 CREATE INDEX org_position_slices_tenant_position_effective_idx ON org_position_slices (tenant_id, position_id, effective_date);
 
 CREATE INDEX org_position_slices_tenant_node_effective_idx ON org_position_slices (tenant_id, org_node_id, effective_date);
 
 CREATE INDEX org_position_slices_tenant_reports_to_effective_idx ON org_position_slices (tenant_id, reports_to_position_id, effective_date);
+
+CREATE INDEX org_position_slices_tenant_position_effective_on_idx ON org_position_slices (tenant_id, position_id, effective_on);
 
 -- DEV-PLAN-056: Job Catalog / Job Profile (master data).
 CREATE TABLE org_job_family_groups (
@@ -483,9 +537,12 @@ CREATE TABLE org_assignments (
     allocated_fte numeric(9, 2) NOT NULL DEFAULT 1.0,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_assignments_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_assignments_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_assignments_subject_type_check CHECK (subject_type IN ('person')),
     CONSTRAINT org_assignments_assignment_type_check CHECK (assignment_type IN ('primary', 'matrix', 'dotted')),
     CONSTRAINT org_assignments_primary_check CHECK ((assignment_type = 'primary') = is_primary),
@@ -502,11 +559,25 @@ ALTER TABLE org_assignments
     ADD CONSTRAINT org_assignments_subject_position_unique_in_time
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, position_id gist_uuid_ops WITH =, subject_type gist_text_ops WITH =, subject_id gist_uuid_ops WITH =, assignment_type gist_text_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
 
+ALTER TABLE org_assignments
+    ADD CONSTRAINT org_assignments_tenant_subject_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, subject_type gist_text_ops WITH =, subject_id gist_uuid_ops WITH =, assignment_type gist_text_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
+
+ALTER TABLE org_assignments
+    ADD CONSTRAINT org_assignments_tenant_position_subject_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, position_id gist_uuid_ops WITH =, subject_type gist_text_ops WITH =, subject_id gist_uuid_ops WITH =, assignment_type gist_text_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
+
 CREATE INDEX org_assignments_tenant_subject_effective_idx ON org_assignments (tenant_id, subject_id, effective_date);
 
 CREATE INDEX org_assignments_tenant_position_effective_idx ON org_assignments (tenant_id, position_id, effective_date);
 
 CREATE INDEX org_assignments_tenant_pernr_effective_idx ON org_assignments (tenant_id, pernr, effective_date);
+
+CREATE INDEX org_assignments_tenant_subject_effective_on_idx ON org_assignments (tenant_id, subject_id, effective_on);
+
+CREATE INDEX org_assignments_tenant_position_effective_on_idx ON org_assignments (tenant_id, position_id, effective_on);
+
+CREATE INDEX org_assignments_tenant_pernr_effective_on_idx ON org_assignments (tenant_id, pernr, effective_on);
 
 CREATE TABLE org_attribute_inheritance_rules (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
@@ -517,15 +588,22 @@ CREATE TABLE org_attribute_inheritance_rules (
     inheritance_break_node_type text NULL,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_attribute_inheritance_rules_tenant_id_id_key UNIQUE (tenant_id, id),
-    CONSTRAINT org_attribute_inheritance_rules_effective_check CHECK (effective_date < end_date)
+    CONSTRAINT org_attribute_inheritance_rules_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_attribute_inheritance_rules_effective_on_check CHECK (effective_on <= end_on)
 );
 
 ALTER TABLE org_attribute_inheritance_rules
     ADD CONSTRAINT org_attribute_inheritance_rules_no_overlap
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, hierarchy_type gist_text_ops WITH =, attribute_name gist_text_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+
+ALTER TABLE org_attribute_inheritance_rules
+    ADD CONSTRAINT org_attribute_inheritance_rules_tenant_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, hierarchy_type gist_text_ops WITH =, attribute_name gist_text_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
 
 CREATE INDEX org_attribute_inheritance_rules_tenant_hierarchy_attribute_effective_idx ON org_attribute_inheritance_rules (tenant_id, hierarchy_type, attribute_name, effective_date);
 
@@ -553,10 +631,13 @@ CREATE TABLE org_role_assignments (
     org_node_id uuid NOT NULL,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_role_assignments_tenant_id_id_key UNIQUE (tenant_id, id),
     CONSTRAINT org_role_assignments_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_role_assignments_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_role_assignments_subject_type_check CHECK (subject_type IN ('user', 'group')),
     CONSTRAINT org_role_assignments_role_fk FOREIGN KEY (tenant_id, role_id) REFERENCES org_roles (tenant_id, id) ON DELETE RESTRICT,
     CONSTRAINT org_role_assignments_org_node_fk FOREIGN KEY (tenant_id, org_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT
@@ -565,6 +646,10 @@ CREATE TABLE org_role_assignments (
 ALTER TABLE org_role_assignments
     ADD CONSTRAINT org_role_assignments_no_overlap
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, role_id gist_uuid_ops WITH =, subject_type gist_text_ops WITH =, subject_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+
+ALTER TABLE org_role_assignments
+    ADD CONSTRAINT org_role_assignments_tenant_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, role_id gist_uuid_ops WITH =, subject_type gist_text_ops WITH =, subject_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
 
 CREATE INDEX org_role_assignments_tenant_node_effective_idx ON org_role_assignments (tenant_id, org_node_id, effective_date);
 
@@ -616,11 +701,14 @@ CREATE TABLE org_audit_logs (
     entity_id uuid NOT NULL,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL,
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     old_values jsonb NULL,
     new_values jsonb NOT NULL DEFAULT '{}' ::jsonb,
     meta jsonb NOT NULL DEFAULT '{}' ::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_audit_logs_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_audit_logs_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_audit_logs_entity_type_check CHECK (entity_type IN ('org_node', 'org_edge', 'org_position', 'org_assignment'))
 );
 
@@ -669,10 +757,13 @@ CREATE TABLE org_security_group_mappings (
     applies_to_subtree boolean NOT NULL DEFAULT FALSE,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_security_group_mappings_tenant_id_id_key UNIQUE (tenant_id, id),
     CONSTRAINT org_security_group_mappings_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_security_group_mappings_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_security_group_mappings_security_group_key_check CHECK (char_length(trim(security_group_key)) > 0),
     CONSTRAINT org_security_group_mappings_org_node_fk FOREIGN KEY (tenant_id, org_node_id) REFERENCES org_nodes (tenant_id, id) ON DELETE RESTRICT
 );
@@ -680,6 +771,10 @@ CREATE TABLE org_security_group_mappings (
 ALTER TABLE org_security_group_mappings
     ADD CONSTRAINT org_security_group_mappings_no_overlap
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, security_group_key gist_text_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+
+ALTER TABLE org_security_group_mappings
+    ADD CONSTRAINT org_security_group_mappings_tenant_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, security_group_key gist_text_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
 
 CREATE INDEX org_security_group_mappings_tenant_node_effective_idx ON org_security_group_mappings (tenant_id, org_node_id, effective_date);
 
@@ -695,10 +790,13 @@ CREATE TABLE org_links (
     metadata jsonb NOT NULL DEFAULT '{}' ::jsonb,
     effective_date timestamptz NOT NULL,
     end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+    effective_on date NOT NULL,
+    end_on date NOT NULL DEFAULT DATE '9999-12-31',
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_links_tenant_id_id_key UNIQUE (tenant_id, id),
     CONSTRAINT org_links_effective_check CHECK (effective_date < end_date),
+    CONSTRAINT org_links_effective_on_check CHECK (effective_on <= end_on),
     CONSTRAINT org_links_object_key_check CHECK (char_length(trim(object_key)) > 0),
     CONSTRAINT org_links_metadata_is_object_check CHECK (jsonb_typeof(metadata) = 'object'),
     CONSTRAINT org_links_object_type_check CHECK (object_type IN ('project', 'cost_center', 'budget_item', 'custom')),
@@ -709,6 +807,10 @@ CREATE TABLE org_links (
 ALTER TABLE org_links
     ADD CONSTRAINT org_links_no_overlap
     EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, object_type gist_text_ops WITH =, object_key gist_text_ops WITH =, link_type gist_text_ops WITH =, tstzrange(effective_date, end_date, '[)') WITH &&);
+
+ALTER TABLE org_links
+    ADD CONSTRAINT org_links_tenant_no_overlap_on
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, org_node_id gist_uuid_ops WITH =, object_type gist_text_ops WITH =, object_key gist_text_ops WITH =, link_type gist_text_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
 
 CREATE INDEX org_links_tenant_node_effective_idx ON org_links (tenant_id, org_node_id, effective_date);
 
@@ -723,6 +825,7 @@ CREATE TABLE org_personnel_events (
     person_uuid uuid NOT NULL,
     pernr text NOT NULL,
     effective_date timestamptz NOT NULL,
+    effective_on date NOT NULL,
     reason_code text NOT NULL,
     payload jsonb NOT NULL DEFAULT '{}' ::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -736,5 +839,7 @@ CREATE TABLE org_personnel_events (
 );
 
 CREATE INDEX org_personnel_events_tenant_person_effective_idx ON org_personnel_events (tenant_id, person_uuid, effective_date DESC);
+
+CREATE INDEX org_personnel_events_tenant_person_effective_on_idx ON org_personnel_events (tenant_id, person_uuid, effective_on DESC);
 
 -- EOF

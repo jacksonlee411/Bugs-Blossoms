@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 )
@@ -28,6 +29,33 @@ type importOptions struct {
 	strict          bool
 	backend         string
 	mode            string
+}
+
+func pgDateOnlyUTC(t time.Time) pgtype.Date {
+	if t.IsZero() {
+		return pgtype.Date{}
+	}
+	u := t.UTC()
+	y, m, d := u.Date()
+	return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
+}
+
+func pgEffectiveOnFromEffectiveDate(effectiveDate time.Time) pgtype.Date {
+	return pgDateOnlyUTC(effectiveDate)
+}
+
+func pgEndOnFromEndDate(endDate time.Time) pgtype.Date {
+	if endDate.IsZero() {
+		return pgtype.Date{}
+	}
+
+	u := endDate.UTC()
+	y, m, d := u.Date()
+	if y == 9999 && m == time.December && d == 31 {
+		return pgtype.Date{Time: time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC), Valid: true}
+	}
+
+	return pgDateOnlyUTC(u.Add(-time.Microsecond))
 }
 
 func newImportCmd() *cobra.Command {
@@ -1244,11 +1272,11 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_node_slices (
-				tenant_id, id, org_node_id, name, i18n_names, status, legal_entity_id, company_code, location_id,
-				display_order, parent_hint, manager_user_id, effective_date, end_date
-			) VALUES (
-				$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
-			)`,
+					tenant_id, id, org_node_id, name, i18n_names, status, legal_entity_id, company_code, location_id,
+					display_order, parent_hint, manager_user_id, effective_date, end_date, effective_on, end_on
+				) VALUES (
+					$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
+				)`,
 			data.tenantID,
 			ins.id,
 			nodeID,
@@ -1263,6 +1291,8 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 			r.managerUserID,
 			r.effectiveDate,
 			r.endDate,
+			pgEffectiveOnFromEffectiveDate(r.effectiveDate),
+			pgEndOnFromEndDate(r.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_node_slices(%s): %w", r.line, r.code, err))
 		}
@@ -1284,18 +1314,18 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_positions (
-					tenant_id, id, org_node_id, code, title, status, is_auto_created, effective_date, end_date
-				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-			data.tenantID, p.id, p.orgNodeID, p.code, p.title, p.status, p.isAutoCreated, p.effectiveDate, p.endDate,
+						tenant_id, id, org_node_id, code, title, status, is_auto_created, effective_date, end_date, effective_on, end_on
+					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+			data.tenantID, p.id, p.orgNodeID, p.code, p.title, p.status, p.isAutoCreated, p.effectiveDate, p.endDate, pgEffectiveOnFromEffectiveDate(p.effectiveDate), pgEndOnFromEndDate(p.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_positions(%s): %w", p.line, p.code, err))
 		}
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_position_slices (
-					tenant_id, id, position_id, org_node_id, title, lifecycle_status, capacity_fte, effective_date, end_date
-				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-			data.tenantID, sliceID, p.id, p.orgNodeID, p.title, p.status, 1.0, p.effectiveDate, p.endDate,
+						tenant_id, id, position_id, org_node_id, title, lifecycle_status, capacity_fte, effective_date, end_date, effective_on, end_on
+					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+			data.tenantID, sliceID, p.id, p.orgNodeID, p.title, p.status, 1.0, p.effectiveDate, p.endDate, pgEffectiveOnFromEffectiveDate(p.effectiveDate), pgEndOnFromEndDate(p.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slices(%s): %w", p.line, p.code, err))
 		}
@@ -1306,9 +1336,9 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_assignments (
-				tenant_id, id, position_id, subject_id, pernr, is_primary, effective_date, end_date
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-			data.tenantID, a.id, a.positionID, a.subjectID, a.pernr, true, a.effectiveDate, a.endDate,
+					tenant_id, id, position_id, subject_id, pernr, is_primary, effective_date, end_date, effective_on, end_on
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+			data.tenantID, a.id, a.positionID, a.subjectID, a.pernr, true, a.effectiveDate, a.endDate, pgEffectiveOnFromEffectiveDate(a.effectiveDate), pgEndOnFromEndDate(a.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_assignments(pernr=%s): %w", a.line, a.pernr, err))
 		}
@@ -1396,9 +1426,9 @@ func insertEdges(ctx context.Context, tx pgx.Tx, data normalizedData) error {
 			}
 			if _, err := tx.Exec(
 				ctx,
-				`INSERT INTO org_edges (tenant_id, id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
-				 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-				data.tenantID, e.id, "OrgUnit", parentID, childID, e.effectiveDate, e.endDate,
+				`INSERT INTO org_edges (tenant_id, id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
+					 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+				data.tenantID, e.id, "OrgUnit", parentID, childID, e.effectiveDate, e.endDate, pgEffectiveOnFromEffectiveDate(e.effectiveDate), pgEndOnFromEndDate(e.endDate),
 			); err != nil {
 				return withCode(exitDBWrite, fmt.Errorf("insert org_edges(child=%s): %w", e.childCode, err))
 			}

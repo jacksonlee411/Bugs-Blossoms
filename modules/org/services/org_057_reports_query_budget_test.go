@@ -41,9 +41,25 @@ func TestOrg057StaffingSummaryQueryBudget(t *testing.T) {
 	asOf := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 
-	schemaSQL := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "00001_org_baseline.sql")))
-	_, err := pool.Exec(ctx, schemaSQL, pgx.QueryExecModeSimpleProtocol)
-	require.NoError(t, err)
+	files := []string{
+		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
+	}
+	for _, f := range files {
+		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
+		_, err := pool.Exec(ctx, sql, pgx.QueryExecModeSimpleProtocol)
+		require.NoError(t, err, "failed migration %s", f)
+	}
 
 	largeTenantID := uuid.MustParse("00000000-0000-0000-0000-000000000057")
 	smallTenantID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(largeTenantID.String()+":small"))
@@ -58,19 +74,29 @@ func TestOrg057StaffingSummaryQueryBudget(t *testing.T) {
 
 	smallPosID := uuid.New()
 	largePosID := uuid.New()
-	_, err = pool.Exec(ctx, `
-INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
-VALUES ($1,$2,$3,$4,'active',false,$5,$6)
+	_, err := pool.Exec(ctx, `
+INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date, effective_on, end_on)
+VALUES (
+	$1,$2,$3,$4,'active',false,$5,$6,
+	($5 AT TIME ZONE 'UTC')::date,
+	CASE
+		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+	END
+)
 `, smallTenantID, smallPosID, smallRoot, "POS-SMALL", asOf, endDate)
 	require.NoError(t, err)
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
-VALUES ($1,$2,$3,$4,'active',false,$5,$6)
+INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date, effective_on, end_on)
+VALUES (
+	$1,$2,$3,$4,'active',false,$5,$6,
+	($5 AT TIME ZONE 'UTC')::date,
+	CASE
+		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+	END
+)
 `, largeTenantID, largePosID, largeRoot, "POS-LARGE", asOf, endDate)
-	require.NoError(t, err)
-
-	m053 := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "20251220160000_org_position_slices_and_fte.sql")))
-	_, err = pool.Exec(ctx, m053)
 	require.NoError(t, err)
 
 	repo := persistence.NewOrgRepository()

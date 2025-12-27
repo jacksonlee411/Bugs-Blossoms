@@ -83,23 +83,25 @@ func (r *OrgRepository) InsertAuditLog(ctx context.Context, tenantID uuid.UUID, 
 	}
 
 	if err := tx.QueryRow(ctx, `
-INSERT INTO org_audit_logs (
-	tenant_id,
-	request_id,
-	transaction_time,
-	initiator_id,
-	change_type,
-	entity_type,
-	entity_id,
-	effective_date,
-	end_date,
-	old_values,
-	new_values,
-	meta
-)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb)
-RETURNING id
-`,
+	INSERT INTO org_audit_logs (
+		tenant_id,
+		request_id,
+		transaction_time,
+		initiator_id,
+		change_type,
+		entity_type,
+		entity_id,
+		effective_date,
+		end_date,
+		effective_on,
+		end_on,
+		old_values,
+		new_values,
+		meta
+	)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb)
+	RETURNING id
+	`,
 		pgUUID(tenantID),
 		log.RequestID,
 		log.TransactionTime.UTC(),
@@ -109,6 +111,8 @@ RETURNING id
 		pgUUID(log.EntityID),
 		log.EffectiveDate.UTC(),
 		log.EndDate.UTC(),
+		pgEffectiveOnFromEffectiveDate(log.EffectiveDate),
+		pgEndOnFromEndDate(log.EndDate),
 		old,
 		newValuesJSON,
 		metaJSON,

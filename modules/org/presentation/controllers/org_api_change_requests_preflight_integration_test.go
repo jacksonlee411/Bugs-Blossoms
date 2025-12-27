@@ -222,9 +222,17 @@ func TestOrgAPIController_Preflight_SuccessHasNoSideEffects(t *testing.T) {
 
 	pool, tenantID := setupOrgTestDB(t, []string{
 		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
 		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
 		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
