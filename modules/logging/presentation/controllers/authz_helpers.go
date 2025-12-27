@@ -22,7 +22,6 @@ import (
 )
 
 const logsAuthzObject = "logging.logs"
-const loggingAuthzDomain = "logging"
 
 func ensureLoggingAuthz(
 	w http.ResponseWriter,
@@ -38,9 +37,6 @@ func ensureLoggingAuthz(
 		*r = *r.WithContext(ctxWithState)
 	}
 	authzDomain := authz.DomainFromTenant(tenantID)
-	if state != nil {
-		state.Tenant = loggingAuthzDomain
-	}
 	subject := resolveLoggingSubject(tenantID, currentUser)
 	req := authz.NewRequest(
 		subject,

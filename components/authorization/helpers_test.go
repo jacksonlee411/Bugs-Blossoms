@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/iota-uz/iota-sdk/pkg/authz"
@@ -14,9 +15,11 @@ import (
 func TestNormalizePoliciesFiltersAndFallsBack(t *testing.T) {
 	t.Parallel()
 
-	state := authz.NewViewState("tenant:demo:user:1", "global")
-	state.AddMissingPolicy(authz.MissingPolicy{Domain: "global", Object: "core.users", Action: "list"})
-	state.AddMissingPolicy(authz.MissingPolicy{Domain: "logging", Object: "logging.logs", Action: "view"})
+	tenantID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	domain := authz.DomainFromTenant(tenantID)
+	state := authz.NewViewState("tenant:demo:user:1", domain)
+	state.AddMissingPolicy(authz.MissingPolicy{Domain: domain, Object: "core.users", Action: "list"})
+	state.AddMissingPolicy(authz.MissingPolicy{Domain: domain, Object: "logging.logs", Action: "view"})
 
 	filtered := normalizePolicies(state, "core.users", "list")
 	require.Len(t, filtered, 1)
@@ -30,9 +33,11 @@ func TestNormalizePoliciesFiltersAndFallsBack(t *testing.T) {
 func TestSuggestedDiffBuildsJSON(t *testing.T) {
 	t.Parallel()
 
-	state := authz.NewViewState("tenant:demo:user:42", "logging")
+	tenantID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	domain := authz.DomainFromTenant(tenantID)
+	state := authz.NewViewState("tenant:demo:user:42", domain)
 	policies := []authz.MissingPolicy{{
-		Domain: "logging",
+		Domain: domain,
 		Object: "logging.logs",
 		Action: "view",
 	}}
@@ -44,7 +49,7 @@ func TestSuggestedDiffBuildsJSON(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(diff), &suggestions))
 	require.Len(t, suggestions, 1)
 	require.Equal(t, state.Subject, suggestions[0].Subject)
-	require.Equal(t, "logging", suggestions[0].Domain)
+	require.Equal(t, domain, suggestions[0].Domain)
 	require.Equal(t, "logging.logs", suggestions[0].Object)
 	require.Equal(t, "view", suggestions[0].Action)
 	require.Equal(t, "allow", suggestions[0].Effect)
@@ -54,12 +59,14 @@ func TestSuggestedDiffBuildsJSON(t *testing.T) {
 func TestResolveHelpers(t *testing.T) {
 	setAuthzPolicyPath(t)
 
-	state := authz.NewViewState("tenant:demo:user:99", "hrm")
+	tenantID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	domain := authz.DomainFromTenant(tenantID)
+	state := authz.NewViewState("tenant:demo:user:99", domain)
 
 	require.Equal(t, "provided-subject", resolveSubject(state, " provided-subject "))
 	require.Equal(t, state.Subject, resolveSubject(state, ""))
 
-	require.Equal(t, "hrm", resolveDomain(state, " "))
+	require.Equal(t, domain, resolveDomain(state, " "))
 	require.Equal(t, "custom-domain", resolveDomain(state, " custom-domain "))
 
 	require.Equal(t, "given-revision", resolveBaseRevision(context.Background(), " given-revision "))

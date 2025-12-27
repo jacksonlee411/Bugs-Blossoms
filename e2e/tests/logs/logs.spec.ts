@@ -3,6 +3,14 @@ import { login, logout, waitForAlpine, resetTestDatabase, seedScenario } from '.
 
 test.describe.configure({ mode: 'serial' });
 
+function extractDomainFromSubject(subject: string): string {
+	const match = /^tenant:([^:]+):user:/.exec(subject);
+	if (!match) {
+		throw new Error(`unexpected authz subject format: ${subject}`);
+	}
+	return match[1];
+}
+
 test.describe('logging authz gating', () => {
 	test.beforeAll(async ({ request }) => {
 		await resetTestDatabase(request, { reseedMinimal: false });
@@ -57,7 +65,7 @@ test.describe('logging authz gating', () => {
 		expect(body.action).toBe('view');
 		expect(typeof body.subject).toBe('string');
 		expect(body.subject).toMatch(/tenant:/);
-		expect(body.domain).toBe('logging');
+		expect(body.domain).toBe(extractDomainFromSubject(body.subject));
 		expect(Array.isArray(body.missing_policies)).toBeTruthy();
 		expect(body.missing_policies.length).toBeGreaterThan(0);
 		expect(body.debug_url).toContain('/core/api/authz/debug');
