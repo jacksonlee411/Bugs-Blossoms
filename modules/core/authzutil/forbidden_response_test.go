@@ -21,14 +21,15 @@ func TestBuildForbiddenPayload_WithStateAndHeaders(t *testing.T) {
 	tenantID := uuid.New()
 	req = req.WithContext(composables.WithTenantID(req.Context(), tenantID))
 
-	state := authz.NewViewState(authz.SubjectForUserID(tenantID, "user-1"), "logging")
-	state.AddMissingPolicy(authz.MissingPolicy{Domain: "logging", Object: "logging.logs", Action: "view"})
+	domain := authz.DomainFromTenant(tenantID)
+	state := authz.NewViewState(authz.SubjectForUserID(tenantID, "user-1"), domain)
+	state.AddMissingPolicy(authz.MissingPolicy{Domain: domain, Object: "logging.logs", Action: "view"})
 
 	payload := BuildForbiddenPayload(req, state, "logging.logs", "view")
 
 	require.Equal(t, "logging.logs", payload.Object)
 	require.Equal(t, "view", payload.Action)
-	require.Equal(t, "logging", payload.Domain)
+	require.Equal(t, domain, payload.Domain)
 	require.Equal(t, state.Subject, payload.Subject)
 	require.Equal(t, "req-123", payload.RequestID)
 	require.NotEmpty(t, payload.BaseRevision)

@@ -68,9 +68,6 @@ func (c *LogsController) List(w http.ResponseWriter, r *http.Request) {
 	if ctxWithState != r.Context() {
 		*r = *r.WithContext(ctxWithState)
 	}
-	if state != nil {
-		state.Tenant = loggingAuthzDomain
-	}
 
 	pagination := composables.UsePaginated(r)
 	tab := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("tab")))

@@ -13,8 +13,6 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
-const personAuthzDomain = "person"
-
 func ensurePersonAuthz(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -29,9 +27,6 @@ func ensurePersonAuthz(
 	ctxWithState, state := authzutil.EnsureViewStateOrAnonymous(r.Context(), tenantID, currentUser)
 	if ctxWithState != r.Context() {
 		*r = *r.WithContext(ctxWithState)
-	}
-	if state != nil {
-		state.Tenant = personAuthzDomain
 	}
 
 	if err != nil || currentUser == nil {
@@ -153,9 +148,10 @@ func checkPersonCapability(
 		return allowed, true, nil
 	}
 
+	domain := authz.DomainFromTenant(tenantID)
 	req := authz.NewRequest(
 		authzutil.SubjectForUser(tenantID, u),
-		authz.DomainFromTenant(tenantID),
+		domain,
 		object,
 		action,
 	)
@@ -166,7 +162,7 @@ func checkPersonCapability(
 	state.SetCapability(capKey, allowed)
 	if !allowed {
 		state.AddMissingPolicy(authz.MissingPolicy{
-			Domain: personAuthzDomain,
+			Domain: domain,
 			Object: object,
 			Action: action,
 		})

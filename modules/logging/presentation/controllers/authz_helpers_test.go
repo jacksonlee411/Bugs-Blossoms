@@ -108,7 +108,7 @@ func TestEnsureLoggingAuthz_DeniedPopulatesViewState(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &payload))
 	require.Equal(t, "logging.logs", payload["object"])
 	require.Equal(t, "view", payload["action"])
-	require.Equal(t, loggingAuthzDomain, payload["domain"])
+	require.Equal(t, authz.DomainFromTenant(uuid.Nil), payload["domain"])
 	require.NotEmpty(t, payload["subject"])
 
 	missing, ok := payload["missing_policies"].([]interface{})
