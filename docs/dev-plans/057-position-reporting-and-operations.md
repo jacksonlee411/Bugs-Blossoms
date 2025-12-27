@@ -1,6 +1,8 @@
 # DEV-PLAN-057：Position 报表与运营（统计/空缺分析/质量守护）（对齐 051 阶段 E）
 
 **状态**: 已完成（2025-12-21）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time / as-of 一律按天（`YYYY-MM-DD`）语义；示例不再使用 RFC3339 timestamp 表达生效日。
 
 ## 0. 进度速记
 - 本计划对齐 050 §8.3/§8.4 的报表需求与 051 阶段 E（E0/E1/E2）：先冻结口径，再交付可查询/可导出的稳定 API；最后补齐质量守护与性能预算，确保“可重复对账、可回归”。
@@ -143,10 +145,10 @@ flowchart TD
   - （可选）对 scope 查询热点补充 covering index（需先用 034 的 load runner 证明收益）
 - `org_assignments`：
   - `btree (tenant_id, position_id, effective_date)`
-  - （可选）`gist (tenant_id, position_id, tstzrange(effective_date,end_date,'[)'))`
+  - （可选）`gist (tenant_id, position_id, daterange(effective_on,end_on+1,'[)'))`
 
 ## 5. 接口契约 (API Contracts)
-> 约定：内部 API 前缀 `/org/api`；JSON-only；Authz/403 payload 对齐 026；日期参数支持 `YYYY-MM-DD` 或 RFC3339（统一 UTC）。
+> 约定：内部 API 前缀 `/org/api`；JSON-only；Authz/403 payload 对齐 026；Valid Time 一律 `YYYY-MM-DD`（兼容期允许 RFC3339 但会归一化并回显为 `YYYY-MM-DD`；SSOT：DEV-PLAN-064）。
 
 ### 5.1 `GET /org/api/reports/staffing:summary`（编制统计汇总）
 **Query**
@@ -162,7 +164,7 @@ flowchart TD
 {
   "tenant_id": "uuid",
   "org_node_id": "uuid",
-  "effective_date": "2025-03-01T00:00:00Z",
+  "effective_date": "2025-03-01",
   "scope": "subtree",
   "totals": {
     "positions_total": 120,
@@ -199,7 +201,7 @@ flowchart TD
 {
   "tenant_id": "uuid",
   "org_node_id": "uuid",
-  "effective_date": "2025-03-01T00:00:00Z",
+  "effective_date": "2025-03-01",
   "scope": "subtree",
   "items": [
     {
@@ -208,7 +210,7 @@ flowchart TD
       "org_node_id": "uuid",
       "capacity_fte": 1.0,
       "occupied_fte": 0.0,
-      "vacancy_since": "2025-02-10T00:00:00Z",
+      "vacancy_since": "2025-02-10",
       "vacancy_age_days": 20,
       "job_level_id": "uuid|null",
       "position_type": "unknown"

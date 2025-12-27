@@ -2,6 +2,8 @@
 
 **状态**: 已评审（2025-12-18 02:01 UTC）
 **实施状态**: 已落地（2025-12-18），门禁记录见 `docs/dev-records/DEV-PLAN-030-READINESS.md`。
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）统一按天（`YYYY-MM-DD`）语义；示例响应不再使用 RFC3339 timestamp 表达生效日。
 
 ## 0. 进度速记
 - 本计划对应 `docs/dev-plans/020-organization-lifecycle.md` 的步骤 10：在 M1 CRUD/API/审计/outbox 基线稳定后，引入“变更请求（draft/submit）+ 影响预检（preflight）”能力。
@@ -223,7 +225,7 @@ flowchart TD
 **Response 200**
 ```json
 {
-  "effective_date": "2025-03-01T00:00:00Z",
+  "effective_date": "2025-03-01",
   "commands_count": 1,
   "impact": {
     "org_nodes": { "create": 0, "update": 1, "move": 0, "rescind": 0 },

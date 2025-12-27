@@ -60,7 +60,7 @@ DEV-PLAN-020~036 将 Org 模块拆分为：Schema/迁移工具链、主链 CRUD�
 - **时态模型基线（Valid Time）**
   - 用途：支持 as-of 查询、未来排程、历史更正；避免“覆盖式更新”导致审计不可追溯。
   - 入口：DB（`effective_date/end_date` + EXCLUDE no-overlap）、Service（Insert/Correct/Rescind/ShiftBoundary）。
-  - 推荐验证：集成测试覆盖 no-overlap 与半开区间 `[effective_date,end_date)` 行为。
+  - 推荐验证：集成测试覆盖 no-overlap 与按天闭区间 `[effective_date,end_date]` 语义（SSOT：DEV-PLAN-064）。
 - **层级路径（ltree path/depth）与成环拒绝**
   - 用途：在线查询可避免递归；写入时 DB 兜底拒绝成环。
   - 入口：DB trigger（021），写入顺序要求 parent-before-child（023 seed、024 move 子树重切片）。

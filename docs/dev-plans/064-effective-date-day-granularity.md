@@ -9,7 +9,8 @@
 - Go 层写路径已双写 `effective_on/end_on`；读/输出契约已收敛为 `YYYY-MM-DD`（兼容 RFC3339 输入，但会归一化为 date 并回显为 day string）。
 - Cursor（`effective_date:...:id:...`）已改为 day string，并在解析时兼容 legacy RFC3339。
 - 已跑门禁并通过：`go fmt ./...`、`go vet ./...`、`make check lint`、`make test`、`make check doc`、`make org lint`、`GOOSE_TABLE=goose_db_version_org make org migrate up`、`make authz-test && make authz-lint`。
-- 未完成：阶段 D（清理 legacy timestamp 列/旧约束）与阶段 E（停止接受 RFC3339 输入）仍待后续 PR；`12.2` 中 dev-plan 清单修订尚未开始。
+- 12.2 中 Phase 1 DEV-PLAN 清单收敛已完成：A 类/B 类文档已修订或复核，并在各文档头部记录“对齐更新”（以避免继续传播旧的 timestamp/半开区间口径）。
+- 未完成：阶段 D（清理 legacy timestamp 列/旧约束）与阶段 E（停止接受 RFC3339 输入）仍待后续 PR。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：HR 用户对“结束日期当天是否有效”的一致性诉求；对齐 SAP HCM / PeopleSoft 的 day 粒度 effective dating 心智模型。
@@ -104,9 +105,9 @@ graph TD
 
 ### 3.4 SSOT 对齐与替换（避免双权威表达）
 本计划落地后，“Valid Time=date（日粒度）”成为唯一权威表达。以下文档/契约需要在实施过程中同步更新（以避免继续传播旧的“timestamptz + 半开区间”口径）：
-- `docs/dev-plans/020-organization-lifecycle.md`（当前描述半开区间 `[effective_date, end_date)`）
-- `docs/dev-plans/021-org-schema-and-constraints.md`（当前描述 UTC 半开区间 + `tstzrange('[)')`）
-- `docs/dev-plans/053-position-core-schema-service-api.md`（当前多处使用 `[effective_date,end_date)` 作为核心算法描述）
+- `docs/dev-plans/020-organization-lifecycle.md`（已对齐为 day 闭区间口径）
+- `docs/dev-plans/021-org-schema-and-constraints.md`（已对齐为 Valid Time=date + `daterange(...,'[)')` 映射；legacy 双轨已标注）
+- `docs/dev-plans/053-position-core-schema-service-api.md`（已对齐：以 `effective_on/end_on`（date）为准；legacy 双轨已标注）
 原则：
 - 文档层面：统一描述为“按天闭区间（最后有效日）”，并明确 DB 约束使用 `daterange(effective_date, end_date + 1, '[)')` 的映射方式。
 - 代码层面：所有“as-of 判定/截断”必须以 date 口径集中实现，禁止在散落的 SQL/templ 中重复定义边界语义。
@@ -347,57 +348,57 @@ ALTER TABLE org_node_slices
 本计划变更的是“全局时间语义契约”（Valid Time=date（日粒度）），为避免文档漂移与实现阶段即兴决策，需要**有计划地分析并修订所有受影响的 dev-plan**，确保仓库内只有一种权威表达。
 
 ### 12.1 分析方法（可复现、可审计）
-1. [ ] 在 `docs/dev-plans/` 全量检索与 Valid Time 相关的关键字与模式（例如：`effective_date`、`end_date`、`半开区间`、`[effective_date,end_date)`、`tstzrange(`、`timestamptz`）。
-2. [ ] 对命中文档进行分类：
+1. [x] 在 `docs/dev-plans/` 全量检索与 Valid Time 相关的关键字与模式（例如：`effective_date`、`end_date`、`半开区间`、`[effective_date,end_date)`、`tstzrange(`、`timestamptz`）。
+2. [x] 对命中文档进行分类：
    - A 类（契约型）：定义字段类型/区间语义/约束/核心算法（必须修订为本计划口径）。
    - B 类（引用型）：仅引用字段名或作为 UI/路由参数/示例（需要复核并改为引用本计划口径，避免暗示 timestamp 语义）。
-3. [ ] 对 A 类文档执行最小但完整的契约修订：
+3. [x] 对 A 类文档执行最小但完整的契约修订：
    - Valid Time 类型：`timestamptz` → `date`
    - 区间语义：由 `[effective_date,end_date)`（半开）收敛为 day 闭区间 `[effective_date,end_date]`，并明确 DB EXCLUDE 映射为 `daterange(effective_date, end_date + 1, '[)')`
    - 截断规则：`end_date = D` → `end_date = D - 1 day`
    - 示例 JSON/SQL：`effective_date/end_date` 一律使用 `YYYY-MM-DD`
-4. [ ] 对 B 类文档执行“去歧义”修订：删除/替换暗示 `timestamptz` 的表述，并增加到本计划（DEV-PLAN-064）的链接作为 SSOT。
-5. [ ] 每次修订后运行 `make check doc`，并在对应 dev-plan 中记录变更与时间戳（遵循 `docs/dev-plans/000-docs-format.md`）。
+4. [x] 对 B 类文档执行“去歧义”修订：删除/替换暗示 `timestamptz` 的表述，并增加到本计划（DEV-PLAN-064）的链接作为 SSOT。
+5. [x] 每次修订后运行 `make check doc`，并在对应 dev-plan 中记录变更与时间戳（遵循 `docs/dev-plans/000-docs-format.md`）。
 
 ### 12.2 需修订/复核的 DEV-PLAN 清单（Phase 1）
 > 注：本清单以“命中 `effective_date/end_date/tstzrange/timestamptz/半开区间` 等关键字”为初始输入，修订过程中可增补，但不得遗漏已命中项。
 
 **A 类（契约型，必须修订）**
-1. [ ] `docs/dev-plans/001-technical-design-template.md`（模板示例的类型/约束口径）
-2. [ ] `docs/dev-plans/020-organization-lifecycle.md`
-3. [ ] `docs/dev-plans/021-org-schema-and-constraints.md`
-4. [ ] `docs/dev-plans/022-org-placeholders-and-event-contracts.md`
-5. [ ] `docs/dev-plans/023-org-import-rollback-and-readiness.md`
-6. [ ] `docs/dev-plans/024-org-crud-mainline.md`
-7. [ ] `docs/dev-plans/025-org-time-and-audit.md`（Audit/Tx Time vs Valid Time 边界）
-8. [ ] `docs/dev-plans/026-org-api-authz-and-events.md`（事件 payload 的日期表达）
-9. [ ] `docs/dev-plans/028-org-inheritance-and-role-read.md`
-10. [ ] `docs/dev-plans/029-org-closure-and-deep-read-optimization.md`
-11. [ ] `docs/dev-plans/030-org-change-requests-and-preflight.md`
-12. [ ] `docs/dev-plans/031-org-data-quality-and-fixes.md`
-13. [ ] `docs/dev-plans/032-org-permission-mapping-and-associations.md`
-14. [ ] `docs/dev-plans/033-org-visualization-and-reporting.md`
-15. [ ] `docs/dev-plans/036-org-sample-tree-data.md`
-16. [ ] `docs/dev-plans/052-position-contract-freeze-and-decisions.md`
-17. [ ] `docs/dev-plans/053-position-core-schema-service-api.md`
-18. [ ] `docs/dev-plans/056-job-catalog-profile-and-position-restrictions.md`
-19. [ ] `docs/dev-plans/057-position-reporting-and-operations.md`
-20. [ ] `docs/dev-plans/058-assignment-management-enhancements.md`
-21. [ ] `docs/dev-plans/059-position-rollout-readiness-and-observability.md`
-22. [ ] `docs/dev-plans/061-org-position-person-bridge-and-minimal-personnel-events.md`
-23. [ ] `docs/dev-plans/061A-person-detail-hr-ux-improvements.md`
-24. [ ] `docs/dev-plans/061A1-person-assignment-effective-date-and-action-type.md`
-25. [ ] `docs/dev-plans/062-job-data-entry-consolidation.md`
+1. [x] `docs/dev-plans/001-technical-design-template.md`（模板示例的类型/约束口径）
+2. [x] `docs/dev-plans/020-organization-lifecycle.md`
+3. [x] `docs/dev-plans/021-org-schema-and-constraints.md`
+4. [x] `docs/dev-plans/022-org-placeholders-and-event-contracts.md`
+5. [x] `docs/dev-plans/023-org-import-rollback-and-readiness.md`
+6. [x] `docs/dev-plans/024-org-crud-mainline.md`
+7. [x] `docs/dev-plans/025-org-time-and-audit.md`（Audit/Tx Time vs Valid Time 边界）
+8. [x] `docs/dev-plans/026-org-api-authz-and-events.md`（事件 payload 的日期表达）
+9. [x] `docs/dev-plans/028-org-inheritance-and-role-read.md`
+10. [x] `docs/dev-plans/029-org-closure-and-deep-read-optimization.md`
+11. [x] `docs/dev-plans/030-org-change-requests-and-preflight.md`
+12. [x] `docs/dev-plans/031-org-data-quality-and-fixes.md`
+13. [x] `docs/dev-plans/032-org-permission-mapping-and-associations.md`
+14. [x] `docs/dev-plans/033-org-visualization-and-reporting.md`
+15. [x] `docs/dev-plans/036-org-sample-tree-data.md`（复核：无需修订）
+16. [x] `docs/dev-plans/052-position-contract-freeze-and-decisions.md`
+17. [x] `docs/dev-plans/053-position-core-schema-service-api.md`
+18. [x] `docs/dev-plans/056-job-catalog-profile-and-position-restrictions.md`（复核：无需修订）
+19. [x] `docs/dev-plans/057-position-reporting-and-operations.md`
+20. [x] `docs/dev-plans/058-assignment-management-enhancements.md`
+21. [x] `docs/dev-plans/059-position-rollout-readiness-and-observability.md`
+22. [x] `docs/dev-plans/061-org-position-person-bridge-and-minimal-personnel-events.md`
+23. [x] `docs/dev-plans/061A-person-detail-hr-ux-improvements.md`（复核：无需修订）
+24. [x] `docs/dev-plans/061A1-person-assignment-effective-date-and-action-type.md`
+25. [x] `docs/dev-plans/062-job-data-entry-consolidation.md`（复核：无需修订）
 
 **B 类（引用型，需要复核并去歧义）**
-1. [ ] `docs/dev-plans/020L-org-feature-catalog.md`
-2. [ ] `docs/dev-plans/020T1-org-test-gap-closure-plan.md`
-3. [ ] `docs/dev-plans/027-org-performance-and-rollout.md`
-4. [ ] `docs/dev-plans/034-org-ops-monitoring-and-load.md`
-5. [ ] `docs/dev-plans/035-org-ui.md`
-6. [ ] `docs/dev-plans/035A-org-ui-ia-and-sidebar-integration.md`
-7. [ ] `docs/dev-plans/037-org-ui-ux-audit.md`
-8. [ ] `docs/dev-plans/037A-org-ui-verification-and-optimization.md`
-9. [ ] `docs/dev-plans/043-ui-action-error-feedback.md`
-10. [ ] `docs/dev-plans/053A-position-contract-fields-pass-through.md`
-11. [ ] `docs/dev-plans/055-position-ui-org-integration.md`
+1. [x] `docs/dev-plans/020L-org-feature-catalog.md`
+2. [x] `docs/dev-plans/020T1-org-test-gap-closure-plan.md`（复核：无需修订）
+3. [x] `docs/dev-plans/027-org-performance-and-rollout.md`
+4. [x] `docs/dev-plans/034-org-ops-monitoring-and-load.md`
+5. [x] `docs/dev-plans/035-org-ui.md`
+6. [x] `docs/dev-plans/035A-org-ui-ia-and-sidebar-integration.md`（复核：无需修订）
+7. [x] `docs/dev-plans/037-org-ui-ux-audit.md`（复核：无需修订）
+8. [x] `docs/dev-plans/037A-org-ui-verification-and-optimization.md`（复核：无需修订）
+9. [x] `docs/dev-plans/043-ui-action-error-feedback.md`（复核：无需修订）
+10. [x] `docs/dev-plans/053A-position-contract-fields-pass-through.md`（复核：无需修订）
+11. [x] `docs/dev-plans/055-position-ui-org-integration.md`

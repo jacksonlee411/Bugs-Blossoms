@@ -47,17 +47,17 @@ flowchart LR
    - DB 表统一使用 `org_*` 前缀；本计划将 020 文档中提到的 `change_requests` 物理表名选定为 `org_change_requests`（避免与其它模块的 change request 概念冲突，如 `policy_change_requests`）。
 2. **时间语义（选定）**
    - `transaction_time`：事务提交/事件记录时间（Transaction Time）。
-   - `effective_window`：变更生效的有效期窗（Valid Time），语义为半开区间 `[effective_date, end_date)`。
+   - `effective_window`：变更生效的有效期窗（Valid Time），语义为按天闭区间 `[effective_date, end_date]`（`YYYY-MM-DD`）；DB 约束使用 `daterange(effective_date, end_date + 1, '[)')`（半开）映射实现（时间语义 SSOT：`DEV-PLAN-064`）。
    - 消费者必须以 `effective_window` 处理“未来生效”变更，禁止将 `transaction_time` 当作生效时间。
 3. **版本与演进（选定）**
-   - Topic 采用版本后缀（`*.v1`）；任何破坏性变更（字段改名/删字段/改语义）必须发布 `v2` Topic，不允许在 `v1` 上热改。
+   - Topic 采用版本后缀（`*.v1`）；本项目保持 `v1`，禁止新增 `v2`（仅允许新增字段向后兼容；禁止改语义/删字段/改名）。
    - `event_version` 固定为 `1`（配合 Topic 版本，便于调试与校验）。
 4. **幂等与去重（选定）**
    - `event_id` 为幂等键：outbox/relay 允许重复投递（at-least-once），消费者必须按 `event_id` 幂等处理（对齐 017）。
    - `request_id` 用于跨日志/审计/事件的链路串联（来自 `X-Request-Id`；无则生成）。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
-> 约定：PostgreSQL 17；所有表必须包含 `tenant_id uuid not null`；时间窗使用 `effective_date/end_date`（UTC，半开区间）；新增 EXCLUDE 约束需依赖 `btree_gist` 扩展（由 021 统一启用）。
+> 约定：PostgreSQL 17；所有表必须包含 `tenant_id uuid not null`；时间窗使用 `effective_date/end_date`（Valid Time=`date`，按天闭区间）；新增 EXCLUDE 约束需依赖 `btree_gist` 扩展（由 021 统一启用）。
 
 ### 4.1 `org_attribute_inheritance_rules`（属性继承规则，占位）
 **用途**：为后续“属性继承/覆盖”提供可演进的配置表；M1 不启用业务逻辑，仅落地结构与基本约束。
@@ -71,15 +71,15 @@ flowchart LR
 | `attribute_name` | `text` | `not null` |  | 例如 `location_id/manager_user_id` |
 | `can_override` | `boolean` | `not null` | `false` | 子节点是否允许显式覆盖 |
 | `inheritance_break_node_type` | `text` | `null` |  | 遇到该 `node_type` 时断开继承（占位） |
-| `effective_date` | `timestamptz` | `not null` |  | 生效时间 |
-| `end_date` | `timestamptz` | `not null` | `9999-12-31` | 失效时间 |
+| `effective_date` | `date` | `not null` |  | 生效日期（Valid Time） |
+| `end_date` | `date` | `not null` | `9999-12-31` | 失效日期（含当日） |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束与索引（建议）**：
-- `check (effective_date < end_date)`
+- `check (effective_date <= end_date)`
 - 防重叠（同租户/层级/属性同窗不重叠）：
-  - `exclude using gist (tenant_id with =, hierarchy_type with =, attribute_name with =, tstzrange(effective_date, end_date) with &&)`
+  - `exclude using gist (tenant_id with =, hierarchy_type with =, attribute_name with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 索引：
   - `btree (tenant_id, hierarchy_type, attribute_name, effective_date)`
 
@@ -112,16 +112,16 @@ flowchart LR
 | `subject_type` | `text` | `not null` | `user` | `user` / `group`（占位） |
 | `subject_id` | `uuid` | `not null` |  | `user`：`modules/core/authzutil.NormalizedUserUUID(tenant_id, user)`；`group`：`user_groups.id` |
 | `org_node_id` | `uuid` | `not null` |  | FK → `org_nodes.id` |
-| `effective_date` | `timestamptz` | `not null` |  |  |
-| `end_date` | `timestamptz` | `not null` | `9999-12-31` |  |
+| `effective_date` | `date` | `not null` |  |  |
+| `end_date` | `date` | `not null` | `9999-12-31` |  |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束与索引（建议）**：
-- `check (effective_date < end_date)`
+- `check (effective_date <= end_date)`
 - `check (subject_type in ('user','group'))`
 - 防重叠（同租户/同 role/同 subject/同节点同窗不重叠）：
-  - `exclude using gist (tenant_id with =, role_id with =, subject_type with =, subject_id with =, org_node_id with =, tstzrange(effective_date, end_date) with &&)`
+  - `exclude using gist (tenant_id with =, role_id with =, subject_type with =, subject_id with =, org_node_id with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 索引：
   - `btree (tenant_id, org_node_id, effective_date)`
   - `btree (tenant_id, subject_type, subject_id, effective_date)`
@@ -181,7 +181,7 @@ flowchart LR
 | `change_type` | `string` | 是 | 见 5.4 |
 | `entity_type` | `string` | 是 | 见 5.5/5.6/5.7（`org_node/org_edge/org_position/org_assignment/org_personnel_event`） |
 | `entity_id` | `uuid` | 是 | 变更实体 id（与 `entity_type` 搭配） |
-| `entity_version` | `int64` | 是 | 占位；M1 可恒为 `0`，后续如引入强版本需发布 v2 |
+| `entity_version` | `int64` | 是 | 占位；M1 可恒为 `0`；如需扩展仅允许新增字段向后兼容（保持 v1） |
 | `effective_window` | `object` | 是 | 见 5.3 |
 | `sequence` | `int64` | 否 | outbox 有序游标（若投递链路可提供则带上；消费者不得假设全局顺序） |
 | `old_values` | `object` | 否 | 可省略（Create 场景默认省略）；其余建议提供 |
@@ -190,12 +190,12 @@ flowchart LR
 ### 5.3 `effective_window`（v1，选定）
 ```json
 {
-  "effective_date": "2025-01-01T00:00:00Z",
-  "end_date": "9999-12-31T00:00:00Z"
+  "effective_date": "2025-01-01",
+  "end_date": "9999-12-31"
 }
 ```
-- 语义：半开区间 `[effective_date, end_date)`。
-- `effective_date < end_date` 必须成立。
+- 语义：按天闭区间 `[effective_date, end_date]`（`YYYY-MM-DD`）。
+- `effective_date <= end_date` 必须成立（DB 约束使用 `daterange(effective_date, end_date + 1, '[)')` 映射实现）。
 
 ### 5.4 `change_type` 枚举（v1，选定）
 - 对 `org.changed.v1`：
@@ -285,15 +285,15 @@ flowchart LR
   "entity_type": "org_node",
   "entity_id": "b8f2a4c4-6bd7-4c02-9b9f-4d4a0f65a8b3",
   "entity_version": 0,
-  "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" },
+  "effective_window": { "effective_date": "2025-01-01", "end_date": "9999-12-31" },
   "new_values": {
     "org_node_id": "b8f2a4c4-6bd7-4c02-9b9f-4d4a0f65a8b3",
     "code": "HR-001",
     "name": "HR Department",
     "status": "active",
     "parent_node_id": null,
-    "effective_date": "2025-01-01T00:00:00Z",
-    "end_date": "9999-12-31T00:00:00Z"
+    "effective_date": "2025-01-01",
+    "end_date": "9999-12-31"
   }
 }
 ```
@@ -304,7 +304,7 @@ flowchart LR
   "change_type": "position.created",
   "entity_type": "org_position",
   "entity_id": "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d",
-  "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" },
+  "effective_window": { "effective_date": "2025-01-01", "end_date": "9999-12-31" },
   "new_values": {
     "position_id": "9a8b7c6d-5e4f-4a3b-9c8d-7e6f5a4b3c2d",
     "code": "POS-0001",
@@ -312,8 +312,8 @@ flowchart LR
     "lifecycle_status": "active",
     "is_auto_created": false,
     "capacity_fte": 1.0,
-    "effective_date": "2025-01-01T00:00:00Z",
-    "end_date": "9999-12-31T00:00:00Z"
+    "effective_date": "2025-01-01",
+    "end_date": "9999-12-31"
   }
 }
 ```

@@ -1,6 +1,8 @@
 # DEV-PLAN-026：Org API、Authz 与事件发布（Outbox / Snapshot / Batch）
 
 **状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-026-READINESS.md`）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；保持 v1，禁止新增 v2。
 
 ## 0. 进度速记
 - 024/025 定义主链 CRUD 与时间/审计写语义；026 在其契约上补齐“对外 API + Authz + outbox/relay + 缓存 + snapshot/batch”闭环。
@@ -40,7 +42,7 @@
 
 ### 2.2 非目标（本计划明确不做）
 - 不交付 UI（035）/审批与预检（030）/性能读优化与 rollout（027）。
-- 不改变 021 的 schema/约束定义；不改变 022 的 Topic/字段（如需演进必须先更新 022 并发布 v2）。
+- 不改变 021 的 schema/约束定义；不改变 022 的 Topic/字段（保持 v1，禁止新增 v2；仅允许向后兼容新增字段，不允许破坏性改名/改语义/删字段）。
 
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.1 架构图 (Mermaid)
@@ -62,7 +64,7 @@ flowchart TD
 ### 3.2 关键设计决策（ADR 摘要）
 1. **路由与时间语义（选定）**
    - 内部 API 前缀：`/org/api`（对齐 `docs/dev-plans/018-routing-strategy.md`）。
-   - 读请求按 as-of：`effective_date <= t < end_date`；写请求按 025 的 Insert/Correct/Rescind/ShiftBoundary 语义执行。
+   - 读请求按 as-of（Valid Time day）：`effective_date <= d AND d <= end_date`；写请求按 025 的 Insert/Correct/Rescind/ShiftBoundary 语义执行（SSOT：DEV-PLAN-064）。
 2. **Authz 粗粒度动作（选定）**
    - 动作固定为 `read/write/assign/admin`（M1）；避免接口级“动作爆炸”。
    - Assignment 写入只要求 `assign`，即使触发自动创建空壳 Position（见 035 的“权限悖论”约束）。
@@ -198,7 +200,7 @@ CREATE INDEX org_outbox_tenant_published
 ```json
 {
   "tenant_id": "uuid",
-  "effective_date": "2025-01-01T00:00:00Z",
+  "effective_date": "2025-01-01",
   "generated_at": "2025-01-01T12:00:00Z",
   "includes": ["nodes", "edges"],
   "limit": 2000,
@@ -212,8 +214,8 @@ CREATE INDEX org_outbox_tenant_published
         "name": "Engineering",
         "status": "active",
         "parent_node_id": null,
-        "effective_date": "2025-01-01T00:00:00Z",
-        "end_date": "9999-12-31T00:00:00Z"
+        "effective_date": "2025-01-01",
+        "end_date": "9999-12-31"
       }
     }
   ],

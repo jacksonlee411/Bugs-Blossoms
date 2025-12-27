@@ -1,6 +1,8 @@
 # DEV-PLAN-024：Org 主链 CRUD（Person → Position → Org）
 
 **状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-024-READINESS.md`）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；示例与算法不再使用 RFC3339 timestamp 表达生效日。
 
 ## 0. 进度速记
 - 本计划只交付 **主链 CRUD + 自动创建空壳 Position** 的最小可用路径（可写可查），用于支撑后续 025/026/035 的落地与联调。
@@ -84,8 +86,8 @@ flowchart TD
 ### 5.1 通用约定
 - 路由前缀：`/org/api/*`（对齐 018 路由策略）。
 - 时间参数：
-  - `effective_date` 支持 `YYYY-MM-DD` 或 RFC3339；`YYYY-MM-DD` 解释为 `00:00:00Z`。
-  - 缺省 `effective_date`：服务端使用 `time.Now().UTC()`（注意：创建/更新类请求建议客户端显式传入，避免“跨午夜”产生歧义）。
+  - `effective_date`：Valid Time，一律使用 `YYYY-MM-DD`（兼容期允许 RFC3339，但会归一化为 UTC date 并回显为 `YYYY-MM-DD`；SSOT：DEV-PLAN-064）。
+  - 缺省 `effective_date`：服务端使用 `todayUTC`（UTC date）。
 - 错误响应（JSON）统一形状（复用 `modules/core/presentation/controllers/dtos.APIError`）：
   ```json
   { "code": "ORG_INVALID_BODY", "message": "…", "meta": { "request_id": "…" } }
@@ -102,7 +104,7 @@ flowchart TD
 {
   "tenant_id": "uuid",
   "hierarchy_type": "OrgUnit",
-  "effective_date": "2025-01-01T00:00:00Z",
+  "effective_date": "2025-01-01",
   "nodes": [
     {
       "id": "uuid",
@@ -151,7 +153,7 @@ flowchart TD
 {
   "id": "uuid",
   "code": "D001",
-  "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-01-01", "end_date": "9999-12-31" }
 }
 ```
 
@@ -182,7 +184,7 @@ flowchart TD
 - **不允许**在 024 通过本接口修改 `code`、或在 `effective_date` 处做原位修正；若 `effective_date` 等于当前片段 `effective_date`，返回 422 `ORG_USE_CORRECT`（由 025 提供 correct/shiftboundary）。
 
 **Response 200**
-- 返回 `effective_window`（本次新增片段的 `[effective_date, end_date)`）。
+- 返回 `effective_window`（本次新增片段的 `[effective_date, end_date]`（按天闭区间））。
 
 ### 5.5 `POST /org/api/nodes/{id}:move`
 **Request**
@@ -217,8 +219,8 @@ flowchart TD
       "position_id": "uuid",
       "org_node_id": "uuid",
       "assignment_type": "primary",
-      "effective_date": "2025-01-01T00:00:00Z",
-      "end_date": "9999-12-31T00:00:00Z"
+      "effective_date": "2025-01-01",
+      "end_date": "9999-12-31"
     }
   ]
 }
@@ -253,7 +255,7 @@ flowchart TD
   "assignment_id": "uuid",
   "position_id": "uuid",
   "subject_id": "uuid",
-  "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-01-01", "end_date": "9999-12-31" }
 }
 ```
 
@@ -284,7 +286,7 @@ flowchart TD
 {
   "assignment_id": "uuid",
   "position_id": "uuid",
-  "effective_window": { "effective_date": "2025-02-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-02-01", "end_date": "9999-12-31" }
 }
 ```
 
@@ -310,8 +312,8 @@ flowchart TD
 - 规则：若当前 slice `S.effective_date == X`，拒绝（要求走 025 Correct/ShiftBoundary）。
 - 在同一事务内：
   1. 锁定并读取覆盖 `X` 的当前 slice `S`（`FOR UPDATE`）。
-  2. 计算新片段结束 `Y`（复用 025 Insert 规则：下一片段 `effective_date` 或 `9999-12-31`）。
-  3. 将 `S.end_date` 截断为 `X`，插入新 slice `[X,Y)`（含更新后的属性字段；未提供的字段从 `S` 继承）。
+  2. 计算新片段结束 `Y`（复用 025 Insert 规则：下一片段 `effective_date - 1 day`；若不存在则 `9999-12-31`）。
+  3. 将 `S.end_date` 截断为 `X - 1 day`，插入新 slice `[X,Y]`（含更新后的属性字段；未提供的字段从 `S` 继承）。
 
 ### 6.4 MoveNode（Insert edge + 子树重切片）
 - 输入：`org_node_id` + `new_parent_id` + `effective_date=X`。
@@ -322,8 +324,8 @@ flowchart TD
 
 **算法（同一事务内）**：
 1. 读取并锁定在 `X` 的 as-of subtree：
-   - 读出 `moved_path`：`SELECT path FROM org_edges WHERE tenant_id=? AND child_node_id=? AND effective_date<=X AND X<end_date FOR UPDATE`
-   - 列出 subtree edges：`SELECT parent_node_id, child_node_id, depth, end_date FROM org_edges WHERE tenant_id=? AND effective_date<=X AND X<end_date AND path <@ moved_path ORDER BY depth ASC FOR UPDATE`
+   - 读出 `moved_path`：`SELECT path FROM org_edges WHERE tenant_id=? AND child_node_id=? AND effective_on<=X AND X<=end_on FOR UPDATE`
+   - 列出 subtree edges：`SELECT parent_node_id, child_node_id, depth, end_on FROM org_edges WHERE tenant_id=? AND effective_on<=X AND X<=end_on AND path <@ moved_path ORDER BY depth ASC FOR UPDATE`
 2. 先处理被移动节点自身：
    - 将其当前 edge `E` 的 `end_date` 更新为 `X`（`E.effective_date < X` 前置已保证）。
    - 插入新 edge：`(parent_node_id=new_parent_id, child_node_id=org_node_id, effective_date=X, end_date=E.end_date_original)`。
@@ -361,7 +363,7 @@ flowchart TD
   - `transaction_time`：`time.Now().UTC()`（024 先以提交后的 wall-clock 近似；026/outbox 落地后以 outbox 写入时间为准）
   - `initiator_id`：使用 `modules/core/authzutil.NormalizedUserUUID(tenantID, user)`（把 `users.id` 映射为稳定 UUID）
   - `entity_version=0`（M1 固定）
-  - `effective_window`：本次变更影响的 `[effective_date,end_date)`（与写入的时间片一致）
+  - `effective_window`：本次变更影响的 `[effective_date,end_date]`（按天闭区间，与写入的时间片一致）
 - change_type 与产出策略（M1）：
   - Node Create：产出 `node.created`（entity_type=`org_node`, entity_id=`org_nodes.id`）以及 `edge.created`（entity_type=`org_edge`, entity_id=`org_edges.id`）
   - Node Update(Insert)：产出 `node.updated`

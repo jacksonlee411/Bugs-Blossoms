@@ -100,7 +100,7 @@ graph TD
 - 标识：`position_id (uuid)`、`code (string)`、`title (string|null)`
 - 归属：`org_node_id (uuid)`（如列表包含下级节点，`org_node_label` 由层级树数据派生；不作为 053 v1 的硬依赖字段）
 - 生命周期：`lifecycle_status (enum)`（对齐 052 的映射；UI 使用 badge 展示）
-- 有效期窗：`effective_date/end_date (time)`（UTC，`YYYY-MM-DD` 展示）
+- 有效期窗：`effective_date/end_date (date)`（`YYYY-MM-DD`，day 粒度；SSOT：DEV-PLAN-064）
 - 类型标记：`is_auto_created (bool)`（用于 Managed/System 分流；对齐 053）
 - 占编摘要（对齐 053 v1）：
   - `capacity_fte (decimal)`、`occupied_fte (decimal)`、`available_fte (decimal)`（`available_fte = capacity_fte - occupied_fte`）

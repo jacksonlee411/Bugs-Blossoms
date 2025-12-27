@@ -71,19 +71,22 @@ table "org_nodes" {
   column "id" { type = uuid, default = sql("gen_random_uuid()") }
   column "tenant_id" { type = uuid }
   column "code" { type = varchar(64) }
-  column "effective_date" { type = timestamptz }
-  column "end_date" { type = timestamptz, default = "9999-12-31" }
-  
+
+  // Valid Time（业务有效期）统一使用 date（日粒度）；时间戳仅用于 Audit/Tx Time（SSOT：DEV-PLAN-064）。
+  column "effective_date" { type = date }
+  column "end_date" { type = date, default = "9999-12-31" }
+
   primary_key { columns = [column.id] }
-  
+
   // 强约束示例：同一租户下 Code 唯一
   index "idx_org_nodes_code" {
     columns = [column.tenant_id, column.code]
     unique  = true
   }
-  
+
   // 高级约束示例：防时间重叠 (Postgres EXCLUDE)
-  // exclude using gist (tenant_id with =, code with =, tstzrange(effective_date, end_date) with &&)
+  // 注：day 闭区间 [effective_date,end_date] 在 DB 用 daterange 的半开表示实现：
+  // exclude using gist (tenant_id with =, code with =, daterange(effective_date, end_date + 1, '[)') with &&)
 }
 ```
 
@@ -100,7 +103,7 @@ table "org_nodes" {
   {
     "code": "HR-001", // Required, unique
     "parent_id": "uuid", // Optional
-    "effective_date": "2024-01-01T00:00:00Z" // Default: now
+    "effective_date": "2024-01-01" // Valid Time: YYYY-MM-DD（日粒度）
   }
   ```
 - **Response (201 Created)**:
@@ -129,8 +132,8 @@ table "org_nodes" {
 3. **计算 Path**: `new_path = parent.path + "." + new_id`；校验深度是否超限。
 4. **时间片处理 (Effective Dating)**:
    - 锁定目标时间线 (`SELECT FOR UPDATE`)。
-   - 若存在重叠片段 -> 截断旧片段 `end_date = new_effective_date`。
-   - 插入新片段 `[new_effective_date, 9999-12-31)`。
+   - 若存在重叠片段 -> 截断旧片段 `end_date = new_effective_date - 1 day`。
+   - 插入新片段 `[new_effective_date, 9999-12-31]`。
 5. **发布事件**: 写入 Outbox `OrgNodeCreated`。
 6. **提交事务**。
 

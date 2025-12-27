@@ -1,6 +1,8 @@
 # DEV-PLAN-027：Org 性能基准与灰度发布（Step 7）
 
 **状态**: 已评审（2025-12-14 08:22 UTC）；已完成 M1 工具/开关落地（2025-12-18）；Readiness 已补齐（2025-12-19，见 `docs/dev-records/DEV-PLAN-027-READINESS.md`）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：`effective_date` 参数统一为 `YYYY-MM-DD`（day 粒度）；基准/压测应使用固定日期（UTC day）。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**: `docs/dev-plans/020-organization-lifecycle.md` 的 **步骤 7：性能与上线准备**（M1 上线验收门槛）。
@@ -98,7 +100,7 @@ graph TD
 
 - **实现形态 A：Go CLI `cmd/org-perf`（端到端可复用，推荐）**
   - `org-perf dataset apply --tenant <uuid> --scale 1k --seed 42 --profile balanced [--backend db|api] [--apply]`
-  - `org-perf bench tree --tenant <uuid> --effective-date <rfc3339|yyyy-mm-dd> --profile balanced --iterations 200 --warmup 50 --concurrency 1 --backend db|api [--base-url http://localhost:3200] --output <path>`
+  - `org-perf bench tree --tenant <uuid> --effective-date <yyyy-mm-dd> --profile balanced --iterations 200 --warmup 50 --concurrency 1 --backend db|api [--base-url http://localhost:3200] --output <path>`
 
 - **实现形态 B：Go test（CI Query Budget 守卫，必须交付）**
   - `go test ./modules/org/... -run '^TestOrgTreeQueryBudget$' -count=1`
@@ -116,7 +118,7 @@ graph TD
 ### 6.1 基准执行算法（统一口径）
 1. **准备环境**：
    - Postgres 17，迁移已完成（021）；
-   - 使用固定 `TENANT_ID`（基准专用租户）与固定 `effective_date`（默认 `now()` 或固定日期，推荐固定）。
+   - 使用固定 `TENANT_ID`（基准专用租户）与固定 `effective_date`（默认 `today(UTC)` 或固定日期，推荐固定）。
 2. **准备数据集（Scale=1k）**：
    - root 1 个 + 子树合计 1000 个节点（结构固定，至少提供以下 profile）：
      - `balanced`（默认）：深度约 6（允许范围 5-8），按 BFS 填充到 1000 节点，尽量贴近真实组织结构。

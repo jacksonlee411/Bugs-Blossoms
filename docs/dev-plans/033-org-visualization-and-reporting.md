@@ -1,6 +1,8 @@
 # DEV-PLAN-033：Org 可视化与高级报告（Step 13）
 
 **状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time / as-of 一律按天（`YYYY-MM-DD`）语义；示例与查询不再使用 RFC3339 timestamp 表达生效日。
 
 ## 0. 进度速记
 - 本计划交付三类能力：**组织图导出（JSON）**、**节点/人员路径查询**、以及面向 BI 的 **`org_reporting`（as-of 快照）**。
@@ -150,7 +152,7 @@ WHERE b.is_active = TRUE AND b.status = 'ready';
 ### 5.1 `GET /org/api/hierarchies:export`（组织图导出，JSON）
 **Query**
 - `type`：必填，`OrgUnit`
-- `effective_date`：可选（缺省 `nowUTC`）
+- `effective_date`：可选（缺省 `todayUTC`；Valid Time 一律 `YYYY-MM-DD`）
 - `root_node_id`：可选（缺省为租户 root）
 - `max_depth`：可选（缺省不限；最大建议 20，超过返回 422 `ORG_EXPORT_TOO_DEEP`）
 - `include`：可选，逗号分隔；允许值：
@@ -166,7 +168,7 @@ WHERE b.is_active = TRUE AND b.status = 'ready';
 {
   "tenant_id": "uuid",
   "hierarchy_type": "OrgUnit",
-  "effective_date": "2025-03-01T00:00:00Z",
+  "effective_date": "2025-03-01",
   "root_node_id": "uuid",
   "includes": ["nodes", "edges"],
   "limit": 2000,
@@ -188,7 +190,7 @@ WHERE b.is_active = TRUE AND b.status = 'ready';
 
 ### 5.2 `GET /org/api/nodes/{id}:path`（节点路径）
 **Query**
-- `effective_date`：可选（缺省 `nowUTC`）
+- `effective_date`：可选（缺省 `todayUTC`；Valid Time 一律 `YYYY-MM-DD`）
 - `format`：可选，默认 `nodes`；允许值：
   - `nodes`：仅返回 `path.nodes[]`
   - `nodes_with_sources`：返回 `path.nodes[]` + `source`（用于解释来自哪个 ancestor）
@@ -198,7 +200,7 @@ WHERE b.is_active = TRUE AND b.status = 'ready';
 {
   "tenant_id": "uuid",
   "org_node_id": "uuid",
-  "effective_date": "2025-03-01T00:00:00Z",
+  "effective_date": "2025-03-01",
   "path": {
     "nodes": [
       { "id": "uuid", "code": "ROOT", "name": "Company", "depth": 0 },
@@ -215,14 +217,14 @@ WHERE b.is_active = TRUE AND b.status = 'ready';
 ### 5.3 `GET /org/api/reports/person-path`（人员路径）
 **Query**
 - `subject`：必填，格式 `person:{pernr}`（对齐 024 `GET /org/api/assignments`）
-- `effective_date`：可选（缺省 `nowUTC`）
+- `effective_date`：可选（缺省 `todayUTC`；Valid Time 一律 `YYYY-MM-DD`）
 
 **Response 200**
 ```json
 {
   "tenant_id": "uuid",
   "subject": "person:000123",
-  "effective_date": "2025-03-01T00:00:00Z",
+  "effective_date": "2025-03-01",
   "assignment": { "assignment_id": "uuid", "position_id": "uuid", "org_node_id": "uuid" },
   "path": {
     "nodes": [
@@ -264,13 +266,13 @@ WHERE b.is_active = TRUE AND b.status = 'ready';
 5. 返回 `path.nodes[]`；若任一环节无法定位节点 → 404 `ORG_NODE_NOT_FOUND_AT_DATE`。
 
 ### 6.2 人员路径查询（在线）
-输入：`tenant_id, subject=person:{pernr}, t`
+输入：`tenant_id, subject=person:{pernr}, effective_date(d)`（day）
 
 1. 查询 primary assignment as-of：
-   - `org_assignments where tenant_id=? and pernr=? and assignment_type='primary' and effective_date<=t and t<end_date`
+   - `org_assignments where tenant_id=? and pernr=? and assignment_type='primary' and effective_on<=d and d<=end_on`
    - 若无 → 404 `ORG_ASSIGNMENT_NOT_FOUND_AT_DATE`
 2. 查询 position as-of → 得到 `org_node_id`：
-   - `org_positions where tenant_id=? and id=$position_id and effective_date<=t and t<end_date`
+   - `org_positions where tenant_id=? and id=$position_id and effective_on<=d and d<=end_on`
 3. 复用 6.1 的节点路径查询。
 
 ### 6.3 `org_reporting_nodes` build（离线，允许递归）

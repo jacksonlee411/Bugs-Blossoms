@@ -1,6 +1,8 @@
 # DEV-PLAN-028：Org 属性继承解析与角色读侧占位（Step 8）
 
 **状态**: 已评审（2025-12-18 01:21 UTC）；已完成实现（2025-12-18）；Readiness 已补齐（2025-12-18，见 `docs/dev-records/DEV-PLAN-028-READINESS.md`）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）统一按天（`YYYY-MM-DD`）闭区间语义；示例与 as-of 判定不再使用 RFC3339 timestamp。
 
 ## 0. 进度速记
 - 本计划对应 `docs/dev-plans/020-organization-lifecycle.md` 阶段 2 / 步骤 8：在 026（API/Authz/Outbox）与 027（性能/灰度）稳定后，补齐“读侧增强能力”。
@@ -87,7 +89,7 @@ flowchart TD
 > 本计划不新增表；表结构与约束 SSOT 见 `docs/dev-plans/021-org-schema-and-constraints.md` 与 `docs/dev-plans/022-org-placeholders-and-event-contracts.md`。
 
 - **继承输入**：
-  - `org_attribute_inheritance_rules`（022）：按 `effective_date <= t < end_date` 取 as-of 规则；仅处理 `hierarchy_type=OrgUnit`。
+  - `org_attribute_inheritance_rules`（022）：按 day as-of（`effective_date <= d AND d <= end_date`）取规则；仅处理 `hierarchy_type=OrgUnit`（SSOT：DEV-PLAN-064）。
   - `org_node_slices`（Org baseline）：显式属性来源：
     - `legal_entity_id uuid|null`
     - `company_code text|null`
@@ -111,7 +113,7 @@ flowchart TD
 ### 5.1 `GET /org/api/hierarchies`（扩展：可选返回继承解析）
 **Query（继承 024，并新增）**
 - `type`：必填，`OrgUnit`
-- `effective_date`：可选（缺省 `nowUTC`）
+- `effective_date`：可选（缺省 `todayUTC`；Valid Time 一律 `YYYY-MM-DD`）
 - `include`：可选，逗号分隔；允许值：
   - `resolved_attributes`：在每个 node 上返回 `attributes` + `resolved_attributes`
 
@@ -120,7 +122,7 @@ flowchart TD
 {
   "tenant_id": "uuid",
   "hierarchy_type": "OrgUnit",
-  "effective_date": "2025-01-01T00:00:00Z",
+  "effective_date": "2025-01-01",
   "nodes": [
     {
       "id": "uuid",
@@ -157,7 +159,7 @@ flowchart TD
 > 用于灰度/Readiness 中快速定位“某个解析值来自哪个祖先节点”，避免只能通过全树 dump 排查。
 
 **Query**
-- `effective_date`：可选（缺省 `nowUTC`）
+- `effective_date`：可选（缺省 `todayUTC`；Valid Time 一律 `YYYY-MM-DD`）
 - `attributes`：可选，逗号分隔；缺省表示使用 as-of 规则表中出现的属性白名单子集。
 
 **Response 200**
@@ -166,7 +168,7 @@ flowchart TD
   "tenant_id": "uuid",
   "hierarchy_type": "OrgUnit",
   "org_node_id": "uuid",
-  "effective_date": "2025-01-01T00:00:00Z",
+  "effective_date": "2025-01-01",
   "attributes": { "company_code": null, "location_id": "uuid" },
   "resolved_attributes": { "company_code": "ACME", "location_id": "uuid" },
   "resolved_sources": { "company_code": "uuid", "location_id": "uuid" }
@@ -194,7 +196,7 @@ flowchart TD
 ### 5.4 `GET /org/api/role-assignments`（只读，支持祖先继承汇总）
 **Query**
 - `org_node_id`：必填
-- `effective_date`：可选（缺省 `nowUTC`）
+- `effective_date`：可选（缺省 `todayUTC`；Valid Time 一律 `YYYY-MM-DD`）
 - `include_inherited`：可选，默认 `false`
 - `role`：可选（role code）
 - `subject`：可选，格式 `user:<uuid>`（`group:<uuid>` 预留但本期不保证返回）
@@ -204,7 +206,7 @@ flowchart TD
 {
   "tenant_id": "uuid",
   "org_node_id": "uuid",
-  "effective_date": "2025-01-01T00:00:00Z",
+  "effective_date": "2025-01-01",
   "include_inherited": true,
   "items": [
     {
@@ -213,7 +215,7 @@ flowchart TD
       "role_code": "HRBP",
       "subject": "user:uuid",
       "source_org_node_id": "uuid",
-      "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+      "effective_window": { "effective_date": "2025-01-01", "end_date": "9999-12-31" }
     }
   ]
 }

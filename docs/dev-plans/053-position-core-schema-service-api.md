@@ -1,6 +1,8 @@
 # DEV-PLAN-053：Position Core（Schema + Service + API 最小闭环）（对齐 050/051/052）
 
 **状态**: 已完成（Schema + Service + API 最小闭环收口；见 §8.3 实施记录）（2025-12-20 18:36 UTC）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；schema/约束示例以 `effective_on/end_on`（`date`）与 `daterange(...,'[)')` 映射为准。
 
 > 本计划按 [DEV-PLAN-001](001-technical-design-template.md) 的结构补齐“可直接编码”的详细设计（Level 4-5），并以 [DEV-PLAN-052](052-position-contract-freeze-and-decisions.md) 的契约冻结为准：若本计划与 052 冲突，以 052 为 SSOT。
 
@@ -111,13 +113,16 @@ CREATE TABLE org_position_slices (
 
   profile jsonb NOT NULL DEFAULT '{}'::jsonb,
 
-  effective_date timestamptz NOT NULL,
-  end_date timestamptz NOT NULL DEFAULT '9999-12-31',
+  effective_date timestamptz NOT NULL, -- legacy（B1 双轨；待 DEV-PLAN-064 阶段 D 清理）
+  end_date timestamptz NOT NULL DEFAULT '9999-12-31', -- legacy（exclusive 上界）
+  effective_on date NOT NULL,
+  end_on date NOT NULL DEFAULT DATE '9999-12-31',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
 
   CONSTRAINT org_position_slices_tenant_id_id_key UNIQUE (tenant_id, id),
-  CONSTRAINT org_position_slices_effective_check CHECK (effective_date < end_date),
+  CONSTRAINT org_position_slices_effective_check CHECK (effective_date < end_date), -- legacy（半开区间）
+  CONSTRAINT org_position_slices_effective_on_check CHECK (effective_on <= end_on),
   CONSTRAINT org_position_slices_profile_is_object_check CHECK (jsonb_typeof(profile) = 'object'),
   CONSTRAINT org_position_slices_lifecycle_status_check CHECK (lifecycle_status IN ('planned','active','inactive','rescinded')),
   CONSTRAINT org_position_slices_capacity_fte_check CHECK (capacity_fte > 0),
@@ -129,6 +134,7 @@ CREATE TABLE org_position_slices (
 );
 
 ALTER TABLE org_position_slices
+  -- legacy（B1 双轨；待 DEV-PLAN-064 阶段 D 清理）：timestamptz + tstzrange('[)') 约束
   ADD CONSTRAINT org_position_slices_no_overlap
   EXCLUDE USING gist (
     tenant_id gist_uuid_ops WITH =,
@@ -136,11 +142,22 @@ ALTER TABLE org_position_slices
     tstzrange(effective_date, end_date, '[)') WITH &&
   );
 
+ALTER TABLE org_position_slices
+  ADD CONSTRAINT org_position_slices_tenant_position_no_overlap_on
+  EXCLUDE USING gist (
+    tenant_id gist_uuid_ops WITH =,
+    position_id gist_uuid_ops WITH =,
+    daterange(effective_on, end_on + 1, '[)') WITH &&
+  );
+
 CREATE INDEX org_position_slices_tenant_position_effective_idx
-  ON org_position_slices (tenant_id, position_id, effective_date);
+  ON org_position_slices (tenant_id, position_id, effective_date); -- legacy（B1 双轨）
 
 CREATE INDEX org_position_slices_tenant_org_node_effective_idx
-  ON org_position_slices (tenant_id, org_node_id, effective_date);
+  ON org_position_slices (tenant_id, org_node_id, effective_date); -- legacy（B1 双轨）
+
+CREATE INDEX org_position_slices_tenant_position_effective_on_idx
+  ON org_position_slices (tenant_id, position_id, effective_on);
 ```
 
 #### 4.1.2 调整：`org_positions`（稳定实体）
@@ -173,7 +190,7 @@ CREATE INDEX org_position_slices_tenant_org_node_effective_idx
   - 生产通常不执行破坏性 down；如需回滚，按 059 收口计划提供“禁写/只读/feature flag 关闭”的回退路径优先于 schema down。
 
 ## 5. 接口契约 (API Contracts)
-> 标准：定义 URL/Method/Payload/错误码。时间参数沿用 024（支持 `YYYY-MM-DD` 或 RFC3339，统一 UTC）。错误码清单以 052 §6.3 为准；鉴权 object/action 映射以 026 为准（策略由 054 落地）。
+> 标准：定义 URL/Method/Payload/错误码。时间参数沿用 024：Valid Time 一律使用 `YYYY-MM-DD`（兼容期允许 RFC3339 但会归一化并回显为 `YYYY-MM-DD`；SSOT：DEV-PLAN-064）。错误码清单以 052 §6.3 为准；鉴权 object/action 映射以 026 为准（策略由 054 落地）。
 
 ### 5.1 `POST /org/api/positions`（Create）
 **Request**
@@ -211,13 +228,13 @@ CREATE INDEX org_position_slices_tenant_org_node_effective_idx
 {
   "position_id": "uuid",
   "slice_id": "uuid",
-  "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-01-01", "end_date": "9999-12-31" }
 }
 ```
 
 ### 5.2 `GET /org/api/positions`（List, as-of）
 **Query**
-- `effective_date`：可选；缺省为 `nowUTC`（对齐 024/026；若传 `YYYY-MM-DD` 则按 UTC day start 解析）
+- `effective_date`：可选；缺省为 `todayUTC`（Valid Time day）
 - `org_node_id`：可选
 - `include_descendants`：可选（默认 false；当为 true 时使用 029 的 active closure build 展开后代节点集合）
 - `lifecycle_status`：可选
@@ -236,7 +253,7 @@ CREATE INDEX org_position_slices_tenant_org_node_effective_idx
 ```json
 {
   "tenant_id": "uuid",
-  "as_of": "2025-01-01T00:00:00Z",
+  "as_of": "2025-01-01",
   "page": 1,
   "limit": 25,
   "positions": [
@@ -250,8 +267,8 @@ CREATE INDEX org_position_slices_tenant_org_node_effective_idx
       "capacity_fte": 1.0,
       "occupied_fte": 0.5,
       "staffing_state": "partially_filled",
-      "effective_date": "2025-01-01T00:00:00Z",
-      "end_date": "9999-12-31T00:00:00Z"
+      "effective_date": "2025-01-01",
+      "end_date": "9999-12-31"
     }
   ]
 }
@@ -353,7 +370,7 @@ CREATE INDEX org_position_slices_tenant_org_node_effective_idx
 ## 6. 核心逻辑与算法 (Business Logic & Algorithms)
 ### 6.1 as-of 派生：`occupied_fte` / `staffing_state`
 对齐 052 §8.1：
-1. 查 Position Slice：`position_id` 在 `[effective_date,end_date)` 覆盖 as-of 的切片 `S`。
+1. 查 Position Slice：`position_id` 在 `[effective_date,end_date]`（按天闭区间）覆盖 as-of 的切片 `S`。
 2. 查 Assignments：同一 `position_id` 在 as-of 视角有效且计入占编的任职集合（v1 仅 `assignment_type='primary'`）。
 3. `occupied_fte = sum(allocated_fte)`；对比 `capacity_fte`：
    - `empty`：`occupied_fte = 0`
