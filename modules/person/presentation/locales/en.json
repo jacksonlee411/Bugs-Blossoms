@@ -1,6 +1,7 @@
 {
   "NavigationLinks": {
-    "Person": "Person",
+    "Person": "People",
+    "JobData": "Job Data",
     "Persons": "Persons"
   },
   "Person": {

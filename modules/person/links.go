@@ -15,6 +15,15 @@ var PersonsLink = types.NavigationItem{
 	Children:    nil,
 }
 
+var JobDataLink = types.NavigationItem{
+	Name:        "NavigationLinks.JobData",
+	Icon:        nil,
+	Href:        "/org/assignments",
+	AuthzObject: "org.assignments",
+	AuthzAction: "read",
+	Children:    nil,
+}
+
 var PersonLink = types.NavigationItem{
 	Name:        "NavigationLinks.Person",
 	Icon:        icons.Users(icons.Props{Size: "20"}),
@@ -23,6 +32,7 @@ var PersonLink = types.NavigationItem{
 	AuthzAction: "list",
 	Children: []types.NavigationItem{
 		PersonsLink,
+		JobDataLink,
 	},
 }
 

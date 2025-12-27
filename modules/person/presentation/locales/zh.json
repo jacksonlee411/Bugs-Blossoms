@@ -1,6 +1,7 @@
 {
   "NavigationLinks": {
-    "Person": "人员",
+    "Person": "人员管理",
+    "JobData": "任职记录",
     "Persons": "人员"
   },
   "Person": {
