@@ -409,10 +409,6 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 			<div class="text-sm text-300">{ pageCtx.T("Org.UI.Assignments.Empty") }</div>
 		}
 	} else {
-		{{openEnded := func(t time.Time) bool {
-	return t.UTC().Year() == 9999 && t.UTC().Month() == time.December && t.UTC().Day() == 31
-}
-		}}
 		if props.SwapSummary {
 			{{ currentOrg := "" }}
 			{{ currentPos := "" }}
@@ -492,11 +488,11 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 					<tr class="border-b border-surface-400/60">
 						<td class="py-2 pr-2 text-200">{ row.Pernr }</td>
 						<td class="py-2 pr-2 text-200">
-							{ row.EffectiveDate.UTC().Format("2006-01-02") } →
-							if openEnded(row.EndDate) {
+							{ formatValidDate(row.EffectiveDate) } →
+							if openEndedEndDate(row.EndDate) {
 								{ pageCtx.T("Org.UI.Shared.Present") }
 							} else {
-								{ row.EndDate.UTC().Format("2006-01-02") }
+								{ formatValidEndDateFromEndDate(row.EndDate) }
 							}
 						</td>
 						<td class="py-2 pr-2 text-200">

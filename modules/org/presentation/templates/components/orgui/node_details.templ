@@ -84,7 +84,12 @@ templ NodeDetails(props NodeDetailsProps) {
 				<div class="col-span-12 md:col-span-6">
 					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Node.Fields.EffectiveWindow") }</div>
 					<div class="mt-1 text-200">
-						{ props.Node.EffectiveDate.UTC().Format("2006-01-02") } → { props.Node.EndDate.UTC().Format("2006-01-02") }
+						{ formatValidDate(props.Node.EffectiveDate) } →
+						if openEndedEndDate(props.Node.EndDate) {
+							{ pageCtx.T("Org.UI.Shared.Present") }
+						} else {
+							{ formatValidEndDateFromEndDate(props.Node.EndDate) }
+						}
 					</div>
 				</div>
 				<div class="col-span-12 md:col-span-6">

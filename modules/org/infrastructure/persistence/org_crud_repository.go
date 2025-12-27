@@ -722,7 +722,7 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type IN ('hire', 'transfer')
-				AND e.effective_date::date = a.effective_date::date
+				AND e.effective_on = a.effective_on
 			ORDER BY e.created_at DESC
 			LIMIT 1
 		) AS start_event_type,
@@ -732,7 +732,7 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type = 'termination'
-				AND e.effective_date::date = a.end_date::date
+				AND e.effective_on = a.end_on
 			ORDER BY e.created_at DESC
 			LIMIT 1
 		) AS end_event_type
@@ -798,7 +798,7 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 			WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type IN ('hire', 'transfer')
-				AND e.effective_date::date = a.effective_date::date
+				AND e.effective_on = a.effective_on
 			ORDER BY e.created_at DESC
 			LIMIT 1
 		) AS start_event_type,
@@ -808,7 +808,7 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 			WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type = 'termination'
-				AND e.effective_date::date = a.end_date::date
+				AND e.effective_on = a.end_on
 			ORDER BY e.created_at DESC
 			LIMIT 1
 		) AS end_event_type

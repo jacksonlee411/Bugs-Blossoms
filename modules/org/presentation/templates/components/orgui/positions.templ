@@ -420,7 +420,14 @@ templ PositionTimeline(props PositionTimelineProps) {
 			for _, it := range props.Items {
 				<li class="rounded-md border border-surface-400 bg-surface-300 p-3">
 					<div class="flex items-center justify-between gap-3">
-						<div class="text-sm text-100">{ it.EffectiveDate.UTC().Format("2006-01-02") } → { it.EndDate.UTC().Format("2006-01-02") }</div>
+						<div class="text-sm text-100">
+							{ formatValidDate(it.EffectiveDate) } →
+							if openEndedEndDate(it.EndDate) {
+								{ pageCtx.T("Org.UI.Shared.Present") }
+							} else {
+								{ formatValidEndDateFromEndDate(it.EndDate) }
+							}
+						</div>
 						<div class="text-xs text-400">{ positionLifecycleLabel(pageCtx, it.LifecycleStatus) }</div>
 					</div>
 					<div class="mt-1 text-xs text-300">

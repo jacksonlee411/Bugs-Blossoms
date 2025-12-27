@@ -20,6 +20,8 @@ type OrgAssignment struct {
 	AllocatedFte   pgtype.Numeric     `json:"allocated_fte"`
 	EffectiveDate  pgtype.Timestamptz `json:"effective_date"`
 	EndDate        pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn    pgtype.Date        `json:"effective_on"`
+	EndOn          pgtype.Date        `json:"end_on"`
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
 }
@@ -33,6 +35,8 @@ type OrgAttributeInheritanceRule struct {
 	InheritanceBreakNodeType *string            `json:"inheritance_break_node_type"`
 	EffectiveDate            pgtype.Timestamptz `json:"effective_date"`
 	EndDate                  pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn              pgtype.Date        `json:"effective_on"`
+	EndOn                    pgtype.Date        `json:"end_on"`
 	CreatedAt                pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt                pgtype.Timestamptz `json:"updated_at"`
 }
@@ -48,6 +52,8 @@ type OrgAuditLog struct {
 	EntityID        pgtype.UUID        `json:"entity_id"`
 	EffectiveDate   pgtype.Timestamptz `json:"effective_date"`
 	EndDate         pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn     pgtype.Date        `json:"effective_on"`
+	EndOn           pgtype.Date        `json:"end_on"`
 	OldValues       []byte             `json:"old_values"`
 	NewValues       []byte             `json:"new_values"`
 	Meta            []byte             `json:"meta"`
@@ -77,6 +83,8 @@ type OrgEdge struct {
 	Depth         int32              `json:"depth"`
 	EffectiveDate pgtype.Timestamptz `json:"effective_date"`
 	EndDate       pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn   pgtype.Date        `json:"effective_on"`
+	EndOn         pgtype.Date        `json:"end_on"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
@@ -90,6 +98,8 @@ type OrgHierarchyClosure struct {
 	Depth            int32              `json:"depth"`
 	EffectiveDate    pgtype.Timestamptz `json:"effective_date"`
 	EndDate          pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn      pgtype.Date        `json:"effective_on"`
+	EndOn            pgtype.Date        `json:"end_on"`
 }
 
 type OrgHierarchyClosureBuild struct {
@@ -199,6 +209,8 @@ type OrgLink struct {
 	Metadata      []byte             `json:"metadata"`
 	EffectiveDate pgtype.Timestamptz `json:"effective_date"`
 	EndDate       pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn   pgtype.Date        `json:"effective_on"`
+	EndOn         pgtype.Date        `json:"end_on"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
@@ -228,6 +240,8 @@ type OrgNodeSlice struct {
 	ManagerUserID *int64             `json:"manager_user_id"`
 	EffectiveDate pgtype.Timestamptz `json:"effective_date"`
 	EndDate       pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn   pgtype.Date        `json:"effective_on"`
+	EndOn         pgtype.Date        `json:"end_on"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
@@ -256,6 +270,7 @@ type OrgPersonnelEvent struct {
 	PersonUuid    pgtype.UUID        `json:"person_uuid"`
 	Pernr         string             `json:"pernr"`
 	EffectiveDate pgtype.Timestamptz `json:"effective_date"`
+	EffectiveOn   pgtype.Date        `json:"effective_on"`
 	ReasonCode    string             `json:"reason_code"`
 	Payload       []byte             `json:"payload"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
@@ -272,6 +287,8 @@ type OrgPosition struct {
 	IsAutoCreated bool               `json:"is_auto_created"`
 	EffectiveDate pgtype.Timestamptz `json:"effective_date"`
 	EndDate       pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn   pgtype.Date        `json:"effective_on"`
+	EndOn         pgtype.Date        `json:"end_on"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
@@ -297,6 +314,8 @@ type OrgPositionSlice struct {
 	Profile             []byte             `json:"profile"`
 	EffectiveDate       pgtype.Timestamptz `json:"effective_date"`
 	EndDate             pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn         pgtype.Date        `json:"effective_on"`
+	EndOn               pgtype.Date        `json:"end_on"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 }
@@ -361,6 +380,8 @@ type OrgRoleAssignment struct {
 	OrgNodeID     pgtype.UUID        `json:"org_node_id"`
 	EffectiveDate pgtype.Timestamptz `json:"effective_date"`
 	EndDate       pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn   pgtype.Date        `json:"effective_on"`
+	EndOn         pgtype.Date        `json:"end_on"`
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
@@ -373,6 +394,8 @@ type OrgSecurityGroupMapping struct {
 	AppliesToSubtree bool               `json:"applies_to_subtree"`
 	EffectiveDate    pgtype.Timestamptz `json:"effective_date"`
 	EndDate          pgtype.Timestamptz `json:"end_date"`
+	EffectiveOn      pgtype.Date        `json:"effective_on"`
+	EndOn            pgtype.Date        `json:"end_on"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
