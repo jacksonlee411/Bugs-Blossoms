@@ -65,7 +65,8 @@ ALTER TABLE org_node_slices
 
 ALTER TABLE org_node_slices
     ADD CONSTRAINT org_node_slices_sibling_name_unique_on
-    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, parent_hint gist_uuid_ops WITH =, lower(name) gist_text_ops WITH =, daterange(effective_on, end_on + 1, '[)') WITH &&);
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, parent_hint gist_uuid_ops WITH =, lower(name) gist_text_ops WITH =, daterange( effective_on, end_on + 1, '[)'
+) WITH &&);
 
 CREATE INDEX org_node_slices_tenant_node_effective_idx ON org_node_slices (tenant_id, org_node_id, effective_date);
 
