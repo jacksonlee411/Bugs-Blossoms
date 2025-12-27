@@ -161,6 +161,9 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			errs = append(errs, err.Error())
 		} else {
+			if details != nil {
+				details.LongName = c.orgNodeLongNameFor(r, tenantID, *selectedNodeID, effectiveDate)
+			}
 			if details != nil && details.ParentHint != nil && *details.ParentHint != uuid.Nil {
 				if label, ok := parentLabelByID[*details.ParentHint]; ok && strings.TrimSpace(label) != "" {
 					details.ParentLabel = label
@@ -2448,6 +2451,9 @@ func (c *OrgUIController) writeNodePanelWithOOBTree(w http.ResponseWriter, r *ht
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if details != nil {
+		details.LongName = c.orgNodeLongNameFor(r, tenantID, nodeID, effectiveDate)
+	}
 	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -2484,6 +2490,29 @@ func (c *OrgUIController) getNodeDetails(r *http.Request, tenantID uuid.UUID, no
 		return nil, err
 	}
 	return mappers.NodeDetailsToViewModel(node), nil
+}
+
+func (c *OrgUIController) orgNodeLongNameFor(r *http.Request, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) string {
+	if nodeID == uuid.Nil {
+		return ""
+	}
+	path, err := c.org.GetNodePath(r.Context(), tenantID, nodeID, asOf)
+	if err != nil || path == nil {
+		return ""
+	}
+
+	parts := make([]string, 0, len(path.Path))
+	for _, n := range path.Path {
+		part := strings.TrimSpace(n.Name)
+		if part == "" {
+			part = strings.TrimSpace(n.Code)
+		}
+		if part == "" {
+			part = n.ID.String()
+		}
+		parts = append(parts, part)
+	}
+	return strings.Join(parts, " / ")
 }
 
 func (c *OrgUIController) orgNodeLabelFor(r *http.Request, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) string {

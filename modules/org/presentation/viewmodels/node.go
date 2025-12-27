@@ -10,6 +10,7 @@ type OrgNodeDetails struct {
 	ID            uuid.UUID
 	Code          string
 	Name          string
+	LongName      string
 	Status        string
 	DisplayOrder  int
 	ParentHint    *uuid.UUID

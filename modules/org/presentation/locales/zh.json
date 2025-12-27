@@ -179,6 +179,7 @@
 					"Fields": {
 						"Code": "编码",
 						"Name": "名称",
+						"LongName": "组织长名称",
 						"Status": "状态",
 						"DisplayOrder": "排序",
 						"EffectiveWindow": "生效区间",
