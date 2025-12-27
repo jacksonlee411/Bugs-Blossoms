@@ -71,7 +71,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(props.Node.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 26, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 26, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -89,7 +89,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Node.Fields.LongName"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 29, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 29, Col: 48}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -112,7 +112,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(longName)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 33, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 33, Col: 40}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -130,7 +130,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Node.Fields.Code"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 37, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 37, Col: 50}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -143,7 +143,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(props.Node.Code)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 37, Col: 95}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 37, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -156,7 +156,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Node.Fields.Status"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 38, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 38, Col: 52}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -169,7 +169,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.Node.Status)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 38, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 38, Col: 98}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -182,7 +182,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Node.Fields.DisplayOrder"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 39, Col: 59}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 39, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -195,7 +195,7 @@ func NodeDetails(props NodeDetailsProps) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", props.Node.DisplayOrder))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 39, Col: 130}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/node_details.templ`, Line: 39, Col: 129}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {

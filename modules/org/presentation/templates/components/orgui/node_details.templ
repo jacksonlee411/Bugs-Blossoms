@@ -20,25 +20,25 @@ templ NodeDetails(props NodeDetailsProps) {
 	if props.Node == nil {
 		<div class="text-sm text-300">{ pageCtx.T("Org.UI.NodePanel.Empty") }</div>
 	} else {
-			<div class="space-y-4">
-				<div class="flex items-start justify-between gap-3">
-					<div class="min-w-0">
-						<div class="text-base font-semibold text-100 truncate">{ props.Node.Name }</div>
-						{{ longName := strings.TrimSpace(props.Node.LongName) }}
-						<div class="mt-1 text-xs text-300 truncate">
-							{ pageCtx.T("Org.UI.Node.Fields.LongName") }:
-							if longName == "" {
-								<span class="text-400">—</span>
-							} else {
-								<span class="text-200">{ longName }</span>
-							}
-						</div>
-						<div class="mt-1 text-xs text-300 flex flex-wrap items-center gap-x-4 gap-y-1">
-							<span>{ pageCtx.T("Org.UI.Node.Fields.Code") }: <span class="text-200">{ props.Node.Code }</span></span>
-							<span>{ pageCtx.T("Org.UI.Node.Fields.Status") }: <span class="text-200">{ props.Node.Status }</span></span>
-							<span>{ pageCtx.T("Org.UI.Node.Fields.DisplayOrder") }: <span class="text-200">{ fmt.Sprintf("%d", props.Node.DisplayOrder) }</span></span>
-						</div>
+		<div class="space-y-4">
+			<div class="flex items-start justify-between gap-3">
+				<div class="min-w-0">
+					<div class="text-base font-semibold text-100 truncate">{ props.Node.Name }</div>
+					{{ longName := strings.TrimSpace(props.Node.LongName) }}
+					<div class="mt-1 text-xs text-300 truncate">
+						{ pageCtx.T("Org.UI.Node.Fields.LongName") }:
+						if longName == "" {
+							<span class="text-400">—</span>
+						} else {
+							<span class="text-200">{ longName }</span>
+						}
 					</div>
+					<div class="mt-1 text-xs text-300 flex flex-wrap items-center gap-x-4 gap-y-1">
+						<span>{ pageCtx.T("Org.UI.Node.Fields.Code") }: <span class="text-200">{ props.Node.Code }</span></span>
+						<span>{ pageCtx.T("Org.UI.Node.Fields.Status") }: <span class="text-200">{ props.Node.Status }</span></span>
+						<span>{ pageCtx.T("Org.UI.Node.Fields.DisplayOrder") }: <span class="text-200">{ fmt.Sprintf("%d", props.Node.DisplayOrder) }</span></span>
+					</div>
+				</div>
 				<div class="flex items-center gap-2 shrink-0">
 					if pageCtx.CanAuthz("org.nodes", "write") {
 						@button.Secondary(button.Props{
