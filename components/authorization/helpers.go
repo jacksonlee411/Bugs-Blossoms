@@ -57,18 +57,6 @@ func suggestedDiff(state *authz.ViewState, policies []authz.MissingPolicy) strin
 	return string(data)
 }
 
-func parseSuggestedDiff(diff string) []authz.PolicySuggestion {
-	diff = strings.TrimSpace(diff)
-	if diff == "" {
-		return nil
-	}
-	var suggestions []authz.PolicySuggestion
-	if err := json.Unmarshal([]byte(diff), &suggestions); err != nil {
-		return nil
-	}
-	return suggestions
-}
-
 func resolveSubject(state *authz.ViewState, provided string) string {
 	subject := strings.TrimSpace(provided)
 	if subject == "" && state != nil {

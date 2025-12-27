@@ -54,7 +54,7 @@
   - CI 门禁：`.github/workflows/quality-gates.yml`
   - Org 时间/审计：`docs/dev-plans/025-org-time-and-audit.md`
   - Org API/Authz/outbox：`docs/dev-plans/026-org-api-authz-and-events.md`
-  - Authz 工作流：`docs/runbooks/AUTHZ-BOT.md`
+  - Authz 工作流（015C）：`docs/runbooks/authz-policy-apply-api.md`
   - Org 迁移工具链：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`
 
 ### 2.4 并行实施说明（与 056/057）

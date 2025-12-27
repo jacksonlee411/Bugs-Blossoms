@@ -7,7 +7,6 @@
 - 用户权限板：`/users/{id}/policies`
 - Unauthorized：任意受保护页面的 403 渲染（HTMX + 非 HTMX）
 - PolicyInspector：具备 `Authz.Debug` 权限时的调试面板
-- Requests Center：`/core/authz/requests`、`/core/authz/requests/{id}`
 
 ## 键盘可用性清单（Tab/Shift+Tab/Enter/Space/Esc）
 1. **可达性**：页面主操作（Create/Save/Delete/Submit/Apply/Approve/Reject/Cancel/Retry/Undo）均可仅用键盘完成。

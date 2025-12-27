@@ -76,7 +76,6 @@ func TestEnsureLoggingAuthz_ForbidsWithoutUser(t *testing.T) {
 	require.Equal(t, "forbidden", payload["error"])
 	require.Equal(t, "logging.logs", payload["object"])
 	require.Equal(t, "view", payload["action"])
-	require.Equal(t, "/core/api/authz/requests", payload["request_url"])
 	require.Contains(t, payload, "missing_policies")
 	require.Contains(t, payload, "debug_url")
 }
@@ -241,7 +240,7 @@ func TestEnsureLoggingAuthz_ForbiddenHTMLFallbackRendersUnauthorized(t *testing.
 	require.False(t, allowed)
 	require.Equal(t, http.StatusForbidden, rr.Code)
 	require.Contains(t, rr.Body.String(), "data-authz-container")
-	require.Contains(t, rr.Body.String(), "data-request-url=\"/core/api/authz/requests\"")
+	require.Contains(t, rr.Body.String(), "data-debug-url=")
 }
 
 func TestEnsureLoggingAuthz_ForbiddenHTMLFallbackWithoutPageCtxReturnsPlainText(t *testing.T) {

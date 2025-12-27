@@ -1,5 +1,8 @@
 # DEV-PLAN-015A：Casbin 策略平台（API、数据模型与 Bot 工作流）
 
+> [!IMPORTANT]
+> 自 DEV-PLAN-015C 起，策略草稿（requests）/审批/bot 链路已移除；当前唯一口径为管理员直接维护生效（`POST /core/api/authz/policies/apply`）。本文仅作历史记录，不再作为 SSOT。
+
 **状态**: 已完成（2025-12-04 08:18）
 
 ## 背景
@@ -24,15 +27,15 @@
 1. [X] `make authz-test` / `make authz-lint` / `go test ./pkg/authz/... ./modules/core/...` —— 已在 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 登记（2025-01-15 11:05-11:10）。
 2. [X] `make authz-pack` + `go run ./scripts/authz/verify --fixtures ...` —— 同步记录于 dev-records。
 3. [X] `go run ./scripts/authz/export -dry-run` —— 以 `ALLOWED_ENV=production_export` 在本地执行，dry-run 成功（69 p / 4 g），阻塞已解除。
-4. [X] Git bot PAT 凭证与轮询方案：`scripts/authz/bot.sh` 自动加载 `.env.local` 中的 `AUTHZ_BOT_GIT_TOKEN`，已在 dev-records 记录凭证接入与两次端到端验证。
+4. [X]（历史）Git bot PAT 凭证与轮询方案：015C 后该链路已移除，不再需要 bot 凭证与轮询配置。
 5. [X] 数据库迁移链路验证 —— 本地执行 `make db migrate up`，成功生成 migration log，并写入 dev-records。
 
 ## 实施步骤（分阶段）
 
 ### 阶段 Alpha：Schema & Repository 就绪
 1. [X] 迁移：`migrations/changes-1762000001.sql` 创建 `policy_change_requests` 表及索引（含 `bot_locked_at`、`base/applied_revision` 等），已通过 `make db migrate up`。
-2. [X] Repository：在 `pkg/authz/persistence` 新增实体与仓储，提供 CRUD/分页/状态更新/锁管理，避免对 Core 模块的耦合。
-3. [X] 单元测试：`go test ./pkg/authz/persistence` 通过，覆盖锁竞争、bot metadata、审批流转。
+2. [X]（历史）Repository：曾新增独立 persistence 仓储包以避免对 Core 模块耦合（015C 后已删除该包，不再写入/读取）。
+3. [X]（历史）单元测试：覆盖锁竞争、bot metadata、审批流转（015C 后对应链路已移除）。
 4. [X] 风险缓解：记录回滚命令与 `SKIP_MIGRATE=1` 导出说明（文中描述），并在 dev-records 标记迁移执行结果。
 
 ### 阶段 Beta：服务层与 REST API
@@ -56,15 +59,15 @@
 5. [X] 速率限制与红线监控：`/debug` 增加 `20 req/min/IP` 限流与属性过滤。
 
 ### 阶段 Delta：Bot/CLI & 自动化闭环
-1. [X] `cmd/authzbot`/脚本：以 30 秒轮询 `policy_change_requests` 抢占 `bot_lock`，处理 base revision 校验、diff 应用、`make authz-pack && make authz-test`、PR 创建。
-2. [X] 锁管理：`bot_lock` 字段提供 `scripts/authz/bot.sh --force-release <id>` 手动解锁与日志记录，暂不实现自动 TTL。
+1. [X]（历史）Authz Bot/脚本：曾用于轮询 `policy_change_requests` 并创建 PR（015C 后已移除该链路）。
+2. [X]（历史）锁管理：`bot_lock` 字段曾提供手动解锁与日志记录（015C 后不再使用）。
 3. [X] 成功回写 `applied_policy_revision/snapshot`；`/revert` 端点依 snapshot 生成逆向草稿。
-4. [X] CLI `scripts/authz/bot.sh` 支持 `run`/`force-release` 两种模式，文档列明环境变量（Git token、repo）。
+4. [X]（历史）CLI：曾支持 `run`/`force-release` 等模式（015C 后已移除）。
 5. [X] Dev 验证：至少两次“草稿→bot→PR→状态更新”跑通并写入 dev-records。
 
 #### Git Bot 凭证与轮询方案
-1. [X] PAT 凭证链路 —— 创建 `@bb-authz-bot` GitHub 机器人账号，生成只具备 `repo`（contents/pull_requests）权限的 PAT，存入 1Password `DEV-AUTHZ`（命名 `AUTHZ_BOT_GIT_TOKEN`），由 `scripts/authz/bot.sh` 注入 `https://<token>@github.com/acme/Bugs-Blossoms.git`；同一脚本设置 `git config user.name/email`、branch 前缀（`AUTHZ_BOT_GIT_BRANCH_PREFIX` 默认 `authz/bot/`）、远端（`AUTHZ_BOT_GIT_REMOTE` 默认上述 HTTPS），并在推送前统一执行 `make authz-pack authz-test`，失败时写入 `policy_change_requests.error_log` 并释放锁。
-2. [X] 轮询执行流 —— `cmd/authzbot` 每 30 秒扫描 `status IN (approved,failed)` 且 `error_log IS NULL` 的记录，通过 `AcquireBotLock` 控制并发，获取 diff、校验 base revision、更新文件、运行 `make authz-pack && make authz-test`，成功则推送并创建 PR，写回 `applied_policy_revision/snapshot/pr_link`；失败记录 `error_log` 并清空 `bot_lock`；提供 `scripts/authz/bot.sh force-release <id>` 执行 `UPDATE policy_change_requests SET bot_lock=NULL, bot_locked_at=NULL WHERE id=$1` 以支持人工干预；相关 SQL 与 env 示例需记录到 `docs/dev-records/DEV-PLAN-015-CASBIN-UI.md`。
+1. [X]（历史）PAT 凭证链路：015C 后不再通过 bot 创建 PR；在线管理统一改为 stage/apply。
+2. [X]（历史）轮询执行流：015C 后不再扫描/锁管理/PR 自动创建；在线管理统一改为 stage/apply。
 
 ### 阶段 Epsilon：文档、CI 与运维
 1. [X] 文档：README/CONTRIBUTING/AGENTS 新增“策略草稿流程 / bot 操作 / 回滚脚本 / FAQ”章节。
@@ -80,12 +83,12 @@
 ## 交付物
 - `policy_change_requests` schema、repository、mappers、服务层与 REST API。
 - `pkg/authz` Inspector/Debug 能力及对应控制器。
-- `cmd/authzbot`（或脚本）源码、配置模板、日志策略。
+- （历史）Authz Bot（已在 015C 中移除）。
 - README/AGENTS 更新、`docs/dev-records/DEV-PLAN-015-CASBIN-UI.md` 记录模板。
 - 质量门槛脚本与示例命令。
 
 ## 验收标准
-- 在本地运行 `curl -X POST /core/api/authz/requests` 可返回 `request_id`，并通过 `GET /core/api/authz/requests/{id}` 查看状态转换。
+- 015C 之后不再提供 requests API；管理员直接维护生效策略，使用 `POST /core/api/authz/policies/apply`。
 - `go test ./modules/core/... -run PolicyDraft`、`go test ./modules/core/presentation/controllers -run AuthzDebug` 全部通过。
 - 任意草稿在 5 分钟内可被 bot 处理或 UI 提示可重试；bot 失败时 `error_log` 字段包含明确信息。
 - README/AGENTS 包含完整 API/CLI 示例，`git status --short` 在执行 `templ generate && make css`（如需）和 `make authz-pack` 后保持干净。

@@ -10,7 +10,7 @@
 ## 前置依赖
 - DEV-PLAN-012/013 基础设施 (`pkg/authz`、`make authz-test`/`authz-lint`、policy pack/export/verify 脚本) 需保持可用；014A 的 `authz.ViewState`、`ensureAuthz`、`authorizeCore`、导航过滤能力可直接复用到 Logging。
 - Logging 数据面依赖现有 migration/schema（`modules/logging/infrastructure/persistence/schema/logging-schema.sql` + `migrations/**`），需要确认与数据库一致；request logging/Loki 采集链路由 `pkg/middleware/logging`、`pkg/commands/collect_logs` 提供，可按需复用。
-- 015A 提供 `/core/api/authz/requests|debug`、PolicyDraftService 与 bot/CLI；015B（Unauthorized/PolicyInspector UI）尚未落地，需在本计划中暴露兼容数据结构与占位 UI。
+- 015C 之后授权管理已收敛为“管理员直接维护生效策略”：保留 `GET /core/api/authz/debug` 诊断能力与 `POST /core/api/authz/policies/apply` 直接生效能力；requests/bot/审批链路已移除。
 
 ## 前置准备清单（进入实施前完成并记录）
 - [x] 重新执行并登记 readiness：`GOCACHE=/tmp/go-cache make authz-test`、`make authz-lint`、`go test ./pkg/authz/...` 已于 2025-12-06 00:02 UTC 完成，结果写入 `docs/dev-records/DEV-PLAN-012-CASBIN-POC.md`。
@@ -72,7 +72,7 @@
 
 ### 3. Presentation / 模板 / Locales
 - [x] 在 `modules/logging/presentation/templates/pages/logs/` 创建 list/detail/empty templat，全部用 `pageCtx.CanAuthz("logging.logs", "view")` 控制入口，禁止 `user.Can`；空态支持“无数据/无权限”两类。
-- [x] 临时 Unauthorized 组件读取 `pageCtx.AuthzState().MissingPolicies` + `SuggestDiff`，提供跳转 `/core/api/authz/requests` 按钮；待 015B 可直接替换。
+- [x] 临时 Unauthorized 组件读取 `pageCtx.AuthzState().MissingPolicies`，提供 Debug 串联能力（`/core/api/authz/debug`）；待统一组件可直接替换。
 - [x] 补充 viewmodels/mappers 携带 `CanExport`, `CanInspect` 等布尔值，模板避免再做判定；HTMX partial 复用相同 props。
 - [x] 更新 locales `{en,ru,uz,zh}.json`：新增 Logging 页面标题、筛选项、403 文案、申请权限按钮；完成后运行 `make check tr`。
 
@@ -100,9 +100,9 @@
 - [x] 在 `config/access/policies/logging/` 定义 `logging.logs:view` 片段，与 `modules/logging/permissions` ID/名称一致；执行最小 `make authz-pack`（M2 可不提交产物，M3 提交正式产物）。
 - [x] `pkg/defaults` 权限种子与 fixtures 更新，确保 Playwright/e2e/seed 使用同一策略；必要时调整 `quality-gates` 期望；验收需校验模块名/导航/spotlight 入口挂载正确。
 
-### 9. 与 015A/015B 的接口契约
+### 9. 与 015C 的接口契约
 - [x] Controller/模板暴露 `pageCtx.AuthzState().MissingPolicies`、`SuggestDiff`、subject/domain（用于 PolicyInspector 参数），Forbidden 响应保持稳定字段，方便 015B 直接替换 UI。
-- [x] Unauthorized 页/按钮跳转 `/core/api/authz/requests`，并在 props 中附上 object/action/domain 便于预填；若需要新增字段（如 log source），在本文档同步描述并与 015B 对齐。
+- [x] Unauthorized 不再提供“申请权限/requests”入口，仅展示 MissingPolicies 与 Debug 串联能力；若需要新增字段（如 log source），在本文档同步描述并与 015C 对齐。
 
 ## 下一步待办（聚焦）
 - 监控阈值/回滚演练：本阶段不执行，如后续需要，再在 dev-records 单独登记灰度结果与阈值。
@@ -115,7 +115,7 @@
 
 ## 验收标准
 - M1：`go test ./modules/logging/...` 通过；`templ generate && make css`（如修改模板）/`make check tr`（如修改 locale）后 `git status --short` 干净；controller 403/成功路径均有覆盖。
-- M2：`make authz-test authz-lint` + 最小 `make authz-pack` 成功；Forbidden 时带 MissingPolicies/申请入口；导航/Quick Links 按权限过滤。
+- M2：`make authz-test authz-lint` + 最小 `make authz-pack` 成功；Forbidden 时带 MissingPolicies/DebugURL；导航/Quick Links 按权限过滤。
 - M3：如执行灰度，记录 shadow→enforce 命令/观察≥48h，未授权用户无法绕过 controller/service guard；回滚剧本可验证。
 - 验收补充：core session handler 已切换到 logging 仓储（无平行仓储/双写），数据源严格分表查询无聚合视图。
 

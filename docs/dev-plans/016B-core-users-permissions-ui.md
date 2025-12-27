@@ -26,7 +26,7 @@
 - 交互：筛选项 change/keyup 触发 `GET /users/{id}/policies` 刷新整个 `#user-policy-board`。
 
 ### 2.3 SLA/请求状态区（提交后轮询）
-- 提交草稿后，显示状态标签并轮询 `GET /core/api/authz/requests`：
+- 立即生效后，通过 `Hx-Trigger: authz:policies-applied`（或等效 toast）展示结果，并提示需要刷新时处理 `409 base_revision`：
   - 状态：待审批/待部署/已生效/失败/已拒绝/已取消/草稿等。
   - 超时后提示：可重试查询、复制 `request_id`。
 

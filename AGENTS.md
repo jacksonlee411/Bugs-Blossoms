@@ -31,7 +31,7 @@
 | `.templ` / Tailwind / presentation assets | `make generate && make css` + `git status --short` | 生成物必须提交，否则 CI 会失败 |
 | `modules/**/presentation/locales/**/*.json` | `make check tr` | |
 | `migrations/**` 或 `modules/**/infrastructure/persistence/schema/**` | `make db migrate up && make db seed` | CI 会跑 PG17 + migrate smoke |
-| Authz（`config/access/**` / `pkg/authz/**` / `scripts/authz/**` 等） | `make authz-test && make authz-lint` | 另见 `docs/runbooks/AUTHZ-BOT.md` |
+| Authz（`config/access/**` / `pkg/authz/**` / `scripts/authz/**` 等） | `make authz-test && make authz-lint` | 另见 `docs/runbooks/authz-policy-apply-api.md` |
 | Person sqlc（`sqlc.yaml` / `modules/person/infrastructure/sqlc/**` 等） | `scripts/db/export_person_schema.sh` + `make sqlc-generate` + `git status --short` | |
 | Person Atlas/Goose（`modules/person/infrastructure/atlas/**` / `migrations/person/**` 等） | `make db plan && make db lint` | 另见 `docs/runbooks/person-atlas-goose.md` |
 | Org Atlas/Goose（`modules/org/infrastructure/atlas/**` / `modules/org/infrastructure/persistence/schema/**` / `migrations/org/**` 等） | `make org plan && make org lint && make org migrate up` | 另见 `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md` |
@@ -86,7 +86,7 @@ modules/{module}/
 
 - 政策碎片：修改 `config/access/policies/**` 后运行 `make authz-pack`（会生成 `config/access/policy.csv` 与 `config/access/policy.csv.rev`，不要手改聚合文件）。
 - 测试与校验：Authz 相关改动必须跑 `make authz-test && make authz-lint`。
-- Bot：见 `docs/runbooks/AUTHZ-BOT.md`。
+- 管理员直接维护生效（015C）：见 `docs/runbooks/authz-policy-apply-api.md`。
 
 ## 7. Person/Org（sqlc / Atlas+Goose）工作流（摘要）
 
@@ -127,8 +127,8 @@ modules/{module}/
 - 活体架构：`docs/ARCHITECTURE.md`
 - Guides 入口：`docs/guides/index.md`
 - 静态资源约定：`docs/assets/index.md`
-- Authz Policy Draft API：`docs/runbooks/authz-policy-draft-api.md`
-- Authz Bot：`docs/runbooks/AUTHZ-BOT.md`
+- Authz Policy Apply API（015C）：`docs/runbooks/authz-policy-apply-api.md`
+- 简化授权管理（DEV-PLAN-015C）：`docs/dev-plans/015C-authz-direct-effective-policy-management.md`
 - Transactional Outbox（relay/cleaner/排障）：`docs/runbooks/transactional-outbox.md`
 - Person sqlc：`docs/runbooks/person-sqlc.md`
 - Person Atlas+Goose：`docs/runbooks/person-atlas-goose.md`

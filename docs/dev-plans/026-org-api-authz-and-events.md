@@ -137,14 +137,12 @@ CREATE INDEX org_outbox_tenant_published
   ```json
   {
     "error": "forbidden",
-    "message": "Forbidden: org.nodes write. 如需申请权限，请访问 /core/api/authz/requests。",
+    "message": "Forbidden: org.nodes write.",
     "object": "org.nodes",
     "action": "write",
     "subject": "tenant:...:user:...",
     "domain": "tenant_uuid",
     "missing_policies": [{"domain":"...","object":"org.nodes","action":"write"}],
-    "suggest_diff": [],
-    "request_url": "/core/api/authz/requests",
     "debug_url": "/core/api/authz/debug?...",
     "base_revision": "policy.csv.rev",
     "request_id": "X-Request-ID"

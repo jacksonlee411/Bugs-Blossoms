@@ -1,5 +1,8 @@
 # DEV-PLAN-015B4：UI 串联与反馈
 
+> [!IMPORTANT]
+> 自 DEV-PLAN-015C 起，策略草稿（requests）/审批/bot 链路已移除；当前唯一口径为管理员直接维护生效（`POST /core/api/authz/policies/apply`）。本文仅作历史记录，不再作为 SSOT。
+
 **状态**: 已完成（2025-12-11 16:20，步骤 1-5 全部交付）  
 **范围**: 草稿提交/状态反馈、错误处理、bot 联动与 a11y
 
@@ -9,7 +12,7 @@
 - 确保新增组件满足可访问性（a11y）要求。
 
 ## 实施步骤
-1. [x] 反馈与跳转 —— 草稿操作（含 Unauthorized/PolicyInspector 提交）统一通过共享请求封装返回 toast/HTMX snippet，包含 `request_id` 与 SLA 倒计时（后端草稿/请求状态 API 提供 `estimated_sla_expires_at`，缺省用 i18n `sla.unknown`）；提供“查看草稿”跳转 `/core/authz/requests/{id}` 展示 diff/审批状态/bot 日志；HTMX 失败或非 HTMX 请求时使用重定向 + flash/服务器渲染 fallback；状态刷新用请求状态 API 轮询（15s，失焦暂停，回到前台立即触发一次），超过 2 分钟未更新则强制刷新一次。缓存范围仅限当前 tab 内存，命中缓存需满足“同 request_id 且距上次成功请求 <30s 且状态未达终态”，回到前台的首个请求绕过缓存；一旦进入终态或缓存超时即失效，复用现有 toast/flash 与节流，不另建通知系统。
+1. [x] 反馈与跳转 —— 015C 后不再存在草稿/审批/bot/轮询链路；apply 成功后统一通过 toast/HTMX trigger 提示 `revision/added/removed`，并保留 `request_id` 便于排障；遇到 `409 base_revision` 冲突提示刷新重试。
 2. [x] bot 联动 —— PolicyInspector/Unauthorized 显示 bot 状态，`status=failed` 时展示“重试 bot”链接且沿用统一反馈封装，不在组件内额外提示；重试需具备 `Authz.Requests.Update`（或等效）权限，附带单次 `retry_token`（60s 内有效），token 使用现有签名中间件生成的自包含 payload（含 `request_id`、`expires_at`、随机 nonce），后端按共享密钥校验并拒绝过期/重复，仍保持“同 request_id 每 60s 一次”限流；请求终态后隐藏重试入口，超限返回 `E_BOT_RATE_LIMIT`；未授权或 token 失效时返回统一 `showErrorToast`（含 i18n key），同时隐藏重试入口。
 3. [x] 错误处理 —— 后端 4xx/5xx 返回 `HX-Trigger: {"showErrorToast": {"message": "<i18n key>", "code": "<错误码>"}}`，常用映射：`E_REQUEST_NOT_FOUND -> error.request_not_found`，`E_BOT_RATE_LIMIT -> error.bot_rate_limit`，`E_VALIDATION -> error.validation_failed`，`E_INTERNAL -> error.internal_retry`；`AUTHZ_INVALID_REQUEST`/base_revision 过期通过同通道附带最新 rev 并触发“刷新以更新权限基线”提示（HTMX/非 HTMX 都提供刷新 CTA），前端不做自动重试；非 HTMX 请求返回 JSON/HTML 标准错误页（含错误码与“查看详情”链接/flash），表单校验失败用 422 + 字段错误 partial；全局监听 `showErrorToast` 调用统一 toast，网络异常回退到默认“请求失败，请重试”；实现复用现有 serrors/统一响应封装，仅扩展 i18n key 与 HX-Trigger 输出。
 4. [x] 可访问性 —— 本轮未新增模态/抽屉，新增按钮与轮询脚本已用键盘自检（Tab/Shift+Tab 聚焦、Enter 提交、Space 触发复制/重试），无新增 aria 要求；后续如新增弹窗按 `role="dialog"`/`aria-modal`/`aria-labelledby` 约定执行。

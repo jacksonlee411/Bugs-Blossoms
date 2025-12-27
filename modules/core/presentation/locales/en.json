@@ -457,8 +457,15 @@
       "UserNotFound": "User not found"
     }
   },
-  "Authz": {
-    "Debug": "Authz Debug",
+	  "Authz": {
+	    "Debug": "Authz Debug",
+	    "BaseRevision": "Base revision",
+	    "Policies": {
+	      "DefaultReason": {
+	        "Roles": "Update role policies",
+	        "Users": "Update user policies"
+      }
+    },
     "Requests": {
       "Title": "Policy change requests",
       "Mine": "My requests",
@@ -482,9 +489,9 @@
     "Workspace": {
       "Context": "Context",
       "Changes": "Changes",
-      "Discard": "Discard draft",
-      "ConfirmTitle": "Confirm submission",
-      "ConfirmDescription": "This will create a draft from staged changes.",
+      "Discard": "Discard staged changes",
+      "ConfirmTitle": "Confirm apply",
+      "ConfirmDescription": "This will apply staged policy changes immediately.",
       "WarningTitle": "Risk warnings",
       "WarningDeny": "Contains {{.Count}} deny rule(s).",
       "WarningWildcard": "Contains {{.Count}} wildcard rule(s).",
@@ -516,27 +523,20 @@
       "DefaultError": "Request failed, please try again",
       "StaleRevisionTitle": "Policy revision updated",
       "StaleRevisionMessage": "Refresh the page to sync the latest policy revision",
-      "SubmittedPrefix": "Draft submitted"
+      "SubmittedPrefix": "Draft submitted",
+      "AppliedTitle": "Policies updated",
+      "AppliedPrefix": "Applied"
     },
-    "Unauthorized": {
-      "Title": "Permission required",
-      "_Description": "You do not have permission to {{.Operation}}. Request access or contact an administrator.",
-      "MissingPolicies": "Missing policies",
-      "Apply": "Request access",
-      "ApplyDescription": "Submit a policy change request via /core/api/authz/requests with the suggested policy diff.",
-      "ApplyHint": "You do not have permission to perform this action",
-      "SuggestedDiff": "Suggested diff",
-      "Reason": "Reason",
-      "ReasonDefault": "Request access: {{.Operation}}",
-      "RetryOnce": "Retry once",
-      "CopyRequestID": "Copy request_id",
-      "LastRequest": "Last request_id",
-      "SubmitSuccess": "Submitted",
-      "BaseRevision": "Base revision",
-      "RequestID": "Request ID",
-      "ViewRequest": "View request",
-      "RetryBot": "Retry bot"
-    },
+	    "Unauthorized": {
+	      "Title": "Permission required",
+	      "_Description": "You do not have permission to {{.Operation}}. Contact an administrator.",
+	      "MissingPolicies": "Missing policies",
+	      "ApplyHint": "You do not have permission to perform this action",
+	      "ReadOnlyHint": "You do not have permission to edit policies",
+	      "Reason": "Reason",
+	      "BaseRevision": "Base revision",
+	      "RequestID": "Request ID"
+	    },
     "PolicyInspector": {
       "Title": "Policy Inspector",
       "_Description": "Inspect matched policies, attributes, and latency for this action.",
@@ -557,15 +557,16 @@
       "Badge": "Stage %d",
       "BadgeShort": "Staged",
       "AddRule": "Add rule",
+      "ApplyNow": "Apply now",
       "SubmitDraft": "Submit Draft",
       "BulkRemove": "Bulk Remove",
       "BulkRemoveConfirm": "Stage removal of {{.Count}} rules?",
       "BulkRemoveUndo": "Undo",
       "BulkRemoveUndoHint": "Staged removal of {{.Count}} rules.",
       "SelectAll": "Select all",
-      "RoleHint": "Staging only affects the current role and domain; submitting clears it.",
-      "SubmitHint": "Staged %d changes; submitting clears it.",
-      "EmptyHint": "No staged rules; submitting will build diff from the form or staged changes."
+      "RoleHint": "Staging only affects the current role and domain; applying clears it.",
+      "SubmitHint": "Staged %d changes; applying clears it.",
+      "EmptyHint": "No staged rules."
     },
     "SLA": {
       "Expected": "SLA: expect updates within 5 minutes",

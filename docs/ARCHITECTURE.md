@@ -17,7 +17,7 @@
 
 - 策略碎片：`config/access/policies/**`
 - 聚合产物：`config/access/policy.csv` 与 `config/access/policy.csv.rev`（由 `make authz-pack` 生成）
-- Bot/应急：`docs/runbooks/AUTHZ-BOT.md`
+- 管理员直接维护生效（015C）：`docs/runbooks/authz-policy-apply-api.md`
 
 ## 4. Person（人员）数据与迁移
 

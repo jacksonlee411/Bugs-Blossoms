@@ -56,11 +56,6 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 			return
 		}
 		policies := normalizePolicies(state, object, normalizedAction)
-		diffJSON := suggestedDiff(state, policies)
-		reason := strings.TrimSpace(props.Reason)
-		if reason == "" {
-			reason = pageCtx.T("Authz.PolicyInspector.ReasonDefault", map[string]interface{}{"Object": object, "Action": normalizedAction})
-		}
 		operation := strings.TrimSpace(fmt.Sprintf("%s %s", object, normalizedAction))
 		bodyID := fmt.Sprintf("policy-inspector-%s-%s", strings.ReplaceAll(object, ".", "-"), normalizedAction)
 		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"rounded-lg border border-primary/70 bg-surface-600/70 p-4 space-y-3\" data-policy-inspector data-authz-container data-action=\"")
@@ -70,7 +65,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(normalizedAction)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 46, Col: 32}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 40, Col: 32}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -83,7 +78,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(domain)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 47, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 41, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
@@ -96,20 +91,20 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(object)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 48, Col: 22}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 42, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" data-request-url=\"/core/api/authz/requests\" data-subject=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\" data-subject=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(subject)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 50, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 43, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -122,7 +117,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(debug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 51, Col: 24}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 44, Col: 24}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -135,7 +130,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(baseRevision)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 52, Col: 35}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 45, Col: 35}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -148,7 +143,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(requestID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 53, Col: 29}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 46, Col: 29}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -161,7 +156,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Yes"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 54, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 47, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -174,7 +169,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("No"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 55, Col: 37}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 48, Col: 37}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -187,7 +182,7 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 56, Col: 39}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 49, Col: 39}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -200,568 +195,367 @@ func PolicyInspector(props *PolicyInspectorProps) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Loading"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 57, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 50, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" data-sla-unknown=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\"><div class=\"flex items-center justify-between gap-3\"><div><div class=\"text-sm font-semibold text-white\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var13 string
-		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Unknown"))
+		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Title"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 58, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 55, Col: 47}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" data-status-unknown-label=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div><div class=\"text-xs text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Unknown"))
+		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector._Description"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 59, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 58, Col: 54}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\" data-status-pending-review=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div></div><div class=\"flex items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Status.PendingReview"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 60, Col: 70}
+		if debug != "" {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<a class=\"text-xs text-primary hover:underline\" href=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var15 templ.SafeURL = templ.URL(debug)
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var15)))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" target=\"_blank\" rel=\"noreferrer\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var16 string
+			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Debug"))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 69, Col: 32}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</a> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "\" data-status-approved=\"")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var16 string
-		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Status.Approved"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 61, Col: 59}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" data-status-merged=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<button type=\"button\" class=\"rounded-md border border-primary/80 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10\" data-inspector-toggle aria-expanded=\"false\" aria-controls=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var17 string
-		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Status.Merged"))
+		templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(bodyID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 62, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 77, Col: 27}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "\" data-status-failed=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var18 string
-		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Status.Failed"))
+		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Toggle"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 63, Col: 55}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 79, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" data-status-rejected=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</button></div></div><div id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var19 string
-		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Status.Rejected"))
+		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(bodyID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 64, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 83, Col: 18}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\" data-status-canceled=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\" class=\"space-y-4 hidden\" data-inspector-body tabindex=\"-1\"><div class=\"flex items-center justify-between gap-3\"><div class=\"text-xs text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var20 string
-		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Status.Canceled"))
+		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.RequestSummary"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 65, Col: 59}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 86, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" data-status-draft=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, ": ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var21 string
-		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Status.Draft"))
+		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s · %s", domain, operation))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 66, Col: 53}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 86, Col: 104}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\"><div class=\"flex items-center justify-between gap-3\"><div><div class=\"text-sm font-semibold text-white\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div><button type=\"button\" class=\"rounded-md border border-surface-400/60 px-3 py-1 text-xs font-medium text-surface-50 hover:bg-surface-500/60\" data-inspector-refresh hx-get=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var22 string
-		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Title"))
+		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(debug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 71, Col: 47}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 92, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div><div class=\"text-xs text-surface-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "\" hx-target=\"closest [data-policy-inspector]\" hx-swap=\"none\" hx-on::before-request=\"window.authzInspector &amp;&amp; window.authzInspector.onRequest(event)\" hx-on::after-request=\"window.authzInspector &amp;&amp; window.authzInspector.onResponse(event)\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var23 string
-		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector._Description"))
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Refresh"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 74, Col: 54}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 98, Col: 49}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div></div><div class=\"flex items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</button></div><div class=\"grid grid-cols-2 gap-3 text-xs text-surface-50\"><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1\"><div class=\"text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		if debug != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "<a class=\"text-xs text-primary hover:underline\" href=\"")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var24 templ.SafeURL = templ.URL(debug)
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(string(templ_7745c5c3_Var24)))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" target=\"_blank\" rel=\"noreferrer\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var25 string
-			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Debug"))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 85, Col: 32}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</a> ")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
+		var templ_7745c5c3_Var24 string
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Allowed"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 103, Col: 79}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<button type=\"button\" class=\"rounded-md border border-primary/80 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10\" data-inspector-toggle aria-expanded=\"false\" aria-controls=\"")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</div><div class=\"font-semibold\" data-inspector-allowed>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var25 string
+		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Unknown"))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 104, Col: 77}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div></div><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1\"><div class=\"text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var26 string
-		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(bodyID)
+		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Mode"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 93, Col: 27}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 107, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</div><div class=\"font-semibold\" data-inspector-mode>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var27 string
-		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Toggle"))
+		templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Unknown"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 95, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 108, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</button></div></div><div id=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</div></div><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1\"><div class=\"text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var28 string
-		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(bodyID)
+		templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Latency"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 99, Col: 18}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 111, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "\" class=\"space-y-4 hidden\" data-inspector-body tabindex=\"-1\"><div class=\"flex items-center justify-between gap-3\"><div class=\"text-xs text-surface-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "</div><div class=\"font-semibold\" data-inspector-latency>—</div></div><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1\"><div class=\"text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var29 string
-		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.RequestSummary"))
+		templ_7745c5c3_Var29, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.RequestID"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 102, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 115, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var29))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, ": ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</div><div class=\"font-mono\" data-authz-request-id>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var30 string
-		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s · %s", domain, operation))
+		templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(requestID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 102, Col: 104}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 116, Col: 61}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</div><button type=\"button\" class=\"rounded-md border border-surface-400/60 px-3 py-1 text-xs font-medium text-surface-50 hover:bg-surface-500/60\" data-inspector-refresh hx-get=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</div></div><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1 col-span-2\"><div class=\"text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var31 string
-		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(debug)
+		templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Request"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 108, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 119, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "\" hx-target=\"closest [data-policy-inspector]\" hx-swap=\"none\" hx-on::before-request=\"window.authzInspector &amp;&amp; window.authzInspector.onRequest(event)\" hx-on::after-request=\"window.authzInspector &amp;&amp; window.authzInspector.onResponse(event)\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</div><div class=\"font-mono text-surface-50\" data-inspector-request>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var32 string
-		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Refresh"))
+		templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s · %s / %s", subject, domain, operation))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 114, Col: 49}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 121, Col: 64}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</button></div><div class=\"grid grid-cols-2 gap-3 text-xs text-surface-50\"><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1\"><div class=\"text-surface-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</div></div></div><div class=\"space-y-2\"><div class=\"text-xs font-semibold text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var33 string
-		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Allowed"))
+		templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.MatchedPolicy"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 119, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 127, Col: 55}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</div><div class=\"font-semibold\" data-inspector-allowed>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "</div><ul class=\"space-y-1 text-xs text-surface-50\" data-inspector-trace>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var34 string
-		templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Unknown"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 120, Col: 77}
+		if len(policies) == 0 {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<li class=\"text-surface-200\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var34 string
+			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 131, Col: 55}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</li>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "</div></div><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1\"><div class=\"text-surface-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</ul></div><div class=\"space-y-2\"><div class=\"text-xs font-semibold text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var35 string
-		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Mode"))
+		templ_7745c5c3_Var35, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Attributes"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 123, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 137, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var35))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "</div><div class=\"font-semibold\" data-inspector-mode>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</div><dl class=\"grid grid-cols-2 gap-2 text-xs text-surface-50\" data-inspector-attrs><dt class=\"col-span-2 text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var36 string
-		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Unknown"))
+		templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 124, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 140, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</div></div><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1\"><div class=\"text-surface-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</dt></dl></div><div class=\"flex items-center gap-2 text-xs text-surface-200\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var37 string
-		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Latency"))
+		templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.BaseRevision"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 127, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 144, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "</div><div class=\"font-semibold\" data-inspector-latency>—</div></div><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1\"><div class=\"text-surface-200\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, ": <span class=\"font-mono\" data-authz-base-revision>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var38 string
-		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.RequestID"))
+		templ_7745c5c3_Var38, templ_7745c5c3_Err = templ.JoinStringErrs(baseRevision)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 131, Col: 78}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 144, Col: 117}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var38))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "</div><div class=\"font-mono\" data-authz-request-id>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var39 string
-		templ_7745c5c3_Var39, templ_7745c5c3_Err = templ.JoinStringErrs(requestID)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 132, Col: 61}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var39))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "</div></div><div class=\"rounded border border-surface-400/60 bg-surface-500/40 p-3 space-y-1 col-span-2\"><div class=\"text-surface-200\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var40 string
-		templ_7745c5c3_Var40, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Request"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 135, Col: 79}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var40))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</div><div class=\"font-mono text-surface-50\" data-inspector-request>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var41 string
-		templ_7745c5c3_Var41, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%s · %s / %s", subject, domain, operation))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 137, Col: 64}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var41))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</div></div></div><div class=\"space-y-2\"><div class=\"text-xs font-semibold text-surface-200\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var42 string
-		templ_7745c5c3_Var42, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.MatchedPolicy"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 143, Col: 55}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var42))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</div><ul class=\"space-y-1 text-xs text-surface-50\" data-inspector-trace>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		if len(policies) == 0 {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "<li class=\"text-surface-200\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			var templ_7745c5c3_Var43 string
-			templ_7745c5c3_Var43, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
-			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 147, Col: 55}
-			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var43))
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "</li>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</ul></div><div class=\"space-y-2\"><div class=\"text-xs font-semibold text-surface-200\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var44 string
-		templ_7745c5c3_Var44, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.PolicyInspector.Attributes"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 153, Col: 52}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var44))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</div><dl class=\"grid grid-cols-2 gap-2 text-xs text-surface-50\" data-inspector-attrs><dt class=\"col-span-2 text-surface-200\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var45 string
-		templ_7745c5c3_Var45, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Empty"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 156, Col: 65}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var45))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "</dt></dl></div><div class=\"flex items-center gap-2 text-xs text-surface-200\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var46 string
-		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.BaseRevision"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 160, Col: 50}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, ": <span class=\"font-mono\" data-authz-base-revision>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var47 string
-		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(baseRevision)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 160, Col: 117}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "</span></div><div class=\"space-y-2 text-xs text-surface-100\" data-authz-status-block><div class=\"flex items-center gap-2 flex-wrap\"><span>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var48 string
-		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Status"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 164, Col: 32}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, ":</span> <span class=\"font-semibold text-white\" data-authz-status>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var49 string
-		templ_7745c5c3_Var49, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Unknown"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 165, Col: 84}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var49))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "</span> <span class=\"text-surface-200\" data-authz-sla>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var50 string
-		templ_7745c5c3_Var50, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.SLA.Unknown"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 166, Col: 83}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var50))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "</span></div><div class=\"flex items-center gap-3 flex-wrap\"><a class=\"text-primary hover:underline hidden\" target=\"_blank\" rel=\"noreferrer\" data-authz-view>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var51 string
-		templ_7745c5c3_Var51, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.ViewRequest"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 175, Col: 51}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var51))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "</a> <button type=\"button\" class=\"hidden inline-flex items-center rounded-md border border-primary/70 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/10\" data-authz-retry-bot>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var52 string
-		templ_7745c5c3_Var52, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Authz.Unauthorized.RetryBot"))
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `components/authorization/policy_inspector.templ`, Line: 182, Col: 48}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var52))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "</button></div></div>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = requestForm(RequestFormProps{
-			RequestURL:   props.RequestURL,
-			Object:       object,
-			Action:       normalizedAction,
-			Domain:       domain,
-			Subject:      subject,
-			BaseRevision: baseRevision,
-			RequestID:    requestID,
-			Diff:         diffJSON,
-			Reason:       reason,
-			SubmitLabel:  pageCtx.T("Authz.PolicyInspector.GenerateDraft"),
-		}).Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "</div><script>\n\t\t\tif (!window.authzInspector) {\n\t\t\t\twindow.authzInspector = {\n\t\t\t\t\tonRequest: function (evt) {\n\t\t\t\t\t\tvar container = evt.target.closest(\"[data-policy-inspector]\");\n\t\t\t\t\t\tif (!container) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar status = container.querySelector(\"[data-inspector-latency]\");\n\t\t\t\t\t\tif (status) {\n\t\t\t\t\t\t\tstatus.textContent = container.dataset.loadingLabel || \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t},\n\t\t\t\t\tonResponse: function (evt) {\n\t\t\t\t\t\tif (!evt.detail || !evt.detail.xhr) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar container = evt.target.closest(\"[data-policy-inspector]\");\n\t\t\t\t\t\tif (!container) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar xhr = evt.detail.xhr;\n\t\t\t\t\t\tvar latencyEl = container.querySelector(\"[data-inspector-latency]\");\n\t\t\t\t\t\tif (latencyEl) {\n\t\t\t\t\t\t\tlatencyEl.textContent = \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (xhr.status < 200 || xhr.status >= 300) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar payload = {};\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tpayload = JSON.parse(xhr.responseText || \"{}\");\n\t\t\t\t\t\t} catch (e) {\n\t\t\t\t\t\t\tpayload = {};\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar allowedEl = container.querySelector(\"[data-inspector-allowed]\");\n\t\t\t\t\t\tif (allowedEl) {\n\t\t\t\t\t\t\tif (payload.allowed === true) {\n\t\t\t\t\t\t\t\tallowedEl.textContent = container.dataset.allowedLabel || \"yes\";\n\t\t\t\t\t\t\t\tallowedEl.classList.remove(\"text-error-300\");\n\t\t\t\t\t\t\t\tallowedEl.classList.add(\"text-success-300\");\n\t\t\t\t\t\t\t} else if (payload.allowed === false) {\n\t\t\t\t\t\t\t\tallowedEl.textContent = container.dataset.deniedLabel || \"no\";\n\t\t\t\t\t\t\t\tallowedEl.classList.add(\"text-error-300\");\n\t\t\t\t\t\t\t\tallowedEl.classList.remove(\"text-success-300\");\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tallowedEl.textContent = container.dataset.loadingLabel || \"\";\n\t\t\t\t\t\t\t\tallowedEl.classList.remove(\"text-error-300\");\n\t\t\t\t\t\t\t\tallowedEl.classList.remove(\"text-success-300\");\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar modeEl = container.querySelector(\"[data-inspector-mode]\");\n\t\t\t\t\t\tif (modeEl) {\n\t\t\t\t\t\t\tmodeEl.textContent = payload.mode || container.dataset.emptyLabel || \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (latencyEl) {\n\t\t\t\t\t\t\tif (payload.latency_ms) {\n\t\t\t\t\t\t\t\tlatencyEl.textContent = payload.latency_ms + \" ms\";\n\t\t\t\t\t\t\t} else if (typeof payload.latency_ms === \"number\") {\n\t\t\t\t\t\t\t\tlatencyEl.textContent = payload.latency_ms + \" ms\";\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tlatencyEl.textContent = container.dataset.emptyLabel || \"\";\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar requestEl = container.querySelector(\"[data-inspector-request]\");\n\t\t\t\t\t\tif (requestEl && payload.request) {\n\t\t\t\t\t\t\tvar request = payload.request;\n\t\t\t\t\t\t\trequestEl.textContent = [request.subject, request.domain, request.object, request.action].filter(Boolean).join(\" · \");\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar traceEl = container.querySelector(\"[data-inspector-trace]\");\n\t\t\t\t\t\tif (traceEl) {\n\t\t\t\t\t\t\ttraceEl.innerHTML = \"\";\n\t\t\t\t\t\t\tif (payload.trace && payload.trace.matched_policy && payload.trace.matched_policy.length) {\n\t\t\t\t\t\t\t\tvar matched = payload.trace.matched_policy;\n\t\t\t\t\t\t\t\tif (matched.length === 5) {\n\t\t\t\t\t\t\t\t\tvar li = document.createElement(\"li\");\n\t\t\t\t\t\t\t\t\tli.textContent =\n\t\t\t\t\t\t\t\t\t\t\"p: \" +\n\t\t\t\t\t\t\t\t\t\t[\"sub=\" + matched[0], \"dom=\" + matched[1], \"obj=\" + matched[2], \"act=\" + matched[3], \"eft=\" + matched[4]].join(\n\t\t\t\t\t\t\t\t\t\t\t\" · \",\n\t\t\t\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\t\t\ttraceEl.appendChild(li);\n\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\tmatched.forEach(function (rule) {\n\t\t\t\t\t\t\t\t\t\tvar li = document.createElement(\"li\");\n\t\t\t\t\t\t\t\t\t\tli.textContent = rule;\n\t\t\t\t\t\t\t\t\t\ttraceEl.appendChild(li);\n\t\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tvar li = document.createElement(\"li\");\n\t\t\t\t\t\t\t\tli.textContent = container.dataset.emptyLabel || \"\";\n\t\t\t\t\t\t\t\tli.className = \"text-surface-200\";\n\t\t\t\t\t\t\t\ttraceEl.appendChild(li);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar attrsEl = container.querySelector(\"[data-inspector-attrs]\");\n\t\t\t\t\t\tif (attrsEl) {\n\t\t\t\t\t\t\tattrsEl.innerHTML = \"\";\n\t\t\t\t\t\t\tif (payload.attributes) {\n\t\t\t\t\t\t\t\tObject.keys(payload.attributes).forEach(function (key) {\n\t\t\t\t\t\t\t\t\tvar dt = document.createElement(\"dt\");\n\t\t\t\t\t\t\t\t\tdt.className = \"font-semibold\";\n\t\t\t\t\t\t\t\t\tdt.textContent = key;\n\t\t\t\t\t\t\t\t\tvar dd = document.createElement(\"dd\");\n\t\t\t\t\t\t\t\t\tdd.className = \"text-surface-200 break-all\";\n\t\t\t\t\t\t\t\t\tdd.textContent = String(payload.attributes[key]);\n\t\t\t\t\t\t\t\t\tattrsEl.appendChild(dt);\n\t\t\t\t\t\t\t\t\tattrsEl.appendChild(dd);\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (!attrsEl.children.length) {\n\t\t\t\t\t\t\t\tvar dt = document.createElement(\"dt\");\n\t\t\t\t\t\t\t\tdt.className = \"col-span-2 text-surface-200\";\n\t\t\t\t\t\t\t\tdt.textContent = container.dataset.emptyLabel || \"\";\n\t\t\t\t\t\t\t\tattrsEl.appendChild(dt);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar requestId = xhr.getResponseHeader(\"X-Request-ID\") || \"\";\n\t\t\t\t\t\tif (requestId) {\n\t\t\t\t\t\t\tcontainer.dataset.requestId = requestId;\n\t\t\t\t\t\t\tvar idEl = container.querySelector(\"[data-authz-request-id]\");\n\t\t\t\t\t\t\tif (idEl) {\n\t\t\t\t\t\t\t\tidEl.textContent = requestId;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar baseRev = xhr.getResponseHeader(\"X-Authz-Base-Revision\");\n\t\t\t\t\t\tif (baseRev) {\n\t\t\t\t\t\t\tcontainer.dataset.baseRevision = baseRev;\n\t\t\t\t\t\t\tvar revDisplay = container.querySelector(\"[data-authz-base-revision]\");\n\t\t\t\t\t\t\tif (revDisplay) {\n\t\t\t\t\t\t\t\trevDisplay.textContent = baseRev;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tvar revInputs = container.querySelectorAll('input[name=\"base_revision\"]');\n\t\t\t\t\t\t\trevInputs.forEach(function (input) {\n\t\t\t\t\t\t\t\tinput.value = baseRev;\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t},\n\t\t\t\t};\n\t\t\t\tdocument.addEventListener(\"click\", function (evt) {\n\t\t\t\t\tvar toggle = evt.target.closest(\"[data-inspector-toggle]\");\n\t\t\t\t\tif (!toggle) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar container = toggle.closest(\"[data-policy-inspector]\");\n\t\t\t\t\tif (!container) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar body = container.querySelector(\"[data-inspector-body]\");\n\t\t\t\t\tif (!body) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar isHidden = body.classList.contains(\"hidden\");\n\t\t\t\t\tbody.classList.toggle(\"hidden\");\n\t\t\t\t\ttoggle.setAttribute(\"aria-expanded\", isHidden ? \"true\" : \"false\");\n\t\t\t\t\tif (isHidden) {\n\t\t\t\t\t\tbody.focus({ preventScroll: true });\n\t\t\t\t\t\tvar refresh = container.querySelector(\"[data-inspector-refresh]\");\n\t\t\t\t\t\tif (refresh) {\n\t\t\t\t\t\t\trefresh.click();\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t}\n\t\t</script></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</span></div></div><script>\n\t\t\tif (!window.authzInspector) {\n\t\t\t\twindow.authzInspector = {\n\t\t\t\t\tonRequest: function (evt) {\n\t\t\t\t\t\tvar container = evt.target.closest(\"[data-policy-inspector]\");\n\t\t\t\t\t\tif (!container) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar status = container.querySelector(\"[data-inspector-latency]\");\n\t\t\t\t\t\tif (status) {\n\t\t\t\t\t\t\tstatus.textContent = container.dataset.loadingLabel || \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t},\n\t\t\t\t\tonResponse: function (evt) {\n\t\t\t\t\t\tif (!evt.detail || !evt.detail.xhr) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar container = evt.target.closest(\"[data-policy-inspector]\");\n\t\t\t\t\t\tif (!container) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar xhr = evt.detail.xhr;\n\t\t\t\t\t\tvar latencyEl = container.querySelector(\"[data-inspector-latency]\");\n\t\t\t\t\t\tif (latencyEl) {\n\t\t\t\t\t\t\tlatencyEl.textContent = \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (xhr.status < 200 || xhr.status >= 300) {\n\t\t\t\t\t\t\treturn;\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar payload = {};\n\t\t\t\t\t\ttry {\n\t\t\t\t\t\t\tpayload = JSON.parse(xhr.responseText || \"{}\");\n\t\t\t\t\t\t} catch (e) {\n\t\t\t\t\t\t\tpayload = {};\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar allowedEl = container.querySelector(\"[data-inspector-allowed]\");\n\t\t\t\t\t\tif (allowedEl) {\n\t\t\t\t\t\t\tif (payload.allowed === true) {\n\t\t\t\t\t\t\t\tallowedEl.textContent = container.dataset.allowedLabel || \"yes\";\n\t\t\t\t\t\t\t\tallowedEl.classList.remove(\"text-error-300\");\n\t\t\t\t\t\t\t\tallowedEl.classList.add(\"text-success-300\");\n\t\t\t\t\t\t\t} else if (payload.allowed === false) {\n\t\t\t\t\t\t\t\tallowedEl.textContent = container.dataset.deniedLabel || \"no\";\n\t\t\t\t\t\t\t\tallowedEl.classList.add(\"text-error-300\");\n\t\t\t\t\t\t\t\tallowedEl.classList.remove(\"text-success-300\");\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tallowedEl.textContent = container.dataset.loadingLabel || \"\";\n\t\t\t\t\t\t\t\tallowedEl.classList.remove(\"text-error-300\");\n\t\t\t\t\t\t\t\tallowedEl.classList.remove(\"text-success-300\");\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar modeEl = container.querySelector(\"[data-inspector-mode]\");\n\t\t\t\t\t\tif (modeEl) {\n\t\t\t\t\t\t\tmodeEl.textContent = payload.mode || container.dataset.emptyLabel || \"\";\n\t\t\t\t\t\t}\n\t\t\t\t\t\tif (latencyEl) {\n\t\t\t\t\t\t\tif (payload.latency_ms) {\n\t\t\t\t\t\t\t\tlatencyEl.textContent = payload.latency_ms + \" ms\";\n\t\t\t\t\t\t\t} else if (typeof payload.latency_ms === \"number\") {\n\t\t\t\t\t\t\t\tlatencyEl.textContent = payload.latency_ms + \" ms\";\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tlatencyEl.textContent = container.dataset.emptyLabel || \"\";\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar requestEl = container.querySelector(\"[data-inspector-request]\");\n\t\t\t\t\t\tif (requestEl && payload.request) {\n\t\t\t\t\t\t\tvar request = payload.request;\n\t\t\t\t\t\t\trequestEl.textContent = [request.subject, request.domain, request.object, request.action].filter(Boolean).join(\" · \");\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar traceEl = container.querySelector(\"[data-inspector-trace]\");\n\t\t\t\t\t\tif (traceEl) {\n\t\t\t\t\t\t\ttraceEl.innerHTML = \"\";\n\t\t\t\t\t\t\tif (payload.trace && payload.trace.matched_policy && payload.trace.matched_policy.length) {\n\t\t\t\t\t\t\t\tvar matched = payload.trace.matched_policy;\n\t\t\t\t\t\t\t\tif (matched.length === 5) {\n\t\t\t\t\t\t\t\t\tvar li = document.createElement(\"li\");\n\t\t\t\t\t\t\t\t\tli.textContent =\n\t\t\t\t\t\t\t\t\t\t\"p: \" +\n\t\t\t\t\t\t\t\t\t\t[\"sub=\" + matched[0], \"dom=\" + matched[1], \"obj=\" + matched[2], \"act=\" + matched[3], \"eft=\" + matched[4]].join(\n\t\t\t\t\t\t\t\t\t\t\t\" · \",\n\t\t\t\t\t\t\t\t\t\t);\n\t\t\t\t\t\t\t\t\ttraceEl.appendChild(li);\n\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\tmatched.forEach(function (rule) {\n\t\t\t\t\t\t\t\t\t\tvar li = document.createElement(\"li\");\n\t\t\t\t\t\t\t\t\t\tli.textContent = rule;\n\t\t\t\t\t\t\t\t\t\ttraceEl.appendChild(li);\n\t\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\tvar li = document.createElement(\"li\");\n\t\t\t\t\t\t\t\tli.textContent = container.dataset.emptyLabel || \"\";\n\t\t\t\t\t\t\t\tli.className = \"text-surface-200\";\n\t\t\t\t\t\t\t\ttraceEl.appendChild(li);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar attrsEl = container.querySelector(\"[data-inspector-attrs]\");\n\t\t\t\t\t\tif (attrsEl) {\n\t\t\t\t\t\t\tattrsEl.innerHTML = \"\";\n\t\t\t\t\t\t\tif (payload.attributes) {\n\t\t\t\t\t\t\t\tObject.keys(payload.attributes).forEach(function (key) {\n\t\t\t\t\t\t\t\t\tvar dt = document.createElement(\"dt\");\n\t\t\t\t\t\t\t\t\tdt.className = \"font-semibold\";\n\t\t\t\t\t\t\t\t\tdt.textContent = key;\n\t\t\t\t\t\t\t\t\tvar dd = document.createElement(\"dd\");\n\t\t\t\t\t\t\t\t\tdd.className = \"text-surface-200 break-all\";\n\t\t\t\t\t\t\t\t\tdd.textContent = String(payload.attributes[key]);\n\t\t\t\t\t\t\t\t\tattrsEl.appendChild(dt);\n\t\t\t\t\t\t\t\t\tattrsEl.appendChild(dd);\n\t\t\t\t\t\t\t\t});\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tif (!attrsEl.children.length) {\n\t\t\t\t\t\t\t\tvar dt = document.createElement(\"dt\");\n\t\t\t\t\t\t\t\tdt.className = \"col-span-2 text-surface-200\";\n\t\t\t\t\t\t\t\tdt.textContent = container.dataset.emptyLabel || \"\";\n\t\t\t\t\t\t\t\tattrsEl.appendChild(dt);\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar requestId = xhr.getResponseHeader(\"X-Request-ID\") || \"\";\n\t\t\t\t\t\tif (requestId) {\n\t\t\t\t\t\t\tcontainer.dataset.requestId = requestId;\n\t\t\t\t\t\t\tvar idEl = container.querySelector(\"[data-authz-request-id]\");\n\t\t\t\t\t\t\tif (idEl) {\n\t\t\t\t\t\t\t\tidEl.textContent = requestId;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t}\n\t\t\t\t\t\tvar baseRev = xhr.getResponseHeader(\"X-Authz-Base-Revision\");\n\t\t\t\t\t\tif (baseRev) {\n\t\t\t\t\t\t\tcontainer.dataset.baseRevision = baseRev;\n\t\t\t\t\t\t\tvar revDisplay = container.querySelector(\"[data-authz-base-revision]\");\n\t\t\t\t\t\t\tif (revDisplay) {\n\t\t\t\t\t\t\t\trevDisplay.textContent = baseRev;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tvar revInputs = container.querySelectorAll('input[name=\"base_revision\"]');\n\t\t\t\t\t\t\trevInputs.forEach(function (input) {\n\t\t\t\t\t\t\t\tinput.value = baseRev;\n\t\t\t\t\t\t\t});\n\t\t\t\t\t\t}\n\t\t\t\t\t},\n\t\t\t\t};\n\t\t\t\tdocument.addEventListener(\"click\", function (evt) {\n\t\t\t\t\tvar toggle = evt.target.closest(\"[data-inspector-toggle]\");\n\t\t\t\t\tif (!toggle) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar container = toggle.closest(\"[data-policy-inspector]\");\n\t\t\t\t\tif (!container) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar body = container.querySelector(\"[data-inspector-body]\");\n\t\t\t\t\tif (!body) {\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\t\t\t\t\tvar isHidden = body.classList.contains(\"hidden\");\n\t\t\t\t\tbody.classList.toggle(\"hidden\");\n\t\t\t\t\ttoggle.setAttribute(\"aria-expanded\", isHidden ? \"true\" : \"false\");\n\t\t\t\t\tif (isHidden) {\n\t\t\t\t\t\tbody.focus({ preventScroll: true });\n\t\t\t\t\t\tvar refresh = container.querySelector(\"[data-inspector-refresh]\");\n\t\t\t\t\t\tif (refresh) {\n\t\t\t\t\t\t\trefresh.click();\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t}\n\t\t</script></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

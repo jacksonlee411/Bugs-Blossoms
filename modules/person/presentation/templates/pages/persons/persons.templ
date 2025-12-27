@@ -29,12 +29,11 @@ templ Content(props *viewmodels.PersonsListPageProps) {
 	<div class="m-6 space-y-4">
 		if props.CanDebug {
 			@authzcomponents.PolicyInspector(&authzcomponents.PolicyInspectorProps{
-				State:      pageCtx.AuthzState(),
-				Object:     "person.persons",
-				Action:     "list",
-				Domain:     "person",
-				RequestURL: "/core/api/authz/requests",
-				CanDebug:   props.CanDebug,
+				State:    pageCtx.AuthzState(),
+				Object:   "person.persons",
+				Action:   "list",
+				Domain:   "person",
+				CanDebug: props.CanDebug,
 			})
 		}
 		<div class="flex flex-wrap items-center justify-between gap-3">

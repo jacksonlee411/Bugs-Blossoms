@@ -42,12 +42,11 @@ templ Content(props *viewmodels.LogsPageProps) {
 	<div class="m-6 space-y-4">
 		if props.CanDebug {
 			@authzcomponents.PolicyInspector(&authzcomponents.PolicyInspectorProps{
-				State:      pageCtx.AuthzState(),
-				Object:     "logging.logs",
-				Action:     "view",
-				Domain:     "logging",
-				RequestURL: "/core/api/authz/requests",
-				CanDebug:   props.CanDebug,
+				State:    pageCtx.AuthzState(),
+				Object:   "logging.logs",
+				Action:   "view",
+				Domain:   "logging",
+				CanDebug: props.CanDebug,
 			})
 		}
 		<div class="flex items-center justify-between">
@@ -55,32 +54,7 @@ templ Content(props *viewmodels.LogsPageProps) {
 		</div>
 		if !canView {
 			<div class="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-500/40 bg-amber-900/30 px-3 py-2 text-sm text-amber-100">
-				<span>{ pageCtx.T("Authz.Unauthorized.ApplyHint") }</span>
-				<div class="flex flex-wrap items-center gap-2">
-					if props.CanRequest {
-						<form
-							class="flex items-center gap-2"
-							hx-post="/core/api/authz/requests"
-							hx-target="body"
-							hx-swap="none"
-							hx-on::after-request="window.handleAuthzRequest && window.handleAuthzRequest(event)"
-						>
-							<input type="hidden" name="object" value="logging.logs"/>
-							<input type="hidden" name="action" value="view"/>
-							<input type="hidden" name="domain" value="logging"/>
-							<input type="hidden" name="diff" value="[]"/>
-							<input type="hidden" name="request_access" value="1"/>
-							<input
-								type="hidden"
-								name="reason"
-								value={ pageCtx.T("Authz.Unauthorized.ReasonDefault", map[string]any{"Operation": pageCtx.T("NavigationLinks.Logs")}) }
-							/>
-							<button class="btn btn-xs btn-primary" type="submit">
-								{ pageCtx.T("Authz.Unauthorized.Apply") }
-							</button>
-						</form>
-					}
-				</div>
+				<span>{ pageCtx.T("Authz.Unauthorized.ReadOnlyHint") }</span>
 			</div>
 		}
 		<div

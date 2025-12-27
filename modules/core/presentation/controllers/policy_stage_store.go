@@ -46,6 +46,9 @@ func (s *policyStageStore) buildEntry(payload dtos.StagePolicyRequest) (dtos.Sta
 	if typ == "" {
 		return dtos.StagedPolicyEntry{}, errors.New("type is required")
 	}
+	if typ == "g2" {
+		return dtos.StagedPolicyEntry{}, errors.New("type must be p or g")
+	}
 	if strings.TrimSpace(payload.Object) == "" {
 		return dtos.StagedPolicyEntry{}, errors.New("object is required")
 	}
@@ -60,15 +63,16 @@ func (s *policyStageStore) buildEntry(payload dtos.StagePolicyRequest) (dtos.Sta
 		if action == "" {
 			action = "*"
 		}
-		if effect == "" {
-			effect = "allow"
-		}
+		effect = "allow"
 	} else {
 		if action == "" {
 			return dtos.StagedPolicyEntry{}, errors.New("action is required")
 		}
 		if effect == "" {
-			return dtos.StagedPolicyEntry{}, errors.New("effect is required")
+			effect = "allow"
+		}
+		if !strings.EqualFold(effect, "allow") {
+			return dtos.StagedPolicyEntry{}, errors.New("effect must be allow")
 		}
 	}
 

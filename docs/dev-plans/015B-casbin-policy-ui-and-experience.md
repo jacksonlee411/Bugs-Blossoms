@@ -1,5 +1,8 @@
 # DEV-PLAN-015B：Casbin 策略 UI 与授权体验
 
+> [!IMPORTANT]
+> 自 DEV-PLAN-015C 起，策略草稿（requests）/审批/bot 链路已移除；当前唯一口径为管理员直接维护生效（`POST /core/api/authz/policies/apply`）。本文仅作历史记录，不再作为 SSOT。
+
 **状态**: 进行中（2025-12-11 16:20，文档/翻译已补，等待 M3 长稳）
 
 ## 背景

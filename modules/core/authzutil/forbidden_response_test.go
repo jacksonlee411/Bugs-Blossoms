@@ -34,9 +34,7 @@ func TestBuildForbiddenPayload_WithStateAndHeaders(t *testing.T) {
 	require.NotEmpty(t, payload.BaseRevision)
 	require.NotEmpty(t, payload.DebugURL)
 	require.Len(t, payload.MissingPolicies, 1)
-	require.Len(t, payload.SuggestDiff, 1)
 	require.Equal(t, payload.Domain, payload.MissingPolicies[0].Domain)
-	require.Equal(t, "allow", payload.SuggestDiff[0].Effect)
 }
 
 func TestBuildForbiddenPayload_DefaultsWithoutState(t *testing.T) {
@@ -55,7 +53,6 @@ func TestBuildForbiddenPayload_DefaultsWithoutState(t *testing.T) {
 	require.Empty(t, payload.Subject)
 	require.NotEmpty(t, payload.MissingPolicies)
 	require.Equal(t, payload.Domain, payload.MissingPolicies[0].Domain)
-	require.Empty(t, payload.SuggestDiff)
 	require.Equal(t, "fallback-req", payload.RequestID)
 	require.NotEmpty(t, payload.BaseRevision)
 	require.Equal(t, "/core/api/authz/debug", payload.DebugURL)

@@ -58,7 +58,7 @@
 
 ### 3. Presentation / 模板 / 本地化
 - [x] 在 `modules/hrm/presentation/templates/pages/employees/*.templ` 去除 `user.Can`，全部改为 `if pageCtx.CanAuthz("hrm.employees", "create") { ... }`。按钮/链接（新建、保存、删除、批量操作）全部受控。
-- [x] 提供临时 Unauthorized 组件（可直接借用 Core 的 403 文案），props 接收 `pageCtx.AuthzState().MissingPolicies`，展示“申请权限”按钮跳转 `/core/api/authz/requests`，为 015B 升级留钩子。
+- [x] 提供临时 Unauthorized 组件（可直接借用 Core 的 403 文案），props 接收 `pageCtx.AuthzState().MissingPolicies`，展示 Debug 串联能力（`/core/api/authz/debug`），为后续统一组件升级留钩子。
 - [x] 更新 viewmodels/mappers 以携带 `CanEdit`, `CanDelete` 等布尔字段，避免模板内直接发起权限判断。
 - [x] `modules/hrm/presentation/locales/{en,ru,uz}.json` 增加 Casbin 相关文案（Denied 标题、申请按钮、调试提示）；完成后运行 `make check tr`。
 

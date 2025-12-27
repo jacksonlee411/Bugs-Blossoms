@@ -47,10 +47,6 @@ test.describe('logging authz gating', () => {
 		await expect(page.getByRole('heading', { level: 1 })).toContainText(/Logs/i);
 		await expect(page.locator('.pointer-events-none.select-none')).toBeVisible();
 		await expect(page.locator('[data-policy-inspector]')).toHaveCount(0);
-		const requestForm = page.locator('form[hx-post="/core/api/authz/requests"]');
-		if (await requestForm.count()) {
-			await expect(requestForm.first()).toBeVisible();
-		}
 
 		const apiResponse = await page.request.get('/logs', {
 			headers: { Accept: 'application/json' },

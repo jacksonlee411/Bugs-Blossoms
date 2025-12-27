@@ -1,5 +1,8 @@
 # DEV-PLAN-015：Casbin 策略 UI / 平台联调记录
 
+> [!IMPORTANT]
+> 自 DEV-PLAN-015C 起，策略草稿（requests）/审批/bot 链路已移除；本记录仅用于追溯历史联调过程，不再作为现行口径。现行口径见 `docs/runbooks/authz-policy-apply-api.md`。
+
 ## 前置依赖验证（Alpha 前置）
 
 | 日期 | 环境 | 命令 | 结果 | 备注 |
@@ -29,7 +32,7 @@
 | 日期 | 环境 | Request ID | 基线修订 | PR 链接 | Bot Locker | 结果/备注 |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2025-12-04 07:40 | 本地（feature/dev-plan-015a） | `c0c6cd84-4e00-4c35-ac24-359b3f8477de` | `ec522ef3… → 7dc0adfc…` | https://github.com/jacksonlee411/Bugs-Blossoms/pull/11 | `DESKTOP-S9U9E9K-54966-1764805201` | ✅ merged；bot 首次运行即完成，回写 snapshot/PR link 成功 |
-| 2025-12-04 07:44 | 本地（feature/dev-plan-015a） | `c256f1a3-83cd-480d-867e-f5d18c0168f0` | `ec522ef3… → 8f25298b…` | https://github.com/jacksonlee411/Bugs-Blossoms/pull/12 | `DESKTOP-S9U9E9K-58601-1764805469` | ✅ merged；首次推送因 HTTPS token 解析报错被标记失败，执行 `scripts/authz/bot.sh force-release` 后重试成功 |
+| 2025-12-04 07:44 | 本地（feature/dev-plan-015a） | `c256f1a3-83cd-480d-867e-f5d18c0168f0` | `ec522ef3… → 8f25298b…` | https://github.com/jacksonlee411/Bugs-Blossoms/pull/12 | `DESKTOP-S9U9E9K-58601-1764805469` | ✅ merged；首次推送因 HTTPS token 解析报错被标记失败，手动解锁后重试成功 |
 
 > 填写建议：在草稿状态从 `approved` 转为 `merged` 后，记录 bot 输出、`applied_policy_snapshot` 是否写入、相关 PR、Locker 等信息；若失败，记录 `error_log` 并注明是否使用 `force-release` 重试。
 

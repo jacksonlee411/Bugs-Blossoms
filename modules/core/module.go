@@ -3,14 +3,11 @@ package core
 import (
 	"embed"
 
-	"github.com/iota-uz/iota-sdk/modules/core/permissions"
 	"github.com/iota-uz/iota-sdk/modules/core/validators"
 	"github.com/iota-uz/iota-sdk/pkg/rbac"
 	"github.com/iota-uz/iota-sdk/pkg/spotlight"
 
 	icons "github.com/iota-uz/icons/phosphor"
-	authzPersistence "github.com/iota-uz/iota-sdk/pkg/authz/persistence"
-	authzVersion "github.com/iota-uz/iota-sdk/pkg/authz/version"
 	"github.com/iota-uz/iota-sdk/pkg/configuration"
 
 	"github.com/iota-uz/iota-sdk/modules/core/infrastructure/persistence"
@@ -63,7 +60,6 @@ func (m *Module) Register(app application.Application) error {
 	roleRepo := persistence.NewRoleRepository()
 	tenantRepo := persistence.NewTenantRepository()
 	permRepo := persistence.NewPermissionRepository()
-	policyRepo := authzPersistence.NewPolicyChangeRequestRepository()
 
 	// Create query repositories
 	userQueryRepo := query.NewPgUserQueryRepository()
@@ -76,8 +72,7 @@ func (m *Module) Register(app application.Application) error {
 	// Create services
 	tenantService := services.NewTenantService(tenantRepo)
 	uploadService := services.NewUploadService(uploadRepo, fsStorage, app.EventPublisher())
-	revisionProvider := authzVersion.NewFileProvider(cfg.Authz.PolicyPath + ".rev")
-	policyService := services.NewPolicyDraftService(policyRepo, revisionProvider, cfg.Authz.PolicyPath, app.EventPublisher())
+	policyService := services.NewAuthzPolicyService(cfg.Authz.PolicyPath)
 
 	app.RegisterServices(
 		uploadService,
@@ -122,7 +117,6 @@ func (m *Module) Register(app application.Application) error {
 		controllers.NewWebSocketController(app),
 		controllers.NewSettingsController(app),
 		controllers.NewAuthzAPIController(app),
-		controllers.NewAuthzRequestController(app),
 	)
 	if cfg.GoAppEnvironment != configuration.Production || cfg.EnableDevEndpoints {
 		app.RegisterControllers(
@@ -146,12 +140,6 @@ func (m *Module) Register(app application.Application) error {
 			RequireAuthz(RolesLink.AuthzObject, RolesLink.AuthzAction),
 		spotlight.NewQuickLink(GroupsLink.Icon, GroupsLink.Name, GroupsLink.Href).
 			RequireAuthz(GroupsLink.AuthzObject, GroupsLink.AuthzAction),
-		spotlight.NewQuickLink(
-			icons.List(icons.Props{Size: "24"}),
-			AuthzRequestsLink.Name,
-			AuthzRequestsLink.Href,
-		).RequireAuthz(AuthzRequestsLink.AuthzObject, AuthzRequestsLink.AuthzAction).
-			RequirePermissions(permissions.AuthzRequestsRead),
 		spotlight.NewQuickLink(
 			icons.PlusCircle(icons.Props{Size: "24"}),
 			"Users.List.New",

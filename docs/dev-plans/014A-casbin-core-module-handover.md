@@ -21,7 +21,7 @@
   - [x] 盘点 Core 模块所有 REST/GraphQL API（除 `/core/api/authz/*` 外）在通过 middleware 后是否仍需 `ensureAuthz` 或 service guard；对返回 JSON 的接口建议统一 403 payload，并在文档/Swagger 标注依赖的 Casbin 权限。（`writeForbiddenResponse` 统一 403 响应，HX/全页均渲染 Unauthorized 组件）
 - **UI/模板消费 ViewState**
   - [x] 将 PageContext 的 `CanAuthz`/`AuthzState` 应用于所有用户/角色/组/上传页面，所有按钮/操作统一通过该接口控制可见性，彻底删除模板中的 `user.Can`。（Users/Roles/Groups 列表、新建、编辑入口均以 `pageCtx.CanAuthz` 控制；`user.CanUpdate` 仅保留实体态，UI 通过 capability 决定显隐）
-  - [x] 构建统一的 Unauthorized 组件：展示操作名称、`authz.ViewState.MissingPolicies`、`SuggestDiff` 结果及 `/core/api/authz/requests` 入口，shadow 阶段也需提示可申请策略。（新增 `templates/components/unauthorized.templ`，403/HX 响应与页面内操作共同复用）
+  - [x] 构建统一的 Unauthorized 组件：展示操作名称与 `authz.ViewState.MissingPolicies`，并提供 Debug 串联能力（`GET /core/api/authz/debug`）；015C 后策略变更通过 `POST /core/api/authz/policies/apply` 直接生效。（新增 `templates/components/unauthorized.templ`，403/HX 响应与页面内操作共同复用）
   - [x] 对嵌套组件（如 Quick Link 自定义项、批量操作对话框）进行排查，全部改为依赖 `pageCtx.CanAuthz` 或 Controller 注入的 capability 数据。（Users/Groups/QuickLink/Spotlight 均在 controller 侧预热 ViewState，嵌套按钮通过 tooltip/`data-disabled` 提示“申请权限”）
 - **操作入口 & Quick Links**
   - [x] 在 Quick Links/Spotlight 数据源中为所有 Core 入口声明 `RequireAuthz(object, action)`（或 fallback 权限），无权时直接隐藏；保留 legacy 体验仅在 shadow 阶段启用。（Users/Roles/Groups Quick Link + Spotlight 用户数据源均贴合 capability，未授权返回空集）
@@ -50,7 +50,7 @@
    - 后台任务、定时器、Websocket 推送统一通过 `authzutil.WithSystemSubject(ctx, "system:<module>.job")` 注入 subject，策略以 `system:<module>.job` 形式写入。
 2. **Controller & 模板**
    - HTTP 层使用 `ensurePageCapabilities(r, object, actions...)` 预热 `authz.ViewState`，模板侧直接通过 `pageCtx.CanAuthz` 控制按钮/对话框可见性。
-   - 在所有写操作按钮（保存/删除/批量动作）添加 `data-disabled`/tooltip，未授权时渲染 `components.Unauthorized`，展示缺失策略与 `/core/api/authz/requests` 坐标。
+   - 在所有写操作按钮（保存/删除/批量动作）添加 `data-disabled`/tooltip，未授权时渲染 `components.Unauthorized`，展示缺失策略与 Debug 坐标（`/core/api/authz/debug`）。
    - Quick Links/Spotlight/批量入口必须设置 `RequireAuthz`；Spotlight DataSource 需要额外的 capability 检查，未授权直接返回空集。
 3. **灰度与记录**
    - 每次 shadow/enforce 切换前后在 `DEV-PLAN-012` 追加 readiness（`make authz-test authz-lint`、`go test ./modules/<module>/...`），并在 `DEV-PLAN-014` 中登记命令、观测指标与回滚结果。
