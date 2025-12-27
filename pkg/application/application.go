@@ -34,6 +34,8 @@ func translate(localizer *i18n.Localizer, items []types.NavigationItem) []types.
 			Children:    translate(localizer, item.Children),
 			Icon:        item.Icon,
 			Permissions: item.Permissions,
+			AuthzObject: item.AuthzObject,
+			AuthzAction: item.AuthzAction,
 		})
 	}
 	return translated
