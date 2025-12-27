@@ -49,6 +49,17 @@ func TestOrgAPIController_GetSnapshot_PaginatesWithCursor(t *testing.T) {
 
 	pool, tenantID := setupOrgTestDB(t, []string{
 		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
 	})
 
 	asOf := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -81,9 +92,18 @@ func TestOrgAPIController_GetSnapshot_PaginatesWithCursor(t *testing.T) {
 			t.Fatalf("unexpected status %d: %s", rr.Code, strings.TrimSpace(rr.Body.String()))
 		}
 
-		var res orgsvc.SnapshotResult
+		var res struct {
+			TenantID      uuid.UUID             `json:"tenant_id"`
+			EffectiveDate string                `json:"effective_date"`
+			GeneratedAt   string                `json:"generated_at"`
+			Includes      []string              `json:"includes"`
+			Limit         int                   `json:"limit"`
+			Items         []orgsvc.SnapshotItem `json:"items"`
+			NextCursor    *string               `json:"next_cursor"`
+		}
 		require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &res))
 		require.Equal(t, tenantID, res.TenantID)
+		require.Equal(t, asOf.Format("2006-01-02"), res.EffectiveDate)
 		require.Equal(t, "nodes", res.Includes[0])
 		require.Equal(t, "edges", res.Includes[1])
 		require.Equal(t, 2, res.Limit)
@@ -116,8 +136,14 @@ func TestOrgAPIController_Batch_DryRunHasNoSideEffects(t *testing.T) {
 		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
 		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
 		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
 		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
@@ -167,6 +193,17 @@ func TestOrgAPIController_Batch_InvalidCommandReturnsCommandIndexMeta(t *testing
 
 	pool, tenantID := setupOrgTestDB(t, []string{
 		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
 	})
 
 	withOrgRolloutEnabled(t, tenantID)
@@ -277,16 +314,30 @@ func seedOrgTestTree(tb testing.TB, pool *pgxpool.Pool, tenantID uuid.UUID, asOf
 	}
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_node_slices
-			(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date, effective_on, end_on)
+				VALUES (
+					$1,$2,$3,$4,$5,$6,$7,
+					($6 AT TIME ZONE 'UTC')::date,
+					CASE
+						WHEN ($7 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+						ELSE ((($7 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+					END
+				)`,
 			tenantID, n.ID, n.Code, n.DisplayOrder, n.ParentID, asOf, endDate,
 		)
 		require.NoError(tb, err)
 	}
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_edges
-			(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
-			VALUES ($1,$2,$3,$4,$5,$6)`,
+				(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
+				VALUES (
+					$1,$2,$3,$4,$5,$6,
+					($5 AT TIME ZONE 'UTC')::date,
+					CASE
+						WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+						ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+					END
+				)`,
 			tenantID, "OrgUnit", n.ParentID, n.ID, asOf, endDate,
 		)
 		require.NoError(tb, err)

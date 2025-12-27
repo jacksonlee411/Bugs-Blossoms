@@ -55,9 +55,25 @@ func TestOrgTreeQueryBudget(t *testing.T) {
 	pool := newPoolWithQueryTracer(t, itf.DbOpts(dbName), tracer)
 	t.Cleanup(pool.Close)
 
-	schemaSQL := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", "00001_org_baseline.sql")))
-	_, err := pool.Exec(ctx, schemaSQL, pgx.QueryExecModeSimpleProtocol)
-	require.NoError(t, err)
+	files := []string{
+		"00001_org_baseline.sql",
+		"20251218005114_org_placeholders_and_event_contracts.sql",
+		"20251218130000_org_settings_and_audit.sql",
+		"20251218150000_org_outbox.sql",
+		"20251219090000_org_hierarchy_closure_and_snapshots.sql",
+		"20251219195000_org_security_group_mappings_and_links.sql",
+		"20251219220000_org_reporting_nodes_and_view.sql",
+		"20251220160000_org_position_slices_and_fte.sql",
+		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
+		"20251221090000_org_reason_code_mode.sql",
+		"20251222120000_org_personnel_events.sql",
+		"20251227090000_org_valid_time_day_granularity.sql",
+	}
+	for _, f := range files {
+		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
+		_, err := pool.Exec(ctx, sql, pgx.QueryExecModeSimpleProtocol)
+		require.NoError(t, err, "failed migration %s", f)
+	}
 
 	ensureTenant(t, ctx, pool, largeTenantID)
 	ensureTenant(t, ctx, pool, smallTenantID)
@@ -211,8 +227,15 @@ func seedOrgTree(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantI
 
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_node_slices
-			(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date)
-			VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date, effective_on, end_on)
+				VALUES (
+					$1,$2,$3,$4,$5,$6,$7,
+					($6 AT TIME ZONE 'UTC')::date,
+					CASE
+						WHEN ($7 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+						ELSE ((($7 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+					END
+				)`,
 			tenantID, n.ID, n.Code, n.DisplayOrder, n.ParentID, asOf, endDate,
 		)
 		require.NoError(tb, err)
@@ -220,8 +243,15 @@ func seedOrgTree(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantI
 
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_edges
-			(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
-			VALUES ($1,$2,$3,$4,$5,$6)`,
+				(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
+				VALUES (
+					$1,$2,$3,$4,$5,$6,
+					($5 AT TIME ZONE 'UTC')::date,
+					CASE
+						WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+						ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+					END
+				)`,
 			tenantID, "OrgUnit", n.ParentID, n.ID, asOf, endDate,
 		)
 		require.NoError(tb, err)

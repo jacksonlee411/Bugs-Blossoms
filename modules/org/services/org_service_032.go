@@ -209,7 +209,9 @@ func (s *OrgService) ListSecurityGroupMappings(ctx context.Context, tenantID uui
 
 	var asOf *time.Time
 	if filter.AsOf != nil && !filter.AsOf.IsZero() {
-		t := filter.AsOf.UTC()
+		u := filter.AsOf.UTC()
+		y, m, d := u.Date()
+		t := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 		asOf = &t
 		filter.AsOf = asOf
 	}
@@ -224,7 +226,7 @@ func (s *OrgService) ListSecurityGroupMappings(ctx context.Context, tenantID uui
 	nextCursor := (*string)(nil)
 	if len(rows) > filter.Limit {
 		last := rows[filter.Limit-1]
-		v := "effective_date:" + last.EffectiveDate.UTC().Format(time.RFC3339) + ":id:" + last.ID.String()
+		v := "effective_date:" + last.EffectiveDate.UTC().Format(time.DateOnly) + ":id:" + last.ID.String()
 		nextCursor = &v
 		rows = rows[:filter.Limit]
 	}
@@ -398,7 +400,9 @@ func (s *OrgService) ListOrgLinks(ctx context.Context, tenantID uuid.UUID, filte
 
 	var asOf *time.Time
 	if filter.AsOf != nil && !filter.AsOf.IsZero() {
-		t := filter.AsOf.UTC()
+		u := filter.AsOf.UTC()
+		y, m, d := u.Date()
+		t := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 		asOf = &t
 		filter.AsOf = asOf
 	}
@@ -413,7 +417,7 @@ func (s *OrgService) ListOrgLinks(ctx context.Context, tenantID uuid.UUID, filte
 	nextCursor := (*string)(nil)
 	if len(rows) > filter.Limit {
 		last := rows[filter.Limit-1]
-		v := "effective_date:" + last.EffectiveDate.UTC().Format(time.RFC3339) + ":id:" + last.ID.String()
+		v := "effective_date:" + last.EffectiveDate.UTC().Format(time.DateOnly) + ":id:" + last.ID.String()
 		nextCursor = &v
 		rows = rows[:filter.Limit]
 	}

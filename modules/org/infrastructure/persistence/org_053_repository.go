@@ -21,20 +21,22 @@ func (r *OrgRepository) InsertPosition(ctx context.Context, tenantID uuid.UUID, 
 	}
 	var id uuid.UUID
 	if err := tx.QueryRow(ctx, `
-	INSERT INTO org_positions (
-		tenant_id,
-		id,
+		INSERT INTO org_positions (
+			tenant_id,
+			id,
 		org_node_id,
 		code,
-		title,
-		status,
-		is_auto_created,
-		effective_date,
-		end_date
-	)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-	RETURNING id
-	`,
+			title,
+			status,
+			is_auto_created,
+			effective_date,
+			end_date,
+			effective_on,
+			end_on
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		RETURNING id
+		`,
 		pgUUID(tenantID),
 		pgUUID(in.PositionID),
 		pgUUID(in.OrgNodeID),
@@ -44,6 +46,8 @@ func (r *OrgRepository) InsertPosition(ctx context.Context, tenantID uuid.UUID, 
 		in.IsAutoCreated,
 		in.EffectiveDate.UTC(),
 		in.EndDate.UTC(),
+		pgEffectiveOnFromEffectiveDate(in.EffectiveDate),
+		pgEndOnFromEndDate(in.EndDate),
 	).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
@@ -77,9 +81,9 @@ func (r *OrgRepository) InsertPositionSlice(ctx context.Context, tenantID uuid.U
 	}
 	var id uuid.UUID
 	if err := tx.QueryRow(ctx, `
-	INSERT INTO org_position_slices (
-		tenant_id,
-		position_id,
+		INSERT INTO org_position_slices (
+			tenant_id,
+			position_id,
 		org_node_id,
 		title,
 		lifecycle_status,
@@ -92,14 +96,16 @@ func (r *OrgRepository) InsertPositionSlice(ctx context.Context, tenantID uuid.U
 		job_role_code,
 		job_level_code,
 		job_profile_id,
-		cost_center_code,
-		profile,
-		effective_date,
-		end_date
-	)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18)
-	RETURNING id
-	`,
+			cost_center_code,
+			profile,
+			effective_date,
+			end_date,
+			effective_on,
+			end_on
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20)
+		RETURNING id
+		`,
 		pgUUID(tenantID),
 		pgUUID(positionID),
 		pgUUID(in.OrgNodeID),
@@ -118,6 +124,8 @@ func (r *OrgRepository) InsertPositionSlice(ctx context.Context, tenantID uuid.U
 		profile,
 		in.EffectiveDate.UTC(),
 		in.EndDate.UTC(),
+		pgEffectiveOnFromEffectiveDate(in.EffectiveDate),
+		pgEndOnFromEndDate(in.EndDate),
 	).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
@@ -373,7 +381,7 @@ func (r *OrgRepository) UpdatePositionSliceEffectiveDate(ctx context.Context, te
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET effective_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), effectiveDate.UTC())
+	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET effective_date=$3, effective_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), effectiveDate.UTC(), pgEffectiveOnFromEffectiveDate(effectiveDate))
 	return err
 }
 
@@ -382,7 +390,7 @@ func (r *OrgRepository) UpdatePositionSliceEndDate(ctx context.Context, tenantID
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET end_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate.UTC())
+	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET end_date=$3, end_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate.UTC(), pgEndOnFromEndDate(endDate))
 	return err
 }
 

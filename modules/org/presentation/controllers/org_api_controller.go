@@ -209,7 +209,7 @@ func (c *OrgAPIController) GetHierarchies(w http.ResponseWriter, r *http.Request
 		writeJSON(w, http.StatusOK, hierarchiesResolvedResponse{
 			TenantID:      tenantID.String(),
 			HierarchyType: hType,
-			EffectiveDate: effectiveDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(effectiveDate),
 			Nodes:         nodes,
 		})
 		return
@@ -230,7 +230,7 @@ func (c *OrgAPIController) GetHierarchies(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, hierarchiesResponse{
 		TenantID:      tenantID.String(),
 		HierarchyType: hType,
-		EffectiveDate: effectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate: formatValidDate(effectiveDate),
 		Nodes:         nodes,
 	})
 }
@@ -406,7 +406,7 @@ func (c *OrgAPIController) ExportHierarchies(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, exportResponse{
 		TenantID:      res.TenantID.String(),
 		HierarchyType: res.HierarchyType,
-		EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate: formatValidDate(res.EffectiveDate),
 		RootNodeID:    res.RootNodeID.String(),
 		Includes:      res.Includes,
 		Limit:         res.Limit,
@@ -486,7 +486,7 @@ func (c *OrgAPIController) GetNodePath(w http.ResponseWriter, r *http.Request) {
 	var out nodePathResponse
 	out.TenantID = res.TenantID.String()
 	out.OrgNodeID = res.OrgNodeID.String()
-	out.EffectiveDate = res.EffectiveDate.UTC().Format(time.RFC3339)
+	out.EffectiveDate = formatValidDate(res.EffectiveDate)
 	out.Path.Nodes = nodes
 	if format == "nodes_with_sources" {
 		out.Source = &nodePathSource{
@@ -556,7 +556,7 @@ func (c *OrgAPIController) GetPersonPath(w http.ResponseWriter, r *http.Request)
 	var out personPathResponse
 	out.TenantID = res.TenantID.String()
 	out.Subject = res.Subject
-	out.EffectiveDate = res.EffectiveDate.UTC().Format(time.RFC3339)
+	out.EffectiveDate = formatValidDate(res.EffectiveDate)
 	out.Assignment.AssignmentID = res.Assignment.AssignmentID.String()
 	out.Assignment.PositionID = res.Assignment.PositionID.String()
 	out.Assignment.OrgNodeID = res.Assignment.OrgNodeID.String()
@@ -675,7 +675,7 @@ func (c *OrgAPIController) GetNodeResolvedAttributes(w http.ResponseWriter, r *h
 		TenantID:           tenantID.String(),
 		HierarchyType:      hierarchyType,
 		OrgNodeID:          nodeID.String(),
-		EffectiveDate:      effectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate:      formatValidDate(effectiveDate),
 		Attributes:         attrs,
 		ResolvedAttributes: resolved,
 		ResolvedSources:    resolvedSources,
@@ -795,7 +795,7 @@ func (c *OrgAPIController) GetRoleAssignments(w http.ResponseWriter, r *http.Req
 	writeJSON(w, http.StatusOK, response{
 		TenantID:         tenantID.String(),
 		OrgNodeID:        orgNodeID.String(),
-		EffectiveDate:    effectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate:    formatValidDate(effectiveDate),
 		IncludeInherited: includeInherited,
 		Items:            items,
 	})
@@ -898,15 +898,15 @@ func (c *OrgAPIController) GetSecurityGroupMappings(w http.ResponseWriter, r *ht
 			SecurityGroupKey: row.SecurityGroupKey,
 			AppliesToSubtree: row.AppliesToSubtree,
 			EffectiveWindow: effectiveWindowResponse{
-				EffectiveDate: row.EffectiveDate.UTC().Format(time.RFC3339),
-				EndDate:       row.EndDate.UTC().Format(time.RFC3339),
+				EffectiveDate: formatValidDate(row.EffectiveDate),
+				EndDate:       formatValidEndDateFromEndDate(row.EndDate),
 			},
 		})
 	}
 
 	var ed *string
 	if res.EffectiveDate != nil && !res.EffectiveDate.IsZero() {
-		v := res.EffectiveDate.UTC().Format(time.RFC3339)
+		v := formatValidDate(*res.EffectiveDate)
 		ed = &v
 	}
 
@@ -967,8 +967,8 @@ func (c *OrgAPIController) CreateSecurityGroupMapping(w http.ResponseWriter, r *
 	writeJSON(w, http.StatusCreated, response{
 		ID: res.ID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1025,8 +1025,8 @@ func (c *OrgAPIController) RescindSecurityGroupMapping(w http.ResponseWriter, r 
 	writeJSON(w, http.StatusOK, response{
 		ID: res.ID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1137,15 +1137,15 @@ func (c *OrgAPIController) GetLinks(w http.ResponseWriter, r *http.Request) {
 			LinkType:   row.LinkType,
 			Metadata:   row.Metadata,
 			EffectiveWindow: effectiveWindowResponse{
-				EffectiveDate: row.EffectiveDate.UTC().Format(time.RFC3339),
-				EndDate:       row.EndDate.UTC().Format(time.RFC3339),
+				EffectiveDate: formatValidDate(row.EffectiveDate),
+				EndDate:       formatValidEndDateFromEndDate(row.EndDate),
 			},
 		})
 	}
 
 	var ed *string
 	if res.EffectiveDate != nil && !res.EffectiveDate.IsZero() {
-		v := res.EffectiveDate.UTC().Format(time.RFC3339)
+		v := formatValidDate(*res.EffectiveDate)
 		ed = &v
 	}
 
@@ -1210,8 +1210,8 @@ func (c *OrgAPIController) CreateLink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, response{
 		ID: res.ID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1268,8 +1268,8 @@ func (c *OrgAPIController) RescindLink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, response{
 		ID: res.ID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1386,7 +1386,7 @@ func (c *OrgAPIController) GetPermissionPreview(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusOK, permissionPreviewResponse{
 		TenantID:       res.TenantID.String(),
 		OrgNodeID:      res.OrgNodeID.String(),
-		EffectiveDate:  res.EffectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate:  formatValidDate(res.EffectiveDate),
 		SecurityGroups: sg,
 		Links:          res.Links,
 		Warnings:       res.Warnings,
@@ -1466,8 +1466,8 @@ func (c *OrgAPIController) CreateNode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, createNodeResponse{
 		ID: res.NodeID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1625,8 +1625,8 @@ func (c *OrgAPIController) UpdateNode(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, updateNodeResponse{
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1682,8 +1682,8 @@ func (c *OrgAPIController) MoveNode(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, moveNodeResponse{
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1774,8 +1774,8 @@ func (c *OrgAPIController) CorrectNode(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, correctNodeResponse{
 		ID: res.NodeID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1831,8 +1831,8 @@ func (c *OrgAPIController) RescindNode(w http.ResponseWriter, r *http.Request) {
 		ID:     res.NodeID.String(),
 		Status: res.Status,
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -1889,8 +1889,8 @@ func (c *OrgAPIController) ShiftBoundaryNode(w http.ResponseWriter, r *http.Requ
 	}
 	var resp shiftBoundaryResponse
 	resp.ID = res.NodeID.String()
-	resp.Shifted.TargetEffectiveDate = res.TargetStart.UTC().Format(time.RFC3339)
-	resp.Shifted.NewEffectiveDate = res.NewStart.UTC().Format(time.RFC3339)
+	resp.Shifted.TargetEffectiveDate = formatValidDate(res.TargetStart)
+	resp.Shifted.NewEffectiveDate = formatValidDate(res.NewStart)
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -1942,7 +1942,7 @@ func (c *OrgAPIController) CorrectMoveNode(w http.ResponseWriter, r *http.Reques
 	}
 	writeJSON(w, http.StatusOK, correctMoveResponse{
 		ID:            res.NodeID.String(),
-		EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate: formatValidDate(res.EffectiveDate),
 	})
 }
 
@@ -2030,19 +2030,70 @@ func (c *OrgAPIController) GetPositions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	type positionViewRowResponse struct {
+		PositionID          uuid.UUID       `json:"position_id"`
+		Code                string          `json:"code"`
+		OrgNodeID           uuid.UUID       `json:"org_node_id"`
+		Title               *string         `json:"title,omitempty"`
+		LifecycleStatus     string          `json:"lifecycle_status"`
+		IsAutoCreated       bool            `json:"is_auto_created"`
+		CapacityFTE         float64         `json:"capacity_fte"`
+		OccupiedFTE         float64         `json:"occupied_fte"`
+		StaffingState       string          `json:"staffing_state"`
+		PositionType        *string         `json:"position_type,omitempty"`
+		EmploymentType      *string         `json:"employment_type,omitempty"`
+		ReportsToPositionID *uuid.UUID      `json:"reports_to_position_id,omitempty"`
+		JobFamilyGroupCode  *string         `json:"job_family_group_code,omitempty"`
+		JobFamilyCode       *string         `json:"job_family_code,omitempty"`
+		JobRoleCode         *string         `json:"job_role_code,omitempty"`
+		JobLevelCode        *string         `json:"job_level_code,omitempty"`
+		JobProfileID        *uuid.UUID      `json:"job_profile_id,omitempty"`
+		CostCenterCode      *string         `json:"cost_center_code,omitempty"`
+		Profile             json.RawMessage `json:"profile,omitempty"`
+		EffectiveDate       string          `json:"effective_date"`
+		EndDate             string          `json:"end_date"`
+	}
+
+	positions := make([]positionViewRowResponse, 0, len(rows))
+	for _, row := range rows {
+		positions = append(positions, positionViewRowResponse{
+			PositionID:          row.PositionID,
+			Code:                row.Code,
+			OrgNodeID:           row.OrgNodeID,
+			Title:               row.Title,
+			LifecycleStatus:     row.LifecycleStatus,
+			IsAutoCreated:       row.IsAutoCreated,
+			CapacityFTE:         row.CapacityFTE,
+			OccupiedFTE:         row.OccupiedFTE,
+			StaffingState:       row.StaffingState,
+			PositionType:        row.PositionType,
+			EmploymentType:      row.EmploymentType,
+			ReportsToPositionID: row.ReportsToPositionID,
+			JobFamilyGroupCode:  row.JobFamilyGroupCode,
+			JobFamilyCode:       row.JobFamilyCode,
+			JobRoleCode:         row.JobRoleCode,
+			JobLevelCode:        row.JobLevelCode,
+			JobProfileID:        row.JobProfileID,
+			CostCenterCode:      row.CostCenterCode,
+			Profile:             row.Profile,
+			EffectiveDate:       formatValidDate(row.EffectiveDate),
+			EndDate:             formatValidEndDateFromEndDate(row.EndDate),
+		})
+	}
+
 	type getPositionsResponse struct {
-		TenantID  string                     `json:"tenant_id"`
-		AsOf      string                     `json:"as_of"`
-		Page      int                        `json:"page"`
-		Limit     int                        `json:"limit"`
-		Positions []services.PositionViewRow `json:"positions"`
+		TenantID  string                    `json:"tenant_id"`
+		AsOf      string                    `json:"as_of"`
+		Page      int                       `json:"page"`
+		Limit     int                       `json:"limit"`
+		Positions []positionViewRowResponse `json:"positions"`
 	}
 	writeJSON(w, http.StatusOK, getPositionsResponse{
 		TenantID:  tenantID.String(),
-		AsOf:      effectiveDate.UTC().Format(time.RFC3339),
+		AsOf:      formatValidDate(effectiveDate),
 		Page:      page,
 		Limit:     limit,
-		Positions: rows,
+		Positions: positions,
 	})
 }
 
@@ -2126,8 +2177,8 @@ func (c *OrgAPIController) CreatePosition(w http.ResponseWriter, r *http.Request
 		PositionID: res.PositionID.String(),
 		SliceID:    res.SliceID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -2164,15 +2215,61 @@ func (c *OrgAPIController) GetPosition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	type positionViewRowResponse struct {
+		PositionID          uuid.UUID       `json:"position_id"`
+		Code                string          `json:"code"`
+		OrgNodeID           uuid.UUID       `json:"org_node_id"`
+		Title               *string         `json:"title,omitempty"`
+		LifecycleStatus     string          `json:"lifecycle_status"`
+		IsAutoCreated       bool            `json:"is_auto_created"`
+		CapacityFTE         float64         `json:"capacity_fte"`
+		OccupiedFTE         float64         `json:"occupied_fte"`
+		StaffingState       string          `json:"staffing_state"`
+		PositionType        *string         `json:"position_type,omitempty"`
+		EmploymentType      *string         `json:"employment_type,omitempty"`
+		ReportsToPositionID *uuid.UUID      `json:"reports_to_position_id,omitempty"`
+		JobFamilyGroupCode  *string         `json:"job_family_group_code,omitempty"`
+		JobFamilyCode       *string         `json:"job_family_code,omitempty"`
+		JobRoleCode         *string         `json:"job_role_code,omitempty"`
+		JobLevelCode        *string         `json:"job_level_code,omitempty"`
+		JobProfileID        *uuid.UUID      `json:"job_profile_id,omitempty"`
+		CostCenterCode      *string         `json:"cost_center_code,omitempty"`
+		Profile             json.RawMessage `json:"profile,omitempty"`
+		EffectiveDate       string          `json:"effective_date"`
+		EndDate             string          `json:"end_date"`
+	}
+
 	type getPositionResponse struct {
-		TenantID string                   `json:"tenant_id"`
-		AsOf     string                   `json:"as_of"`
-		Position services.PositionViewRow `json:"position"`
+		TenantID string                  `json:"tenant_id"`
+		AsOf     string                  `json:"as_of"`
+		Position positionViewRowResponse `json:"position"`
 	}
 	writeJSON(w, http.StatusOK, getPositionResponse{
 		TenantID: tenantID.String(),
-		AsOf:     effectiveDate.UTC().Format(time.RFC3339),
-		Position: row,
+		AsOf:     formatValidDate(effectiveDate),
+		Position: positionViewRowResponse{
+			PositionID:          row.PositionID,
+			Code:                row.Code,
+			OrgNodeID:           row.OrgNodeID,
+			Title:               row.Title,
+			LifecycleStatus:     row.LifecycleStatus,
+			IsAutoCreated:       row.IsAutoCreated,
+			CapacityFTE:         row.CapacityFTE,
+			OccupiedFTE:         row.OccupiedFTE,
+			StaffingState:       row.StaffingState,
+			PositionType:        row.PositionType,
+			EmploymentType:      row.EmploymentType,
+			ReportsToPositionID: row.ReportsToPositionID,
+			JobFamilyGroupCode:  row.JobFamilyGroupCode,
+			JobFamilyCode:       row.JobFamilyCode,
+			JobRoleCode:         row.JobRoleCode,
+			JobLevelCode:        row.JobLevelCode,
+			JobProfileID:        row.JobProfileID,
+			CostCenterCode:      row.CostCenterCode,
+			Profile:             row.Profile,
+			EffectiveDate:       formatValidDate(row.EffectiveDate),
+			EndDate:             formatValidEndDateFromEndDate(row.EndDate),
+		},
 	})
 }
 
@@ -2295,8 +2392,8 @@ func (c *OrgAPIController) UpdatePosition(w http.ResponseWriter, r *http.Request
 		PositionID: res.PositionID.String(),
 		SliceID:    res.SliceID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -2385,8 +2482,8 @@ func (c *OrgAPIController) CorrectPosition(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, correctPositionResponse{
 		PositionID: res.PositionID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -2442,8 +2539,8 @@ func (c *OrgAPIController) RescindPosition(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, rescindPositionResponse{
 		PositionID: res.PositionID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -2506,8 +2603,8 @@ func (c *OrgAPIController) ShiftBoundaryPosition(w http.ResponseWriter, r *http.
 	}
 	var resp shiftBoundaryPositionResponse
 	resp.PositionID = res.PositionID.String()
-	resp.Shifted.TargetEffectiveDate = res.TargetStart.UTC().Format(time.RFC3339)
-	resp.Shifted.NewEffectiveDate = res.NewStart.UTC().Format(time.RFC3339)
+	resp.Shifted.TargetEffectiveDate = formatValidDate(res.TargetStart)
+	resp.Shifted.NewEffectiveDate = formatValidDate(res.NewStart)
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -2543,16 +2640,51 @@ func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	type assignmentViewRowResponse struct {
+		ID             uuid.UUID  `json:"id"`
+		PositionID     uuid.UUID  `json:"position_id"`
+		OrgNodeID      uuid.UUID  `json:"org_node_id"`
+		AssignmentType string     `json:"assignment_type"`
+		IsPrimary      bool       `json:"is_primary"`
+		AllocatedFTE   float64    `json:"allocated_fte"`
+		EffectiveDate  string     `json:"effective_date"`
+		EndDate        string     `json:"end_date"`
+		PositionCode   *string    `json:"position_code,omitempty"`
+		Pernr          *string    `json:"pernr,omitempty"`
+		SubjectID      *uuid.UUID `json:"subject_id,omitempty"`
+		StartEventType *string    `json:"start_event_type,omitempty"`
+		EndEventType   *string    `json:"end_event_type,omitempty"`
+	}
+
+	assignments := make([]assignmentViewRowResponse, 0, len(rows))
+	for _, row := range rows {
+		assignments = append(assignments, assignmentViewRowResponse{
+			ID:             row.ID,
+			PositionID:     row.PositionID,
+			OrgNodeID:      row.OrgNodeID,
+			AssignmentType: row.AssignmentType,
+			IsPrimary:      row.IsPrimary,
+			AllocatedFTE:   row.AllocatedFTE,
+			EffectiveDate:  formatValidDate(row.EffectiveDate),
+			EndDate:        formatValidEndDateFromEndDate(row.EndDate),
+			PositionCode:   row.PositionCode,
+			Pernr:          row.Pernr,
+			SubjectID:      row.SubjectID,
+			StartEventType: row.StartEventType,
+			EndEventType:   row.EndEventType,
+		})
+	}
+
 	type getAssignmentsResponse struct {
-		TenantID      string                       `json:"tenant_id"`
-		Subject       string                       `json:"subject"`
-		SubjectID     string                       `json:"subject_id"`
-		EffectiveDate *string                      `json:"effective_date,omitempty"`
-		Assignments   []services.AssignmentViewRow `json:"assignments"`
+		TenantID      string                      `json:"tenant_id"`
+		Subject       string                      `json:"subject"`
+		SubjectID     string                      `json:"subject_id"`
+		EffectiveDate *string                     `json:"effective_date,omitempty"`
+		Assignments   []assignmentViewRowResponse `json:"assignments"`
 	}
 	var effectiveDateOut *string
 	if !effectiveDate.IsZero() {
-		v := effectiveDate.UTC().Format(time.RFC3339)
+		v := formatValidDate(effectiveDate)
 		effectiveDateOut = &v
 	}
 	writeJSON(w, http.StatusOK, getAssignmentsResponse{
@@ -2560,7 +2692,7 @@ func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request
 		Subject:       subject,
 		SubjectID:     subjectID.String(),
 		EffectiveDate: effectiveDateOut,
-		Assignments:   rows,
+		Assignments:   assignments,
 	})
 }
 
@@ -2629,8 +2761,8 @@ func (c *OrgAPIController) CreateAssignment(w http.ResponseWriter, r *http.Reque
 		PositionID:   res.PositionID.String(),
 		SubjectID:    res.SubjectID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -2717,7 +2849,7 @@ func (c *OrgAPIController) HirePersonnelEvent(w http.ResponseWriter, r *http.Req
 		EventType:        res.Event.EventType,
 		PersonUUID:       res.Event.PersonUUID.String(),
 		Pernr:            res.Event.Pernr,
-		EffectiveDate:    res.Event.EffectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate:    formatValidDate(res.Event.EffectiveDate),
 		ReasonCode:       res.Event.ReasonCode,
 	})
 }
@@ -2771,7 +2903,7 @@ func (c *OrgAPIController) TransferPersonnelEvent(w http.ResponseWriter, r *http
 		EventType:        res.Event.EventType,
 		PersonUUID:       res.Event.PersonUUID.String(),
 		Pernr:            res.Event.Pernr,
-		EffectiveDate:    res.Event.EffectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate:    formatValidDate(res.Event.EffectiveDate),
 		ReasonCode:       res.Event.ReasonCode,
 	})
 }
@@ -2817,7 +2949,7 @@ func (c *OrgAPIController) TerminationPersonnelEvent(w http.ResponseWriter, r *h
 		EventType:        res.Event.EventType,
 		PersonUUID:       res.Event.PersonUUID.String(),
 		Pernr:            res.Event.Pernr,
-		EffectiveDate:    res.Event.EffectiveDate.UTC().Format(time.RFC3339),
+		EffectiveDate:    formatValidDate(res.Event.EffectiveDate),
 		ReasonCode:       res.Event.ReasonCode,
 	})
 }
@@ -2896,8 +3028,8 @@ func (c *OrgAPIController) UpdateAssignment(w http.ResponseWriter, r *http.Reque
 		AssignmentID: res.AssignmentID.String(),
 		PositionID:   res.PositionID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -2950,8 +3082,8 @@ func (c *OrgAPIController) CorrectAssignment(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, correctAssignmentResponse{
 		AssignmentID: res.AssignmentID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -3005,8 +3137,8 @@ func (c *OrgAPIController) RescindAssignment(w http.ResponseWriter, r *http.Requ
 	writeJSON(w, http.StatusOK, rescindAssignmentResponse{
 		AssignmentID: res.AssignmentID.String(),
 		EffectiveWindow: effectiveWindowResponse{
-			EffectiveDate: res.EffectiveDate.UTC().Format(time.RFC3339),
-			EndDate:       res.EndDate.UTC().Format(time.RFC3339),
+			EffectiveDate: formatValidDate(res.EffectiveDate),
+			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }
@@ -3048,7 +3180,24 @@ func (c *OrgAPIController) GetSnapshot(w http.ResponseWriter, r *http.Request) {
 		writeServiceError(w, requestID, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, res)
+	type snapshotResponse struct {
+		TenantID      uuid.UUID               `json:"tenant_id"`
+		EffectiveDate string                  `json:"effective_date"`
+		GeneratedAt   string                  `json:"generated_at"`
+		Includes      []string                `json:"includes"`
+		Limit         int                     `json:"limit"`
+		Items         []services.SnapshotItem `json:"items"`
+		NextCursor    *string                 `json:"next_cursor"`
+	}
+	writeJSON(w, http.StatusOK, snapshotResponse{
+		TenantID:      res.TenantID,
+		EffectiveDate: formatValidDate(res.EffectiveDate),
+		GeneratedAt:   res.GeneratedAt.UTC().Format(time.RFC3339),
+		Includes:      res.Includes,
+		Limit:         res.Limit,
+		Items:         res.Items,
+		NextCursor:    res.NextCursor,
+	})
 }
 
 type batchRequest struct {
@@ -3103,7 +3252,7 @@ func (c *OrgAPIController) Batch(w http.ResponseWriter, r *http.Request) {
 
 	globalEffective := strings.TrimSpace(req.EffectiveDate)
 	if globalEffective == "" {
-		globalEffective = time.Now().UTC().Format(time.RFC3339)
+		globalEffective = formatValidDate(time.Now())
 	} else {
 		if _, err := parseEffectiveDate(globalEffective); err != nil {
 			writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_BATCH_INVALID_BODY", "effective_date is invalid")
@@ -4045,7 +4194,7 @@ func (c *OrgAPIController) Preflight(w http.ResponseWriter, r *http.Request) {
 
 	globalEffective := strings.TrimSpace(req.EffectiveDate)
 	if globalEffective == "" {
-		globalEffective = time.Now().UTC().Format(time.RFC3339)
+		globalEffective = formatValidDate(time.Now())
 	} else {
 		if _, err := parseEffectiveDate(globalEffective); err != nil {
 			writeAPIError(w, http.StatusUnprocessableEntity, requestID, "ORG_PREFLIGHT_INVALID_BODY", "effective_date is invalid")
@@ -4116,7 +4265,7 @@ func (c *OrgAPIController) Preflight(w http.ResponseWriter, r *http.Request) {
 
 	asOf, _ := parseEffectiveDate(globalEffective)
 	writeJSON(w, http.StatusOK, preflightResponse{
-		EffectiveDate: asOf.UTC().Format(time.RFC3339),
+		EffectiveDate: formatValidDate(asOf),
 		CommandsCount: len(req.Commands),
 		Impact:        impact,
 		Warnings:      []string{},
@@ -4759,7 +4908,7 @@ func parseEffectiveIDCursor(raw string) (*time.Time, *uuid.UUID, error) {
 		return nil, nil, fmt.Errorf("invalid cursor")
 	}
 
-	at, err := time.Parse(time.RFC3339, atStr)
+	at, err := parseEffectiveDate(atStr)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -4930,13 +5079,13 @@ func parseEffectiveDate(v string) (time.Time, error) {
 		return time.Time{}, nil
 	}
 	if t, err := time.Parse("2006-01-02", v); err == nil {
-		return t.UTC(), nil
+		return normalizeValidTimeDayUTC(t), nil
 	}
 	t, err := time.Parse(time.RFC3339, v)
 	if err != nil {
 		return time.Time{}, err
 	}
-	return t.UTC(), nil
+	return normalizeValidTimeDayUTC(t), nil
 }
 
 func parseRequiredEffectiveDate(v string) (time.Time, error) {
@@ -4948,6 +5097,34 @@ func parseRequiredEffectiveDate(v string) (time.Time, error) {
 		return time.Time{}, errors.New("effective_date is required")
 	}
 	return t, nil
+}
+
+func normalizeValidTimeDayUTC(t time.Time) time.Time {
+	if t.IsZero() {
+		return t
+	}
+	u := t.UTC()
+	y, m, d := u.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+func formatValidDate(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return normalizeValidTimeDayUTC(t).Format(time.DateOnly)
+}
+
+func formatValidEndDateFromEndDate(endDate time.Time) string {
+	if endDate.IsZero() {
+		return ""
+	}
+	u := endDate.UTC()
+	y, m, d := u.Date()
+	if y == 9999 && m == time.December && d == 31 {
+		return "9999-12-31"
+	}
+	return u.Add(-time.Microsecond).Format(time.DateOnly)
 }
 
 func decodeJSON(body io.ReadCloser, out any) error {

@@ -95,17 +95,19 @@ func (r *OrgRepository) InsertSecurityGroupMapping(ctx context.Context, tenantID
 
 	var id uuid.UUID
 	err = tx.QueryRow(ctx, `
-INSERT INTO org_security_group_mappings (
-  tenant_id,
-  org_node_id,
-  security_group_key,
-  applies_to_subtree,
-  effective_date,
-  end_date
-)
-VALUES ($1,$2,$3,$4,$5,$6)
-RETURNING id
-`, pgUUID(tenantID), pgUUID(in.OrgNodeID), in.SecurityGroupKey, in.AppliesToSubtree, in.EffectiveDate, in.EndDate).Scan(&id)
+	INSERT INTO org_security_group_mappings (
+	  tenant_id,
+	  org_node_id,
+	  security_group_key,
+	  applies_to_subtree,
+	  effective_date,
+	  end_date,
+	  effective_on,
+	  end_on
+	)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+	RETURNING id
+	`, pgUUID(tenantID), pgUUID(in.OrgNodeID), in.SecurityGroupKey, in.AppliesToSubtree, in.EffectiveDate, in.EndDate, pgEffectiveOnFromEffectiveDate(in.EffectiveDate), pgEndOnFromEndDate(in.EndDate)).Scan(&id)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -154,10 +156,10 @@ func (r *OrgRepository) UpdateSecurityGroupMappingEndDate(ctx context.Context, t
 		return err
 	}
 	_, err = tx.Exec(ctx, `
-UPDATE org_security_group_mappings
-SET end_date=$3, updated_at=now()
-WHERE tenant_id=$1 AND id=$2
-`, pgUUID(tenantID), pgUUID(id), endDate)
+	UPDATE org_security_group_mappings
+	SET end_date=$3, end_on=$4, updated_at=now()
+	WHERE tenant_id=$1 AND id=$2
+	`, pgUUID(tenantID), pgUUID(id), endDate, pgEndOnFromEndDate(endDate))
 	return err
 }
 
@@ -312,19 +314,21 @@ func (r *OrgRepository) InsertOrgLink(ctx context.Context, tenantID uuid.UUID, i
 
 	var id uuid.UUID
 	err = tx.QueryRow(ctx, `
-INSERT INTO org_links (
-  tenant_id,
-  org_node_id,
-  object_type,
-  object_key,
-  link_type,
-  metadata,
-  effective_date,
-  end_date
-)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-RETURNING id
-`, pgUUID(tenantID), pgUUID(in.OrgNodeID), in.ObjectType, in.ObjectKey, in.LinkType, in.Metadata, in.EffectiveDate, in.EndDate).Scan(&id)
+	INSERT INTO org_links (
+	  tenant_id,
+	  org_node_id,
+	  object_type,
+	  object_key,
+	  link_type,
+	  metadata,
+	  effective_date,
+	  end_date,
+	  effective_on,
+	  end_on
+	)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+	RETURNING id
+	`, pgUUID(tenantID), pgUUID(in.OrgNodeID), in.ObjectType, in.ObjectKey, in.LinkType, in.Metadata, in.EffectiveDate, in.EndDate, pgEffectiveOnFromEffectiveDate(in.EffectiveDate), pgEndOnFromEndDate(in.EndDate)).Scan(&id)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -379,10 +383,10 @@ func (r *OrgRepository) UpdateOrgLinkEndDate(ctx context.Context, tenantID uuid.
 		return err
 	}
 	_, err = tx.Exec(ctx, `
-UPDATE org_links
-SET end_date=$3, updated_at=now()
-WHERE tenant_id=$1 AND id=$2
-`, pgUUID(tenantID), pgUUID(id), endDate)
+	UPDATE org_links
+	SET end_date=$3, end_on=$4, updated_at=now()
+	WHERE tenant_id=$1 AND id=$2
+	`, pgUUID(tenantID), pgUUID(id), endDate, pgEndOnFromEndDate(endDate))
 	return err
 }
 

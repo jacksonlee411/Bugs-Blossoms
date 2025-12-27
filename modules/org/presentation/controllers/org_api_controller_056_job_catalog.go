@@ -561,7 +561,7 @@ func (c *OrgAPIController) GetPositionRestrictions(w http.ResponseWriter, r *htt
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"tenant_id":    tenantID.String(),
-		"as_of":        effectiveDate.UTC().Format(time.RFC3339),
+		"as_of":        formatValidDate(effectiveDate),
 		"restrictions": res,
 	})
 }
@@ -614,8 +614,8 @@ func (c *OrgAPIController) SetPositionRestrictions(w http.ResponseWriter, r *htt
 		"position_id": res.PositionID.String(),
 		"slice_id":    res.SliceID.String(),
 		"effective_window": map[string]any{
-			"effective_date": res.EffectiveDate.UTC().Format(time.RFC3339),
-			"end_date":       res.EndDate.UTC().Format(time.RFC3339),
+			"effective_date": formatValidDate(res.EffectiveDate),
+			"end_date":       formatValidEndDateFromEndDate(res.EndDate),
 		},
 	})
 }

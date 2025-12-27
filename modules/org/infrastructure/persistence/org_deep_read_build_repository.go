@@ -334,19 +334,21 @@ VALUES ($1,$2,$3,'building',false,$4)
 		}
 
 		tag, err := tx.Exec(txCtx, `
-INSERT INTO org_hierarchy_closure (
-	tenant_id,
-	hierarchy_type,
-	build_id,
-	ancestor_node_id,
-	descendant_node_id,
-	depth,
-	effective_date,
-	end_date
-)
-WITH RECURSIVE edges AS (
-	SELECT parent_node_id, child_node_id, effective_date, end_date
-	FROM org_edges
+	INSERT INTO org_hierarchy_closure (
+		tenant_id,
+		hierarchy_type,
+		build_id,
+		ancestor_node_id,
+		descendant_node_id,
+		depth,
+		effective_date,
+		end_date,
+		effective_on,
+		end_on
+	)
+	WITH RECURSIVE edges AS (
+		SELECT parent_node_id, child_node_id, effective_date, end_date
+		FROM org_edges
 	WHERE tenant_id=$1
 	  AND hierarchy_type=$2
 ),
@@ -373,17 +375,22 @@ dedup AS (
 	SELECT DISTINCT ancestor_node_id, descendant_node_id, depth, effective_date, end_date
 	FROM closure
 )
-SELECT
-	$1,
-	$2,
-	$4,
-	ancestor_node_id,
-	descendant_node_id,
-	depth,
-	effective_date,
-	end_date
-FROM dedup
-`, pgUUID(tenantID), hierarchyType, orgDeepReadMaxDepth, pgUUID(buildID))
+	SELECT
+		$1,
+		$2,
+		$4,
+		ancestor_node_id,
+		descendant_node_id,
+		depth,
+		effective_date,
+		end_date,
+		(effective_date AT TIME ZONE 'UTC')::date AS effective_on,
+		CASE
+			WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+			ELSE (((end_date AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
+		END AS end_on
+	FROM dedup
+	`, pgUUID(tenantID), hierarchyType, orgDeepReadMaxDepth, pgUUID(buildID))
 		if err != nil {
 			return err
 		}

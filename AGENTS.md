@@ -62,6 +62,11 @@
 
 使用 AI 辅助时，优先追求“简单（Simple）”而不是“容易（Easy）”：先写清边界、不变量、失败路径与验收标准（建议以 dev-plan/Spec 固化），再实现；拒绝补丁式堆叠分支、复制粘贴与相似文件增殖；任何新抽象必须可在 5 分钟内解释清楚、具备可替换性，并能对应到明确的业务约束（评审清单见 `docs/dev-plans/045-simple-not-easy-review-guide.md`）。
 
+### 3.5 时间语义（Valid Time vs Audit/Tx Time）
+
+- 将“业务生效日期/有效期（Valid Time）”从 `timestamptz`（秒/微秒级）收敛为 **day（date）粒度**，对齐 SAP HCM（`BEGDA/ENDDA`）与 PeopleSoft（`EFFDT/EFFSEQ`）的 HR 习惯；同时明确 **时间戳（秒/微秒级）仅用于操作/审计时间（Audit/Tx Time）**（如 `created_at/updated_at/transaction_time`）。
+- 方案与迁移路径：`docs/dev-plans/064-effective-date-day-granularity.md`。
+
 ## 4. 架构与目录约束（DDD + CleanArchGuard）
 
 每个模块遵循 DDD 分层，依赖约束由 `.gocleanarch.yml` 定义，`make check lint` 会同时执行 golangci-lint 与 cleanarchguard。
@@ -193,6 +198,7 @@ modules/{module}/
 - 任职（人员）生效日期 + 操作类型（DEV-PLAN-061A1）：`docs/dev-plans/061A1-person-assignment-effective-date-and-action-type.md`
 - 任职记录（Job Data）入口收敛：唯一写入口（DEV-PLAN-062）：`docs/dev-plans/062-job-data-entry-consolidation.md`
 - 任职时间线部门/职位名称按时间切片渲染（DEV-PLAN-063）：`docs/dev-plans/063-assignment-timeline-org-labels-by-effective-slice.md`
+- 生效日期（日粒度）统一：Valid Time=DATE，Audit Time=TIMESTAMPTZ（DEV-PLAN-064）：`docs/dev-plans/064-effective-date-day-granularity.md`
 - 组织架构详情页显示“组织长名称”（DEV-PLAN-065）：`docs/dev-plans/065-org-node-details-long-name.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
