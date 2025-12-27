@@ -192,5 +192,6 @@ modules/{module}/
 - 人员详情页对齐 HR 操作习惯（DEV-PLAN-061A）：`docs/dev-plans/061A-person-detail-hr-ux-improvements.md`
 - 任职（人员）生效日期 + 操作类型（DEV-PLAN-061A1）：`docs/dev-plans/061A1-person-assignment-effective-date-and-action-type.md`
 - 任职记录（Job Data）入口收敛：唯一写入口（DEV-PLAN-062）：`docs/dev-plans/062-job-data-entry-consolidation.md`
+- 任职时间线部门/职位名称按时间切片渲染（DEV-PLAN-063）：`docs/dev-plans/063-assignment-timeline-org-labels-by-effective-slice.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
