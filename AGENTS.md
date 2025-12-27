@@ -67,6 +67,10 @@
 - 将“业务生效日期/有效期（Valid Time）”从 `timestamptz`（秒/微秒级）收敛为 **day（date）粒度**，对齐 SAP HCM（`BEGDA/ENDDA`）与 PeopleSoft（`EFFDT/EFFSEQ`）的 HR 习惯；同时明确 **时间戳（秒/微秒级）仅用于操作/审计时间（Audit/Tx Time）**（如 `created_at/updated_at/transaction_time`）。
 - 方案与迁移路径：`docs/dev-plans/064-effective-date-day-granularity.md`。
 
+### 3.6 运维与监控（早期阶段）
+
+关于运维与监控，不需要引入开关切换。本项目仍处于初期，未发布上线，避免过度运维和监控。
+
 ## 4. 架构与目录约束（DDD + CleanArchGuard）
 
 每个模块遵循 DDD 分层，依赖约束由 `.gocleanarch.yml` 定义，`make check lint` 会同时执行 golangci-lint 与 cleanarchguard。
