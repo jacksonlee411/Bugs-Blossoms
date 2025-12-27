@@ -179,6 +179,7 @@
         "Fields": {
           "Code": "Code",
           "Name": "Name",
+          "LongName": "Long name",
           "Status": "Status",
           "DisplayOrder": "Display order",
           "EffectiveWindow": "Effective window",
