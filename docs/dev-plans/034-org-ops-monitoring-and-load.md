@@ -1,6 +1,8 @@
 # DEV-PLAN-034：Org 运维治理与压测（Step 14）
 
 **状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：`effective_date` 参数统一为 `YYYY-MM-DD`（day 粒度）；缺省为服务端当前 `today(UTC)`。
 
 ## 0. 进度速记
 - 本计划交付“可观测性（metrics/health）+ 可重复压测 + 运维脚本入口”，用于支撑 Org 长期运行与灰度/回滚演练。
@@ -170,7 +172,7 @@ flowchart TD
 > Org 级健康/新鲜度/堆积检查；返回 200/503 与 `status` 一致；403 payload 对齐 026。
 
 **Query**
-- `effective_date`：可选（缺省 `nowUTC`）；用于 deep-read freshness 判断（可选）。
+- `effective_date`：可选（缺省 `today(UTC)`，`YYYY-MM-DD`）；用于 deep-read freshness 判断（可选）。
 
 **Response 200/503**
 ```json

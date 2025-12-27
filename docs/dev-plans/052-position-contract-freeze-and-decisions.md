@@ -1,6 +1,8 @@
 # DEV-PLAN-052：职位管理（Position）契约冻结与关键决策（对齐 050/051）
 
 **状态**: 已冻结（2025-12-20）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；`tstzrange('[)')` 约束口径统一迁移为 `daterange(effective_date, end_date + 1, '[)')`。
 
 > 本计划是 051 的“阶段 A（Contract First）”可执行化版本；内容结构参考 [DEV-PLAN-001](001-technical-design-template.md) 的技术设计模板，但仅冻结**契约与决策**，不展开到具体代码实现细节（实现由 053+ 承接）。
 
@@ -139,7 +141,7 @@ flowchart LR
 
 - Update：在未来/当前某个 `effective_date` 插入新切片（截断旧切片）。
 - Correct：对某个切片的 `effective_date` 原位更正（不新增切片；强审计与高权限）。
-- Rescind：撤销从某个 `effective_date` 起的未来（对齐 025）：删除 future slices，并插入 `lifecycle_status=rescinded` 的新切片 `[effective_date,'9999-12-31')`（必要时先截断前驱切片）。
+- Rescind：撤销从某个 `effective_date` 起的未来（对齐 025）：删除 future slices，并插入 `lifecycle_status=rescinded` 的新切片 `[effective_date,'9999-12-31']`（必要时先截断前驱切片）。
 - ShiftBoundary：调整切片边界（仅变更 `effective_date/end_date`），强审计与冻结窗口约束。
 - 冻结窗口（Freeze Window）：沿用 `org_settings.freeze_mode/freeze_grace_days`，对“影响 cutoff 之前的 effective_date”进行治理（disabled/shadow/enforce）。
 
@@ -221,13 +223,13 @@ flowchart LR
 | `job_profile_id` | `uuid` | null |  | Job Profile（由 056 定义 SSOT） |
 | `cost_center_code` | `varchar(64)` | null |  | 可选 |
 | `profile` | `jsonb` | not null, check object | `'{}'::jsonb` | 扩展字段（避免跨域强耦合） |
-| `effective_date` | `timestamptz` | not null, check `< end_date` |  | 生效时间 |
-| `end_date` | `timestamptz` | not null | `'9999-12-31'` | 终止时间（半开区间） |
+| `effective_date` | `date` | not null, check `<= end_date` |  | 生效日（day） |
+| `end_date` | `date` | not null | `'9999-12-31'` | 失效日（最后有效日，含） |
 | `created_at` | `timestamptz` | not null | `now()` |  |
 | `updated_at` | `timestamptz` | not null | `now()` |  |
 
 **关键约束（v1 必需）**：
-- 无重叠：`EXCLUDE USING gist (tenant_id WITH =, position_id WITH =, tstzrange(effective_date,end_date,'[)') WITH &&)`
+- 无重叠：`EXCLUDE USING gist (tenant_id WITH =, position_id WITH =, daterange(effective_date, end_date + 1, '[)') WITH &&)`
 - 组织有效性：FK 保障 org_node 存在；“as-of 存在性”校验由 service 层完成（对齐 050 §7.1）。
 - `UNIQUE (tenant_id, id)`：与 Org 现有表风格保持一致，便于跨表复合 FK 与一致的审计引用。
 
@@ -238,7 +240,7 @@ flowchart LR
 **约束调整（v1）**：
 - 移除 `org_assignments_position_unique_in_time`（否则无法“一岗多人/部分填充”）。
 - 新增“同一 subject 在同一 position 的时间窗不重叠”约束（建议）：
-  - `EXCLUDE USING gist (tenant_id WITH =, position_id WITH =, subject_type WITH =, subject_id WITH =, assignment_type WITH =, tstzrange(effective_date,end_date,'[)') WITH &&)`
+  - `EXCLUDE USING gist (tenant_id WITH =, position_id WITH =, subject_type WITH =, subject_id WITH =, assignment_type WITH =, daterange(effective_date, end_date + 1, '[)') WITH &&)`
 - 保留 `org_assignments_primary_unique_in_time`（默认一个人同一时间最多一个 primary assignment；若业务未来要放开，需另立决策并评审）。
 
 ## 6. 接口契约 (API Contracts, v1)
@@ -259,7 +261,7 @@ flowchart LR
 {
   "code": "POS-0001",
   "org_node_id": "00000000-0000-0000-0000-000000000000",
-  "effective_date": "2025-01-01T00:00:00Z",
+  "effective_date": "2025-01-01",
   "title": "财务经理",
   "lifecycle_status": "planned",
   "position_type": "regular",
@@ -276,7 +278,7 @@ flowchart LR
 **`PATCH /org/api/positions/{id}`（示例：Update 插入新切片）**：
 ```json
 {
-  "effective_date": "2025-02-01T00:00:00Z",
+  "effective_date": "2025-02-01",
   "capacity_fte": 2.0,
   "reason_code": "headcount_increase"
 }
@@ -335,7 +337,7 @@ flowchart LR
 
 ## 8. 核心逻辑与算法（消歧义，v1）
 ### 8.1 填充状态派生（as-of）
-1. 查 Position Slice：`position_id` 在 `[effective_date,end_date)` 覆盖 as-of 的切片。
+1. 查 Position Slice：`position_id` 在 `[effective_date,end_date]`（按天闭区间）覆盖 as-of 的切片。
 2. 查 Assignment slices：同一 `position_id` 在 as-of 视角有效且“计入占编”的记录集合（v1 仅 `assignment_type=primary`）。
 3. `occupied_fte = sum(allocated_fte)`；比较 `capacity_fte` 得到 `staffing_state`。
 

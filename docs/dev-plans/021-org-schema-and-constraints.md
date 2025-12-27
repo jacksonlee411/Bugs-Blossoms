@@ -21,7 +21,7 @@
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
 - [x] **Schema 合同**：落地 Org M1 核心表（`org_nodes`、`org_node_slices`、`org_edges`、`org_positions`、`org_assignments`）的字段/类型/约束/索引（精确到 DB 级别）。
-- [x] **时态强约束**：用 `check + EXCLUDE USING gist` 兜底“同键区间不重叠”（slice、双亲、主属唯一等），有效期语义统一为 UTC 半开区间 `[effective_date, end_date)`。
+- [x] **时态强约束**：用 `check + EXCLUDE USING gist` 兜底“同键区间不重叠”（slice、双亲、主属唯一等），有效期语义统一为按天闭区间 `[effective_date, end_date]`（Valid Time = `date`）；DB 约束使用 `daterange(effective_date, end_date + 1, '[)')`（半开）映射实现（时间语义 SSOT：`DEV-PLAN-064`）。
 - [x] **层级强约束**：用 `ltree` 存储路径，写入时拒绝成环；禁止直接 `UPDATE parent_node_id/child_node_id`（移动必须走“失效旧边 + 创建新边”）。
 - [x] **迁移闭环**：Org 专用 migrations 目录可生成、可 lint、可执行 up/down。
 - [x] **Readiness 可追溯**：将 lint/上下行验证/关键 SQL 校验命令与结果记录到 `docs/dev-records/DEV-PLAN-021-READINESS.md`（本计划只定义格式与要求；文件在落地时创建）。
@@ -65,7 +65,7 @@ erDiagram
 
 ### 4.0 通用约定
 - Postgres：17
-- 时间语义：Valid Time；统一 UTC；半开区间 `[effective_date, end_date)`；约束表达用 `tstzrange(effective_date, end_date, '[)')`（不额外存储 range 列）。
+- 时间语义：Valid Time；统一 UTC day；按天闭区间 `[effective_date, end_date]`（字段类型 `date`）；约束表达用 `daterange(effective_date, end_date + 1, '[)')`（不额外存储 range 列）。
 - `tenant_id` 外键：`tenant_id references tenants (id) on delete cascade`（与现有模块一致；tenant 清理时连带删除 Org 数据）。
 - 依赖扩展：
   - `ltree`：路径存储与 `@>`/`<@` 查询
@@ -106,20 +106,20 @@ erDiagram
 | `display_order` | `int` | `not null` | `0` | 同层排序 |
 | `parent_hint` | `uuid` | `null` |  | 冗余父节点（与 `org_edges` 同步，Service 校验一致性） |
 | `manager_user_id` | `bigint` | `null` |  | 负责人 user id（FK 是否强制见下） |
-| `effective_date` | `timestamptz` | `not null` |  |  |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` |  |
+| `effective_date` | `date` | `not null` |  |  |
+| `end_date` | `date` | `not null` | `'9999-12-31'` |  |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束/索引**：
-- `check (effective_date < end_date)`
+- `check (effective_date <= end_date)`
 - FK（tenant 隔离）：
   - `fk (tenant_id, org_node_id) -> org_nodes (tenant_id, id) on delete restrict`
   - `fk (tenant_id, parent_hint) -> org_nodes (tenant_id, id) on delete restrict`（允许 `null`）
 - slice 不重叠（同节点同窗不重叠）：
-  - `exclude using gist (tenant_id with =, org_node_id with =, tstzrange(effective_date, end_date, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, org_node_id with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 同父同窗重名（最小版；i18n 口径后续可扩展）：
-  - `exclude using gist (tenant_id with =, parent_hint with =, lower(name) with =, tstzrange(effective_date, end_date, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, parent_hint with =, lower(name) with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 自环保护（只约束 hint，不替代 edge 校验）：
   - `check (parent_hint is null or parent_hint <> org_node_id)`
 - `manager_user_id` 外键策略（M1 选定）：
@@ -140,18 +140,18 @@ erDiagram
 | `child_node_id` | `uuid` | `not null` |  | FK → `org_nodes` |
 | `path` | `ltree` | `not null` |  | root 到 child 的路径 |
 | `depth` | `int` | `not null` |  | `nlevel(path)-1` |
-| `effective_date` | `timestamptz` | `not null` |  |  |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` |  |
+| `effective_date` | `date` | `not null` |  |  |
+| `end_date` | `date` | `not null` | `'9999-12-31'` |  |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束/索引**：
-- `check (effective_date < end_date)`
+- `check (effective_date <= end_date)`
 - FK（tenant 隔离）：
   - `fk (tenant_id, child_node_id) -> org_nodes (tenant_id, id) on delete restrict`
   - `fk (tenant_id, parent_node_id) -> org_nodes (tenant_id, id) on delete restrict`（允许 `null`）
 - 防双亲（同 child 同窗仅一个 parent；root 也被包含在内）：
-  - `exclude using gist (tenant_id with =, child_node_id with =, tstzrange(effective_date, end_date, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, child_node_id with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 直接自环（parent=child）：
   - `check (parent_node_id is null or parent_node_id <> child_node_id)`
 - 索引建议：
@@ -169,17 +169,17 @@ erDiagram
 | `title` | `text` | `null` |  | 展示名（可空） |
 | `status` | `text` | `not null` + check | `'active'` | `active/retired/rescinded` |
 | `is_auto_created` | `boolean` | `not null` | `false` | 是否自动生成空壳 |
-| `effective_date` | `timestamptz` | `not null` |  |  |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` |  |
+| `effective_date` | `date` | `not null` |  |  |
+| `end_date` | `date` | `not null` | `'9999-12-31'` |  |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束/索引**：
-- `check (effective_date < end_date)`
+- `check (effective_date <= end_date)`
 - FK（tenant 隔离）：
   - `fk (tenant_id, org_node_id) -> org_nodes (tenant_id, id) on delete restrict`
 - Position code 带时效唯一（允许历史复用）：
-  - `exclude using gist (tenant_id with =, code with =, tstzrange(effective_date, end_date, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, code with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 索引建议：
   - `btree (tenant_id, org_node_id, effective_date)`
   - `btree (tenant_id, code, effective_date)`
@@ -195,22 +195,22 @@ erDiagram
 | `pernr` | `text` | `not null` |  | 可读人员编号（M1：允许用 HRM employees.id 字符串） |
 | `assignment_type` | `text` | `not null` + check | `'primary'` | `primary/matrix/dotted`（M1 仅写 primary） |
 | `is_primary` | `boolean` | `not null` | `true` | M1 与 `assignment_type` 一致 |
-| `effective_date` | `timestamptz` | `not null` |  |  |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` |  |
+| `effective_date` | `date` | `not null` |  |  |
+| `end_date` | `date` | `not null` | `'9999-12-31'` |  |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束/索引**：
-- `check (effective_date < end_date)`
+- `check (effective_date <= end_date)`
 - `check (subject_type in ('person'))`
 - `check (assignment_type in ('primary','matrix','dotted'))`
 - `check ((assignment_type = 'primary') = is_primary)`（或用触发器保持一致；二选一但需落盘）
 - FK（tenant 隔离）：
   - `fk (tenant_id, position_id) -> org_positions (tenant_id, id) on delete restrict`
 - primary 唯一（同主体同窗仅一个 primary）：
-  - `exclude using gist (tenant_id with =, subject_type with =, subject_id with =, assignment_type with =, tstzrange(effective_date, end_date, '[)') with &&) where assignment_type = 'primary'`
+  - `exclude using gist (tenant_id with =, subject_type with =, subject_id with =, assignment_type with =, daterange(effective_date, end_date + 1, '[)') with &&) where assignment_type = 'primary'`
 - Position 同窗仅一个占用（M1 保守；未来矩阵可放宽为 feature flag）：
-  - `exclude using gist (tenant_id with =, position_id with =, tstzrange(effective_date, end_date, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, position_id with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 索引建议：
   - `btree (tenant_id, subject_id, effective_date)`
   - `btree (tenant_id, position_id, effective_date)`
@@ -252,8 +252,8 @@ erDiagram
 
 ## 6. 核心逻辑与算法 (Business Logic & Algorithms)
 ### 6.1 有效期与 end_date 管理（M1 口径）
-- DB 兜底：`check (effective_date < end_date)` + EXCLUDE 防重叠。
-- Service 口径（必须遵守）：Update（Insert）**仅接受 `effective_date`**，`end_date` 由系统自动计算为“下一片段的 `effective_date`（若存在）否则 `9999-12-31`”；算法与锁顺序见 `docs/dev-plans/025-org-time-and-audit.md`。
+- DB 兜底：`check (effective_date <= end_date)` + EXCLUDE（`daterange(effective_date, end_date + 1, '[)')`）防重叠。
+- Service 口径（必须遵守）：Update（Insert）**仅接受 `effective_date`**，`end_date` 由系统自动计算为“下一片段的 `effective_date - 1 day`（若存在）否则 `9999-12-31`”；算法与锁顺序见 `docs/dev-plans/025-org-time-and-audit.md`。
 
 ### 6.2 `org_edges.path/depth` 维护与环路拒绝（DB 触发器）
 > 目标：在 DB 层把 `path/depth` 计算与“禁止成环”兜底锁死；MoveNode 的“子树级联 time-slice”属于 Service（024/025），不在触发器内做大范围写放大。

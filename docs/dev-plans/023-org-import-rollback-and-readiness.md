@@ -1,6 +1,8 @@
 # DEV-PLAN-023：Org 导入/回滚工具与 Readiness
 
 **状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-023-READINESS.md`；2025-12-22：`subject_id` SSOT 已修订为 `person_uuid`，实现需按 026/061 增量适配）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）统一按天（`YYYY-MM-DD`）闭区间语义；兼容期内允许 RFC3339 输入但会归一化为 UTC date。
 
 ## 0. 进度速记
 - ✅ 交付形态：Go CLI `cmd/org-data`（默认 dry-run）。
@@ -74,12 +76,12 @@ flowchart TD
 - 分隔与引用：RFC4180（逗号分隔、双引号转义），Header 必须存在。
 - Trim 规则：对所有 `code/pernr/email` 等标识字段执行 `strings.TrimSpace`；Trim 后为空视为缺失。
 - 时间字段：
-  - 输入：`YYYY-MM-DD` 或 RFC3339。
-  - 规范化：`YYYY-MM-DD` 解释为 `00:00:00Z`；所有时间按 UTC 写入。
-  - 语义：半开区间 `[effective_date, end_date)`；要求 `effective_date < end_date`。
+  - 输入：优先 `YYYY-MM-DD`；兼容期允许 RFC3339（会被归一化为 UTC date 并在输出/回显中以 `YYYY-MM-DD` 表达）。
+  - 规范化：Valid Time 一律先归一化为 UTC date（仅保留 day 粒度，不携带时区/时刻）。
+  - 语义：按天闭区间 `[effective_date, end_date]`；要求 `effective_date <= end_date`（允许“单日有效”）。
 - `end_date` 自动补齐：
   - 若行内提供 `end_date`：按输入写入。
-  - 若行内未提供 `end_date`：按“同一实体的下一片段 `effective_date`，否则 `9999-12-31T00:00:00Z`”补齐。
+  - 若行内未提供 `end_date`：按“同一实体的下一片段 `effective_date - 1 day`，否则 `9999-12-31`”补齐。
 - JSON 字段：必须为合法 JSON；写入 DB 时不做额外键校验（M1 保守），但必须是 object。
 
 ### 4.3 `nodes.csv`（映射到 `org_nodes` + `org_node_slices` + `org_edges`）
@@ -166,7 +168,7 @@ flowchart TD
 1. 读取 CSV（剥离 BOM、解析 Header、逐行解析为 struct）。
 2. 规范化：
    - trim 所有标识字段；
-   - 解析 `effective_date/end_date` 并转为 UTC；
+   - 解析 `effective_date/end_date` 并归一化为 UTC date（只保留 `YYYY-MM-DD` 的日期归属）；
    - `end_date` 缺省按 4.2 规则补齐；
    - `manager_email` → `manager_user_id`（若提供 email 且缺 id，则查 `users` 表；查不到报错）。
 3. 构建内存映射：
@@ -179,7 +181,7 @@ flowchart TD
      - resolve 与一致性校验在 DB 阶段执行（需要查询 `persons` 表），见 §3.2 决策 5。
 
 ### 6.2 Static Validate（不访问 DB）
-- 必填字段、枚举值、JSON shape（必须为 object）、`effective_date < end_date`。
+- 必填字段、枚举值、JSON shape（必须为 object）、`effective_date <= end_date`。
 - 同一实体时间片不重叠（node_slices / edges / positions / assignments 按各自键排序验证）。
 - Root 规则（4.3）校验。
 - 环路检测：

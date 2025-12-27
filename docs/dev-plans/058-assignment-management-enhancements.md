@@ -1,6 +1,8 @@
 # DEV-PLAN-058：任职管理增强（对齐 050 §10，051 阶段 F）
 
 **状态**: 已完成（2025-12-20 20:20 UTC）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；文档不再使用 `[start,end)` 传播半开区间心智模型。
 
 ## 0. 进度速记
 - 本计划对齐 050 §10 的“任职管理后续能力清单”，作为 051 阶段 F 的独立里程碑：在不阻塞 053（v1）上线的前提下，分增量交付“任职类型/计划任职/多段任职/历史更正与审计增强”。
@@ -196,7 +198,7 @@ flowchart LR
 7. 截断旧窗并插入新窗（`effective_date` 起生效）；写审计并 enqueue outbox（对齐 025/026）。
 
 ### 6.3 多段任职事件（segments）表示与约束（v2）
-- 表示方式：每段任职对应 `org_assignments` 一行时间片 `[effective_date,end_date)`；同一员工在同一职位出现多次任职即为多段时间片（050 §10）。
+- 表示方式：每段任职对应 `org_assignments` 一行时间片（day 闭区间）`[effective_date,end_date]`；同一员工在同一职位出现多次任职即为多段时间片（050 §10）。
 - 约束策略（最小集）：
   - primary：同一 subject 同窗最多一个（`org_assignments_primary_unique_in_time`）。
   - 非 primary：允许与 primary 重叠；允许跨 position 并行存在多条（matrix/dotted 的业务含义），同一 subject/position/assignment_type 仍禁止 overlap（`org_assignments_subject_position_unique_in_time`）。

@@ -1,6 +1,8 @@
 # DEV-PLAN-061A1：任职（人员）生效日期 + 操作类型（雇用/调动/离职）详细设计
 
 **状态**: 规划中（2025-12-23 23:20 UTC）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（业务有效期）统一按天闭区间；对外 `effective_date/end_date` 一律以 `YYYY-MM-DD` 表达；任职截断规则为旧段 `end_date = effective_date - 1 day`。
 
 > 本计划是 `docs/dev-plans/061A-person-detail-hr-ux-improvements.md` 的后续：在“创建任职/编辑任职”的 UI 中补齐 HR 常用的“生效日期”和“操作类型（Hire/Transfer/Termination）”显式输入与契约。
 
@@ -162,7 +164,7 @@
 ### 6.2 调动（Transfer）
 1. 校验冻结窗口：`effective_date >= cutoff`。
 2. 读取并锁定“被操作的 assignment_id”（即 UI 传入的 `{id}`），并校验其为 `primary` 且 pernr 匹配。
-3. 将旧 assignment 的 `end_date` 截断到 `effective_date`（区间 `[old.effective_date, effective_date)`）。
+3. 将旧 assignment 的 `end_date` 截断为 `effective_date - 1 day`（按天闭区间；SSOT：DEV-PLAN-064）。
 4. 创建新 primary assignment（`effective_date` 起生效）。
 5. 写入 `org_personnel_events(event_type=transfer, payload.previous_* + new *)`：
    - `payload.previous_assignment_id/previous_org_node_id/previous_position_id`
@@ -171,18 +173,18 @@
 ### 6.3 离职（Termination）
 1. 校验冻结窗口：`effective_date >= cutoff`。
 2. 读取并锁定“被操作的 assignment_id”（即 UI 传入的 `{id}`），并校验其为 `primary` 且 pernr 匹配。
-3. 将该人员在生效日仍有效的任职全部截断到 `effective_date`（建议至少包含：primary + 其他扩展任职类型）。
+3. 将该人员在生效日仍有效的任职全部截断为 `end_date = effective_date - 1 day`（建议至少包含：primary + 其他扩展任职类型；按天闭区间；SSOT：DEV-PLAN-064）。
 4. 写入 `org_personnel_events(event_type=termination, payload.previous_*)`：至少记录被操作的 primary assignment 作为 “anchor”，其余被关闭任职可追加到 `payload.terminated_assignment_ids`（数组）用于审计。
 5. 本计划不强制联动 `persons.status`；如 HR 需要“离职=人员不可用”，另起计划做人员状态与权限联动。
 
 ### 6.4 时间语义与边界条件（行业通常做法）
-> 采用 Postgres 时间区间的常见约定：任职区间是半开区间 `[effective_date, end_date)`，因此“调动/离职的生效日”是新状态开始的第一天，旧状态在该日 00:00 即失效。
+> 对齐 DEV-PLAN-064：任职区间语义为按天闭区间 `[effective_date, end_date]`（`YYYY-MM-DD`）；“调动/离职的生效日”是新状态开始的第一天，旧状态的 `end_date = effective_date - 1 day`。
 
-- **禁止零长度区间**：由于 DB check `effective_date < end_date`，当 `effective_date == old.effective_date` 时无法通过“截断 end_date=effective_date”。
+- **禁止倒错区间**：当 `effective_date == current.effective_date` 时，截断将导致 `end_date = effective_date - 1 day < current.effective_date`。
   - 处理建议：
     - 对 `transfer/termination`：若 `effective_date == current.effective_date`，提示用户使用“更正（correct）/撤销（rescind）”而不是“调动/离职”。
     - 对 `hire`：若当天错误录入，应走 `correct/rescind` 而非再次 hire。
-- **有效范围校验**：`transfer/termination` 的 `effective_date` 必须满足 `current.effective_date < effective_date <= current.end_date`（上界按实现决定是否允许等于 end_date）。
+- **有效范围校验**：`transfer/termination` 的 `effective_date` 必须满足 `current.effective_date < effective_date <= current.end_date`。
 - **重入/再雇用（rehire）**：若该人员已存在有效 primary assignment，则 `hire` 应返回冲突并引导走 `transfer`；若人员曾离职且当前无有效任职，则允许再次 `hire`。
 
 ## 7. 安全与鉴权 (Security & Authz)

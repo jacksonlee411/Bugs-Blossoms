@@ -1,6 +1,8 @@
 # DEV-PLAN-031：Org 数据质量与修复（Step 11）
 
 **状态**: 已完成（2025-12-19）— 已落地 `org-data quality` 与 Readiness 记录（PR #87）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time / as-of 一律按天（`YYYY-MM-DD`）语义；示例不再使用 RFC3339 timestamp 表达生效日。
 
 ## 0. 进度速记
 - 本计划聚焦“数据质量规则/报告 + 可回滚的批量修复工具”，为 Org 进入长期运行提供最小治理闭环。
@@ -105,7 +107,7 @@ flowchart TD
   "schema_version": 1,
   "run_id": "uuid",
   "tenant_id": "uuid",
-  "as_of": "2025-03-01T00:00:00Z",
+  "as_of": "2025-03-01",
   "generated_at": "2025-03-01T12:00:00Z",
   "ruleset": { "name": "org-quality", "version": "v1" },
   "summary": {
@@ -119,7 +121,7 @@ flowchart TD
       "rule_id": "ORG_Q_008_ASSIGNMENT_SUBJECT_MAPPING",
       "severity": "error",
       "entity": { "type": "org_assignment", "id": "uuid" },
-      "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" },
+      "effective_window": { "effective_date": "2025-01-01", "end_date": "9999-12-31" },
       "message": "subject_id mismatch with SSOT mapping",
       "details": { "pernr": " 000123 ", "expected_subject_id": "uuid", "actual_subject_id": "uuid" },
       "autofix": {
@@ -146,7 +148,7 @@ flowchart TD
   "schema_version": 1,
   "run_id": "uuid",
   "tenant_id": "uuid",
-  "as_of": "2025-03-01T00:00:00Z",
+  "as_of": "2025-03-01",
   "source_report_run_id": "uuid",
   "created_at": "2025-03-01T12:01:00Z",
   "batch_request": {
@@ -179,7 +181,7 @@ flowchart TD
   "schema_version": 1,
   "run_id": "uuid",
   "tenant_id": "uuid",
-  "as_of": "2025-03-01T00:00:00Z",
+  "as_of": "2025-03-01",
   "applied_at": "2025-03-01T12:02:00Z",
   "source_fix_plan_run_id": "uuid",
   "change_request_id": "uuid|null",
@@ -207,8 +209,8 @@ flowchart TD
 > CLI 以 023 的 `org-data` 为基础扩展（避免引入新的二进制与配置漂移）。
 
 ### 5.1 子命令
-- `org-data quality check --tenant <uuid> [--as-of <date|rfc3339>] [--backend db|api] [--output <dir>] [--format json]`
-  - 默认：`--as-of nowUTC`，`--backend db`，输出 `org_quality_report.v1.json`（见 §4.1）。
+- `org-data quality check --tenant <uuid> [--as-of <YYYY-MM-DD|rfc3339>] [--backend db|api] [--output <dir>] [--format json]`
+  - 默认：`--as-of todayUTC`（兼容期允许 RFC3339 但会归一化为 UTC date），`--backend db`，输出 `org_quality_report.v1.json`（见 §4.1）。
 - `org-data quality plan --report <path> --output <path> [--max-commands 100]`
   - 只为可 autofix 的 issue 生成 fix plan（见 §4.2）；超出上限必须失败（exit=2）。
 - `org-data quality apply --fix-plan <path> [--dry-run] [--apply] [--yes] [--change-request-id <uuid>]`

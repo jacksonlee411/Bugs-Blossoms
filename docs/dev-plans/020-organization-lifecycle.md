@@ -20,7 +20,7 @@
 5. **时间线 API**：所有读写接口必须显式接受 `effective_date`（对齐 Workday 的 `Effective Date` 查询点），未提供时默认 `time.Now().UTC()`，以保障历史查询与未来排程。
 6. **事件一致性（outbox）**：关键变更通过 DEV-PLAN-017 的 outbox 闭环投递（业务写入 + outbox enqueue 同一事务提交；at-least-once；消费者按 `event_id` 幂等）。
 - **安全与最小权限**：M1 定义 `Org.Read`/`Org.Write`/`Org.Assign`/`Org.Admin`（对齐 026：`org.*` + `read/write/assign/admin`），接口默认要求 Session+租户校验与对应权限；策略片段走 `make authz-pack`（生成）+ `make authz-test && make authz-lint`（门禁）。
-- **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；日期字段命名与 Workday 对齐：`effective_date`（开始），`end_date`/`inactive_date`（结束，半开区间）。
+- **命名约定**：Workday “Supervisory Organization” 在本项目统一称为 “Organization Unit”，字段/标签使用 “Org Unit”，`HierarchyType` 固定使用 `OrgUnit`；日期字段命名与 Workday 对齐：`effective_date`（开始），`end_date`/`inactive_date`（结束，按天闭区间）。时间语义契约以 `DEV-PLAN-064` 为 SSOT。
 - **人员标识**：采用 `person_uuid` 作为自然人内部主键（UUID，不可变且独立生成）；工号字段沿用 SAP 术语 `PERNR`，中文“工号”，同一租户内唯一。
 
 - **必需语境**：本模块文档、接口、评审交流均默认中文。
@@ -64,7 +64,7 @@
 - **后续（M3+）**：Draft/Review/Scheduled/Active/Retired、MassMove、并行版本、promotion/回滚、批次幂等、脏数据隔离等流程能力放入 backlog，待工作流能力成熟后再立项。
 
 ### 3. 时间约束策略（对齐 SAP/Workday）
-- 默认模型：`OrgNode`、`OrgEdge`、`Assignment` 采用“约束 1”口径 —— 任意时点恰好一条记录，禁止重叠且无空档。写入时自动截断上一段，半开区间 `[effective_date, end_date)`，缺省 `end_date=9999-12-31`。
+- 默认模型：`OrgNode`、`OrgEdge`、`Assignment` 采用“约束 1”口径 —— 任意日期恰好一条记录，禁止重叠且无空档。写入时自动截断上一段，按天闭区间 `[effective_date, end_date]`，缺省 `end_date=9999-12-31`（DB 约束使用 `daterange(effective_date, end_date + 1, '[)')` 映射实现）。
 - 冻结窗口：对 Organization Unit 树应用配置化冻结窗口（默认月末+3 天，可按租户覆盖），冻结期仅允许未来日期变更。
 - 历史/未来查询：接口统一接受 `effective_date` 作为查询点。Retro 重播与补偿不在 M1 范围，列为后续增强。
 - SAP 约束对照：约束 1（无空档、无重叠）为本方案默认；A/2/3/B/T 仅作为参考，不在 Org 模块使用。
@@ -95,10 +95,10 @@
   - `org_assignments`（tenant_id, id, position_id, subject_type=person, subject_id=person_uuid, pernr, assignment_type=primary|matrix|dotted, effective_date, end_date, primary bool）。
   - 占位/可选表：`org_attribute_inheritance_rules`（属性继承策略配置）、`org_roles`（角色字典）、`org_role_assignments`（角色分配，带有效期）、`org_change_requests`（变更草稿/提交/审批/生效占位，M1 可仅存草稿+审计字段）、`org_matrix_links`（矩阵/虚线组织关联）、`org_security_group_mappings`（组织节点与安全组关联）、`org_links`（组织与项目/成本中心/预算科目等多对多关联，带有效期）。
   - 其他表（retro/security/bp/version 等）不在 M1 创建，待后续里程碑再设计。
-  - 附加索引：`gist (tenant_id, node_id, tstzrange(effective_date, end_date))` 用于时间冲突约束，`(tenant_id, parent_node_id, display_order)` 便于排序。
+  - 附加索引：`gist (tenant_id, node_id, daterange(effective_date, end_date + 1, '[)'))` 用于时间冲突约束，`(tenant_id, parent_node_id, display_order)` 便于排序。
 - 约束（M1 落地）：`org_nodes` 的 code 需在 tenant 内唯一；name/i18n_names 在同一父节点+时间窗口内唯一（按默认 locale）；`org_edges` 防环/双亲（ltree path + 唯一 child per hierarchy）；`positions` 需归属 OrgNode；`org_assignments` 对同一 subject 在重叠时间内仅允许一个 primary（部分唯一约束），position_id 必填，assignment_type 默认 primary。
 - 多租户隔离：所有主键/唯一约束均以 `(tenant_id, <id/unique fields>)` 复合，外键与 sqlc 查询强制带 tenant 过滤；路径/缓存 key 同样纳入 tenant，避免跨租户穿透。对齐 DEV-PLAN-019/019A：tenant 上下文缺失时 fail-closed；启用 RLS 时必须在事务内注入 `app.current_tenant`；对齐 019A：系统队列表（如 `org_outbox`）PoC 阶段不启用 RLS 以保证 relay 可跨租户 claim，未来如需启用必须走专用 DB role/连接池，禁止通过放宽 policy 绕过隔离。
-- Postgres 依赖：迁移启用 `ltree` 与 `btree_gist` 扩展；有效期字段统一 `tstzrange` 且使用 `[start, end)` 半开区间，写入/校验一律 UTC，迁移包含时区/边界说明；`EXCLUDE USING gist (tenant_id WITH =, node_id WITH =, tstzrange(effective_date, end_date) WITH &&)` 防重叠，重名用 `(tenant_id,parent_node_id,name,effective_date,end_date)` 唯一。
+- Postgres 依赖：迁移启用 `ltree` 与 `btree_gist` 扩展；Valid Time 字段统一为 `date`（按天闭区间），写入/校验一律 UTC day；DB 约束使用 `daterange(effective_date, end_date + 1, '[)')`（半开）映射实现；`EXCLUDE USING gist (tenant_id WITH =, node_id WITH =, daterange(effective_date, end_date + 1, '[)') WITH &&)` 防重叠，重名可用 `EXCLUDE` + `lower(name)` + `daterange(...)` 约束实现。
 - sqlc 包：`modules/org/infrastructure/sqlc/...` 负责 CRUD + 冲突检测查询，包含 Position、继承解析只读视图、变更请求占位。
 - 性能与冲突验证：itf/bench 覆盖 1k 节点查询 <200ms，重叠/重名写入被拒绝；在 CI 以基准或集成测试执行。
 - 需要 Atlas/Goose 迁移流程，沿用 HRM 指南。

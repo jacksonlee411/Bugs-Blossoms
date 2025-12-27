@@ -1,6 +1,8 @@
 # DEV-PLAN-059：Position 交付收口（Readiness / 回滚 / 可观测性）（对齐 051 收口）
 
 **状态**: 实施中（最小冒烟/追溯闭环已落地并合并；兼容性回归与更全面可观测仍待收口，2025-12-21）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（业务有效期）按天（`YYYY-MM-DD`）闭区间语义；追溯/审计查询优先使用 `effective_on/end_on`（date）字段。
 
 ## 0. 进度速记
 - 本计划负责把 052-058 的交付收口成“可上线、可回滚、可观测、可复现”的整体：readiness 记录 + 灰度/回滚开关 + 最小冒烟/演示闭环 + 关键指标与审计追溯。
@@ -109,7 +111,7 @@ flowchart LR
 ```sql
 -- 审计：按 request_id 串起“成功写入”的上下文（拒绝默认不落审计）
 SELECT
-  transaction_time, change_type, entity_type, entity_id, effective_date, end_date, meta
+  transaction_time, change_type, entity_type, entity_id, effective_on, end_on, meta
 FROM org_audit_logs
 WHERE tenant_id = $1 AND request_id = $2
 ORDER BY transaction_time ASC;

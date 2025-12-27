@@ -2,6 +2,8 @@
 
 **状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
 **实施状态**: 已落地（2025-12-19）；Readiness：`docs/dev-records/DEV-PLAN-032-READINESS.md`
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；DB 约束以 `effective_on/end_on`（`date`）与 `daterange(...,'[)')` 映射为准。
 
 ## 0. 进度速记
 - 本计划交付“可有效期化的映射表 + 只读权限预览接口”，用于支撑后续 workflow/报表/下游集成的 scope 计算与对账。
@@ -72,7 +74,7 @@ flowchart TD
 
 ### 3.2 关键设计决策（ADR 摘要）
 1. **有效期化（选定）**
-   - `org_security_group_mappings` 与 `org_links` 均使用 `[effective_date, end_date)` 半开区间（UTC）并用 EXCLUDE 防重叠，保持与 Org 主链一致。
+   - `org_security_group_mappings` 与 `org_links` 的 Valid Time 统一按天闭区间 `[effective_date, end_date]`；DB 约束使用 `effective_on/end_on`（`date`）并通过 `daterange(effective_on, end_on + 1, '[)')` 映射实现 no-overlap（SSOT：DEV-PLAN-064）。
 2. **继承标记用“对子树生效”表达（选定）**
    - 每条 security group mapping 持有 `applies_to_subtree`；preview 通过 `org_edges.path`（ltree）在 as-of 视图上计算祖先/子树关系，并返回 `source_org_node_id` 便于解释。
 3. **执行面不生成策略（选定）**
@@ -81,7 +83,7 @@ flowchart TD
    - 为保证 preflight/change-request/dry-run 能复用同一合同，本计划新增的写操作同时提供单条接口与 batch command type（见 §5.5）。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
-> 约定：PostgreSQL 17；UTC；半开区间 `[effective_date, end_date)`；EXCLUDE 依赖 `btree_gist`（由 021 baseline 已启用）。
+> 约定：PostgreSQL 17；Valid Time 按天闭区间 `[effective_date, end_date]`（`YYYY-MM-DD`）；DB 约束使用 `daterange(effective_on, end_on + 1, '[)')`；EXCLUDE 依赖 `btree_gist`（由 021 baseline 已启用）。
 
 ### 4.1 `org_security_group_mappings`
 **用途**：把“安全组（security group）”绑定到 OrgNode，并声明是否对子树继承；用于权限 scope 预览与后续下游订阅。
@@ -92,22 +94,24 @@ flowchart TD
 | `id` | `uuid` | `pk` | `gen_random_uuid()` | mapping slice id |
 | `org_node_id` | `uuid` | `not null` |  | FK → `org_nodes`（tenant 隔离） |
 | `security_group_key` | `text` | `not null` |  | 安全组标识（v1 为字符串 key，不做跨模块 FK） |
-| `applies_to_subtree` | `boolean` | `not null` | `true` | `true`=对子树继承；`false`=仅本节点 |
-| `effective_date` | `timestamptz` | `not null` |  | 生效时间 |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` | 失效时间 |
+| `applies_to_subtree` | `boolean` | `not null` | `false` | `true`=对子树继承；`false`=仅本节点 |
+| `effective_date` | `timestamptz` | `not null` |  | legacy（兼容期保留；Phase D 清理） |
+| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` | legacy（exclusive；兼容期保留；Phase D 清理） |
+| `effective_on` | `date` | `not null` |  | 生效日（day） |
+| `end_on` | `date` | `not null` | `'9999-12-31'` | 失效日（最后有效日，含） |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束/索引（v1 选定）**
-- `check (effective_date < end_date)`
+- `check (effective_on <= end_on)`
 - `check (char_length(trim(security_group_key)) > 0)`
 - FK（tenant 隔离）：
   - `fk (tenant_id, org_node_id) -> org_nodes (tenant_id, id) on delete restrict`
 - no-overlap（同 node + 同 key 的时间片不重叠）：
-  - `exclude using gist (tenant_id with =, org_node_id with =, security_group_key with =, tstzrange(effective_date, end_date, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, org_node_id with =, security_group_key with =, daterange(effective_on, end_on + 1, '[)') with &&)`
 - 索引：
-  - `btree (tenant_id, org_node_id, effective_date)`
-  - `btree (tenant_id, security_group_key, effective_date)`
+  - `btree (tenant_id, org_node_id, effective_on)`
+  - `btree (tenant_id, security_group_key, effective_on)`
 
 ### 4.2 `org_links`
 **用途**：把 OrgNode 与外部业务对象（project/cost_center/…）建立多对多关联；支持有效期化与反查。
@@ -121,13 +125,15 @@ flowchart TD
 | `object_key` | `text` | `not null` |  | 外部对象 key（例如 project_code/cost_center_code） |
 | `link_type` | `text` | `not null` + check |  | v1：`owns/uses/reports_to/custom` |
 | `metadata` | `jsonb` | `not null` | `'{}'` | 扩展信息（必须是 object） |
-| `effective_date` | `timestamptz` | `not null` |  |  |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` |  |
+| `effective_date` | `timestamptz` | `not null` |  | legacy（兼容期保留；Phase D 清理） |
+| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` | legacy（exclusive；兼容期保留；Phase D 清理） |
+| `effective_on` | `date` | `not null` |  | 生效日（day） |
+| `end_on` | `date` | `not null` | `'9999-12-31'` | 失效日（最后有效日，含） |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束/索引（v1 选定）**
-- `check (effective_date < end_date)`
+- `check (effective_on <= end_on)`
 - `check (char_length(trim(object_key)) > 0)`
 - `check (jsonb_typeof(metadata) = 'object')`
 - `check (object_type in ('project','cost_center','budget_item','custom'))`
@@ -135,10 +141,10 @@ flowchart TD
 - FK（tenant 隔离）：
   - `fk (tenant_id, org_node_id) -> org_nodes (tenant_id, id) on delete restrict`
 - no-overlap（同 node + 同对象 + 同 link_type 的时间片不重叠）：
-  - `exclude using gist (tenant_id with =, org_node_id with =, object_type with =, object_key with =, link_type with =, tstzrange(effective_date, end_date, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, org_node_id with =, object_type with =, object_key with =, link_type with =, daterange(effective_on, end_on + 1, '[)') with &&)`
 - 索引：
-  - `btree (tenant_id, org_node_id, effective_date)`
-  - `btree (tenant_id, object_type, object_key, effective_date)`
+  - `btree (tenant_id, org_node_id, effective_on)`
+  - `btree (tenant_id, object_type, object_key, effective_on)`
 
 ### 4.3 迁移策略（Org Atlas+Goose）
 - schema 源 SSOT：`modules/org/infrastructure/persistence/schema/org-schema.sql`
@@ -146,7 +152,7 @@ flowchart TD
 - 生成/lint/应用命令入口与门禁：见 `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`（本文不复制）。
 
 ## 5. 接口契约 (API Contracts)
-> 约定：内部 API 前缀 `/org/api`；JSON-only；Authz/403 payload 对齐 026；时间参数支持 `YYYY-MM-DD` 或 RFC3339，统一 UTC。
+> 约定：内部 API 前缀 `/org/api`；JSON-only；Authz/403 payload 对齐 026；Valid Time 一律 `YYYY-MM-DD`（兼容期允许 RFC3339 但会归一化并回显为 `YYYY-MM-DD`；SSOT：DEV-PLAN-064）。
 
 ### 5.1 通用错误码（复用）
 - 400 `ORG_INVALID_QUERY`
@@ -169,14 +175,14 @@ flowchart TD
 ```json
 {
   "tenant_id": "uuid",
-  "effective_date": "2025-03-01T00:00:00Z|null",
+  "effective_date": "2025-03-01|null",
   "items": [
     {
       "id": "uuid",
       "org_node_id": "uuid",
       "security_group_key": "wd:HRBP",
       "applies_to_subtree": true,
-      "effective_window": { "effective_date": "2025-03-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+      "effective_window": { "effective_date": "2025-03-01", "end_date": "9999-12-31" }
     }
   ],
   "next_cursor": null
@@ -204,7 +210,7 @@ flowchart TD
 ```json
 {
   "id": "uuid",
-  "effective_window": { "effective_date": "2025-03-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-03-01", "end_date": "9999-12-31" }
 }
 ```
 
@@ -221,7 +227,8 @@ flowchart TD
 ```
 
 **Rules**
-- `effective_date` 必须满足 `mapping.effective_date < effective_date < mapping.end_date`，否则 422 `ORG_INVALID_RESCIND_DATE`（复用 025 口径）。
+- `effective_date` 必须满足 `mapping.effective_date < effective_date <= mapping.end_date`，否则 422 `ORG_INVALID_RESCIND_DATE`（复用 025 口径；按天闭区间）。
+  - 语义：`effective_date` 为终止生效日（first invalid day），因此 `end_date = effective_date - 1 day`（最后有效日，含）。
 
 ### 5.5 batch 扩展（对齐 026）
 > 为支持 030 change-request payload 复用，本计划新增 command type（并提供对应单条接口作为 SSOT）。
@@ -251,7 +258,7 @@ flowchart TD
 ```json
 {
   "tenant_id": "uuid",
-  "effective_date": "2025-03-01T00:00:00Z|null",
+  "effective_date": "2025-03-01|null",
   "items": [
     {
       "id": "uuid",
@@ -260,7 +267,7 @@ flowchart TD
       "object_key": "CC-100",
       "link_type": "uses",
       "metadata": {},
-      "effective_window": { "effective_date": "2025-03-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+      "effective_window": { "effective_date": "2025-03-01", "end_date": "9999-12-31" }
     }
   ],
   "next_cursor": null
@@ -290,7 +297,7 @@ flowchart TD
 ```json
 {
   "id": "uuid",
-  "effective_window": { "effective_date": "2025-03-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-03-01", "end_date": "9999-12-31" }
 }
 ```
 
@@ -307,14 +314,15 @@ flowchart TD
 ```
 
 **Rules**
-- `effective_date` 必须满足 `link.effective_date < effective_date < link.end_date`，否则 422 `ORG_INVALID_RESCIND_DATE`。
+- `effective_date` 必须满足 `link.effective_date < effective_date <= link.end_date`，否则 422 `ORG_INVALID_RESCIND_DATE`（按天闭区间）。
+  - 语义：`effective_date` 为终止生效日（first invalid day），因此 `end_date = effective_date - 1 day`（最后有效日，含）。
 
 ### 5.9 `GET /org/api/permission-preview`
 > 只读预览：给定 org node + as-of，返回该节点“生效的安全组集合（含继承来源）”与 as-of 的业务对象关联；用于排障/对账/Readiness。
 
 **Query**
 - `org_node_id`：必填
-- `effective_date`：可选（缺省 `nowUTC`）
+- `effective_date`：可选（缺省 `todayUTC`；Valid Time 一律 `YYYY-MM-DD`）
 - `include`：可选，逗号分隔；允许值：
   - `security_groups`（默认）
   - `links`（默认）
@@ -325,7 +333,7 @@ flowchart TD
 {
   "tenant_id": "uuid",
   "org_node_id": "uuid",
-  "effective_date": "2025-03-01T00:00:00Z",
+  "effective_date": "2025-03-01",
   "security_groups": [
     {
       "security_group_key": "wd:HRBP",
@@ -366,18 +374,18 @@ flowchart TD
 
 ## 6. 核心逻辑与算法 (Business Logic & Algorithms)
 ### 6.1 as-of 选择（通用）
-- 任何 as-of 查询以 `effective_date <= t AND t < end_date` 取片段。
-- `YYYY-MM-DD` 解释为 `00:00:00Z`（对齐 024/026）。
+- 任何 as-of 查询以 day 语义 `effective_date <= d AND d <= end_date` 取片段（DB 约束映射：`daterange(effective_on, end_on + 1, '[)')`；SSOT：DEV-PLAN-064）。
+- `effective_date` 输入一律使用 `YYYY-MM-DD`（兼容期允许 RFC3339，但会先归一化为 UTC date）。
 
 ### 6.2 Permission Preview：安全组继承计算（v1）
-输入：`tenant_id, org_node_id, t`
+输入：`tenant_id, org_node_id, d`
 
 1. 取目标节点在 as-of 的路径：
-   - `SELECT path, depth FROM org_edges WHERE tenant_id=? AND child_node_id=? AND effective_date<=t AND t<end_date`
+   - `SELECT path, depth FROM org_edges WHERE tenant_id=? AND child_node_id=? AND effective_on<=d AND d<=end_on`
    - 若不存在：404 `ORG_NODE_NOT_FOUND_AT_DATE`
 2. 计算“对该节点生效”的 mapping：
    - 候选条件：
-     - mapping 本身在 as-of 生效：`m.effective_date<=t AND t<m.end_date`
+     - mapping 本身在 as-of 生效：`m.effective_on<=d AND d<=m.end_on`
      - mapping 绑定节点在 as-of 存在：join `org_edges` as-of 获取 `m_node_path/m_node_depth`
    - 生效规则（v1）：
      - 若 `m.applies_to_subtree=true`：当且仅当 `target_path <@ m_node_path`（目标在其子树内）时生效
@@ -395,7 +403,7 @@ flowchart TD
   - 预检：`org_node_id` 在 `effective_date` 必须存在（通过查 `org_edges` as-of 或 `org_nodes + org_edges` 组合）。
   - 写入：插入新 slice；DB EXCLUDE 拒绝重叠。
 - `:rescind`：
-  - 复用 025 的 rescind 判定：`start < effective_date < end`，并执行 `UPDATE ... SET end_date = effective_date`。
+  - 复用 025 的 rescind 判定：`start < effective_date <= end`（day），并执行 `UPDATE ... SET end_date = effective_date - 1 day`（最后有效日，含）。
 
 ### 6.5 batch 扩展执行（对齐 026）
 - 在 026 batch 的“单事务、多指令”框架内新增两类 handler：

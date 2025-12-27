@@ -18,7 +18,7 @@
   - UI 采用 server-rendered `templ` + `HTMX`（项目既有栈），不引入 SPA。
   - Authz 403 体验与能力暴露遵循 [DEV-PLAN-014D](014D-casbin-public-layer-ui-interface.md)/[DEV-PLAN-015](015-casbin-policy-ui-and-workflow.md) 以及既有 `components/authorization/unauthorized.templ`。
 - **关键术语**:
-  - `effective_date`: “as-of” 查询点；M1 UI 统一以 `YYYY-MM-DD`（UTC）作为输入格式，并在服务层转换为 `time.Time`。
+- `effective_date`: “as-of” 查询点；M1 UI 统一以 `YYYY-MM-DD`（UTC day）作为输入格式，服务层先归一化为 Valid Time day（SSOT：DEV-PLAN-064）。
   - `pernr`: 人员编号（`string`）。M1 临时采用 `HRM employees.id`（十进制字符串）作为 `pernr`，后续可替换为真实工号并通过迁移/映射兼容。
   - `subject_id`: Org 内部主体标识（`uuid`）。服务端通过确定性映射从 `(tenant_id, subject_type, pernr)` 生成，前端不生成 `subject_id`。
 

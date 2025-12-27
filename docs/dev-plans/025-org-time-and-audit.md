@@ -1,6 +1,8 @@
 # DEV-PLAN-025：Org 时间约束、冻结窗口与审计（Update / Correct / Rescind / ShiftBoundary）
 
 **状态**: 已完成（已合并至 main；Readiness：`docs/dev-records/DEV-PLAN-025-READINESS.md`）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）统一按天（`YYYY-MM-DD`）闭区间语义；兼容期内允许 RFC3339 输入但会归一化为 UTC date 并回显为 `YYYY-MM-DD`。
 
 ## 0. 进度速记
 - 本计划在 024 主链 CRUD 已可跑通的前提下，补齐 **有效期强校验 + 冻结窗口 + 审计落盘 + Correct/Rescind/ShiftBoundary**。
@@ -17,7 +19,7 @@
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
 - [x] **有效期语义强校验**：
-  - [x] 统一解析/规范化 `effective_date`（UTC，半开区间 `[start,end)`）。
+  - [x] 统一解析/规范化 `effective_date`（UTC date，`YYYY-MM-DD`，按天闭区间；Valid Time SSOT：DEV-PLAN-064）。
   - [x] 写入前校验：无重叠（DB 兜底）、关键时间线无空档（Service 保证）、跨表 valid-time 引用合法（Assignment 在 Position 有效窗内等）。
   - [x] 对 OrgEdge/OrgNode 的结构写入保持“无环/无双亲/有 root edge”（DB + Service 组合）。
 - [x] **冻结窗口（可租户覆盖）**：默认“上月 + 3 天宽限期”，到期后拒绝修改更早月份的历史数据（可 per-tenant override）。
@@ -90,15 +92,15 @@ flowchart TD
 | `change_type` | `text` | `not null` |  | 例如 `node.updated/assignment.rescinded`（对齐 022） |
 | `entity_type` | `text` | `not null` + check |  | `org_node/org_edge/org_position/org_assignment` |
 | `entity_id` | `uuid` | `not null` |  | 变更实体 id（口径见 §7.4） |
-| `effective_date` | `timestamptz` | `not null` |  | 受影响有效期窗 start |
-| `end_date` | `timestamptz` | `not null` |  | 受影响有效期窗 end |
+| `effective_on` | `date` | `not null` |  | 受影响有效期窗 start（Valid Time，day） |
+| `end_on` | `date` | `not null` |  | 受影响有效期窗 end（Valid Time，day，含） |
 | `old_values` | `jsonb` | `null` |  | 可省略（Create 可空） |
 | `new_values` | `jsonb` | `not null` | `'{}'::jsonb` | 变更后快照（或被撤销实体快照） |
 | `meta` | `jsonb` | `not null` | `'{}'::jsonb` | `{"operation":"ShiftBoundary","freeze_mode":"shadow",...}` |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 
 约束/索引建议：
-- `check (effective_date < end_date)`
+- `check (effective_on <= end_on)`
 - `check (entity_type in ('org_node','org_edge','org_position','org_assignment'))`
 - `btree (tenant_id, transaction_time desc)`
 - `btree (tenant_id, entity_type, entity_id, transaction_time desc)`
@@ -112,7 +114,7 @@ flowchart TD
 > 024 已定义 Update/Move 的最小写入口；本节补齐 025 引入的 Correct/Rescind/ShiftBoundary 契约（internal API，JSON-only）。
 
 ### 5.1 通用约定
-- 时间参数：同 024（支持 `YYYY-MM-DD` 或 RFC3339；统一 UTC）。
+- 时间参数：Valid Time 一律使用 `YYYY-MM-DD`（兼容期允许 RFC3339 但会归一化并回显为 `YYYY-MM-DD`；SSOT：DEV-PLAN-064）。
 - Authz：由 026 绑定 object/action；本计划只定义“需要 admin 的操作”：
   - `Correct/Rescind/ShiftBoundary` 统一要求 `org.* admin`（026 enforce）。
 - 错误响应形状：复用 `modules/core/presentation/controllers/dtos.APIError`。
@@ -140,7 +142,7 @@ flowchart TD
 ```json
 {
   "id": "uuid",
-  "effective_window": { "effective_date": "2025-02-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-02-01", "end_date": "9999-12-31" }
 }
 ```
 
@@ -165,7 +167,7 @@ flowchart TD
 ```json
 {
   "id": "uuid",
-  "effective_window": { "effective_date": "2025-02-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" },
+  "effective_window": { "effective_date": "2025-02-01", "end_date": "9999-12-31" },
   "status": "rescinded"
 }
 ```
@@ -190,15 +192,15 @@ flowchart TD
 **Rules**
 - `target_effective_date` 必须等于目标 slice 的 `effective_date`（用于定位 `T`，见 §6.6）。
 - `new_effective_date` 需满足：
-  - `new_effective_date < T.end_date`（否则 422 `ORG_SHIFTBOUNDARY_INVERTED`）
-  - 若存在前驱片段 `P`（满足 `P.end_date == target_effective_date`）：`new_effective_date > P.effective_date`（否则 422 `ORG_SHIFTBOUNDARY_SWALLOW`）
+  - `new_effective_date <= T.end_date`（否则 422 `ORG_SHIFTBOUNDARY_INVERTED`）
+  - 若存在前驱片段 `P`（满足 `P.end_date = target_effective_date - 1 day`）：`new_effective_date > P.effective_date`（否则 422 `ORG_SHIFTBOUNDARY_SWALLOW`）
 - 触发冻结窗口校验（见 §6.2，`affected_at=min(old_start,new_effective_date)`）。
 
 **Response 200**
 ```json
 {
   "id": "uuid",
-  "shifted": { "target_effective_date": "2025-02-01T00:00:00Z", "new_effective_date": "2025-02-05T00:00:00Z" }
+  "shifted": { "target_effective_date": "2025-02-01", "new_effective_date": "2025-02-05" }
 }
 ```
 
@@ -230,7 +232,7 @@ flowchart TD
 ```json
 {
   "assignment_id": "uuid",
-  "effective_window": { "effective_date": "2025-02-01T00:00:00Z", "end_date": "9999-12-31T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-02-01", "end_date": "9999-12-31" }
 }
 ```
 
@@ -248,15 +250,15 @@ flowchart TD
 ```
 
 **Rules**
-- `effective_date` 必须满足 `assignment.effective_date < effective_date < assignment.end_date`，否则 422 `ORG_INVALID_RESCIND_DATE`。
-- 实现为：更新该 assignment 的 `end_date = effective_date`（时间线收口），并写审计/事件 `assignment.rescinded`。
+- `effective_date` 必须满足 `assignment.effective_date < effective_date <= assignment.end_date`，否则 422 `ORG_INVALID_RESCIND_DATE`。
+- 实现为：更新该 assignment 的 `end_date = effective_date - 1 day`（时间线收口，按天闭区间），并写审计/事件 `assignment.rescinded`。
 - `reason_code` 必填：写入 `org_audit_logs.meta.reason_code`（对齐 052）；兼容期允许后端填充 `legacy`，进入强制后缺失则 400 `ORG_INVALID_BODY`。
 
 **Response 200**
 ```json
 {
   "assignment_id": "uuid",
-  "effective_window": { "effective_date": "2025-01-01T00:00:00Z", "end_date": "2025-03-01T00:00:00Z" }
+  "effective_window": { "effective_date": "2025-01-01", "end_date": "2025-02-28" }
 }
 ```
 
@@ -281,7 +283,7 @@ flowchart TD
 ```json
 {
   "id": "uuid",
-  "effective_date": "2025-03-01T00:00:00Z"
+  "effective_date": "2025-03-01"
 }
 ```
 
@@ -325,12 +327,12 @@ flowchart TD
 对任何“时间片表”的 Update 都遵循 Insert 语义：只接受 `effective_date=X`，系统计算 `end_date`。
 
 1. `X = effective_date`
-2. 定位当前片段 `S`：满足 `S.effective_date <= X < S.end_date` 的片段；不存在则拒绝 422 `ORG_NOT_FOUND_AT_DATE`（禁止在 gap 中 Update；需走 Create）。
+2. 定位当前片段 `S`：满足 `S.effective_date <= X <= S.end_date` 的片段；不存在则拒绝 422 `ORG_NOT_FOUND_AT_DATE`（禁止在 gap 中 Update；需走 Create）。
 3. 定位下一片段 `N`：满足 `N.effective_date > X` 的最小片段（同 key）。
-4. `Y = N.effective_date`（若 N 存在）否则 `9999-12-31T00:00:00Z`
+4. `Y = N.effective_date - 1 day`（若 N 存在）否则 `9999-12-31`
 5. 同一事务内：
    - 若 `S.effective_date == X`：拒绝 422 `ORG_USE_CORRECT`（原位更正走 Correct/ShiftBoundary）
-   - 将 `S.end_date` 截断为 `X`，插入新片段 `[X, Y)`
+   - 将 `S.end_date` 截断为 `X - 1 day`，插入新片段 `[X, Y]`
 6. 并发：同 key 时间线必须 `SELECT ... FOR UPDATE`（至少锁 `S` 与 `N`），DB EXCLUDE 兜底重叠；冲突可重试（最多 1 次）。
 
 ### 6.4 Correct（原位更正）算法（M1）
@@ -357,23 +359,23 @@ flowchart TD
 
 #### 6.5.2 Assignment Rescind
 1. 读取并锁定 assignment `A`。
-2. 冻结窗口校验：`affected_at = X`（X 为新 end_date）。
-3. 校验：`A.effective_date < X < A.end_date`。
-4. 更新 `A.end_date = X`；写审计/事件 `assignment.rescinded`。
+2. 冻结窗口校验：`affected_at = X`（X 为终止生效日：first invalid day；新 `end_date = X - 1 day`）。
+3. 校验：`A.effective_date < X <= A.end_date`。
+4. 更新 `A.end_date = X - 1 day`；写审计/事件 `assignment.rescinded`。
 
 ### 6.6 ShiftBoundary（边界移动）算法（M1）
 适用对象：`org_node_slices`（M1 必做）。`org_assignments/org_positions` 是否扩展由实现评审决定；`org_edges` 不在 M1 支持列表（避免与 021 的 edge 触发器“禁止改 effective_date”规则冲突）。
 
 输入：`target_effective_date=old_start`、`new_effective_date`.
 
-1. 锁定目标片段 `T`（`T.effective_date == old_start`）与前驱片段 `P`（满足 `P.end_date == old_start`），均 `FOR UPDATE`。
+1. 锁定目标片段 `T`（`T.effective_date == old_start`）与前驱片段 `P`（满足 `P.end_date = old_start - 1 day`），均 `FOR UPDATE`。
 2. 基础校验：
-   - `new_effective_date < T.end_date`（倒错拒绝：422 `ORG_SHIFTBOUNDARY_INVERTED`）
+   - `new_effective_date <= T.end_date`（倒错拒绝：422 `ORG_SHIFTBOUNDARY_INVERTED`）
    - 若 `P` 存在：`new_effective_date > P.effective_date`（吞没拒绝：422 `ORG_SHIFTBOUNDARY_SWALLOW`）
 3. 冻结窗口校验：`affected_at = min(old_start, new_effective_date)`
 4. 写入顺序（避免触发 EXCLUDE）：
-   - Move Earlier：先 `UPDATE P.end_date = new_effective_date`，再 `UPDATE T.effective_date = new_effective_date`
-   - Move Later：先 `UPDATE T.effective_date = new_effective_date`，再 `UPDATE P.end_date = new_effective_date`
+   - Move Earlier：先 `UPDATE P.end_date = new_effective_date - 1 day`，再 `UPDATE T.effective_date = new_effective_date`
+   - Move Later：先 `UPDATE T.effective_date = new_effective_date`，再 `UPDATE P.end_date = new_effective_date - 1 day`
 5. 审计：同一事务内写两条审计记录（针对 `P` 与 `T`），`request_id` 相同；integration event 统一使用 `node.corrected`（022 v1）并在 `meta.operation=ShiftBoundary` 标记。
 
 ## 7. 审计与事件 (Audit & Events)
