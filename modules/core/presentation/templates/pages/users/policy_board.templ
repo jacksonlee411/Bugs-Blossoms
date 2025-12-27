@@ -137,55 +137,53 @@ func totalPages(total, limit int) int {
 }
 
 templ UserPolicyBoardMeta(label string, value string) {
-	if strings.TrimSpace(value) == "" {
-		return
+	if strings.TrimSpace(value) != "" {
+		<div class="flex items-center gap-2 rounded-full border border-primary bg-surface-300 px-3 py-1">
+			<span class="text-[11px] font-semibold uppercase tracking-wide text-secondary-200">{ label }</span>
+			<span class="font-mono text-[12px] text-secondary-100" title={ value }>{ shortenSubject(value) }</span>
+			@copy_button.CopyButton(copy_button.Props{
+				Text:    value,
+				Size:    "14",
+				Variant: copy_button.VariantMinimal,
+				Class:   "text-secondary-200 hover:text-secondary-50",
+			})
+		</div>
 	}
-	<div class="flex items-center gap-2 rounded-full border border-primary bg-surface-300 px-3 py-1">
-		<span class="text-[11px] font-semibold uppercase tracking-wide text-secondary-200">{ label }</span>
-		<span class="font-mono text-[12px] text-secondary-100" title={ value }>{ shortenSubject(value) }</span>
-		@copy_button.CopyButton(copy_button.Props{
-			Text:    value,
-			Size:    "14",
-			Variant: copy_button.VariantMinimal,
-			Class:   "text-secondary-200 hover:text-secondary-50",
-		})
-	</div>
 }
 
 templ UserPolicyBoardAddMenu(canStage bool) {
-	{{ pageCtx := composables.UsePageCtx(ctx) }}
-	if !canStage {
-		return
+	if canStage {
+		{{ pageCtx := composables.UsePageCtx(ctx) }}
+		<details class="relative" x-data="{}">
+			<summary class="list-none">
+				<button class="btn btn-xs btn-primary" type="button" data-testid="authz-user-stage-menu">
+					{ pageCtx.T("Create") }
+				</button>
+			</summary>
+			<ul class="absolute right-0 mt-2 w-56 rounded-md border border-primary bg-surface-300 p-1 text-sm shadow-sm">
+				<li>
+					<button
+						type="button"
+						class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
+						@click="$dispatch('open-stage-policy-direct')"
+						data-testid="authz-user-stage-open-direct"
+					>
+						{ pageCtx.T("Users.Permissions.Direct") }
+					</button>
+				</li>
+				<li>
+					<button
+						type="button"
+						class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
+						@click="$dispatch('open-stage-policy-overrides')"
+						data-testid="authz-user-stage-open-overrides"
+					>
+						{ pageCtx.T("Users.Permissions.Overrides") }
+					</button>
+				</li>
+			</ul>
+		</details>
 	}
-	<details class="relative" x-data="{}">
-		<summary class="list-none">
-			<button class="btn btn-xs btn-primary" type="button" data-testid="authz-user-stage-menu">
-				{ pageCtx.T("Create") }
-			</button>
-		</summary>
-		<ul class="absolute right-0 mt-2 w-56 rounded-md border border-primary bg-surface-300 p-1 text-sm shadow-sm">
-			<li>
-				<button
-					type="button"
-					class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
-					@click="$dispatch('open-stage-policy-direct')"
-					data-testid="authz-user-stage-open-direct"
-				>
-					{ pageCtx.T("Users.Permissions.Direct") }
-				</button>
-			</li>
-			<li>
-				<button
-					type="button"
-					class="w-full rounded-md px-2 py-2 text-left hover:bg-surface-400"
-					@click="$dispatch('open-stage-policy-overrides')"
-					data-testid="authz-user-stage-open-overrides"
-				>
-					{ pageCtx.T("Users.Permissions.Overrides") }
-				</button>
-			</li>
-		</ul>
-	</details>
 }
 
 templ UserPolicyBoard(props *UserPolicyBoardProps) {
@@ -633,117 +631,116 @@ templ UserEffectivePolicies(props *UserEffectivePoliciesProps) {
 templ UserPolicyStageDrawer(props *UserPolicyColumnProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	{{ canEdit := props.CanStage && props.Column != "inherited" }}
-	if !canEdit {
-		return
-	}
-	{{ objectListID := fmt.Sprintf("authz-policy-object-options-%s", props.Column) }}
-	{{ actionListID := fmt.Sprintf("authz-policy-action-options-%s", props.Column) }}
-	{{ roleListID := fmt.Sprintf("authz-policy-role-options-%s", props.Column) }}
-	@dialog.StdViewDrawer(dialog.StdDrawerProps{
-		ID:     fmt.Sprintf("stage-policy-%s", props.Column),
-		Title:  pageCtx.T("Authz.Stage.AddRule"),
-		Action: fmt.Sprintf("open-stage-policy-%s", props.Column),
-	}) {
-		<form
-			class="space-y-4 p-4"
-			hx-post="/core/api/authz/policies/stage"
-			hx-target="body"
-			hx-swap="none"
-		>
-			<input type="hidden" name="type" value={ props.Type }/>
-			<input type="hidden" name="subject" value={ props.Subject }/>
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-				@input.Text(&input.Props{
-					Label: pageCtx.T("Authz.Domain"),
-					Attrs: templ.Attributes{
-						"name": "domain",
-						"value": func() string {
-							if props.DomainFilter != "" {
-								return props.DomainFilter
-							}
-							if props.Domain != "" {
-								return props.Domain
-							}
-							return props.DefaultDomain
-						}(),
-					},
-				})
-				if props.Type != "g" {
-					<div class="space-y-1">
-						<label class="text-sm text-secondary-200">{ pageCtx.T("Authz.Effect") }</label>
-						<select name="effect" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
-							<option value="allow" selected>{ pageCtx.T("Authz.EffectAllow") }</option>
-						</select>
-					</div>
+	if canEdit {
+		{{ objectListID := fmt.Sprintf("authz-policy-object-options-%s", props.Column) }}
+		{{ actionListID := fmt.Sprintf("authz-policy-action-options-%s", props.Column) }}
+		{{ roleListID := fmt.Sprintf("authz-policy-role-options-%s", props.Column) }}
+		@dialog.StdViewDrawer(dialog.StdDrawerProps{
+			ID:     fmt.Sprintf("stage-policy-%s", props.Column),
+			Title:  pageCtx.T("Authz.Stage.AddRule"),
+			Action: fmt.Sprintf("open-stage-policy-%s", props.Column),
+		}) {
+			<form
+				class="space-y-4 p-4"
+				hx-post="/core/api/authz/policies/stage"
+				hx-target="body"
+				hx-swap="none"
+			>
+				<input type="hidden" name="type" value={ props.Type }/>
+				<input type="hidden" name="subject" value={ props.Subject }/>
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+					@input.Text(&input.Props{
+						Label: pageCtx.T("Authz.Domain"),
+						Attrs: templ.Attributes{
+							"name": "domain",
+							"value": func() string {
+								if props.DomainFilter != "" {
+									return props.DomainFilter
+								}
+								if props.Domain != "" {
+									return props.Domain
+								}
+								return props.DefaultDomain
+							}(),
+						},
+					})
+					if props.Type != "g" {
+						<div class="space-y-1">
+							<label class="text-sm text-secondary-200">{ pageCtx.T("Authz.Effect") }</label>
+							<select name="effect" class="select select-sm bg-surface-500 border border-primary text-sm rounded w-full">
+								<option value="allow" selected>{ pageCtx.T("Authz.EffectAllow") }</option>
+							</select>
+						</div>
+					}
+				</div>
+				if props.Type == "g" {
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("Authz.Role"),
+						Placeholder: "role:core.viewer",
+						Attrs: templ.Attributes{
+							"name":     "object",
+							"required": "true",
+							"list":     roleListID,
+						},
+					})
+				} else {
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("Authz.Object"),
+						Placeholder: "core.users",
+						Attrs: templ.Attributes{
+							"name":     "object",
+							"required": "true",
+							"list":     objectListID,
+						},
+					})
+					@input.Text(&input.Props{
+						Label:       pageCtx.T("Authz.Action"),
+						Placeholder: "read",
+						Attrs: templ.Attributes{
+							"name":     "action",
+							"required": "true",
+							"list":     actionListID,
+						},
+					})
 				}
-			</div>
-			if props.Type == "g" {
-				@input.Text(&input.Props{
-					Label:       pageCtx.T("Authz.Role"),
-					Placeholder: "role:core.viewer",
-					Attrs: templ.Attributes{
-						"name":     "object",
-						"required": "true",
-						"list":     roleListID,
-					},
-				})
-			} else {
-				@input.Text(&input.Props{
-					Label:       pageCtx.T("Authz.Object"),
-					Placeholder: "core.users",
-					Attrs: templ.Attributes{
-						"name":     "object",
-						"required": "true",
-						"list":     objectListID,
-					},
-				})
-				@input.Text(&input.Props{
-					Label:       pageCtx.T("Authz.Action"),
-					Placeholder: "read",
-					Attrs: templ.Attributes{
-						"name":     "action",
-						"required": "true",
-						"list":     actionListID,
-					},
-				})
-			}
-			<datalist id={ objectListID }>
-				for _, option := range props.ObjectOptions {
-					<option value={ option }></option>
-				}
-			</datalist>
-			<datalist id={ actionListID }>
-				for _, option := range props.ActionOptions {
-					<option value={ option }></option>
-				}
-			</datalist>
-			<datalist id={ roleListID }>
-				for _, option := range props.RoleOptions {
-					<option value={ option }></option>
-				}
-			</datalist>
-			<div class="flex justify-end gap-2">
-				@button.Secondary(button.Props{
-					Size: button.SizeSM,
-					Attrs: templ.Attributes{
-						"type":           "button",
-						"formnovalidate": "true",
-						"@click":         fmt.Sprintf("$dispatch('open-stage-policy-%s')", props.Column),
-					},
-				}) {
-					{ pageCtx.T("Cancel") }
-				}
-				@button.Primary(button.Props{
-					Size: button.SizeSM,
-					Attrs: templ.Attributes{
-						"type":        "submit",
-						"data-testid": fmt.Sprintf("authz-user-stage-save-%s", props.Column),
-					},
-				}) {
-					{ pageCtx.T("Save") }
-				}
-			</div>
-		</form>
+				<datalist id={ objectListID }>
+					for _, option := range props.ObjectOptions {
+						<option value={ option }></option>
+					}
+				</datalist>
+				<datalist id={ actionListID }>
+					for _, option := range props.ActionOptions {
+						<option value={ option }></option>
+					}
+				</datalist>
+				<datalist id={ roleListID }>
+					for _, option := range props.RoleOptions {
+						<option value={ option }></option>
+					}
+				</datalist>
+				<div class="flex justify-end gap-2">
+					@button.Secondary(button.Props{
+						Size: button.SizeSM,
+						Attrs: templ.Attributes{
+							"type":           "button",
+							"formnovalidate": "true",
+							"@click":         fmt.Sprintf("$dispatch('open-stage-policy-%s')", props.Column),
+						},
+					}) {
+						{ pageCtx.T("Cancel") }
+					}
+					@button.Primary(button.Props{
+						Size: button.SizeSM,
+						Attrs: templ.Attributes{
+							"type":        "submit",
+							"data-testid": fmt.Sprintf("authz-user-stage-save-%s", props.Column),
+						},
+					}) {
+						{ pageCtx.T("Save") }
+					}
+				</div>
+			</form>
+		}
 	}
 }
 
