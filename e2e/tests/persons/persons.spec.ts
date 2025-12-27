@@ -40,10 +40,11 @@ test.describe('persons list page and authz gating', () => {
 		await expect(page.getByRole('heading', { name: /Permission required/i, level: 2 })).toBeVisible();
 		const container = page.locator('section[data-authz-container]');
 		await expect(container).toBeVisible();
-		await expect(container).toHaveAttribute('data-domain', 'person');
+		const uiDomain = await container.getAttribute('data-domain');
+		expect(uiDomain).toMatch(/^(global|[0-9a-f-]{36})$/);
 		await expect(container).toHaveAttribute('data-object', 'person.persons');
 		await expect(container).toHaveAttribute('data-action', 'list');
-			await expect(container).toHaveAttribute('data-debug-url', /\/core\/api\/authz\/debug/);
+		await expect(container).toHaveAttribute('data-debug-url', /\/core\/api\/authz\/debug/);
 		await expect(container).toHaveAttribute('data-base-revision', /.+/);
 		await expect(page.locator('[data-policy-inspector]')).toHaveCount(0);
 
@@ -54,7 +55,7 @@ test.describe('persons list page and authz gating', () => {
 		const body = await apiResponse.json();
 		expect(body.object).toBe('person.persons');
 		expect(body.action).toBe('list');
-		expect(body.domain).toBe('person');
+		expect(body.domain).toBe(uiDomain);
 		expect(body.request_id).toBe('e2e-person-req');
 		expect(body.base_revision).toBeTruthy();
 	});

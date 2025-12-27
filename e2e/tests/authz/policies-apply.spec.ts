@@ -3,6 +3,14 @@ import { login, logout, waitForAlpine, resetTestDatabase, seedScenario } from '.
 
 test.describe.configure({ mode: 'serial' });
 
+function extractDomainFromSubject(subject: string): string {
+	const match = /^tenant:([^:]+):user:/.exec(subject);
+	if (!match) {
+		throw new Error(`unexpected authz subject format: ${subject}`);
+	}
+	return match[1];
+}
+
 test.describe('authz policies apply', () => {
 	test.beforeAll(async ({ request }) => {
 		await resetTestDatabase(request, { reseedMinimal: false });
@@ -14,7 +22,7 @@ test.describe('authz policies apply', () => {
 	});
 
 	test('can apply and rollback direct policy changes', async ({ page }) => {
-		const policyDomain = 'logging';
+		let policyDomain = '';
 		let currentRevision = '';
 		let policySubject = '';
 		let rollbackApplied = false;
@@ -52,13 +60,15 @@ test.describe('authz policies apply', () => {
 			const workspace = page.locator('#authz-workspace');
 			await expect(workspace).toHaveCount(1, { timeout: 15_000 });
 
-			const baseRevision = await workspace.locator('input[name="base_revision"]').inputValue();
-			policySubject = await workspace.locator('input[name="subject"]').inputValue();
-			expect(policySubject).not.toBe('');
+				const baseRevision = await workspace.locator('input[name="base_revision"]').inputValue();
+				policySubject = await workspace.locator('input[name="subject"]').inputValue();
+				expect(policySubject).not.toBe('');
+				policyDomain = extractDomainFromSubject(policySubject);
+				expect(policyDomain).not.toBe('');
 
-			const applyResp = await page.request.post('/core/api/authz/policies/apply', {
-				data: {
-					base_revision: baseRevision,
+				const applyResp = await page.request.post('/core/api/authz/policies/apply', {
+					data: {
+						base_revision: baseRevision,
 					subject: policySubject,
 					domain: policyDomain,
 					reason: 'e2e apply direct policy',
