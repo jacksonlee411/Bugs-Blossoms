@@ -9,19 +9,20 @@ import (
 )
 
 type OrgAssignment struct {
-	TenantID       pgtype.UUID        `json:"tenant_id"`
-	ID             pgtype.UUID        `json:"id"`
-	PositionID     pgtype.UUID        `json:"position_id"`
-	SubjectType    string             `json:"subject_type"`
-	SubjectID      pgtype.UUID        `json:"subject_id"`
-	Pernr          string             `json:"pernr"`
-	AssignmentType string             `json:"assignment_type"`
-	IsPrimary      bool               `json:"is_primary"`
-	AllocatedFte   pgtype.Numeric     `json:"allocated_fte"`
-	EffectiveDate  pgtype.Date        `json:"effective_date"`
-	EndDate        pgtype.Date        `json:"end_date"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	TenantID         pgtype.UUID        `json:"tenant_id"`
+	ID               pgtype.UUID        `json:"id"`
+	PositionID       pgtype.UUID        `json:"position_id"`
+	SubjectType      string             `json:"subject_type"`
+	SubjectID        pgtype.UUID        `json:"subject_id"`
+	Pernr            string             `json:"pernr"`
+	AssignmentType   string             `json:"assignment_type"`
+	IsPrimary        bool               `json:"is_primary"`
+	AllocatedFte     pgtype.Numeric     `json:"allocated_fte"`
+	EmploymentStatus string             `json:"employment_status"`
+	EffectiveDate    pgtype.Date        `json:"effective_date"`
+	EndDate          pgtype.Date        `json:"end_date"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrgAttributeInheritanceRule struct {

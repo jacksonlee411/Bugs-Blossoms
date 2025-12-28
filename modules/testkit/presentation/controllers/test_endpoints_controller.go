@@ -281,6 +281,12 @@ func (c *TestEndpointsController) handleHealth(w http.ResponseWriter, r *http.Re
 		"config": map[string]interface{}{
 			"enableTestEndpoints": conf.EnableTestEndpoints,
 			"environment":         conf.GoAppEnvironment,
+			"database": map[string]interface{}{
+				"host": conf.Database.Host,
+				"port": conf.Database.Port,
+				"name": conf.Database.Name,
+				"user": conf.Database.User,
+			},
 		},
 	}
 

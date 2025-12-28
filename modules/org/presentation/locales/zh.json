@@ -1,13 +1,16 @@
 {
 	"NavigationLinks": {
-		"Org": "组织与职位"
+		"Org": "组织与职位",
+		"OrgStructure": "组织架构",
+		"OrgPositions": "职位管理",
+		"JobCatalog": "Job Catalog"
 	},
 	"Org": {
 		"UI": {
 			"Tabs": {
-				"Structure": "组织结构",
+				"Structure": "组织架构",
 				"Assignments": "人员分配",
-				"Positions": "职位"
+				"Positions": "职位管理"
 			},
 				"Shared": {
 					"AsOf": "生效视图",
@@ -16,8 +19,8 @@
 					"Present": "至今"
 				},
 			"Nodes": {
-				"MetaTitle": "组织结构",
-				"Title": "组织结构"
+				"MetaTitle": "组织架构",
+				"Title": "组织架构"
 			},
 					"Assignments": {
 						"MetaTitle": "人员分配",
@@ -86,9 +89,9 @@
 				"Move": "移动"
 			},
 			"Positions": {
-				"MetaTitle": "职位",
-				"Title": "职位",
-				"ListTitle": "职位",
+				"MetaTitle": "职位管理",
+				"Title": "职位管理",
+				"ListTitle": "职位管理",
 				"DetailsTitle": "详情",
 				"TimelineTitle": "时间线",
 				"Empty": "请选择组织节点查看职位。",
@@ -128,6 +131,12 @@
 					"Code": "编码",
 					"OrgNode": "组织节点",
 					"Title": "名称",
+					"PositionType": "职位类型",
+					"EmploymentType": "雇佣类型",
+					"JobFamilyGroupCode": "Job Family Group",
+					"JobFamilyCode": "Job Family",
+					"JobRoleCode": "Job Role",
+					"JobLevelCode": "Job Level",
 					"Lifecycle": "生命周期",
 					"Staffing": "占编",
 					"FTE": "FTE",
@@ -155,6 +164,22 @@
 					"Page": "页",
 					"Prev": "上一页",
 					"Next": "下一页"
+				}
+			},
+			"JobCatalog": {
+				"MetaTitle": "Job Catalog",
+				"Title": "Job Catalog",
+				"Tabs": {
+					"FamilyGroups": "Family Groups",
+					"Families": "Families",
+					"Roles": "Roles",
+					"Levels": "Levels"
+				},
+				"Fields": {
+					"Code": "编码",
+					"Name": "名称",
+					"IsActive": "状态",
+					"DisplayOrder": "排序"
 				}
 			},
 				"Node": {

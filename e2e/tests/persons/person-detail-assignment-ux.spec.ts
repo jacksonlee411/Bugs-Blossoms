@@ -2,7 +2,20 @@ import { test, expect } from '@playwright/test';
 import { execFileSync } from 'child_process';
 import path from 'path';
 import { login, logout } from '../../fixtures/auth';
-import { resetTestDatabase, seedScenario } from '../../fixtures/test-data';
+import { checkTestEndpointsHealth, resetTestDatabase, seedScenario } from '../../fixtures/test-data';
+
+type TestDBConfig = {
+	host?: string;
+	port?: string;
+	name?: string;
+	user?: string;
+};
+
+type TestHealthResponse = {
+	config?: {
+		database?: TestDBConfig;
+	};
+};
 
 function looksLikeUUID(value: string) {
 	return /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(
@@ -10,12 +23,18 @@ function looksLikeUUID(value: string) {
 	);
 }
 
-function seedOrg036ManufacturingDataset() {
+function seedOrg036ManufacturingDataset(dbConfig?: TestDBConfig) {
 	const tenantID = '00000000-0000-0000-0000-000000000001';
 	const projectRoot = path.resolve(__dirname, '../../..');
 	const outputDir = process.env.ORG_DATA_MANIFEST_DIR || '/tmp/org-data-import';
 
 	try {
+		const dbName = dbConfig?.name || process.env.DB_NAME || 'iota_erp_e2e';
+		const dbHost = dbConfig?.host || process.env.DB_HOST || 'localhost';
+		const dbPort = dbConfig?.port || process.env.DB_PORT || '5432';
+		const dbUser = dbConfig?.user || process.env.DB_USER || 'postgres';
+		const dbPassword = process.env.DB_PASSWORD || 'postgres';
+
 		execFileSync(
 			'go',
 			[
@@ -35,7 +54,11 @@ function seedOrg036ManufacturingDataset() {
 				cwd: projectRoot,
 				env: {
 					...process.env,
-					DB_NAME: process.env.DB_NAME || 'iota_erp_e2e',
+					DB_NAME: dbName,
+					DB_HOST: dbHost,
+					DB_PORT: dbPort,
+					DB_USER: dbUser,
+					DB_PASSWORD: dbPassword,
 				},
 				stdio: 'pipe',
 				encoding: 'utf8',
@@ -70,12 +93,14 @@ function seedOrg036ManufacturingDataset() {
 		await page.waitForTimeout(250);
 	}
 
-test.describe('person detail page assignment UX', () => {
-	test.beforeAll(async ({ request }) => {
-		await resetTestDatabase(request, { reseedMinimal: false });
-		await seedScenario(request, 'comprehensive');
-		seedOrg036ManufacturingDataset();
-	});
+	test.describe('person detail page assignment UX', () => {
+		test.beforeAll(async ({ request }) => {
+			await resetTestDatabase(request, { reseedMinimal: false });
+			await seedScenario(request, 'comprehensive');
+
+			const health = (await checkTestEndpointsHealth(request)) as TestHealthResponse;
+			seedOrg036ManufacturingDataset(health.config?.database);
+		});
 
 	test.beforeEach(async ({ page }) => {
 		await page.setViewportSize({ width: 1440, height: 900 });

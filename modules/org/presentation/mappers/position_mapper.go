@@ -17,19 +17,59 @@ func PositionsToViewModels(rows []services.PositionViewRow) []viewmodels.OrgPosi
 		if r.Title != nil {
 			title = strings.TrimSpace(*r.Title)
 		}
+		positionType := ""
+		if r.PositionType != nil {
+			positionType = strings.TrimSpace(*r.PositionType)
+		}
+		employmentType := ""
+		if r.EmploymentType != nil {
+			employmentType = strings.TrimSpace(*r.EmploymentType)
+		}
+		jobFamilyGroupCode := ""
+		if r.JobFamilyGroupCode != nil {
+			jobFamilyGroupCode = strings.TrimSpace(*r.JobFamilyGroupCode)
+		}
+		jobFamilyCode := ""
+		if r.JobFamilyCode != nil {
+			jobFamilyCode = strings.TrimSpace(*r.JobFamilyCode)
+		}
+		jobRoleCode := ""
+		if r.JobRoleCode != nil {
+			jobRoleCode = strings.TrimSpace(*r.JobRoleCode)
+		}
+		jobLevelCode := ""
+		if r.JobLevelCode != nil {
+			jobLevelCode = strings.TrimSpace(*r.JobLevelCode)
+		}
+		jobProfileID := r.JobProfileID
+		if jobProfileID != nil && *jobProfileID == uuid.Nil {
+			jobProfileID = nil
+		}
+		costCenterCode := ""
+		if r.CostCenterCode != nil {
+			costCenterCode = strings.TrimSpace(*r.CostCenterCode)
+		}
 		out = append(out, viewmodels.OrgPositionRow{
-			ID:              r.PositionID,
-			Code:            strings.TrimSpace(r.Code),
-			Title:           title,
-			OrgNodeID:       r.OrgNodeID,
-			LifecycleStatus: strings.TrimSpace(r.LifecycleStatus),
-			IsAutoCreated:   r.IsAutoCreated,
-			CapacityFTE:     r.CapacityFTE,
-			OccupiedFTE:     r.OccupiedFTE,
-			AvailableFTE:    r.CapacityFTE - r.OccupiedFTE,
-			StaffingState:   strings.TrimSpace(r.StaffingState),
-			EffectiveDate:   r.EffectiveDate,
-			EndDate:         r.EndDate,
+			ID:                 r.PositionID,
+			Code:               strings.TrimSpace(r.Code),
+			Title:              title,
+			OrgNodeID:          r.OrgNodeID,
+			LifecycleStatus:    strings.TrimSpace(r.LifecycleStatus),
+			IsAutoCreated:      r.IsAutoCreated,
+			CapacityFTE:        r.CapacityFTE,
+			OccupiedFTE:        r.OccupiedFTE,
+			AvailableFTE:       r.CapacityFTE - r.OccupiedFTE,
+			StaffingState:      strings.TrimSpace(r.StaffingState),
+			PositionType:       positionType,
+			EmploymentType:     employmentType,
+			JobFamilyGroupCode: jobFamilyGroupCode,
+			JobFamilyCode:      jobFamilyCode,
+			JobRoleCode:        jobRoleCode,
+			JobLevelCode:       jobLevelCode,
+			JobProfileID:       jobProfileID,
+			CostCenterCode:     costCenterCode,
+			EffectiveDate:      r.EffectiveDate,
+			EndDate:            r.EndDate,
 		})
 	}
 	return out
@@ -44,6 +84,10 @@ func PositionDetailsFrom(row services.PositionViewRow, reportsToID *uuid.UUID) *
 		Row:                 items[0],
 		ReportsToPositionID: reportsToID,
 		ReportsToLabel:      "",
+		JobFamilyGroupLabel: "",
+		JobFamilyLabel:      "",
+		JobRoleLabel:        "",
+		JobLevelLabel:       "",
 	}
 }
 

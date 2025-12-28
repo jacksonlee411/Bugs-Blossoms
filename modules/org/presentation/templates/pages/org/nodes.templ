@@ -49,12 +49,6 @@ templ NodesHeader(props NodesHeaderProps) {
 					/>
 				</div>
 			</div>
-			@orgui.Subnav(orgui.SubnavProps{
-				EffectiveDate:  props.EffectiveDate,
-				Active:         "nodes",
-				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
-				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
-			})
 		</div>
 	} else {
 		<div id="org-nodes-header" class="space-y-3">
@@ -81,12 +75,6 @@ templ NodesHeader(props NodesHeaderProps) {
 					/>
 				</div>
 			</div>
-			@orgui.Subnav(orgui.SubnavProps{
-				EffectiveDate:  props.EffectiveDate,
-				Active:         "nodes",
-				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
-				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
-			})
 		</div>
 	}
 }

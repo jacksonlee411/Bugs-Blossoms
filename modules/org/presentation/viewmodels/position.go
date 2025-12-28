@@ -17,14 +17,28 @@ type OrgPositionRow struct {
 	OccupiedFTE     float64
 	AvailableFTE    float64
 	StaffingState   string
-	EffectiveDate   time.Time
-	EndDate         time.Time
+	PositionType    string
+	EmploymentType  string
+
+	JobFamilyGroupCode string
+	JobFamilyCode      string
+	JobRoleCode        string
+	JobLevelCode       string
+	JobProfileID       *uuid.UUID
+	CostCenterCode     string
+	EffectiveDate      time.Time
+	EndDate            time.Time
 }
 
 type OrgPositionDetails struct {
 	Row                 OrgPositionRow
 	ReportsToPositionID *uuid.UUID
 	ReportsToLabel      string
+
+	JobFamilyGroupLabel string
+	JobFamilyLabel      string
+	JobRoleLabel        string
+	JobLevelLabel       string
 }
 
 type OrgPositionTimelineItem struct {

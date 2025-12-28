@@ -1,11 +1,14 @@
 {
   "NavigationLinks": {
-    "Org": "Org"
+    "Org": "Org & Positions",
+    "OrgStructure": "Org structure",
+    "OrgPositions": "Positions",
+    "JobCatalog": "Job Catalog"
   },
   "Org": {
     "UI": {
       "Tabs": {
-        "Structure": "Structure",
+        "Structure": "Org structure",
         "Assignments": "Assignments",
         "Positions": "Positions"
       },
@@ -128,6 +131,12 @@
           "Code": "Code",
           "OrgNode": "Org node",
           "Title": "Title",
+          "PositionType": "Position type",
+          "EmploymentType": "Employment type",
+          "JobFamilyGroupCode": "Job family group",
+          "JobFamilyCode": "Job family",
+          "JobRoleCode": "Job role",
+          "JobLevelCode": "Job level",
           "Lifecycle": "Lifecycle",
           "Staffing": "Staffing",
           "FTE": "FTE",
@@ -155,6 +164,22 @@
           "Page": "Page",
           "Prev": "Prev",
           "Next": "Next"
+        }
+      },
+      "JobCatalog": {
+        "MetaTitle": "Job Catalog",
+        "Title": "Job Catalog",
+        "Tabs": {
+          "FamilyGroups": "Family Groups",
+          "Families": "Families",
+          "Roles": "Roles",
+          "Levels": "Levels"
+        },
+        "Fields": {
+          "Code": "Code",
+          "Name": "Name",
+          "IsActive": "Status",
+          "DisplayOrder": "Display order"
         }
       },
       "Node": {
