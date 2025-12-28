@@ -118,103 +118,77 @@ func NodesHeader(props NodesHeaderProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100\" hx-get=\"/org/nodes\" hx-trigger=\"change\" hx-target=\"#org-nodes-page\" hx-select=\"#org-nodes-page\" hx-swap=\"outerHTML\" hx-push-url=\"true\" hx-include=\"#effective-date\"></div></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = orgui.Subnav(orgui.SubnavProps{
-				EffectiveDate:  props.EffectiveDate,
-				Active:         "nodes",
-				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
-				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
-			}).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\" class=\"rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100\" hx-get=\"/org/nodes\" hx-trigger=\"change\" hx-target=\"#org-nodes-page\" hx-select=\"#org-nodes-page\" hx-swap=\"outerHTML\" hx-push-url=\"true\" hx-include=\"#effective-date\"></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div id=\"org-nodes-header\" class=\"space-y-3\"><div class=\"flex items-center justify-between gap-4 flex-wrap\"><div class=\"flex items-center gap-3\"><h1 class=\"text-lg font-semibold text-100\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div id=\"org-nodes-header\" class=\"space-y-3\"><div class=\"flex items-center justify-between gap-4 flex-wrap\"><div class=\"flex items-center gap-3\"><h1 class=\"text-lg font-semibold text-100\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Nodes.Title"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 63, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 57, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</h1><span class=\"text-xs text-300\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</h1><span class=\"text-xs text-300\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Shared.AsOf"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 64, Col: 69}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 58, Col: 69}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, ": ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, ": ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(props.EffectiveDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 64, Col: 94}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 58, Col: 94}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</span></div><div class=\"flex items-center gap-2\"><label class=\"text-xs font-medium text-200\" for=\"effective-date\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</span></div><div class=\"flex items-center gap-2\"><label class=\"text-xs font-medium text-200\" for=\"effective-date\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Shared.EffectiveDate"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 67, Col: 112}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 61, Col: 112}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</label> <input id=\"effective-date\" type=\"date\" name=\"effective_date\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</label> <input id=\"effective-date\" type=\"date\" name=\"effective_date\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(props.EffectiveDate)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 72, Col: 33}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 66, Col: 33}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" class=\"rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100\" hx-get=\"/org/nodes\" hx-trigger=\"change\" hx-target=\"#org-nodes-page\" hx-select=\"#org-nodes-page\" hx-swap=\"outerHTML\" hx-push-url=\"true\" hx-include=\"#effective-date\"></div></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = orgui.Subnav(orgui.SubnavProps{
-				EffectiveDate:  props.EffectiveDate,
-				Active:         "nodes",
-				CanAssignments: pageCtx.CanAuthz("org.assignments", "read"),
-				CanPositions:   pageCtx.CanAuthz("org.positions", "read"),
-			}).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" class=\"rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100\" hx-get=\"/org/nodes\" hx-trigger=\"change\" hx-target=\"#org-nodes-page\" hx-select=\"#org-nodes-page\" hx-swap=\"outerHTML\" hx-push-url=\"true\" hx-include=\"#effective-date\"></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -257,7 +231,7 @@ func NodesPage(props NodesPageProps) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div id=\"org-nodes-page\" class=\"p-6 space-y-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<div id=\"org-nodes-page\" class=\"p-6 space-y-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -266,48 +240,48 @@ func NodesPage(props NodesPageProps) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if len(props.Errors) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<div class=\"rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200\"><ul class=\"list-disc pl-5 space-y-1\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200\"><ul class=\"list-disc pl-5 space-y-1\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				for _, msg := range props.Errors {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<li>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<li>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var14 string
 					templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 107, Col: 16}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 95, Col: 16}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</li>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</li>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</ul></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</ul></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<div class=\"grid grid-cols-12 gap-4\"><div class=\"col-span-12 lg:col-span-4\"><div class=\"rounded-lg border border-surface-400 bg-surface-300\"><div class=\"flex items-center justify-between border-b border-surface-400 p-3\"><div class=\"text-sm font-medium text-100\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<div class=\"grid grid-cols-12 gap-4\"><div class=\"col-span-12 lg:col-span-4\"><div class=\"rounded-lg border border-surface-400 bg-surface-300\"><div class=\"flex items-center justify-between border-b border-surface-400 p-3\"><div class=\"text-sm font-medium text-100\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Tree.Title"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 116, Col: 81}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 104, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -327,7 +301,7 @@ func NodesPage(props NodesPageProps) templ.Component {
 					var templ_7745c5c3_Var17 string
 					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Tree.NewNode"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 128, Col: 43}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 116, Col: 43}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -349,7 +323,7 @@ func NodesPage(props NodesPageProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div><div class=\"p-2\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</div><div class=\"p-2\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -361,38 +335,38 @@ func NodesPage(props NodesPageProps) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "</div></div></div><div class=\"col-span-12 lg:col-span-8\"><div class=\"rounded-lg border border-surface-400 bg-surface-300 min-h-[280px]\"><div class=\"border-b border-surface-400 p-3\"><div class=\"text-sm font-medium text-100\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div></div></div><div class=\"col-span-12 lg:col-span-8\"><div class=\"rounded-lg border border-surface-400 bg-surface-300 min-h-[280px]\"><div class=\"border-b border-surface-400 p-3\"><div class=\"text-sm font-medium text-100\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.NodePanel.Title"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 144, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 132, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div></div><div id=\"org-node-panel\" class=\"p-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "</div></div><div id=\"org-node-panel\" class=\"p-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if props.SelectedNode == nil {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "<div class=\"text-sm text-300\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<div class=\"text-sm text-300\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var19 string
 				templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.NodePanel.Empty"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 149, Col: 46}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/nodes.templ`, Line: 137, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 26, "</div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "</div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -405,7 +379,7 @@ func NodesPage(props NodesPageProps) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "</div></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "</div></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

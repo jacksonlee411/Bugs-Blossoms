@@ -136,6 +136,9 @@ func collectTrUsages(root string) ([]trUsage, error) {
 			if rel == ".git" || strings.HasPrefix(rel, ".git/") {
 				return fs.SkipDir
 			}
+			if rel == ".cache" || strings.HasPrefix(rel, ".cache/") {
+				return fs.SkipDir
+			}
 			if rel == "vendor" || strings.HasPrefix(rel, "vendor/") {
 				return fs.SkipDir
 			}

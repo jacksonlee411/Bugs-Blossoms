@@ -92,6 +92,21 @@ func (c *OrgUIController) Register(r *mux.Router) {
 	router.HandleFunc("/positions/{id}", c.PositionDetails).Methods(http.MethodGet)
 	router.HandleFunc("/positions/{id}/edit", c.EditPositionForm).Methods(http.MethodGet)
 	router.HandleFunc("/positions/{id}", c.UpdatePosition).Methods(http.MethodPatch)
+
+	router.HandleFunc("/job-catalog", c.JobCatalogPage).Methods(http.MethodGet)
+	router.HandleFunc("/job-catalog/family-groups", c.CreateJobFamilyGroupUI).Methods(http.MethodPost)
+	router.HandleFunc("/job-catalog/family-groups/{id}", c.UpdateJobFamilyGroupUI).Methods(http.MethodPatch)
+	router.HandleFunc("/job-catalog/families", c.CreateJobFamilyUI).Methods(http.MethodPost)
+	router.HandleFunc("/job-catalog/families/{id}", c.UpdateJobFamilyUI).Methods(http.MethodPatch)
+	router.HandleFunc("/job-catalog/roles", c.CreateJobRoleUI).Methods(http.MethodPost)
+	router.HandleFunc("/job-catalog/roles/{id}", c.UpdateJobRoleUI).Methods(http.MethodPatch)
+	router.HandleFunc("/job-catalog/levels", c.CreateJobLevelUI).Methods(http.MethodPost)
+	router.HandleFunc("/job-catalog/levels/{id}", c.UpdateJobLevelUI).Methods(http.MethodPatch)
+
+	router.HandleFunc("/job-catalog/family-groups/options", c.JobFamilyGroupOptions).Methods(http.MethodGet)
+	router.HandleFunc("/job-catalog/families/options", c.JobFamilyOptions).Methods(http.MethodGet)
+	router.HandleFunc("/job-catalog/roles/options", c.JobRoleOptions).Methods(http.MethodGet)
+	router.HandleFunc("/job-catalog/levels/options", c.JobLevelOptions).Methods(http.MethodGet)
 }
 
 func (c *OrgUIController) RedirectRoot(w http.ResponseWriter, r *http.Request) {
@@ -696,6 +711,1268 @@ func (c *OrgUIController) PositionSearchOptions(w http.ResponseWriter, r *http.R
 	templ.Handler(orgui.NodeSearchOptions(options), templ.WithStreaming()).ServeHTTP(w, r)
 }
 
+func (c *OrgUIController) JobFamilyGroupOptions(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "read") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromQuery(r)
+	if err != nil || effectiveDate.IsZero() {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("effective_date is required"))
+		return
+	}
+
+	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
+	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
+
+	rows, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type opt struct {
+		Code string
+		Name string
+	}
+	out := make([]opt, 0, len(rows))
+	for _, row := range rows {
+		if !includeInactive && !row.IsActive {
+			continue
+		}
+		code := strings.TrimSpace(row.Code)
+		name := strings.TrimSpace(row.Name)
+		if q != "" && !strings.Contains(strings.ToLower(code), q) && !strings.Contains(strings.ToLower(name), q) {
+			continue
+		}
+		out = append(out, opt{Code: code, Name: name})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Code == out[j].Code {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].Code < out[j].Code
+	})
+
+	options := make([]*base.ComboboxOption, 0, minInt(len(out), 50))
+	for i, o := range out {
+		if i >= 50 {
+			break
+		}
+		label := strings.TrimSpace(o.Code)
+		if strings.TrimSpace(o.Name) != "" {
+			label = fmt.Sprintf("%s — %s", strings.TrimSpace(o.Code), strings.TrimSpace(o.Name))
+		}
+		options = append(options, &base.ComboboxOption{Value: o.Code, Label: label})
+	}
+	templ.Handler(orgui.NodeSearchOptions(options), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) JobFamilyOptions(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "read") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromQuery(r)
+	if err != nil || effectiveDate.IsZero() {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("effective_date is required"))
+		return
+	}
+
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	if groupCode == "" {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
+	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
+
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var groupID uuid.UUID
+	for _, g := range groups {
+		if strings.EqualFold(strings.TrimSpace(g.Code), groupCode) {
+			groupID = g.ID
+			break
+		}
+	}
+	if groupID == uuid.Nil {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	rows, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type opt struct {
+		Code string
+		Name string
+	}
+	out := make([]opt, 0, len(rows))
+	for _, row := range rows {
+		if !includeInactive && !row.IsActive {
+			continue
+		}
+		code := strings.TrimSpace(row.Code)
+		name := strings.TrimSpace(row.Name)
+		if q != "" && !strings.Contains(strings.ToLower(code), q) && !strings.Contains(strings.ToLower(name), q) {
+			continue
+		}
+		out = append(out, opt{Code: code, Name: name})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Code == out[j].Code {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].Code < out[j].Code
+	})
+
+	options := make([]*base.ComboboxOption, 0, minInt(len(out), 50))
+	for i, o := range out {
+		if i >= 50 {
+			break
+		}
+		label := strings.TrimSpace(o.Code)
+		if strings.TrimSpace(o.Name) != "" {
+			label = fmt.Sprintf("%s — %s", strings.TrimSpace(o.Code), strings.TrimSpace(o.Name))
+		}
+		options = append(options, &base.ComboboxOption{Value: o.Code, Label: label})
+	}
+	templ.Handler(orgui.NodeSearchOptions(options), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) JobRoleOptions(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "read") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromQuery(r)
+	if err != nil || effectiveDate.IsZero() {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("effective_date is required"))
+		return
+	}
+
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	familyCode := strings.TrimSpace(param(r, "job_family_code"))
+	if groupCode == "" || familyCode == "" {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
+	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
+
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var groupID uuid.UUID
+	for _, g := range groups {
+		if strings.EqualFold(strings.TrimSpace(g.Code), groupCode) {
+			groupID = g.ID
+			break
+		}
+	}
+	if groupID == uuid.Nil {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	families, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var familyID uuid.UUID
+	for _, f := range families {
+		if strings.EqualFold(strings.TrimSpace(f.Code), familyCode) {
+			familyID = f.ID
+			break
+		}
+	}
+	if familyID == uuid.Nil {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	rows, err := c.org.ListJobRoles(r.Context(), tenantID, familyID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type opt struct {
+		Code string
+		Name string
+	}
+	out := make([]opt, 0, len(rows))
+	for _, row := range rows {
+		if !includeInactive && !row.IsActive {
+			continue
+		}
+		code := strings.TrimSpace(row.Code)
+		name := strings.TrimSpace(row.Name)
+		if q != "" && !strings.Contains(strings.ToLower(code), q) && !strings.Contains(strings.ToLower(name), q) {
+			continue
+		}
+		out = append(out, opt{Code: code, Name: name})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Code == out[j].Code {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].Code < out[j].Code
+	})
+
+	options := make([]*base.ComboboxOption, 0, minInt(len(out), 50))
+	for i, o := range out {
+		if i >= 50 {
+			break
+		}
+		label := strings.TrimSpace(o.Code)
+		if strings.TrimSpace(o.Name) != "" {
+			label = fmt.Sprintf("%s — %s", strings.TrimSpace(o.Code), strings.TrimSpace(o.Name))
+		}
+		options = append(options, &base.ComboboxOption{Value: o.Code, Label: label})
+	}
+	templ.Handler(orgui.NodeSearchOptions(options), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) JobLevelOptions(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "read") {
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromQuery(r)
+	if err != nil || effectiveDate.IsZero() {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte("effective_date is required"))
+		return
+	}
+
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	familyCode := strings.TrimSpace(param(r, "job_family_code"))
+	roleCode := strings.TrimSpace(param(r, "job_role_code"))
+	if groupCode == "" || familyCode == "" || roleCode == "" {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
+	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
+
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var groupID uuid.UUID
+	for _, g := range groups {
+		if strings.EqualFold(strings.TrimSpace(g.Code), groupCode) {
+			groupID = g.ID
+			break
+		}
+	}
+	if groupID == uuid.Nil {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	families, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var familyID uuid.UUID
+	for _, f := range families {
+		if strings.EqualFold(strings.TrimSpace(f.Code), familyCode) {
+			familyID = f.ID
+			break
+		}
+	}
+	if familyID == uuid.Nil {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	roles, err := c.org.ListJobRoles(r.Context(), tenantID, familyID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var roleID uuid.UUID
+	for _, rr := range roles {
+		if strings.EqualFold(strings.TrimSpace(rr.Code), roleCode) {
+			roleID = rr.ID
+			break
+		}
+	}
+	if roleID == uuid.Nil {
+		templ.Handler(orgui.NodeSearchOptions([]*base.ComboboxOption{}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	rows, err := c.org.ListJobLevels(r.Context(), tenantID, roleID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type opt struct {
+		Code string
+		Name string
+	}
+	out := make([]opt, 0, len(rows))
+	for _, row := range rows {
+		if !includeInactive && !row.IsActive {
+			continue
+		}
+		code := strings.TrimSpace(row.Code)
+		name := strings.TrimSpace(row.Name)
+		if q != "" && !strings.Contains(strings.ToLower(code), q) && !strings.Contains(strings.ToLower(name), q) {
+			continue
+		}
+		out = append(out, opt{Code: code, Name: name})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Code == out[j].Code {
+			return out[i].Name < out[j].Name
+		}
+		return out[i].Code < out[j].Code
+	})
+
+	options := make([]*base.ComboboxOption, 0, minInt(len(out), 50))
+	for i, o := range out {
+		if i >= 50 {
+			break
+		}
+		label := strings.TrimSpace(o.Code)
+		if strings.TrimSpace(o.Name) != "" {
+			label = fmt.Sprintf("%s — %s", strings.TrimSpace(o.Code), strings.TrimSpace(o.Name))
+		}
+		options = append(options, &base.ComboboxOption{Value: o.Code, Label: label})
+	}
+	templ.Handler(orgui.NodeSearchOptions(options), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func normalizeJobCatalogTab(v string) string {
+	v = strings.TrimSpace(strings.ToLower(v))
+	switch v {
+	case "", "family-groups":
+		return "family-groups"
+	case "families", "roles", "levels":
+		return v
+	default:
+		return "family-groups"
+	}
+}
+
+func canonicalJobCatalogURL(tab, effectiveDateStr, groupCode, familyCode, roleCode string) string {
+	v := url.Values{}
+	tab = normalizeJobCatalogTab(tab)
+	v.Set("tab", tab)
+	if strings.TrimSpace(effectiveDateStr) != "" {
+		v.Set("effective_date", strings.TrimSpace(effectiveDateStr))
+	}
+	if strings.TrimSpace(groupCode) != "" {
+		v.Set("job_family_group_code", strings.TrimSpace(groupCode))
+	}
+	if strings.TrimSpace(familyCode) != "" {
+		v.Set("job_family_code", strings.TrimSpace(familyCode))
+	}
+	if strings.TrimSpace(roleCode) != "" {
+		v.Set("job_role_code", strings.TrimSpace(roleCode))
+	}
+	return "/org/job-catalog?" + v.Encode()
+}
+
+func redirectUI(w http.ResponseWriter, r *http.Request, url string) {
+	if htmx.IsHxRequest(r) {
+		htmx.Redirect(w, url)
+		return
+	}
+	http.Redirect(w, r, url, http.StatusFound)
+}
+
+func (c *OrgUIController) JobCatalogPage(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "read")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "read") {
+		return
+	}
+	ensureOrgPageCapabilities(r, orgJobCatalogAuthzObject, "admin")
+
+	statusCode := http.StatusOK
+	var pageErrs []string
+
+	effectiveDate, err := effectiveDateFromQuery(r)
+	if err != nil {
+		statusCode = http.StatusBadRequest
+		pageErrs = append(pageErrs, "invalid effective_date")
+		effectiveDate = normalizeValidTimeDayUTC(time.Now().UTC())
+	}
+	if effectiveDate.IsZero() {
+		effectiveDate = normalizeValidTimeDayUTC(time.Now().UTC())
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	familyCode := strings.TrimSpace(param(r, "job_family_code"))
+	roleCode := strings.TrimSpace(param(r, "job_role_code"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+
+	props, err := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, roleCode, editID, pageErrs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if statusCode != http.StatusOK {
+		w.WriteHeader(statusCode)
+	}
+	templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+}
+
+func (c *OrgUIController) CreateJobFamilyGroupUI(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := normalizeValidTimeDayUTC(effectiveDate).UTC().Format("2006-01-02")
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+
+	code := strings.TrimSpace(param(r, "code"))
+	name := strings.TrimSpace(param(r, "name"))
+	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
+
+	_, err = c.org.CreateJobFamilyGroup(r.Context(), tenantID, services.JobFamilyGroupCreate{
+		Code:     code,
+		Name:     name,
+		IsActive: isActive,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, "", "", "", editID, []string{formErr})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(statusCode)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	redirectUI(w, r, canonicalJobCatalogURL("family-groups", effectiveDateStr, "", "", ""))
+}
+
+func (c *OrgUIController) UpdateJobFamilyGroupUI(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := normalizeValidTimeDayUTC(effectiveDate).UTC().Format("2006-01-02")
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(param(r, "name"))
+	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
+
+	_, err = c.org.UpdateJobFamilyGroup(r.Context(), tenantID, id, services.JobFamilyGroupUpdate{
+		Name:     &name,
+		IsActive: &isActive,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, "", "", "", editID, []string{formErr})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(statusCode)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	redirectUI(w, r, canonicalJobCatalogURL("family-groups", effectiveDateStr, "", "", ""))
+}
+
+func (c *OrgUIController) CreateJobFamilyUI(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := normalizeValidTimeDayUTC(effectiveDate).UTC().Format("2006-01-02")
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	code := strings.TrimSpace(param(r, "code"))
+	name := strings.TrimSpace(param(r, "name"))
+	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
+
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var groupID uuid.UUID
+	for _, g := range groups {
+		if strings.EqualFold(strings.TrimSpace(g.Code), groupCode) {
+			groupID = g.ID
+			break
+		}
+	}
+	if groupID == uuid.Nil {
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, "", "", editID, []string{"invalid job_family_group_code"})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	_, err = c.org.CreateJobFamily(r.Context(), tenantID, services.JobFamilyCreate{
+		JobFamilyGroupID: groupID,
+		Code:             code,
+		Name:             name,
+		IsActive:         isActive,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, "", "", editID, []string{formErr})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(statusCode)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	redirectUI(w, r, canonicalJobCatalogURL("families", effectiveDateStr, groupCode, "", ""))
+}
+
+func (c *OrgUIController) UpdateJobFamilyUI(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := normalizeValidTimeDayUTC(effectiveDate).UTC().Format("2006-01-02")
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(param(r, "name"))
+	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
+
+	_, err = c.org.UpdateJobFamily(r.Context(), tenantID, id, services.JobFamilyUpdate{
+		Name:     &name,
+		IsActive: &isActive,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, "", "", editID, []string{formErr})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(statusCode)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	redirectUI(w, r, canonicalJobCatalogURL("families", effectiveDateStr, groupCode, "", ""))
+}
+
+func (c *OrgUIController) CreateJobRoleUI(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := normalizeValidTimeDayUTC(effectiveDate).UTC().Format("2006-01-02")
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	familyCode := strings.TrimSpace(param(r, "job_family_code"))
+	code := strings.TrimSpace(param(r, "code"))
+	name := strings.TrimSpace(param(r, "name"))
+	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
+
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var groupID uuid.UUID
+	for _, g := range groups {
+		if strings.EqualFold(strings.TrimSpace(g.Code), groupCode) {
+			groupID = g.ID
+			break
+		}
+	}
+	if groupID == uuid.Nil {
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, "", editID, []string{"invalid job_family_group_code"})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	families, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var familyID uuid.UUID
+	for _, f := range families {
+		if strings.EqualFold(strings.TrimSpace(f.Code), familyCode) {
+			familyID = f.ID
+			break
+		}
+	}
+	if familyID == uuid.Nil {
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, "", editID, []string{"invalid job_family_code"})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	_, err = c.org.CreateJobRole(r.Context(), tenantID, services.JobRoleCreate{
+		JobFamilyID: familyID,
+		Code:        code,
+		Name:        name,
+		IsActive:    isActive,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, "", editID, []string{formErr})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(statusCode)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	redirectUI(w, r, canonicalJobCatalogURL("roles", effectiveDateStr, groupCode, familyCode, ""))
+}
+
+func (c *OrgUIController) UpdateJobRoleUI(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := normalizeValidTimeDayUTC(effectiveDate).UTC().Format("2006-01-02")
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	familyCode := strings.TrimSpace(param(r, "job_family_code"))
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(param(r, "name"))
+	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
+
+	_, err = c.org.UpdateJobRole(r.Context(), tenantID, id, services.JobRoleUpdate{
+		Name:     &name,
+		IsActive: &isActive,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, "", editID, []string{formErr})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(statusCode)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	redirectUI(w, r, canonicalJobCatalogURL("roles", effectiveDateStr, groupCode, familyCode, ""))
+}
+
+func (c *OrgUIController) CreateJobLevelUI(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := normalizeValidTimeDayUTC(effectiveDate).UTC().Format("2006-01-02")
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	familyCode := strings.TrimSpace(param(r, "job_family_code"))
+	roleCode := strings.TrimSpace(param(r, "job_role_code"))
+	code := strings.TrimSpace(param(r, "code"))
+	name := strings.TrimSpace(param(r, "name"))
+	displayOrderRaw := strings.TrimSpace(param(r, "display_order"))
+	displayOrder := 0
+	if displayOrderRaw != "" {
+		v, err := strconv.Atoi(displayOrderRaw)
+		if err != nil {
+			http.Error(w, "invalid display_order", http.StatusBadRequest)
+			return
+		}
+		displayOrder = v
+	}
+	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
+
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var groupID uuid.UUID
+	for _, g := range groups {
+		if strings.EqualFold(strings.TrimSpace(g.Code), groupCode) {
+			groupID = g.ID
+			break
+		}
+	}
+	if groupID == uuid.Nil {
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, roleCode, editID, []string{"invalid job_family_group_code"})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	families, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var familyID uuid.UUID
+	for _, f := range families {
+		if strings.EqualFold(strings.TrimSpace(f.Code), familyCode) {
+			familyID = f.ID
+			break
+		}
+	}
+	if familyID == uuid.Nil {
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, roleCode, editID, []string{"invalid job_family_code"})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	roles, err := c.org.ListJobRoles(r.Context(), tenantID, familyID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	var roleID uuid.UUID
+	for _, rr := range roles {
+		if strings.EqualFold(strings.TrimSpace(rr.Code), roleCode) {
+			roleID = rr.ID
+			break
+		}
+	}
+	if roleID == uuid.Nil {
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, roleCode, editID, []string{"invalid job_role_code"})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	_, err = c.org.CreateJobLevel(r.Context(), tenantID, services.JobLevelCreate{
+		JobRoleID:    roleID,
+		Code:         code,
+		Name:         name,
+		DisplayOrder: displayOrder,
+		IsActive:     isActive,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, roleCode, editID, []string{formErr})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(statusCode)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	redirectUI(w, r, canonicalJobCatalogURL("levels", effectiveDateStr, groupCode, familyCode, roleCode))
+}
+
+func (c *OrgUIController) UpdateJobLevelUI(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgJobCatalogAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := normalizeValidTimeDayUTC(effectiveDate).UTC().Format("2006-01-02")
+	tab := normalizeJobCatalogTab(param(r, "tab"))
+	editID := strings.TrimSpace(param(r, "edit_id"))
+	groupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	familyCode := strings.TrimSpace(param(r, "job_family_code"))
+	roleCode := strings.TrimSpace(param(r, "job_role_code"))
+
+	id, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(param(r, "name"))
+	displayOrderRaw := strings.TrimSpace(param(r, "display_order"))
+	displayOrder := 0
+	if displayOrderRaw != "" {
+		v, err := strconv.Atoi(displayOrderRaw)
+		if err != nil {
+			http.Error(w, "invalid display_order", http.StatusBadRequest)
+			return
+		}
+		displayOrder = v
+	}
+	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
+
+	_, err = c.org.UpdateJobLevel(r.Context(), tenantID, id, services.JobLevelUpdate{
+		Name:         &name,
+		DisplayOrder: &displayOrder,
+		IsActive:     &isActive,
+	})
+	if err != nil {
+		formErr, _, statusCode := mapServiceErrorToForm(err)
+		props, buildErr := c.buildJobCatalogPageProps(r, tenantID, effectiveDateStr, tab, groupCode, familyCode, roleCode, editID, []string{formErr})
+		if buildErr != nil {
+			http.Error(w, buildErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(statusCode)
+		templ.Handler(orgtemplates.JobCatalogPage(props), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+	redirectUI(w, r, canonicalJobCatalogURL("levels", effectiveDateStr, groupCode, familyCode, roleCode))
+}
+
+func (c *OrgUIController) buildJobCatalogPageProps(
+	r *http.Request,
+	tenantID uuid.UUID,
+	effectiveDateStr string,
+	tab string,
+	groupCode string,
+	familyCode string,
+	roleCode string,
+	editID string,
+	pageErrs []string,
+) (orgtemplates.JobCatalogPageProps, error) {
+	tab = normalizeJobCatalogTab(tab)
+	groupCode = strings.TrimSpace(groupCode)
+	familyCode = strings.TrimSpace(familyCode)
+	roleCode = strings.TrimSpace(roleCode)
+	editID = strings.TrimSpace(editID)
+
+	groupLabel, familyLabel, roleLabel, _ := c.jobCatalogLabelsFor(r, tenantID, services.JobCatalogCodes{
+		JobFamilyGroupCode: groupCode,
+		JobFamilyCode:      familyCode,
+		JobRoleCode:        roleCode,
+	})
+
+	props := orgtemplates.JobCatalogPageProps{
+		EffectiveDate:       effectiveDateStr,
+		Tab:                 tab,
+		JobFamilyGroupCode:  groupCode,
+		JobFamilyGroupLabel: groupLabel,
+		JobFamilyCode:       familyCode,
+		JobFamilyLabel:      familyLabel,
+		JobRoleCode:         roleCode,
+		JobRoleLabel:        roleLabel,
+		FamilyGroups:        []viewmodels.JobFamilyGroupRow{},
+		Families:            []viewmodels.JobFamilyRow{},
+		Roles:               []viewmodels.JobRoleRow{},
+		Levels:              []viewmodels.JobLevelRow{},
+		EditID:              editID,
+		Errors:              pageErrs,
+	}
+
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		return props, err
+	}
+
+	props.FamilyGroups = make([]viewmodels.JobFamilyGroupRow, 0, len(groups))
+	for _, g := range groups {
+		props.FamilyGroups = append(props.FamilyGroups, viewmodels.JobFamilyGroupRow{
+			ID:       g.ID,
+			Code:     strings.TrimSpace(g.Code),
+			Name:     strings.TrimSpace(g.Name),
+			IsActive: g.IsActive,
+		})
+	}
+
+	var groupID uuid.UUID
+	for _, g := range groups {
+		if strings.EqualFold(strings.TrimSpace(g.Code), groupCode) {
+			groupID = g.ID
+			break
+		}
+	}
+
+	switch tab {
+	case "family-groups":
+		if editID != "" {
+			if parsed, err := uuid.Parse(editID); err == nil && parsed != uuid.Nil {
+				for _, row := range props.FamilyGroups {
+					if row.ID == parsed {
+						selected := row
+						props.EditFamilyGroup = &selected
+						break
+					}
+				}
+			}
+		}
+	case "families":
+		if groupID == uuid.Nil {
+			return props, nil
+		}
+		rows, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+		if err != nil {
+			return props, err
+		}
+		props.Families = make([]viewmodels.JobFamilyRow, 0, len(rows))
+		for _, rr := range rows {
+			props.Families = append(props.Families, viewmodels.JobFamilyRow{
+				ID:               rr.ID,
+				JobFamilyGroupID: rr.JobFamilyGroupID,
+				Code:             strings.TrimSpace(rr.Code),
+				Name:             strings.TrimSpace(rr.Name),
+				IsActive:         rr.IsActive,
+			})
+		}
+		if editID != "" {
+			if parsed, err := uuid.Parse(editID); err == nil && parsed != uuid.Nil {
+				for _, row := range props.Families {
+					if row.ID == parsed {
+						selected := row
+						props.EditFamily = &selected
+						break
+					}
+				}
+			}
+		}
+	case "roles":
+		if groupID == uuid.Nil || familyCode == "" {
+			return props, nil
+		}
+		families, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+		if err != nil {
+			return props, err
+		}
+		var familyID uuid.UUID
+		for _, f := range families {
+			if strings.EqualFold(strings.TrimSpace(f.Code), familyCode) {
+				familyID = f.ID
+				break
+			}
+		}
+		if familyID == uuid.Nil {
+			return props, nil
+		}
+		rows, err := c.org.ListJobRoles(r.Context(), tenantID, familyID)
+		if err != nil {
+			return props, err
+		}
+		props.Roles = make([]viewmodels.JobRoleRow, 0, len(rows))
+		for _, rr := range rows {
+			props.Roles = append(props.Roles, viewmodels.JobRoleRow{
+				ID:          rr.ID,
+				JobFamilyID: rr.JobFamilyID,
+				Code:        strings.TrimSpace(rr.Code),
+				Name:        strings.TrimSpace(rr.Name),
+				IsActive:    rr.IsActive,
+			})
+		}
+		if editID != "" {
+			if parsed, err := uuid.Parse(editID); err == nil && parsed != uuid.Nil {
+				for _, row := range props.Roles {
+					if row.ID == parsed {
+						selected := row
+						props.EditRole = &selected
+						break
+					}
+				}
+			}
+		}
+	case "levels":
+		if groupID == uuid.Nil || familyCode == "" || roleCode == "" {
+			return props, nil
+		}
+		families, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+		if err != nil {
+			return props, err
+		}
+		var familyID uuid.UUID
+		for _, f := range families {
+			if strings.EqualFold(strings.TrimSpace(f.Code), familyCode) {
+				familyID = f.ID
+				break
+			}
+		}
+		if familyID == uuid.Nil {
+			return props, nil
+		}
+		roles, err := c.org.ListJobRoles(r.Context(), tenantID, familyID)
+		if err != nil {
+			return props, err
+		}
+		var roleID uuid.UUID
+		for _, rr := range roles {
+			if strings.EqualFold(strings.TrimSpace(rr.Code), roleCode) {
+				roleID = rr.ID
+				break
+			}
+		}
+		if roleID == uuid.Nil {
+			return props, nil
+		}
+		rows, err := c.org.ListJobLevels(r.Context(), tenantID, roleID)
+		if err != nil {
+			return props, err
+		}
+		props.Levels = make([]viewmodels.JobLevelRow, 0, len(rows))
+		for _, rr := range rows {
+			props.Levels = append(props.Levels, viewmodels.JobLevelRow{
+				ID:           rr.ID,
+				JobRoleID:    rr.JobRoleID,
+				Code:         strings.TrimSpace(rr.Code),
+				Name:         strings.TrimSpace(rr.Name),
+				DisplayOrder: rr.DisplayOrder,
+				IsActive:     rr.IsActive,
+			})
+		}
+		if editID != "" {
+			if parsed, err := uuid.Parse(editID); err == nil && parsed != uuid.Nil {
+				for _, row := range props.Levels {
+					if row.ID == parsed {
+						selected := row
+						props.EditLevel = &selected
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return props, nil
+}
+
 func (c *OrgUIController) NewPositionForm(w http.ResponseWriter, r *http.Request) {
 	tenantID, currentUser, ok := tenantAndUserFromContext(r)
 	if !ok {
@@ -723,16 +2000,26 @@ func (c *OrgUIController) NewPositionForm(w http.ResponseWriter, r *http.Request
 		nodeLabel = c.orgNodeLabelFor(r, tenantID, parsed, effectiveDate)
 	}
 	templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
-		Mode:            orgui.PositionFormCreate,
-		EffectiveDate:   effectiveDateStr,
-		NodeID:          nodeID,
-		Code:            "",
-		OrgNodeID:       nodeID,
-		OrgNodeLabel:    nodeLabel,
-		LifecycleStatus: "active",
-		CapacityFTE:     "1.00",
-		ReasonCode:      "create",
-		Errors:          map[string]string{},
+		Mode:                orgui.PositionFormCreate,
+		EffectiveDate:       effectiveDateStr,
+		NodeID:              nodeID,
+		Code:                "",
+		OrgNodeID:           nodeID,
+		OrgNodeLabel:        nodeLabel,
+		LifecycleStatus:     "active",
+		PositionType:        "regular",
+		EmploymentType:      "full_time",
+		CapacityFTE:         "1.00",
+		ReasonCode:          "create",
+		JobFamilyGroupCode:  "",
+		JobFamilyGroupLabel: "",
+		JobFamilyCode:       "",
+		JobFamilyLabel:      "",
+		JobRoleCode:         "",
+		JobRoleLabel:        "",
+		JobLevelCode:        "",
+		JobLevelLabel:       "",
+		Errors:              map[string]string{},
 	}), templ.WithStreaming()).ServeHTTP(w, r)
 }
 
@@ -796,6 +2083,68 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 		reasonNote = &reasonNoteRaw
 	}
 
+	positionType := strings.TrimSpace(param(r, "position_type"))
+	employmentType := strings.TrimSpace(param(r, "employment_type"))
+	jobFamilyGroupCode := strings.TrimSpace(param(r, "job_family_group_code"))
+	jobFamilyCode := strings.TrimSpace(param(r, "job_family_code"))
+	jobRoleCode := strings.TrimSpace(param(r, "job_role_code"))
+	jobLevelCode := strings.TrimSpace(param(r, "job_level_code"))
+
+	fieldErrs := map[string]string{}
+	if positionType == "" {
+		fieldErrs["position_type"] = "required"
+	}
+	if employmentType == "" {
+		fieldErrs["employment_type"] = "required"
+	}
+	if jobFamilyGroupCode == "" {
+		fieldErrs["job_family_group_code"] = "required"
+	}
+	if jobFamilyCode == "" {
+		fieldErrs["job_family_code"] = "required"
+	}
+	if jobRoleCode == "" {
+		fieldErrs["job_role_code"] = "required"
+	}
+	if jobLevelCode == "" {
+		fieldErrs["job_level_code"] = "required"
+	}
+	if len(fieldErrs) > 0 {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		nodeLabel := c.orgNodeLabelFor(r, tenantID, orgNodeID, effectiveDate)
+		groupLabel, familyLabel, roleLabel, levelLabel := c.jobCatalogLabelsFor(r, tenantID, services.JobCatalogCodes{
+			JobFamilyGroupCode: jobFamilyGroupCode,
+			JobFamilyCode:      jobFamilyCode,
+			JobRoleCode:        jobRoleCode,
+			JobLevelCode:       jobLevelCode,
+		})
+		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
+			Mode:                orgui.PositionFormCreate,
+			EffectiveDate:       effectiveDateStr,
+			NodeID:              orgNodeID.String(),
+			Code:                code,
+			OrgNodeID:           orgNodeID.String(),
+			OrgNodeLabel:        nodeLabel,
+			Title:               titleRaw,
+			LifecycleStatus:     lifecycle,
+			PositionType:        positionType,
+			EmploymentType:      employmentType,
+			CapacityFTE:         fmt.Sprintf("%.2f", capacity),
+			ReasonCode:          reasonCode,
+			ReasonNote:          reasonNoteRaw,
+			JobFamilyGroupCode:  jobFamilyGroupCode,
+			JobFamilyGroupLabel: groupLabel,
+			JobFamilyCode:       jobFamilyCode,
+			JobFamilyLabel:      familyLabel,
+			JobRoleCode:         jobRoleCode,
+			JobRoleLabel:        roleLabel,
+			JobLevelCode:        jobLevelCode,
+			JobLevelLabel:       levelLabel,
+			Errors:              fieldErrs,
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
 	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	requestID := ensureRequestID(r)
 	res, err := c.org.CreatePosition(r.Context(), tenantID, requestID, initiatorID, services.CreatePositionInput{
@@ -804,14 +2153,14 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 		EffectiveDate:      effectiveDate,
 		Title:              title,
 		LifecycleStatus:    lifecycle,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
+		PositionType:       positionType,
+		EmploymentType:     employmentType,
 		CapacityFTE:        capacity,
 		ReportsToID:        reportsTo,
-		JobFamilyGroupCode: "UNSPECIFIED",
-		JobFamilyCode:      "UNSPECIFIED",
-		JobRoleCode:        "UNSPECIFIED",
-		JobLevelCode:       "UNSPECIFIED",
+		JobFamilyGroupCode: jobFamilyGroupCode,
+		JobFamilyCode:      jobFamilyCode,
+		JobRoleCode:        jobRoleCode,
+		JobLevelCode:       jobLevelCode,
 		ReasonCode:         reasonCode,
 		ReasonNote:         reasonNote,
 	})
@@ -820,20 +2169,36 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 		formErr = attachRequestID(formErr, requestID)
 		w.WriteHeader(statusCode)
 		nodeLabel := c.orgNodeLabelFor(r, tenantID, orgNodeID, effectiveDate)
+		groupLabel, familyLabel, roleLabel, levelLabel := c.jobCatalogLabelsFor(r, tenantID, services.JobCatalogCodes{
+			JobFamilyGroupCode: jobFamilyGroupCode,
+			JobFamilyCode:      jobFamilyCode,
+			JobRoleCode:        jobRoleCode,
+			JobLevelCode:       jobLevelCode,
+		})
 		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
-			Mode:            orgui.PositionFormCreate,
-			EffectiveDate:   effectiveDateStr,
-			NodeID:          orgNodeID.String(),
-			Code:            code,
-			OrgNodeID:       orgNodeID.String(),
-			OrgNodeLabel:    nodeLabel,
-			Title:           titleRaw,
-			LifecycleStatus: lifecycle,
-			CapacityFTE:     fmt.Sprintf("%.2f", capacity),
-			ReasonCode:      reasonCode,
-			ReasonNote:      reasonNoteRaw,
-			Errors:          map[string]string{},
-			FormError:       formErr,
+			Mode:                orgui.PositionFormCreate,
+			EffectiveDate:       effectiveDateStr,
+			NodeID:              orgNodeID.String(),
+			Code:                code,
+			OrgNodeID:           orgNodeID.String(),
+			OrgNodeLabel:        nodeLabel,
+			Title:               titleRaw,
+			LifecycleStatus:     lifecycle,
+			PositionType:        positionType,
+			EmploymentType:      employmentType,
+			CapacityFTE:         fmt.Sprintf("%.2f", capacity),
+			ReasonCode:          reasonCode,
+			ReasonNote:          reasonNoteRaw,
+			JobFamilyGroupCode:  jobFamilyGroupCode,
+			JobFamilyGroupLabel: groupLabel,
+			JobFamilyCode:       jobFamilyCode,
+			JobFamilyLabel:      familyLabel,
+			JobRoleCode:         jobRoleCode,
+			JobRoleLabel:        roleLabel,
+			JobLevelCode:        jobLevelCode,
+			JobLevelLabel:       levelLabel,
+			Errors:              map[string]string{},
+			FormError:           formErr,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
@@ -935,22 +2300,62 @@ func (c *OrgUIController) EditPositionForm(w http.ResponseWriter, r *http.Reques
 	if row.Title != nil {
 		title = strings.TrimSpace(*row.Title)
 	}
+	positionType := ""
+	if row.PositionType != nil {
+		positionType = strings.TrimSpace(*row.PositionType)
+	}
+	employmentType := ""
+	if row.EmploymentType != nil {
+		employmentType = strings.TrimSpace(*row.EmploymentType)
+	}
+	jobFamilyGroupCode := ""
+	if row.JobFamilyGroupCode != nil {
+		jobFamilyGroupCode = strings.TrimSpace(*row.JobFamilyGroupCode)
+	}
+	jobFamilyCode := ""
+	if row.JobFamilyCode != nil {
+		jobFamilyCode = strings.TrimSpace(*row.JobFamilyCode)
+	}
+	jobRoleCode := ""
+	if row.JobRoleCode != nil {
+		jobRoleCode = strings.TrimSpace(*row.JobRoleCode)
+	}
+	jobLevelCode := ""
+	if row.JobLevelCode != nil {
+		jobLevelCode = strings.TrimSpace(*row.JobLevelCode)
+	}
+	groupLabel, familyLabel, roleLabel, levelLabel := c.jobCatalogLabelsFor(r, tenantID, services.JobCatalogCodes{
+		JobFamilyGroupCode: jobFamilyGroupCode,
+		JobFamilyCode:      jobFamilyCode,
+		JobRoleCode:        jobRoleCode,
+		JobLevelCode:       jobLevelCode,
+	})
 	templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
-		Mode:            orgui.PositionFormEdit,
-		EffectiveDate:   effectiveDateStr,
-		NodeID:          strings.TrimSpace(param(r, "node_id")),
-		PositionID:      positionID.String(),
-		Code:            row.Code,
-		OrgNodeID:       row.OrgNodeID.String(),
-		OrgNodeLabel:    nodeLabel,
-		Title:           title,
-		LifecycleStatus: row.LifecycleStatus,
-		CapacityFTE:     fmt.Sprintf("%.2f", row.CapacityFTE),
-		ReportsToID:     reportsToID,
-		ReportsToLabel:  reportsToLabel,
-		ReasonCode:      "update",
-		ReasonNote:      "",
-		Errors:          map[string]string{},
+		Mode:                orgui.PositionFormEdit,
+		EffectiveDate:       effectiveDateStr,
+		NodeID:              strings.TrimSpace(param(r, "node_id")),
+		PositionID:          positionID.String(),
+		Code:                row.Code,
+		OrgNodeID:           row.OrgNodeID.String(),
+		OrgNodeLabel:        nodeLabel,
+		Title:               title,
+		LifecycleStatus:     row.LifecycleStatus,
+		PositionType:        positionType,
+		EmploymentType:      employmentType,
+		CapacityFTE:         fmt.Sprintf("%.2f", row.CapacityFTE),
+		ReportsToID:         reportsToID,
+		ReportsToLabel:      reportsToLabel,
+		ReasonCode:          "update",
+		ReasonNote:          "",
+		JobFamilyGroupCode:  jobFamilyGroupCode,
+		JobFamilyGroupLabel: groupLabel,
+		JobFamilyCode:       jobFamilyCode,
+		JobFamilyLabel:      familyLabel,
+		JobRoleCode:         jobRoleCode,
+		JobRoleLabel:        roleLabel,
+		JobLevelCode:        jobLevelCode,
+		JobLevelLabel:       levelLabel,
+		Errors:              map[string]string{},
 	}), templ.WithStreaming()).ServeHTTP(w, r)
 }
 
@@ -1024,18 +2429,102 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 		reasonNote = &reasonNoteRaw
 	}
 
+	positionTypeRaw := strings.TrimSpace(param(r, "position_type"))
+	employmentTypeRaw := strings.TrimSpace(param(r, "employment_type"))
+	jobFamilyGroupCodeRaw := strings.TrimSpace(param(r, "job_family_group_code"))
+	jobFamilyCodeRaw := strings.TrimSpace(param(r, "job_family_code"))
+	jobRoleCodeRaw := strings.TrimSpace(param(r, "job_role_code"))
+	jobLevelCodeRaw := strings.TrimSpace(param(r, "job_level_code"))
+
+	fieldErrs := map[string]string{}
+	if positionTypeRaw == "" {
+		fieldErrs["position_type"] = "required"
+	}
+	if employmentTypeRaw == "" {
+		fieldErrs["employment_type"] = "required"
+	}
+	if jobFamilyGroupCodeRaw == "" {
+		fieldErrs["job_family_group_code"] = "required"
+	}
+	if jobFamilyCodeRaw == "" {
+		fieldErrs["job_family_code"] = "required"
+	}
+	if jobRoleCodeRaw == "" {
+		fieldErrs["job_role_code"] = "required"
+	}
+	if jobLevelCodeRaw == "" {
+		fieldErrs["job_level_code"] = "required"
+	}
+	if len(fieldErrs) > 0 {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		nodeLabel := c.orgNodeLabelFor(r, tenantID, orgNodeID, effectiveDate)
+		reportsToLabel := strings.TrimSpace(param(r, "reports_to_position_id"))
+		if reportsToLabel != "" {
+			if parsed, err := uuid.Parse(reportsToLabel); err == nil && parsed != uuid.Nil {
+				reportsToLabel = c.positionLabelFor(r, tenantID, parsed, effectiveDate, reportsToLabel)
+			}
+		}
+		groupLabel, familyLabel, roleLabel, levelLabel := c.jobCatalogLabelsFor(r, tenantID, services.JobCatalogCodes{
+			JobFamilyGroupCode: jobFamilyGroupCodeRaw,
+			JobFamilyCode:      jobFamilyCodeRaw,
+			JobRoleCode:        jobRoleCodeRaw,
+			JobLevelCode:       jobLevelCodeRaw,
+		})
+		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
+			Mode:                orgui.PositionFormEdit,
+			EffectiveDate:       effectiveDateStr,
+			NodeID:              strings.TrimSpace(param(r, "node_id")),
+			PositionID:          positionID.String(),
+			Code:                strings.TrimSpace(param(r, "code")),
+			OrgNodeID:           orgNodeID.String(),
+			OrgNodeLabel:        nodeLabel,
+			Title:               titleRaw,
+			LifecycleStatus:     lifecycleRaw,
+			PositionType:        positionTypeRaw,
+			EmploymentType:      employmentTypeRaw,
+			CapacityFTE:         capacityRaw,
+			ReportsToID:         strings.TrimSpace(param(r, "reports_to_position_id")),
+			ReportsToLabel:      reportsToLabel,
+			ReasonCode:          reasonCode,
+			ReasonNote:          reasonNoteRaw,
+			JobFamilyGroupCode:  jobFamilyGroupCodeRaw,
+			JobFamilyGroupLabel: groupLabel,
+			JobFamilyCode:       jobFamilyCodeRaw,
+			JobFamilyLabel:      familyLabel,
+			JobRoleCode:         jobRoleCodeRaw,
+			JobRoleLabel:        roleLabel,
+			JobLevelCode:        jobLevelCodeRaw,
+			JobLevelLabel:       levelLabel,
+			Errors:              fieldErrs,
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	positionType := positionTypeRaw
+	employmentType := employmentTypeRaw
+	jobFamilyGroupCode := jobFamilyGroupCodeRaw
+	jobFamilyCode := jobFamilyCodeRaw
+	jobRoleCode := jobRoleCodeRaw
+	jobLevelCode := jobLevelCodeRaw
+
 	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
 	requestID := ensureRequestID(r)
 	_, err = c.org.UpdatePosition(r.Context(), tenantID, requestID, initiatorID, services.UpdatePositionInput{
-		PositionID:      positionID,
-		EffectiveDate:   effectiveDate,
-		ReasonCode:      reasonCode,
-		ReasonNote:      reasonNote,
-		OrgNodeID:       &orgNodeID,
-		Title:           title,
-		LifecycleStatus: lifecycle,
-		CapacityFTE:     capacity,
-		ReportsToID:     reportsTo,
+		PositionID:         positionID,
+		EffectiveDate:      effectiveDate,
+		ReasonCode:         reasonCode,
+		ReasonNote:         reasonNote,
+		OrgNodeID:          &orgNodeID,
+		Title:              title,
+		LifecycleStatus:    lifecycle,
+		PositionType:       &positionType,
+		EmploymentType:     &employmentType,
+		JobFamilyGroupCode: &jobFamilyGroupCode,
+		JobFamilyCode:      &jobFamilyCode,
+		JobRoleCode:        &jobRoleCode,
+		JobLevelCode:       &jobLevelCode,
+		CapacityFTE:        capacity,
+		ReportsToID:        reportsTo,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1049,23 +2538,39 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 				reportsToLabel = c.positionLabelFor(r, tenantID, parsed, effectiveDate, reportsToIDRaw)
 			}
 		}
+		groupLabel, familyLabel, roleLabel, levelLabel := c.jobCatalogLabelsFor(r, tenantID, services.JobCatalogCodes{
+			JobFamilyGroupCode: jobFamilyGroupCodeRaw,
+			JobFamilyCode:      jobFamilyCodeRaw,
+			JobRoleCode:        jobRoleCodeRaw,
+			JobLevelCode:       jobLevelCodeRaw,
+		})
 		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
-			Mode:            orgui.PositionFormEdit,
-			EffectiveDate:   effectiveDateStr,
-			NodeID:          strings.TrimSpace(param(r, "node_id")),
-			PositionID:      positionID.String(),
-			Code:            strings.TrimSpace(param(r, "code")),
-			OrgNodeID:       orgNodeID.String(),
-			OrgNodeLabel:    nodeLabel,
-			Title:           titleRaw,
-			LifecycleStatus: lifecycleRaw,
-			CapacityFTE:     capacityRaw,
-			ReportsToID:     reportsToIDRaw,
-			ReportsToLabel:  reportsToLabel,
-			ReasonCode:      reasonCode,
-			ReasonNote:      reasonNoteRaw,
-			Errors:          map[string]string{},
-			FormError:       formErr,
+			Mode:                orgui.PositionFormEdit,
+			EffectiveDate:       effectiveDateStr,
+			NodeID:              strings.TrimSpace(param(r, "node_id")),
+			PositionID:          positionID.String(),
+			Code:                strings.TrimSpace(param(r, "code")),
+			OrgNodeID:           orgNodeID.String(),
+			OrgNodeLabel:        nodeLabel,
+			Title:               titleRaw,
+			LifecycleStatus:     lifecycleRaw,
+			PositionType:        positionTypeRaw,
+			EmploymentType:      employmentTypeRaw,
+			CapacityFTE:         capacityRaw,
+			ReportsToID:         reportsToIDRaw,
+			ReportsToLabel:      reportsToLabel,
+			ReasonCode:          reasonCode,
+			ReasonNote:          reasonNoteRaw,
+			JobFamilyGroupCode:  jobFamilyGroupCodeRaw,
+			JobFamilyGroupLabel: groupLabel,
+			JobFamilyCode:       jobFamilyCodeRaw,
+			JobFamilyLabel:      familyLabel,
+			JobRoleCode:         jobRoleCodeRaw,
+			JobRoleLabel:        roleLabel,
+			JobLevelCode:        jobLevelCodeRaw,
+			JobLevelLabel:       levelLabel,
+			Errors:              map[string]string{},
+			FormError:           formErr,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
@@ -1222,7 +2727,101 @@ func (c *OrgUIController) getPositionDetails(r *http.Request, tenantID uuid.UUID
 	if details != nil && details.ReportsToPositionID != nil && *details.ReportsToPositionID != uuid.Nil {
 		details.ReportsToLabel = c.positionLabelFor(r, tenantID, *details.ReportsToPositionID, asOf, details.ReportsToPositionID.String())
 	}
+	if details != nil {
+		groupLabel, familyLabel, roleLabel, levelLabel := c.jobCatalogLabelsFor(r, tenantID, services.JobCatalogCodes{
+			JobFamilyGroupCode: details.Row.JobFamilyGroupCode,
+			JobFamilyCode:      details.Row.JobFamilyCode,
+			JobRoleCode:        details.Row.JobRoleCode,
+			JobLevelCode:       details.Row.JobLevelCode,
+		})
+		details.JobFamilyGroupLabel = groupLabel
+		details.JobFamilyLabel = familyLabel
+		details.JobRoleLabel = roleLabel
+		details.JobLevelLabel = levelLabel
+	}
 	return details, mappers.PositionTimelineToViewModels(slices), nil
+}
+
+func (c *OrgUIController) jobCatalogLabelsFor(r *http.Request, tenantID uuid.UUID, codes services.JobCatalogCodes) (string, string, string, string) {
+	codes.JobFamilyGroupCode = strings.TrimSpace(codes.JobFamilyGroupCode)
+	codes.JobFamilyCode = strings.TrimSpace(codes.JobFamilyCode)
+	codes.JobRoleCode = strings.TrimSpace(codes.JobRoleCode)
+	codes.JobLevelCode = strings.TrimSpace(codes.JobLevelCode)
+
+	if codes.JobFamilyGroupCode == "" && codes.JobFamilyCode == "" && codes.JobRoleCode == "" && codes.JobLevelCode == "" {
+		return "", "", "", ""
+	}
+
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	if err != nil {
+		return "", "", "", ""
+	}
+	var group *services.JobFamilyGroupRow
+	for _, g := range groups {
+		if strings.EqualFold(strings.TrimSpace(g.Code), codes.JobFamilyGroupCode) {
+			found := g
+			group = &found
+			break
+		}
+	}
+	if group == nil {
+		return "", "", "", ""
+	}
+	groupLabel := strings.TrimSpace(group.Name)
+	if codes.JobFamilyCode == "" {
+		return groupLabel, "", "", ""
+	}
+
+	families, err := c.org.ListJobFamilies(r.Context(), tenantID, group.ID)
+	if err != nil {
+		return groupLabel, "", "", ""
+	}
+	var family *services.JobFamilyRow
+	for _, f := range families {
+		if strings.EqualFold(strings.TrimSpace(f.Code), codes.JobFamilyCode) {
+			found := f
+			family = &found
+			break
+		}
+	}
+	if family == nil {
+		return groupLabel, "", "", ""
+	}
+	familyLabel := strings.TrimSpace(family.Name)
+	if codes.JobRoleCode == "" {
+		return groupLabel, familyLabel, "", ""
+	}
+
+	roles, err := c.org.ListJobRoles(r.Context(), tenantID, family.ID)
+	if err != nil {
+		return groupLabel, familyLabel, "", ""
+	}
+	var role *services.JobRoleRow
+	for _, rr := range roles {
+		if strings.EqualFold(strings.TrimSpace(rr.Code), codes.JobRoleCode) {
+			found := rr
+			role = &found
+			break
+		}
+	}
+	if role == nil {
+		return groupLabel, familyLabel, "", ""
+	}
+	roleLabel := strings.TrimSpace(role.Name)
+	if codes.JobLevelCode == "" {
+		return groupLabel, familyLabel, roleLabel, ""
+	}
+
+	levels, err := c.org.ListJobLevels(r.Context(), tenantID, role.ID)
+	if err != nil {
+		return groupLabel, familyLabel, roleLabel, ""
+	}
+	for _, lv := range levels {
+		if strings.EqualFold(strings.TrimSpace(lv.Code), codes.JobLevelCode) {
+			return groupLabel, familyLabel, roleLabel, strings.TrimSpace(lv.Name)
+		}
+	}
+	return groupLabel, familyLabel, roleLabel, ""
 }
 
 func descendantNodeIDs(nodes []services.HierarchyNode, root uuid.UUID) []uuid.UUID {
@@ -1256,6 +2855,13 @@ func uuidPtrString(id *uuid.UUID) string {
 		return ""
 	}
 	return id.String()
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func attachRequestID(msg, requestID string) string {

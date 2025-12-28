@@ -1,0 +1,736 @@
+package org
+
+import (
+	"fmt"
+	"net/url"
+	"strings"
+
+	icons "github.com/iota-uz/icons/phosphor"
+
+	"github.com/iota-uz/iota-sdk/components/base"
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/modules/core/presentation/templates/layouts"
+	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type JobCatalogPageProps struct {
+	EffectiveDate string
+
+	Tab string
+
+	JobFamilyGroupCode  string
+	JobFamilyGroupLabel string
+	JobFamilyCode       string
+	JobFamilyLabel      string
+	JobRoleCode         string
+	JobRoleLabel        string
+
+	FamilyGroups []viewmodels.JobFamilyGroupRow
+	Families     []viewmodels.JobFamilyRow
+	Roles        []viewmodels.JobRoleRow
+	Levels       []viewmodels.JobLevelRow
+
+	EditID          string
+	EditFamilyGroup *viewmodels.JobFamilyGroupRow
+	EditFamily      *viewmodels.JobFamilyRow
+	EditRole        *viewmodels.JobRoleRow
+	EditLevel       *viewmodels.JobLevelRow
+
+	Errors []string
+}
+
+func jobCatalogURL(tab, effectiveDate, groupCode, familyCode, roleCode, editID string) string {
+	v := url.Values{}
+	if strings.TrimSpace(tab) != "" {
+		v.Set("tab", strings.TrimSpace(tab))
+	}
+	if strings.TrimSpace(effectiveDate) != "" {
+		v.Set("effective_date", strings.TrimSpace(effectiveDate))
+	}
+	if strings.TrimSpace(groupCode) != "" {
+		v.Set("job_family_group_code", strings.TrimSpace(groupCode))
+	}
+	if strings.TrimSpace(familyCode) != "" {
+		v.Set("job_family_code", strings.TrimSpace(familyCode))
+	}
+	if strings.TrimSpace(roleCode) != "" {
+		v.Set("job_role_code", strings.TrimSpace(roleCode))
+	}
+	if strings.TrimSpace(editID) != "" {
+		v.Set("edit_id", strings.TrimSpace(editID))
+	}
+	if v.Encode() == "" {
+		return "/org/job-catalog"
+	}
+	return "/org/job-catalog?" + v.Encode()
+}
+
+type JobCatalogHeaderProps struct {
+	EffectiveDate string
+}
+
+templ JobCatalogHeader(props JobCatalogHeaderProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	<div class="flex items-center justify-between gap-4 flex-wrap">
+		<div class="flex items-center gap-3">
+			<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.JobCatalog.Title") }</h1>
+			<span class="text-xs text-300">{ pageCtx.T("Org.UI.Shared.AsOf") }: { props.EffectiveDate }</span>
+		</div>
+		<div class="flex items-center gap-2">
+			<label class="text-xs font-medium text-200" for="effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
+			<input
+				id="effective-date"
+				type="date"
+				name="effective_date"
+				value={ props.EffectiveDate }
+				class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
+				hx-get="/org/job-catalog"
+				hx-trigger="change"
+				hx-target="#org-job-catalog-page"
+				hx-select="#org-job-catalog-page"
+				hx-swap="outerHTML"
+				hx-push-url="true"
+				hx-include="#org-job-catalog-filters, #effective-date"
+			/>
+		</div>
+	</div>
+}
+
+templ JobCatalogPage(props JobCatalogPageProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	@layouts.Authenticated(layouts.AuthenticatedProps{
+		BaseProps: layouts.BaseProps{
+			Title: pageCtx.T("Org.UI.JobCatalog.MetaTitle"),
+		},
+	}) {
+		<div id="org-job-catalog-page" class="p-6 space-y-4">
+			@JobCatalogHeader(JobCatalogHeaderProps{EffectiveDate: props.EffectiveDate})
+			if len(props.Errors) > 0 {
+				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+					<ul class="list-disc pl-5 space-y-1">
+						for _, msg := range props.Errors {
+							<li>{ msg }</li>
+						}
+					</ul>
+				</div>
+			}
+
+			<div class="flex flex-wrap gap-2">
+				<a
+					href={ templ.SafeURL(jobCatalogURL("family-groups", props.EffectiveDate, props.JobFamilyGroupCode, props.JobFamilyCode, props.JobRoleCode, "")) }
+					class={
+						"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+						templ.KV("border-primary bg-primary/10 text-100", props.Tab == "family-groups"),
+						templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Tab != "family-groups"),
+					}
+				>
+					@icons.Stack(icons.Props{Size: "18"})
+					{ pageCtx.T("Org.UI.JobCatalog.Tabs.FamilyGroups") }
+				</a>
+				<a
+					href={ templ.SafeURL(jobCatalogURL("families", props.EffectiveDate, props.JobFamilyGroupCode, props.JobFamilyCode, props.JobRoleCode, "")) }
+					class={
+						"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+						templ.KV("border-primary bg-primary/10 text-100", props.Tab == "families"),
+						templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Tab != "families"),
+					}
+				>
+					@icons.Folder(icons.Props{Size: "18"})
+					{ pageCtx.T("Org.UI.JobCatalog.Tabs.Families") }
+				</a>
+				<a
+					href={ templ.SafeURL(jobCatalogURL("roles", props.EffectiveDate, props.JobFamilyGroupCode, props.JobFamilyCode, props.JobRoleCode, "")) }
+					class={
+						"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+						templ.KV("border-primary bg-primary/10 text-100", props.Tab == "roles"),
+						templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Tab != "roles"),
+					}
+				>
+					@icons.Briefcase(icons.Props{Size: "18"})
+					{ pageCtx.T("Org.UI.JobCatalog.Tabs.Roles") }
+				</a>
+				<a
+					href={ templ.SafeURL(jobCatalogURL("levels", props.EffectiveDate, props.JobFamilyGroupCode, props.JobFamilyCode, props.JobRoleCode, "")) }
+					class={
+						"inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm",
+						templ.KV("border-primary bg-primary/10 text-100", props.Tab == "levels"),
+						templ.KV("border-surface-400 bg-surface-100 text-200 hover:bg-surface-300", props.Tab != "levels"),
+					}
+				>
+					@icons.Steps(icons.Props{Size: "18"})
+					{ pageCtx.T("Org.UI.JobCatalog.Tabs.Levels") }
+				</a>
+			</div>
+
+			<form id="org-job-catalog-filters" class="space-y-3">
+				<input type="hidden" name="tab" value={ props.Tab }/>
+				switch props.Tab {
+					case "families", "roles", "levels":
+						@base.Combobox(base.ComboboxProps{
+							Searchable:   true,
+							Label:        pageCtx.T("Org.UI.Positions.Fields.JobFamilyGroupCode"),
+							Name:         "job_family_group_code",
+							Endpoint:     fmt.Sprintf("/org/job-catalog/family-groups/options?effective_date=%s", props.EffectiveDate),
+							Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
+							NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+							Attrs: templ.Attributes{
+								"hx-get":      "/org/job-catalog",
+								"hx-trigger":  "change",
+								"hx-target":   "#org-job-catalog-page",
+								"hx-select":   "#org-job-catalog-page",
+								"hx-swap":     "outerHTML",
+								"hx-push-url": "true",
+								"hx-include":  "#org-job-catalog-filters, #effective-date",
+							},
+						}) {
+							if strings.TrimSpace(props.JobFamilyGroupCode) != "" {
+								<option value={ props.JobFamilyGroupCode } selected>{ fmt.Sprintf("%s — %s", strings.TrimSpace(props.JobFamilyGroupCode), strings.TrimSpace(props.JobFamilyGroupLabel)) }</option>
+							}
+							<!-- options loaded via HTMX -->
+						}
+				}
+				switch props.Tab {
+					case "roles", "levels":
+						@base.Combobox(base.ComboboxProps{
+							Searchable:   true,
+							Label:        pageCtx.T("Org.UI.Positions.Fields.JobFamilyCode"),
+							Name:         "job_family_code",
+							Endpoint:     fmt.Sprintf("/org/job-catalog/families/options?effective_date=%s", props.EffectiveDate),
+							Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
+							NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+							Trigger: &base.Trigger{
+								Render: func(trigger *base.TriggerProps) templ.Component {
+									trigger.InputAttrs["hx-include"] = "#org-job-catalog-filters select[name='job_family_group_code']"
+									trigger.InputAttrs["x-init"] = "(() => { const input = $el; const groupSelect = document.querySelector(\"#org-job-catalog-filters select[name='job_family_group_code']\"); let prevGroup = groupSelect?.value || \"\"; const reset = () => { selectedValues.clear(); const select = $refs?.select; if (select) { for (const opt of select.options) { opt.selected = false; } select.value = \"\"; select.dispatchEvent(new Event(\"change\")); } }; const updateDisabled = () => { const hasGroup = (groupSelect?.value || \"\") !== \"\"; input.disabled = !hasGroup; if (!hasGroup) { reset(); } }; updateDisabled(); if (!groupSelect) return; groupSelect.addEventListener(\"change\", (e) => { const nextGroup = e.target?.value || \"\"; if (nextGroup === prevGroup) return; prevGroup = nextGroup; reset(); updateDisabled(); }); })()"
+									return input.Text(&input.Props{
+										Placeholder: trigger.Placeholder,
+										WrapperProps: templ.Attributes{
+											"x-ref":  "trigger",
+											"@click": "if ($el.querySelector('input')?.disabled) return; open = true",
+										},
+										AddonLeft: &input.Addon{
+											Component: base.SelectedValues(),
+											Attrs: templ.Attributes{
+												"x-show": "selectedValues.size > 0",
+											},
+										},
+										Attrs: trigger.InputAttrs,
+										AddonRight: &input.Addon{
+											Component: base.DropdownIndicator(),
+										},
+									})
+								},
+							},
+							Attrs: templ.Attributes{
+								"hx-get":      "/org/job-catalog",
+								"hx-trigger":  "change",
+								"hx-target":   "#org-job-catalog-page",
+								"hx-select":   "#org-job-catalog-page",
+								"hx-swap":     "outerHTML",
+								"hx-push-url": "true",
+								"hx-include":  "#org-job-catalog-filters, #effective-date",
+							},
+						}) {
+							if strings.TrimSpace(props.JobFamilyCode) != "" {
+								<option value={ props.JobFamilyCode } selected>{ fmt.Sprintf("%s — %s", strings.TrimSpace(props.JobFamilyCode), strings.TrimSpace(props.JobFamilyLabel)) }</option>
+							}
+							<!-- options loaded via HTMX -->
+						}
+				}
+				switch props.Tab {
+					case "levels":
+						@base.Combobox(base.ComboboxProps{
+							Searchable:   true,
+							Label:        pageCtx.T("Org.UI.Positions.Fields.JobRoleCode"),
+							Name:         "job_role_code",
+							Endpoint:     fmt.Sprintf("/org/job-catalog/roles/options?effective_date=%s", props.EffectiveDate),
+							Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
+							NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+							Trigger: &base.Trigger{
+								Render: func(trigger *base.TriggerProps) templ.Component {
+									trigger.InputAttrs["hx-include"] = "#org-job-catalog-filters select[name='job_family_group_code'], #org-job-catalog-filters select[name='job_family_code']"
+									trigger.InputAttrs["x-init"] = "(() => { const input = $el; const groupSelect = document.querySelector(\"#org-job-catalog-filters select[name='job_family_group_code']\"); const familySelect = document.querySelector(\"#org-job-catalog-filters select[name='job_family_code']\"); let prevFamily = familySelect?.value || \"\"; const reset = () => { selectedValues.clear(); const select = $refs?.select; if (select) { for (const opt of select.options) { opt.selected = false; } select.value = \"\"; select.dispatchEvent(new Event(\"change\")); } }; const updateDisabled = () => { const has = (groupSelect?.value || \"\") !== \"\" && (familySelect?.value || \"\") !== \"\"; input.disabled = !has; if (!has) { reset(); } }; updateDisabled(); if (!familySelect) return; familySelect.addEventListener(\"change\", (e) => { const nextFamily = e.target?.value || \"\"; if (nextFamily === prevFamily) return; prevFamily = nextFamily; reset(); updateDisabled(); }); })()"
+									return input.Text(&input.Props{
+										Placeholder: trigger.Placeholder,
+										WrapperProps: templ.Attributes{
+											"x-ref":  "trigger",
+											"@click": "if ($el.querySelector('input')?.disabled) return; open = true",
+										},
+										AddonLeft: &input.Addon{
+											Component: base.SelectedValues(),
+											Attrs: templ.Attributes{
+												"x-show": "selectedValues.size > 0",
+											},
+										},
+										Attrs: trigger.InputAttrs,
+										AddonRight: &input.Addon{
+											Component: base.DropdownIndicator(),
+										},
+									})
+								},
+							},
+							Attrs: templ.Attributes{
+								"hx-get":      "/org/job-catalog",
+								"hx-trigger":  "change",
+								"hx-target":   "#org-job-catalog-page",
+								"hx-select":   "#org-job-catalog-page",
+								"hx-swap":     "outerHTML",
+								"hx-push-url": "true",
+								"hx-include":  "#org-job-catalog-filters, #effective-date",
+							},
+						}) {
+							if strings.TrimSpace(props.JobRoleCode) != "" {
+								<option value={ props.JobRoleCode } selected>{ fmt.Sprintf("%s — %s", strings.TrimSpace(props.JobRoleCode), strings.TrimSpace(props.JobRoleLabel)) }</option>
+							}
+							<!-- options loaded via HTMX -->
+						}
+				}
+			</form>
+
+			switch props.Tab {
+				case "family-groups":
+					if pageCtx.CanAuthz("org.job_catalog", "admin") {
+						<div class="rounded-lg border border-surface-400 bg-surface-300 p-4 space-y-3">
+							{{ isEdit := props.EditFamilyGroup != nil }}
+							<div class="flex items-center justify-between gap-3">
+								<div class="text-sm font-semibold text-100">
+									if isEdit {
+										{ pageCtx.T("Edit") }
+									} else {
+										{ pageCtx.T("Create") }
+									}
+								</div>
+								if isEdit {
+									@button.Ghost(button.Props{
+										Size: button.SizeSM,
+										Icon: icons.X(icons.Props{Size: "18"}),
+										Attrs: templ.Attributes{
+											"type": "button",
+											"hx-get": jobCatalogURL("family-groups", props.EffectiveDate, "", "", "", ""),
+											"hx-target": "#org-job-catalog-page",
+											"hx-select": "#org-job-catalog-page",
+											"hx-swap": "outerHTML",
+											"hx-push-url": "true",
+										},
+									}) { { pageCtx.T("Cancel") } }
+								}
+							</div>
+							<form class="space-y-3">
+								<input type="hidden" name="tab" value="family-groups"/>
+								<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+								if isEdit {
+									<input type="hidden" name="edit_id" value={ props.EditID }/>
+								}
+								@input.Text(&input.Props{
+									Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
+									Attrs: templ.Attributes{
+										"name": "code",
+										"value": ternaryString(isEdit, props.EditFamilyGroup.Code, ""),
+										"readonly": isEdit,
+									},
+								})
+								@input.Text(&input.Props{
+									Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
+									Attrs: templ.Attributes{
+										"name": "name",
+										"value": ternaryString(isEdit, props.EditFamilyGroup.Name, ""),
+									},
+								})
+								@base.Select(&base.SelectProps{
+									Label: pageCtx.T("Org.UI.JobCatalog.Fields.IsActive"),
+									Attrs: templ.Attributes{
+										"name": "is_active",
+									},
+								}) {
+									<option value="1" selected?={ !isEdit || props.EditFamilyGroup.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
+									<option value="0" selected?={ isEdit && !props.EditFamilyGroup.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
+								}
+								<div class="flex items-center justify-end gap-2 pt-2">
+									@button.Primary(button.Props{
+										Size: button.SizeSM,
+										Attrs: templ.Attributes{
+											"type": "submit",
+											"hx-include": "#org-job-catalog-filters, #effective-date",
+											ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/family-groups/%s", props.EditID), "/org/job-catalog/family-groups"),
+										},
+									}) { { pageCtx.T("Save") } }
+								</div>
+							</form>
+						</div>
+					}
+					<div class="rounded-lg border border-surface-400 bg-surface-300 overflow-hidden">
+						<table class="w-full text-sm">
+							<thead class="bg-surface-200 text-300">
+								<tr>
+									<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.Code") }</th>
+									<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.Name") }</th>
+									<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.IsActive") }</th>
+									if pageCtx.CanAuthz("org.job_catalog", "admin") {
+										<th class="text-right font-medium p-3"></th>
+									}
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-surface-400">
+								for _, row := range props.FamilyGroups {
+									<tr class="text-200">
+										<td class="p-3 font-mono text-xs">{ row.Code }</td>
+										<td class="p-3">{ row.Name }</td>
+										<td class="p-3 text-xs">
+											if row.IsActive {
+												<span class="text-green-300">{ pageCtx.T("Org.UI.Node.Status.Active") }</span>
+											} else {
+												<span class="text-400">{ pageCtx.T("Org.UI.Node.Status.Inactive") }</span>
+											}
+										</td>
+										if pageCtx.CanAuthz("org.job_catalog", "admin") {
+											<td class="p-3 text-right">
+												<a class="text-primary hover:underline" href={ templ.SafeURL(jobCatalogURL("family-groups", props.EffectiveDate, "", "", "", row.ID.String())) }>
+													{ pageCtx.T("Edit") }
+												</a>
+											</td>
+										}
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				case "families":
+					<div class="rounded-lg border border-surface-400 bg-surface-300 p-4 space-y-3">
+						if strings.TrimSpace(props.JobFamilyGroupCode) == "" {
+							<div class="text-sm text-300">{ pageCtx.T("Org.UI.Shared.NotFound") }</div>
+						} else {
+							if pageCtx.CanAuthz("org.job_catalog", "admin") {
+								{{ isEdit := props.EditFamily != nil }}
+								<div class="flex items-center justify-between gap-3">
+									<div class="text-sm font-semibold text-100">{ pageCtx.T(ternaryString(isEdit, "Edit", "Create")) }</div>
+									if isEdit {
+										@button.Ghost(button.Props{
+											Size: button.SizeSM,
+											Icon: icons.X(icons.Props{Size: "18"}),
+											Attrs: templ.Attributes{
+												"type": "button",
+												"hx-get": jobCatalogURL("families", props.EffectiveDate, props.JobFamilyGroupCode, "", "", ""),
+												"hx-target": "#org-job-catalog-page",
+												"hx-select": "#org-job-catalog-page",
+												"hx-swap": "outerHTML",
+												"hx-push-url": "true",
+											},
+										}) { { pageCtx.T("Cancel") } }
+									}
+								</div>
+								<form class="space-y-3">
+									<input type="hidden" name="tab" value="families"/>
+									<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+									<input type="hidden" name="job_family_group_code" value={ props.JobFamilyGroupCode }/>
+									if isEdit {
+										<input type="hidden" name="edit_id" value={ props.EditID }/>
+									}
+									@input.Text(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
+										Attrs: templ.Attributes{
+											"name": "code",
+											"value": ternaryString(isEdit, props.EditFamily.Code, ""),
+											"readonly": isEdit,
+										},
+									})
+									@input.Text(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
+										Attrs: templ.Attributes{
+											"name": "name",
+											"value": ternaryString(isEdit, props.EditFamily.Name, ""),
+										},
+									})
+									@base.Select(&base.SelectProps{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.IsActive"),
+										Attrs: templ.Attributes{
+											"name": "is_active",
+										},
+									}) {
+										<option value="1" selected?={ !isEdit || props.EditFamily.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
+										<option value="0" selected?={ isEdit && !props.EditFamily.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
+									}
+									<div class="flex items-center justify-end gap-2 pt-2">
+										@button.Primary(button.Props{
+											Size: button.SizeSM,
+											Attrs: templ.Attributes{
+												"type": "submit",
+												"hx-include": "#org-job-catalog-filters, #effective-date",
+												ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/families/%s", props.EditID), "/org/job-catalog/families"),
+											},
+										}) { { pageCtx.T("Save") } }
+									</div>
+								</form>
+							}
+							<div class="rounded-lg border border-surface-400 bg-surface-300 overflow-hidden">
+								<table class="w-full text-sm">
+									<thead class="bg-surface-200 text-300">
+										<tr>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.Code") }</th>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.Name") }</th>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.IsActive") }</th>
+											if pageCtx.CanAuthz("org.job_catalog", "admin") {
+												<th class="text-right font-medium p-3"></th>
+											}
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-surface-400">
+										for _, row := range props.Families {
+											<tr class="text-200">
+												<td class="p-3 font-mono text-xs">{ row.Code }</td>
+												<td class="p-3">{ row.Name }</td>
+												<td class="p-3 text-xs">
+													if row.IsActive {
+														<span class="text-green-300">{ pageCtx.T("Org.UI.Node.Status.Active") }</span>
+													} else {
+														<span class="text-400">{ pageCtx.T("Org.UI.Node.Status.Inactive") }</span>
+													}
+												</td>
+												if pageCtx.CanAuthz("org.job_catalog", "admin") {
+													<td class="p-3 text-right">
+														<a class="text-primary hover:underline" href={ templ.SafeURL(jobCatalogURL("families", props.EffectiveDate, props.JobFamilyGroupCode, "", "", row.ID.String())) }>
+															{ pageCtx.T("Edit") }
+														</a>
+													</td>
+												}
+											</tr>
+										}
+									</tbody>
+								</table>
+							</div>
+						}
+					</div>
+				case "roles":
+					<div class="rounded-lg border border-surface-400 bg-surface-300 p-4 space-y-3">
+						if strings.TrimSpace(props.JobFamilyGroupCode) == "" || strings.TrimSpace(props.JobFamilyCode) == "" {
+							<div class="text-sm text-300">{ pageCtx.T("Org.UI.Shared.NotFound") }</div>
+						} else {
+							if pageCtx.CanAuthz("org.job_catalog", "admin") {
+								{{ isEdit := props.EditRole != nil }}
+								<div class="flex items-center justify-between gap-3">
+									<div class="text-sm font-semibold text-100">{ pageCtx.T(ternaryString(isEdit, "Edit", "Create")) }</div>
+									if isEdit {
+										@button.Ghost(button.Props{
+											Size: button.SizeSM,
+											Icon: icons.X(icons.Props{Size: "18"}),
+											Attrs: templ.Attributes{
+												"type": "button",
+												"hx-get": jobCatalogURL("roles", props.EffectiveDate, props.JobFamilyGroupCode, props.JobFamilyCode, "", ""),
+												"hx-target": "#org-job-catalog-page",
+												"hx-select": "#org-job-catalog-page",
+												"hx-swap": "outerHTML",
+												"hx-push-url": "true",
+											},
+										}) { { pageCtx.T("Cancel") } }
+									}
+								</div>
+								<form class="space-y-3">
+									<input type="hidden" name="tab" value="roles"/>
+									<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+									<input type="hidden" name="job_family_group_code" value={ props.JobFamilyGroupCode }/>
+									<input type="hidden" name="job_family_code" value={ props.JobFamilyCode }/>
+									if isEdit {
+										<input type="hidden" name="edit_id" value={ props.EditID }/>
+									}
+									@input.Text(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
+										Attrs: templ.Attributes{
+											"name": "code",
+											"value": ternaryString(isEdit, props.EditRole.Code, ""),
+											"readonly": isEdit,
+										},
+									})
+									@input.Text(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
+										Attrs: templ.Attributes{
+											"name": "name",
+											"value": ternaryString(isEdit, props.EditRole.Name, ""),
+										},
+									})
+									@base.Select(&base.SelectProps{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.IsActive"),
+										Attrs: templ.Attributes{
+											"name": "is_active",
+										},
+									}) {
+										<option value="1" selected?={ !isEdit || props.EditRole.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
+										<option value="0" selected?={ isEdit && !props.EditRole.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
+									}
+									<div class="flex items-center justify-end gap-2 pt-2">
+										@button.Primary(button.Props{
+											Size: button.SizeSM,
+											Attrs: templ.Attributes{
+												"type": "submit",
+												"hx-include": "#org-job-catalog-filters, #effective-date",
+												ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/roles/%s", props.EditID), "/org/job-catalog/roles"),
+											},
+										}) { { pageCtx.T("Save") } }
+									</div>
+								</form>
+							}
+							<div class="rounded-lg border border-surface-400 bg-surface-300 overflow-hidden">
+								<table class="w-full text-sm">
+									<thead class="bg-surface-200 text-300">
+										<tr>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.Code") }</th>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.Name") }</th>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.IsActive") }</th>
+											if pageCtx.CanAuthz("org.job_catalog", "admin") {
+												<th class="text-right font-medium p-3"></th>
+											}
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-surface-400">
+										for _, row := range props.Roles {
+											<tr class="text-200">
+												<td class="p-3 font-mono text-xs">{ row.Code }</td>
+												<td class="p-3">{ row.Name }</td>
+												<td class="p-3 text-xs">
+													if row.IsActive {
+														<span class="text-green-300">{ pageCtx.T("Org.UI.Node.Status.Active") }</span>
+													} else {
+														<span class="text-400">{ pageCtx.T("Org.UI.Node.Status.Inactive") }</span>
+													}
+												</td>
+												if pageCtx.CanAuthz("org.job_catalog", "admin") {
+													<td class="p-3 text-right">
+														<a class="text-primary hover:underline" href={ templ.SafeURL(jobCatalogURL("roles", props.EffectiveDate, props.JobFamilyGroupCode, props.JobFamilyCode, "", row.ID.String())) }>
+															{ pageCtx.T("Edit") }
+														</a>
+													</td>
+												}
+											</tr>
+										}
+									</tbody>
+								</table>
+							</div>
+						}
+					</div>
+				case "levels":
+					<div class="rounded-lg border border-surface-400 bg-surface-300 p-4 space-y-3">
+						if strings.TrimSpace(props.JobFamilyGroupCode) == "" || strings.TrimSpace(props.JobFamilyCode) == "" || strings.TrimSpace(props.JobRoleCode) == "" {
+							<div class="text-sm text-300">{ pageCtx.T("Org.UI.Shared.NotFound") }</div>
+						} else {
+							if pageCtx.CanAuthz("org.job_catalog", "admin") {
+								{{ isEdit := props.EditLevel != nil }}
+								<div class="flex items-center justify-between gap-3">
+									<div class="text-sm font-semibold text-100">{ pageCtx.T(ternaryString(isEdit, "Edit", "Create")) }</div>
+									if isEdit {
+										@button.Ghost(button.Props{
+											Size: button.SizeSM,
+											Icon: icons.X(icons.Props{Size: "18"}),
+											Attrs: templ.Attributes{
+												"type": "button",
+												"hx-get": jobCatalogURL("levels", props.EffectiveDate, props.JobFamilyGroupCode, props.JobFamilyCode, props.JobRoleCode, ""),
+												"hx-target": "#org-job-catalog-page",
+												"hx-select": "#org-job-catalog-page",
+												"hx-swap": "outerHTML",
+												"hx-push-url": "true",
+											},
+										}) { { pageCtx.T("Cancel") } }
+									}
+								</div>
+								<form class="space-y-3">
+									<input type="hidden" name="tab" value="levels"/>
+									<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+									<input type="hidden" name="job_family_group_code" value={ props.JobFamilyGroupCode }/>
+									<input type="hidden" name="job_family_code" value={ props.JobFamilyCode }/>
+									<input type="hidden" name="job_role_code" value={ props.JobRoleCode }/>
+									if isEdit {
+										<input type="hidden" name="edit_id" value={ props.EditID }/>
+									}
+									@input.Text(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
+										Attrs: templ.Attributes{
+											"name": "code",
+											"value": ternaryString(isEdit, props.EditLevel.Code, ""),
+											"readonly": isEdit,
+										},
+									})
+									@input.Text(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
+										Attrs: templ.Attributes{
+											"name": "name",
+											"value": ternaryString(isEdit, props.EditLevel.Name, ""),
+										},
+									})
+									@input.Number(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.DisplayOrder"),
+										Attrs: templ.Attributes{
+											"name": "display_order",
+											"value": ternaryString(isEdit, fmt.Sprintf("%d", props.EditLevel.DisplayOrder), "0"),
+										},
+									})
+									@base.Select(&base.SelectProps{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.IsActive"),
+										Attrs: templ.Attributes{
+											"name": "is_active",
+										},
+									}) {
+										<option value="1" selected?={ !isEdit || props.EditLevel.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
+										<option value="0" selected?={ isEdit && !props.EditLevel.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
+									}
+									<div class="flex items-center justify-end gap-2 pt-2">
+										@button.Primary(button.Props{
+											Size: button.SizeSM,
+											Attrs: templ.Attributes{
+												"type": "submit",
+												"hx-include": "#org-job-catalog-filters, #effective-date",
+												ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/levels/%s", props.EditID), "/org/job-catalog/levels"),
+											},
+										}) { { pageCtx.T("Save") } }
+									</div>
+								</form>
+							}
+							<div class="rounded-lg border border-surface-400 bg-surface-300 overflow-hidden">
+								<table class="w-full text-sm">
+									<thead class="bg-surface-200 text-300">
+										<tr>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.Code") }</th>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.Name") }</th>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.DisplayOrder") }</th>
+											<th class="text-left font-medium p-3">{ pageCtx.T("Org.UI.JobCatalog.Fields.IsActive") }</th>
+											if pageCtx.CanAuthz("org.job_catalog", "admin") {
+												<th class="text-right font-medium p-3"></th>
+											}
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-surface-400">
+										for _, row := range props.Levels {
+											<tr class="text-200">
+												<td class="p-3 font-mono text-xs">{ row.Code }</td>
+												<td class="p-3">{ row.Name }</td>
+												<td class="p-3 text-xs">{ fmt.Sprintf("%d", row.DisplayOrder) }</td>
+												<td class="p-3 text-xs">
+													if row.IsActive {
+														<span class="text-green-300">{ pageCtx.T("Org.UI.Node.Status.Active") }</span>
+													} else {
+														<span class="text-400">{ pageCtx.T("Org.UI.Node.Status.Inactive") }</span>
+													}
+												</td>
+												if pageCtx.CanAuthz("org.job_catalog", "admin") {
+													<td class="p-3 text-right">
+														<a class="text-primary hover:underline" href={ templ.SafeURL(jobCatalogURL("levels", props.EffectiveDate, props.JobFamilyGroupCode, props.JobFamilyCode, props.JobRoleCode, row.ID.String())) }>
+															{ pageCtx.T("Edit") }
+														</a>
+													</td>
+												}
+											</tr>
+										}
+									</tbody>
+								</table>
+							</div>
+						}
+					</div>
+			}
+		</div>
+	}
+}
+
+func ternaryString(cond bool, a, b string) string {
+	if cond {
+		return a
+	}
+	return b
+}
