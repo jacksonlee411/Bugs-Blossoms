@@ -5,11 +5,12 @@
 ## 1. 背景与上下文 (Context)
 - Org UI 的“组织架构”入口（`/org/nodes`）右侧面板当前仅展示节点的短名称（`name`）与少量字段（code/status 等）。
 - 在多层级组织、或存在同名部门/多次 Move/Rename 的场景下，仅靠短名称难以判断节点的真实上下文（属于哪条路径、上级链路是什么）。
-- 现有后端能力已经提供“节点路径查询”（root→node），可用于在 UI 读时拼接得到“组织长名称”，无需引入冗余存储字段。
+- 现有后端能力已提供“组织长名称（long_name）”读时派生能力（DEV-PLAN-068，落地在 `pkg/orglabels`），可用于在 UI 以 as-of day 快照渲染 root→self 的路径名称串；无需引入冗余存储字段。
 
 **相关 SSOT/依赖**
 - 路径查询契约：`docs/dev-plans/033-org-visualization-and-reporting.md`（`GET /org/api/nodes/{id}:path`）
 - Org UI（树 + 右侧详情面板）：`docs/dev-plans/035-org-ui.md`
+- 组织长名称投影（SSOT）：`docs/dev-plans/068-org-node-long-name-projection.md`
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
@@ -44,8 +45,8 @@
 - **示例**：`Company / Engineering / Platform`
 
 ### 3.2 数据来源（复用既有能力）
-- 使用 Org 服务的节点路径查询结果（root→node），以 page as-of 的 `effective_date` 作为查询点：
-  - UI 侧实现直接调用 `OrgService.GetNodePath(...)`（同源于 033 的契约），避免 UI 再走 HTTP 回环调用自身 API。
+- 使用 `pkg/orglabels.ResolveOrgNodeLongNamesAsOf(...)` 的投影结果，以 page as-of 的 `effective_date` 作为查询点（对齐 DEV-PLAN-068 的契约与拼接/兜底规则）：
+  - UI 侧直接调用 `orglabels`，避免 UI 再走 HTTP 回环调用自身 API。
   - **边界约束**：仅在渲染“节点详情面板”的 handler 中为“当前选中节点”补齐一次 `LongName`；不要把该调用下沉到 `getNodeDetails(...)`（该函数被多处复用，容易引入隐性额外查询与 N+1）。
 
 ### 3.3 拼接规则（消除歧义）
@@ -70,7 +71,7 @@
 
 ## 5. 实施步骤 (Tasks)
 1. [X] ViewModel：为 `OrgNodeDetails` 增加 `LongName` 字段，并调整相关 mapper/表单回显初始化（仅影响详情展示的字段可置空）。
-2. [X] Controller：在渲染节点详情面板时，为“当前选中节点”调用 `OrgService.GetNodePath(...)` 并按 §3.3 规则构造 `LongName`；路径查询失败仅置空/兜底，不返回错误（避免页面 500）。
+2. [X] Controller：在渲染节点详情面板时，为“当前选中节点”调用 `pkg/orglabels.ResolveOrgNodeLongNamesAsOf(...)` 获取 `LongName`；失败路径仅置空/兜底，不返回错误（避免页面 500）。
 3. [X] Templ：在 `node_details.templ` 渲染 `LongName`，并补齐 i18n 文案。
 4. [X] 验证：本地门禁已通过（`make generate && make css && go fmt ./... && go vet ./... && make check lint && make test && make check doc && make check tr`，2025-12-27 10:20 UTC）。
 

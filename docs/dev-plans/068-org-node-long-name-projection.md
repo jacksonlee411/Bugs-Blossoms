@@ -122,6 +122,7 @@ if !pageAsOfDay.Before(rowStartDay) && !pageAsOfDay.After(rowEndDay) {
 适用：报表/列表以“单一 `effective_date`（as-of）”渲染全表（例如花名册、薪资明细表某日快照）。
 
 SQL 形状（示意，真实实现以 `pkg/orglabels` 为准）：
+> 说明：在 DEV-PLAN-069 的 Gate 达成后，推荐采用 DEV-PLAN-069A 的 **path-driven** 形状（从 `target.path` 拆分祖先序列），避免 `org_edges` 自连接扫描祖先集合。
 ```sql
 WITH target AS (
   SELECT e.child_node_id AS org_node_id, e.path
@@ -132,20 +133,18 @@ WITH target AS (
     AND e.effective_date <= $3::date
     AND e.end_date >= $3::date
 ),
-ancestors AS (
-  SELECT t.org_node_id, e.child_node_id AS ancestor_id, e.depth
+path_parts AS (
+  SELECT
+    t.org_node_id,
+    p.ord,
+    p.key_text::uuid AS ancestor_id
   FROM target t
-  JOIN org_edges e
-    ON e.tenant_id=$1
-   AND e.hierarchy_type='OrgUnit'
-   AND e.effective_date <= $3::date
-   AND e.end_date >= $3::date
-   AND e.path @> t.path
+  CROSS JOIN LATERAL unnest(string_to_array(t.path::text, '.')) WITH ORDINALITY AS p(key_text, ord)
 ),
 parts AS (
-  SELECT a.org_node_id, a.depth,
+  SELECT a.org_node_id, a.ord,
          COALESCE(NULLIF(BTRIM(ns.name),''), NULLIF(BTRIM(n.code),''), n.id::text) AS part
-  FROM ancestors a
+  FROM path_parts a
   JOIN org_nodes n
     ON n.tenant_id=$1 AND n.id=a.ancestor_id
   LEFT JOIN org_node_slices ns
@@ -153,7 +152,7 @@ parts AS (
    AND ns.effective_date <= $3::date AND ns.end_date >= $3::date
 )
 SELECT org_node_id,
-       string_agg(part, ' / ' ORDER BY depth ASC) AS long_name
+       string_agg(part, ' / ' ORDER BY ord ASC) AS long_name
 FROM parts
 GROUP BY org_node_id;
 ```
@@ -164,35 +163,35 @@ GROUP BY org_node_id;
 约束：不得按 `distinct(as_of_day)` 分组逐组查询（在“每行一个起始日”的时间线场景会退化为近似 N 次查询）。
 
 SQL 形状（示意）：
+> 说明：`pkg/orglabels` 的 mixed as-of 入参当前是 `$3::text[]`（`YYYY-MM-DD` 字符串），并在 SQL 内 `::date` cast（与 064A 的 valid-time day 语义对齐）。本示意也沿用该形状。
 ```sql
 WITH input AS (
   SELECT *
-  FROM unnest($2::uuid[], $3::date[]) AS q(org_node_id, as_of_day)
+  FROM unnest($2::uuid[], $3::text[]) AS q(org_node_id, as_of_date)
 ),
 target AS (
-  SELECT i.org_node_id, i.as_of_day, e.path
+  SELECT i.org_node_id, i.as_of_date::date AS as_of_day, e.path
   FROM input i
   JOIN org_edges e
     ON e.tenant_id=$1
    AND e.hierarchy_type='OrgUnit'
    AND e.child_node_id=i.org_node_id
-   AND e.effective_date <= i.as_of_day
-   AND e.end_date >= i.as_of_day
+   AND e.effective_date <= i.as_of_date::date
+   AND e.end_date >= i.as_of_date::date
 ),
-ancestors AS (
-  SELECT t.org_node_id, t.as_of_day, e.child_node_id AS ancestor_id, e.depth
+path_parts AS (
+  SELECT
+    t.org_node_id,
+    t.as_of_day,
+    p.ord,
+    p.key_text::uuid AS ancestor_id
   FROM target t
-  JOIN org_edges e
-    ON e.tenant_id=$1
-   AND e.hierarchy_type='OrgUnit'
-   AND e.effective_date <= t.as_of_day
-   AND e.end_date >= t.as_of_day
-   AND e.path @> t.path
+  CROSS JOIN LATERAL unnest(string_to_array(t.path::text, '.')) WITH ORDINALITY AS p(key_text, ord)
 ),
 parts AS (
-  SELECT a.org_node_id, a.as_of_day, a.depth,
+  SELECT a.org_node_id, a.as_of_day, a.ord,
          COALESCE(NULLIF(BTRIM(ns.name),''), NULLIF(BTRIM(n.code),''), n.id::text) AS part
-  FROM ancestors a
+  FROM path_parts a
   JOIN org_nodes n
     ON n.tenant_id=$1 AND n.id=a.ancestor_id
   LEFT JOIN org_node_slices ns
@@ -201,7 +200,7 @@ parts AS (
 )
 SELECT org_node_id,
        as_of_day,
-       string_agg(part, ' / ' ORDER BY depth ASC) AS long_name
+       string_agg(part, ' / ' ORDER BY ord ASC) AS long_name
 FROM parts
 GROUP BY org_node_id, as_of_day;
 ```
