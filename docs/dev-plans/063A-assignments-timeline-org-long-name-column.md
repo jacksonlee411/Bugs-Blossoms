@@ -172,3 +172,22 @@ return out
 - **回滚方案**：
   - 代码回滚：`git revert` 回滚对应变更。
   - 数据回滚：无数据变更。
+
+## 11. DEV-PLAN-045 评审（Simple > Easy）
+### 结构（解耦/边界）
+- [x] 变更局部：仅新增“组织长名称”展示列与对应 hydrate，不引入新 service/新 API/新持久化字段。
+- [x] 边界清晰：长路径计算集中在 `OrgUIController`（request-scope cache 去重），复用 `OrgService.GetNodePath(asOf)`，避免把复杂度塞进模板或 DB 递归 SQL。
+- [x] 单一权威表达：Valid Time 对外只使用 `effective_date=YYYY-MM-DD`；对齐 064A 停止线，不新增/扩散 `effective_on/end_on`。
+
+### 演化（规格/确定性）
+- [x] Spec 可执行：已按 001 模板补齐架构图/ADR/算法/契约/验收标准，实施不需要再“对话式补丁”。
+- [ ] 实施阶段如发现 `GetNodePath` 在时间线行数较大时带来不可接受的延迟，应先更新本计划的性能策略（例如批量化/上界/降级展示）再改实现，避免 Vibe Coding。
+
+### 认知（本质/偶然复杂度）
+- [x] 复杂度对应明确不变量：每条任职行展示“当时路径快照”，并允许通过切换页面 `effective_date` 在有效期内查看指定日期快照（但不拆分任职行）。
+- [x] 偶然复杂度隔离：与 064/064A 的迁移期字段/语义仅通过“停止线”约束进入本计划，不把双轨映射规则扩散为新概念。
+
+### 维护（可理解/可解释）
+- [x] 5 分钟可解释：计算 `labelAsOfDay` → `GetNodePath(asOf)` → 拼接 → 渲染/兜底；失败路径明确且不影响其他列。
+
+结论：通过（建议：实现时抽出 `labelAsOfDayForRow` 小 helper 并复用，避免未来复制粘贴漂移）。 
