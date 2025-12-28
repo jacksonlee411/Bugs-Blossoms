@@ -147,8 +147,7 @@ target AS (
   SELECT
     i.org_node_id,
     i.as_of_date::date AS as_of_day,
-    e.path,
-    e.depth AS target_depth
+    e.path
   FROM input i
   JOIN org_edges e
     ON e.tenant_id=$1
@@ -157,27 +156,22 @@ target AS (
    AND e.effective_date <= i.as_of_date::date
    AND e.end_date >= i.as_of_date::date
 ),
-ancestors AS (
+path_parts AS (
   SELECT
     t.org_node_id,
     t.as_of_day,
-    e.child_node_id AS ancestor_id,
-    (t.target_depth - e.depth) AS rel_depth
+    p.ord,
+    p.key_text::uuid AS ancestor_id
   FROM target t
-  JOIN org_edges e
-    ON e.tenant_id=$1
-   AND e.hierarchy_type='OrgUnit'
-   AND e.effective_date <= t.as_of_day
-   AND e.end_date >= t.as_of_day
-   AND e.path @> t.path
+  CROSS JOIN LATERAL unnest(string_to_array(t.path::text, '.')) WITH ORDINALITY AS p(key_text, ord)
 ),
 parts AS (
   SELECT
     a.org_node_id,
     a.as_of_day,
-    a.rel_depth,
+    a.ord,
     COALESCE(NULLIF(BTRIM(ns.name),''), NULLIF(BTRIM(n.code),''), n.id::text) AS part
-  FROM ancestors a
+  FROM path_parts a
   JOIN org_nodes n
     ON n.tenant_id=$1 AND n.id=a.ancestor_id
   LEFT JOIN org_node_slices ns
@@ -187,7 +181,7 @@ parts AS (
 SELECT
   org_node_id,
   as_of_day::text AS as_of_date,
-  string_agg(part, ' / ' ORDER BY rel_depth DESC) AS long_name
+  string_agg(part, ' / ' ORDER BY ord ASC) AS long_name
 FROM parts
 GROUP BY org_node_id, as_of_day
 `
