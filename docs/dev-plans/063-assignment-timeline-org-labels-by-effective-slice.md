@@ -1,6 +1,8 @@
 # DEV-PLAN-063：任职时间线部门/职位名称按时间切片渲染（TDD）
 
 **状态**: 草拟中（2025-12-27 07:05 UTC）
+**对齐更新**：
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）统一按天（`YYYY-MM-DD`）闭区间语义；本文不再使用 `[start,end)` 表达业务有效期；兼容期允许 RFC3339 输入但会归一化为 UTC day 并回显为 day string。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：本地开发环境验证发现（工号 `004` 任职时间线示例）。
@@ -12,11 +14,13 @@
 
 | 工号 | 生效区间 | 操作类型 | 部门 | 职位 |
 | --- | --- | --- | --- | --- |
-| 004 | 2025-12-01 → 2025-12-03 | 雇用 | AI治理办公室 (2) | 02 — 副总经理 |
-| 004 | 2025-12-03 → 2025-12-08 | 调动 | AI治理办公室 (2) | 02 — 副总经理 |
+| 004 | 2025-12-01 → 2025-12-02 | 雇用 | AI治理办公室 (2) | 02 — 副总经理 |
+| 004 | 2025-12-03 → 2025-12-07 | 调动 | AI治理办公室 (2) | 02 — 副总经理 |
 | 004 | 2025-12-08 → 至今 | 调动 | AI治理办公室 (2) | 02 — 副总经理 |
 
 当组织节点（或职位标题）在 2025-12-01 ~ 至今期间发生过重命名/切片更新时，预期上述三段在“部门/职位”列中应能体现当时的历史名称差异；但当前 UI 会将三段都渲染为最新名称。
+
+> 注：对齐 DEV-PLAN-064 后，Valid Time 为按天闭区间；相邻切片续接时旧段 `end_date = new.effective_date - 1 day`，因此时间线应展示为不重叠的闭区间窗口（而不是共享端点的半开区间表示）。
 
 **建议复现入口**：
 - `http://localhost:3200/org/assignments?pernr=004&effective_date=2025-12-01`（或在页面输入 Pernr/切换 Effective Date）。
@@ -33,11 +37,12 @@
   - [ ] 任职时间线表格每一行的“部门/职位”显示为**该行任职记录时间切片**对应的组织/职位历史名称（而不是页面级 `effective_date` 的名称）。
   - [ ] 不改变任职时间线的行结构（不因组织重命名而拆分任职区间）。
   - [ ] 保持 UI 仍可基于页面 `effective_date` 正确识别“当前任职”（用于 summary/可编辑判断）。
+  - [ ] 消除时间线 label lookup 的 N+1：时间线渲染不应按行查库（允许对 current row 做有上界的覆盖查询）。
   - [ ] 通过本计划命中的门禁（见 §2.1）。
 - **非目标 (Out of Scope)**：
   - 不新增/调整数据库表结构与迁移。
-  - 不重写任职时间线查询（`GetAssignments`/`AssignmentsToTimeline`）为“组织切片联表返回 name/code”。
-  - 不在本计划内做 N+1 优化（如需将另开/升级方案，见 §3.2 决策 2）。
+  - 不把任职时间线查询升级为“返回全量组织/职位详情 DTO”；仅 hydrate 生成 label 所需的最小字段（name/code/title）。
+  - 不引入跨请求/跨页面的全局缓存（避免无 TTL/容量上限带来内存膨胀与一致性问题）。
 
 ## 2.1 工具链与门禁（SSOT 引用）
 > **目的**：避免在 dev-plan 里复制工具链细节导致 drift；本文只声明“本计划命中哪些触发器/工具链”，并给出可复现入口链接。
@@ -58,7 +63,7 @@ graph TD
     B -->|GetAssignments| C[OrgService]
     C --> D[(DB)]
     B --> E[mappers.AssignmentsToTimeline]
-    E --> F[timeline.Rows (EffectiveDate/EndDate/OrgNodeID/PositionID)]
+    E --> F[timeline.Rows (EffectiveDate/EndDate (day)/OrgNodeID/PositionID)]
     B --> G[labelAsOfForRow(row, pageAsOf)]
     B -->|OrgNodeLabel (labelAsOf)| H[OrgService.GetNodeAsOf]
     B -->|PositionLabel (labelAsOf)| I[OrgService.GetPosition]
@@ -71,9 +76,9 @@ graph TD
   - **选项 A（现状）**：所有行都用页面 `effective_date` 解析 label → 历史语义错误（全部变成最新）。
   - **选项 B**：所有行都用 `row.EffectiveDate` 解析 label → 历史语义正确，但 summary/当前行在页面 as-of 切换时不随之变化（语义不一致）。
   - **选项 C（选定）**：默认用 `row.EffectiveDate`；当页面 `asOf` 落在该行区间内时改用页面 `asOf`（与现有 “current row/canEdit” 判定一致）。
-- **决策 2：落点选择（UI 层最小变更）**
-  - 先在 `OrgUIController` 的 timeline 组装处修复（局部且可回滚）。
-  - 性能/N+1 若出现可观测回归，再升级为“服务端批量解析 label”（联表/批量 API）作为后续计划（不在本计划实现）。
+- **决策 2：落点选择（选定：Repo 联表 hydrate，避免 N+1）**
+  - `ListAssignmentsTimeline` 一次 SQL 联表取回行起始日（rowStart）的 `position_code/title` 与 `org_node_name/code`（as-of 口径使用 `effective_on/end_on`，对齐 DEV-PLAN-064）。
+  - UI 组装 timeline 时直接使用行级字段生成 label；仅当页面 `effective_date` 落在该行区间内时，对该行用 `pageAsOf` 做覆盖查询（有上界：每个 `assignment_type` 至多 1 行）。
 - **决策 3：失败路径不阻断页面渲染（选定）**
   - OrgNode label lookup 失败：fallback `nodeID.String()`。
   - Position label lookup 失败：fallback `row.PositionCode`，再 fallback `positionID.String()`。
@@ -81,20 +86,21 @@ graph TD
 ## 4. 数据模型与约束 (Data Model & Constraints)
 > 本计划不引入 DB schema 变更；本节只固化“时间切片语义与边界”，避免实现阶段口径漂移。
 
-- **时间区间语义**：
-  - 任职行区间采用右开区间：`[row.EffectiveDate, row.EndDate)`。
-  - open-ended 以 `9999-12-31` 表示上界（右开）。
-- **effective_date 输入语义**：
-  - `effective_date` 支持 `YYYY-MM-DD` 或 RFC3339；解析后统一为 `UTC`（见 controllers 包内 `parseEffectiveDate`）。
-  - 页面 date input 提供的是 `YYYY-MM-DD`，因此 `pageAsOf` 为当日 `00:00:00Z`。
+- **时间区间语义（Valid Time，按天）**：
+  - 任职行区间采用**按天闭区间**：`[effective_date, end_date]`（`YYYY-MM-DD`）。
+  - open-ended 以 `9999-12-31` 表示上界（UI 展示为“至今”）。
+  - 说明：实现层可能仍保留“end_exclusive = end_date + 1 day”的半开表达以复用既有查询/约束，但业务语义以闭区间为准（时间域分层与映射规则见 `docs/dev-plans/064-effective-date-day-granularity.md`）。
+- **effective_date 输入语义（对齐 064）**：
+  - `effective_date` 对外推荐 `YYYY-MM-DD`；兼容期允许 RFC3339，但会归一化为 UTC day 并回显为 `YYYY-MM-DD`（见 controllers 包内 `parseEffectiveDate`/`normalizeValidTimeDayUTC`）。
+  - 页面 date input 提供的是 `YYYY-MM-DD`，因此 `pageAsOf` 为当日 `00:00:00Z`（day）。
 - **ViewModel（关键字段）**：`modules/org/presentation/viewmodels/assignment.go` 的 `OrgAssignmentRow`：
   - `OrgNodeID/PositionID/PositionCode`
-  - `EffectiveDate/EndDate`（用于区间判断与 labelAsOf 选择）
+  - `EffectiveDate/EndDate`（均应按 day 归一化后再参与区间判断与 labelAsOf 选择；避免把“时分秒”当作业务语义）
 
 ## 5. 接口契约 (API Contracts)
 ### 5.1 页面路由：`GET /org/assignments`
 - **Query 参数**：
-  - `effective_date`：可选；无效时页面返回 `400` 并渲染错误提示，同时 fallback 为 `time.Now().UTC()` 渲染页面。
+  - `effective_date`：可选；无效时页面返回 `400` 并渲染错误提示，同时 fallback 为服务端 `today(UTC)`（day）渲染页面。
   - `pernr`：可选；为空时 timeline 为空（页面仍可访问）。
 - **Response**：HTML 页面（或在 HTMX 场景返回 HTML partial，见 §5.2）。
 
@@ -113,17 +119,17 @@ graph TD
 ## 6. 核心逻辑与算法 (Business Logic & Algorithms)
 ### 6.1 行级 labelAsOf 选择算法（必须与 UI “current row/canEdit” 判定一致）
 输入：
-- `pageAsOf`：页面 `effective_date` 解析后的 UTC 时间。
-- `rowStart = row.EffectiveDate.UTC()`
-- `rowEnd = row.EndDate.UTC()`（右开；open-ended 为 `9999-12-31`）
+- `pageAsOf`：页面 `effective_date` 解析后的 UTC day（`00:00:00Z`）。
+- `rowStart = normalizeValidTimeDayUTC(row.EffectiveDate)`
+- `rowEnd`：该行对外 `end_date`（按天闭区间的右端点，open-ended 为 `9999-12-31`）。若实现层仍持有 legacy `row.EndDate`（exclusive boundary），需要先按 `docs/dev-plans/064-effective-date-day-granularity.md` 的映射规则求得 `end_date` 再做闭区间判定。
 
 输出：
-- `labelAsOf`：用于解析 OrgNode/Position label 的时间点（UTC）。
+- `labelAsOf`：用于解析 OrgNode/Position label 的 day（UTC）。
 
 伪代码：
 ```go
 labelAsOf := rowStart
-if !pageAsOf.Before(rowStart) && pageAsOf.Before(rowEnd) {
+if !pageAsOf.Before(rowStart) && !pageAsOf.After(rowEnd) {
     labelAsOf = pageAsOf
 }
 return labelAsOf
@@ -152,7 +158,7 @@ return labelAsOf
 - **里程碑**：
   1. [ ] 固化本 TDD（本文件）并通过 `make check doc`。
   2. [ ] 实现 §6 的 labelAsOfForRow + 替换所有 callsite。
-  3. [ ] 增补最小回归测试（至少覆盖右开边界与 open-ended）。
+  3. [ ] 增补最小回归测试（至少覆盖右闭边界与 open-ended）。
   4. [ ] 本地验证（主路径 + HTMX 检查）并留证据（截图/trace/console 其一）。
   5. [ ] 按 SSOT 跑 Go 门禁并记录。
 
@@ -168,7 +174,8 @@ return labelAsOf
 
 **边界/失败模式（至少覆盖）**
 - `effective_date == row.EffectiveDate`：该行按 `effective_date` 渲染（左闭）。
-- `effective_date == row.EndDate`：该行不应被视为 current row（右开）。
+- `effective_date == end_date`（该行对外 `end_date`，day）：该行应被视为 current row（右闭；对齐 DEV-PLAN-064 的按天闭区间语义）。
+- `effective_date == end_date + 1 day`：该行不应被视为 current row（避免 overlap）。
 - label lookup 失败：页面不应 500；OrgNode/Position 应回退到 ID/code（见 §3.2 决策 3）。
 
 **HTMX 专项检查（如适用）**
@@ -192,7 +199,7 @@ return labelAsOf
 ## 11. DEV-PLAN-044 评审（UI 验收可执行性）
 - 结论：通过（实施阶段需按 §9 留下可复现证据，并做 HTMX 局部更新检查）。
 - 风险提示：
-  - 仍存在 N+1（每行 label lookup）；若 timeline 行数扩大或出现性能回归，升级为 §3.2 决策 2 的后续方案处理。
+  - current row 覆盖查询有上界（按 `assignment_type` 计最多 3 行）；若未来引入更多类型或页面引入其它按行 hydrate，应复用同一“单次批量/联表”策略，避免回到 N+1。
 
 ## 12. DEV-PLAN-045 评审（Simple > Easy）
 ### 结构（解耦/边界）
@@ -204,7 +211,7 @@ return labelAsOf
 - [ ] 若实施阶段发现“必须下沉到 service 才能满足性能/一致性”，先更新本计划再改实现（避免 Vibe Coding）。
 
 ### 认知（本质/偶然复杂度）
-- [x] 复杂逻辑对应明确不变量：历史行按历史切片显示；as-of 落在行区间内时按 as-of 显示（右开区间）。
+- [x] 复杂逻辑对应明确不变量：历史行按历史切片显示；as-of 落在行闭区间内时按 as-of 显示（按天闭区间）。
 
 ### 维护（可理解/可解释）
 - [x] 5 分钟可解释：选 `labelAsOf` → 计算 label → 渲染与 fallback。

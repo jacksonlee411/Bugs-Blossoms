@@ -289,6 +289,9 @@ type AssignmentViewRow struct {
 	EffectiveDate  time.Time  `json:"effective_date"`
 	EndDate        time.Time  `json:"end_date"`
 	PositionCode   *string    `json:"position_code,omitempty"`
+	PositionTitle  *string    `json:"position_title,omitempty"`
+	OrgNodeCode    *string    `json:"org_node_code,omitempty"`
+	OrgNodeName    *string    `json:"org_node_name,omitempty"`
 	Pernr          *string    `json:"pernr,omitempty"`
 	SubjectID      *uuid.UUID `json:"subject_id,omitempty"`
 	StartEventType *string    `json:"start_event_type,omitempty"`

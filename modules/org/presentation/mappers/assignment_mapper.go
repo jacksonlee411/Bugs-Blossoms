@@ -1,6 +1,7 @@
 package mappers
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
@@ -17,6 +18,39 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 		code := ""
 		if r.PositionCode != nil {
 			code = *r.PositionCode
+		}
+		title := ""
+		if r.PositionTitle != nil {
+			title = *r.PositionTitle
+		}
+		orgNodeCode := ""
+		if r.OrgNodeCode != nil {
+			orgNodeCode = *r.OrgNodeCode
+		}
+		orgNodeName := ""
+		if r.OrgNodeName != nil {
+			orgNodeName = *r.OrgNodeName
+		}
+
+		orgLabel := strings.TrimSpace(r.OrgNodeID.String())
+		orgNodeName = strings.TrimSpace(orgNodeName)
+		orgNodeCode = strings.TrimSpace(orgNodeCode)
+		if orgNodeName != "" && orgNodeCode != "" {
+			orgLabel = fmt.Sprintf("%s (%s)", orgNodeName, orgNodeCode)
+		} else if orgNodeName != "" {
+			orgLabel = orgNodeName
+		} else if orgNodeCode != "" {
+			orgLabel = orgNodeCode
+		}
+
+		posLabel := strings.TrimSpace(code)
+		title = strings.TrimSpace(title)
+		if title != "" {
+			if posLabel != "" {
+				posLabel = fmt.Sprintf("%s — %s", posLabel, title)
+			} else {
+				posLabel = title
+			}
 		}
 		startEventType := ""
 		if r.StartEventType != nil {
@@ -36,7 +70,8 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 			OrgNodeID:     r.OrgNodeID,
 			Pernr:         p,
 			PositionCode:  code,
-			PositionLabel: strings.TrimSpace(code),
+			OrgNodeLabel:  strings.TrimSpace(orgLabel),
+			PositionLabel: strings.TrimSpace(posLabel),
 			OperationType: startEventType,
 			EndEventType:  endEventType,
 			EffectiveDate: r.EffectiveDate,
