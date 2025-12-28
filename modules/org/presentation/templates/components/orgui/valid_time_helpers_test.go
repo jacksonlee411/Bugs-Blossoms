@@ -40,3 +40,44 @@ func TestFormatValidEndDateFromEndDate(t *testing.T) {
 		}
 	})
 }
+
+func TestValidTimeIncludesDay(t *testing.T) {
+	start := time.Date(2025, 12, 1, 12, 0, 0, 0, time.UTC)
+	end := time.Date(2025, 12, 31, 23, 59, 0, 0, time.UTC)
+
+	t.Run("inside", func(t *testing.T) {
+		asOf := time.Date(2025, 12, 28, 0, 0, 0, 0, time.UTC)
+		if !validTimeIncludesDay(asOf, start, end) {
+			t.Fatalf("expected true")
+		}
+	})
+
+	t.Run("start-inclusive", func(t *testing.T) {
+		asOf := time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC)
+		if !validTimeIncludesDay(asOf, start, end) {
+			t.Fatalf("expected true")
+		}
+	})
+
+	t.Run("end-inclusive", func(t *testing.T) {
+		asOf := time.Date(2025, 12, 31, 0, 0, 0, 0, time.UTC)
+		if !validTimeIncludesDay(asOf, start, end) {
+			t.Fatalf("expected true")
+		}
+	})
+
+	t.Run("after-end", func(t *testing.T) {
+		asOf := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+		if validTimeIncludesDay(asOf, start, end) {
+			t.Fatalf("expected false")
+		}
+	})
+
+	t.Run("open-ended", func(t *testing.T) {
+		openEnded := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
+		asOf := time.Date(2050, 1, 1, 0, 0, 0, 0, time.UTC)
+		if !validTimeIncludesDay(asOf, start, openEnded) {
+			t.Fatalf("expected true")
+		}
+	})
+}

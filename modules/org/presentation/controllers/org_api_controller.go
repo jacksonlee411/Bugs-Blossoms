@@ -68,8 +68,11 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/nodes/{id}:move", c.instrumentAPI("nodes.move", c.MoveNode)).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}:correct", c.instrumentAPI("nodes.correct", c.CorrectNode)).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}:rescind", c.instrumentAPI("nodes.rescind", c.RescindNode)).Methods(http.MethodPost)
+	api.HandleFunc("/nodes/{id}:delete-slice", c.instrumentAPI("nodes.delete_slice", c.DeleteNodeSlice)).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}:shift-boundary", c.instrumentAPI("nodes.shift_boundary", c.ShiftBoundaryNode)).Methods(http.MethodPost)
 	api.HandleFunc("/nodes/{id}:correct-move", c.instrumentAPI("nodes.correct_move", c.CorrectMoveNode)).Methods(http.MethodPost)
+
+	api.HandleFunc("/edges/{child_id}:delete-slice", c.instrumentAPI("edges.delete_slice", c.DeleteEdgeSlice)).Methods(http.MethodPost)
 
 	api.HandleFunc("/positions", c.instrumentAPI("positions.list", c.GetPositions)).Methods(http.MethodGet)
 	api.HandleFunc("/positions", c.instrumentAPI("positions.create", c.CreatePosition)).Methods(http.MethodPost)
@@ -78,6 +81,7 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/positions/{id}", c.instrumentAPI("positions.update", c.UpdatePosition)).Methods(http.MethodPatch)
 	api.HandleFunc("/positions/{id}:correct", c.instrumentAPI("positions.correct", c.CorrectPosition)).Methods(http.MethodPost)
 	api.HandleFunc("/positions/{id}:rescind", c.instrumentAPI("positions.rescind", c.RescindPosition)).Methods(http.MethodPost)
+	api.HandleFunc("/positions/{id}:delete-slice", c.instrumentAPI("positions.delete_slice", c.DeletePositionSlice)).Methods(http.MethodPost)
 	api.HandleFunc("/positions/{id}:shift-boundary", c.instrumentAPI("positions.shift_boundary", c.ShiftBoundaryPosition)).Methods(http.MethodPost)
 	api.HandleFunc("/positions/{id}/restrictions", c.instrumentAPI("positions.restrictions.get", c.GetPositionRestrictions)).Methods(http.MethodGet)
 	api.HandleFunc("/positions/{id}:set-restrictions", c.instrumentAPI("positions.restrictions.set", c.SetPositionRestrictions)).Methods(http.MethodPost)
@@ -108,6 +112,7 @@ func (c *OrgAPIController) Register(r *mux.Router) {
 	api.HandleFunc("/assignments/{id}", c.instrumentAPI("assignments.update", c.UpdateAssignment)).Methods(http.MethodPatch)
 	api.HandleFunc("/assignments/{id}:correct", c.instrumentAPI("assignments.correct", c.CorrectAssignment)).Methods(http.MethodPost)
 	api.HandleFunc("/assignments/{id}:rescind", c.instrumentAPI("assignments.rescind", c.RescindAssignment)).Methods(http.MethodPost)
+	api.HandleFunc("/assignments/{id}:delete-slice", c.instrumentAPI("assignments.delete_slice", c.DeleteAssignmentSlice)).Methods(http.MethodPost)
 
 	api.HandleFunc("/personnel-events/hire", c.instrumentAPI("personnel_events.hire", c.HirePersonnelEvent)).Methods(http.MethodPost)
 	api.HandleFunc("/personnel-events/transfer", c.instrumentAPI("personnel_events.transfer", c.TransferPersonnelEvent)).Methods(http.MethodPost)
@@ -1837,6 +1842,65 @@ func (c *OrgAPIController) RescindNode(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+type deleteNodeSliceRequest struct {
+	TargetEffectiveDate string  `json:"target_effective_date"`
+	ReasonCode          string  `json:"reason_code"`
+	ReasonNote          *string `json:"reason_note"`
+}
+
+func (c *OrgAPIController) DeleteNodeSlice(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgNodesAuthzObject, "admin") {
+		return
+	}
+
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req deleteNodeSliceRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	target, err := parseRequiredValidDate("target_effective_date", req.TargetEffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "target_effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.DeleteNodeSliceAndStitch(r.Context(), tenantID, requestID, initiatorID, services.DeleteNodeSliceAndStitchInput{
+		NodeID:              nodeID,
+		TargetEffectiveDate: target,
+		ReasonCode:          req.ReasonCode,
+		ReasonNote:          req.ReasonNote,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type deleteNodeSliceResponse struct {
+		NodeID        string                  `json:"node_id"`
+		DeletedWindow effectiveWindowResponse `json:"deleted_window"`
+		Stitched      bool                    `json:"stitched"`
+	}
+	writeJSON(w, http.StatusOK, deleteNodeSliceResponse{
+		NodeID: res.NodeID.String(),
+		DeletedWindow: effectiveWindowResponse{
+			EffectiveDate: formatValidDate(res.DeletedStart),
+			EndDate:       formatValidEndDateFromEndDate(res.DeletedEnd),
+		},
+		Stitched: res.Stitched,
+	})
+}
+
 type shiftBoundaryNodeRequest struct {
 	TargetEffectiveDate string `json:"target_effective_date"`
 	NewEffectiveDate    string `json:"new_effective_date"`
@@ -1943,6 +2007,77 @@ func (c *OrgAPIController) CorrectMoveNode(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, correctMoveResponse{
 		ID:            res.NodeID.String(),
 		EffectiveDate: formatValidDate(res.EffectiveDate),
+	})
+}
+
+type deleteEdgeSliceRequest struct {
+	HierarchyType       string  `json:"hierarchy_type"`
+	TargetEffectiveDate string  `json:"target_effective_date"`
+	ReasonCode          string  `json:"reason_code"`
+	ReasonNote          *string `json:"reason_note"`
+}
+
+func (c *OrgAPIController) DeleteEdgeSlice(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgEdgesAuthzObject, "admin") {
+		return
+	}
+
+	childNodeID, err := uuid.Parse(mux.Vars(r)["child_id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid child_id")
+		return
+	}
+
+	var req deleteEdgeSliceRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	hierarchyType := strings.TrimSpace(req.HierarchyType)
+	if hierarchyType == "" {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "hierarchy_type is required")
+		return
+	}
+	target, err := parseRequiredValidDate("target_effective_date", req.TargetEffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "target_effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.DeleteEdgeSliceAndStitch(r.Context(), tenantID, requestID, initiatorID, services.DeleteEdgeSliceAndStitchInput{
+		HierarchyType:       hierarchyType,
+		ChildNodeID:         childNodeID,
+		TargetEffectiveDate: target,
+		ReasonCode:          req.ReasonCode,
+		ReasonNote:          req.ReasonNote,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type deleteEdgeSliceResponse struct {
+		EdgeID         string                  `json:"edge_id"`
+		DeletedWindow  effectiveWindowResponse `json:"deleted_window"`
+		StitchedToEdge *string                 `json:"stitched_to_edge_id,omitempty"`
+	}
+	var stitchedTo *string
+	if res.StitchedToEdge != nil {
+		v := res.StitchedToEdge.String()
+		stitchedTo = &v
+	}
+	writeJSON(w, http.StatusOK, deleteEdgeSliceResponse{
+		EdgeID: res.DeletedEdgeID.String(),
+		DeletedWindow: effectiveWindowResponse{
+			EffectiveDate: formatValidDate(res.DeletedStart),
+			EndDate:       formatValidEndDateFromEndDate(res.DeletedEnd),
+		},
+		StitchedToEdge: stitchedTo,
 	})
 }
 
@@ -2545,6 +2680,65 @@ func (c *OrgAPIController) RescindPosition(w http.ResponseWriter, r *http.Reques
 	})
 }
 
+type deletePositionSliceRequest struct {
+	TargetEffectiveDate string  `json:"target_effective_date"`
+	ReasonCode          string  `json:"reason_code"`
+	ReasonNote          *string `json:"reason_note"`
+}
+
+func (c *OrgAPIController) DeletePositionSlice(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgPositionsAuthzObject, "admin") {
+		return
+	}
+
+	positionID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req deletePositionSliceRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+	target, err := parseRequiredValidDate("target_effective_date", req.TargetEffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "target_effective_date is required")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.DeletePositionSliceAndStitch(r.Context(), tenantID, requestID, initiatorID, services.DeletePositionSliceAndStitchInput{
+		PositionID:          positionID,
+		TargetEffectiveDate: target,
+		ReasonCode:          req.ReasonCode,
+		ReasonNote:          req.ReasonNote,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type deletePositionSliceResponse struct {
+		PositionID    string                  `json:"position_id"`
+		DeletedWindow effectiveWindowResponse `json:"deleted_window"`
+		Stitched      bool                    `json:"stitched"`
+	}
+	writeJSON(w, http.StatusOK, deletePositionSliceResponse{
+		PositionID: res.PositionID.String(),
+		DeletedWindow: effectiveWindowResponse{
+			EffectiveDate: formatValidDate(res.DeletedStart),
+			EndDate:       formatValidEndDateFromEndDate(res.DeletedEnd),
+		},
+		Stitched: res.Stitched,
+	})
+}
+
 type shiftBoundaryPositionRequest struct {
 	TargetEffectiveDate string  `json:"target_effective_date"`
 	NewEffectiveDate    string  `json:"new_effective_date"`
@@ -2634,6 +2828,16 @@ func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request
 		asOf = &t
 	}
 
+	includeInactive := false
+	if raw := strings.TrimSpace(r.URL.Query().Get("include_inactive")); raw != "" {
+		v, err := strconv.ParseBool(raw)
+		if err != nil {
+			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "include_inactive is invalid")
+			return
+		}
+		includeInactive = v
+	}
+
 	subjectID, rows, effectiveDate, err := c.org.GetAssignments(r.Context(), tenantID, subject, asOf)
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -2658,6 +2862,13 @@ func (c *OrgAPIController) GetAssignments(w http.ResponseWriter, r *http.Request
 
 	assignments := make([]assignmentViewRowResponse, 0, len(rows))
 	for _, row := range rows {
+		status := strings.TrimSpace(row.EmploymentStatus)
+		if status == "" {
+			status = "active"
+		}
+		if !includeInactive && status != "active" {
+			continue
+		}
 		assignments = append(assignments, assignmentViewRowResponse{
 			ID:             row.ID,
 			PositionID:     row.PositionID,
@@ -3140,6 +3351,63 @@ func (c *OrgAPIController) RescindAssignment(w http.ResponseWriter, r *http.Requ
 			EffectiveDate: formatValidDate(res.EffectiveDate),
 			EndDate:       formatValidEndDateFromEndDate(res.EndDate),
 		},
+	})
+}
+
+type deleteAssignmentSliceRequest struct {
+	ReasonCode string  `json:"reason_code"`
+	ReasonNote *string `json:"reason_note"`
+}
+
+func (c *OrgAPIController) DeleteAssignmentSlice(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
+	if !ok {
+		return
+	}
+	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgAssignmentsAuthzObject, "admin") {
+		return
+	}
+
+	assignmentID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
+		return
+	}
+
+	var req deleteAssignmentSliceRequest
+	if err := decodeJSON(r.Body, &req); err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	res, err := c.org.DeleteAssignmentAndStitch(r.Context(), tenantID, requestID, initiatorID, services.DeleteAssignmentAndStitchInput{
+		AssignmentID: assignmentID,
+		ReasonCode:   req.ReasonCode,
+		ReasonNote:   req.ReasonNote,
+	})
+	if err != nil {
+		writeServiceError(w, requestID, err)
+		return
+	}
+
+	type deleteAssignmentSliceResponse struct {
+		AssignmentID  string                  `json:"assignment_id"`
+		DeletedWindow effectiveWindowResponse `json:"deleted_window"`
+		StitchedToID  *string                 `json:"stitched_to_assignment_id,omitempty"`
+	}
+	var stitchedTo *string
+	if res.StitchedTo != nil {
+		v := res.StitchedTo.String()
+		stitchedTo = &v
+	}
+	writeJSON(w, http.StatusOK, deleteAssignmentSliceResponse{
+		AssignmentID: res.DeletedAssignmentID.String(),
+		DeletedWindow: effectiveWindowResponse{
+			EffectiveDate: formatValidDate(res.DeletedStart),
+			EndDate:       formatValidEndDateFromEndDate(res.DeletedEnd),
+		},
+		StitchedToID: stitchedTo,
 	})
 }
 
@@ -5111,6 +5379,12 @@ func normalizeValidTimeDayUTC(t time.Time) time.Time {
 	u := t.UTC()
 	y, m, d := u.Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+func openEndedEndDate(endDate time.Time) bool {
+	u := endDate.UTC()
+	y, m, d := u.Date()
+	return y == 9999 && m == time.December && d == 31
 }
 
 func formatValidDate(t time.Time) string {

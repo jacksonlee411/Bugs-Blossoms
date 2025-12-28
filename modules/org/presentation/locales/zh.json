@@ -64,14 +64,15 @@
 						"Position": {
 							"Placeholder": "请先选择部门，再搜索职位"
 						},
-					"Table": {
-						"Pernr": "工号",
-						"Effective": "生效区间",
-						"EventType": "操作类型",
-						"OrgNodeID": "部门",
-						"Position": "职位"
-					}
-			},
+						"Table": {
+							"Pernr": "工号",
+							"Effective": "生效区间",
+							"EventType": "操作类型",
+							"OrgNodeID": "部门",
+							"OrgNodeLongName": "组织长名称",
+							"Position": "职位"
+						}
+				},
 			"Tree": {
 				"Title": "组织树",
 				"Empty": "暂无节点",

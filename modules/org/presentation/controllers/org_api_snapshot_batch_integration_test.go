@@ -61,6 +61,8 @@ func TestOrgAPIController_GetSnapshot_PaginatesWithCursor(t *testing.T) {
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
+		"20251228140000_org_assignment_employment_status.sql",
+		"20251228150000_org_gap_free_constraint_triggers.sql",
 	})
 
 	asOf := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -146,6 +148,8 @@ func TestOrgAPIController_Batch_DryRunHasNoSideEffects(t *testing.T) {
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
+		"20251228140000_org_assignment_employment_status.sql",
+		"20251228150000_org_gap_free_constraint_triggers.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
@@ -207,6 +211,8 @@ func TestOrgAPIController_Batch_InvalidCommandReturnsCommandIndexMeta(t *testing
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
+		"20251228140000_org_assignment_employment_status.sql",
+		"20251228150000_org_gap_free_constraint_triggers.sql",
 	})
 
 	withOrgRolloutEnabled(t, tenantID)

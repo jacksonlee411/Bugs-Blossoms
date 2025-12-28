@@ -120,6 +120,7 @@ type OrgRepository interface {
 	ListPositionsAsOf(ctx context.Context, tenantID uuid.UUID, asOf time.Time, filter PositionListFilter) ([]PositionViewRow, error)
 	GetPositionAsOf(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionViewRow, error)
 	DeletePositionSlicesFrom(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, from time.Time) error
+	DeletePositionSliceByID(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID) error
 	UpdatePositionSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch PositionSliceInPlacePatch) error
 	HasPositionSubordinatesAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (bool, error)
 
@@ -150,6 +151,7 @@ type OrgRepository interface {
 	ListJobProfileAllowedLevels(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]uuid.UUID, error)
 
 	LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (AssignmentRow, error)
+	LockAssignmentForTimelineAt(ctx context.Context, tenantID uuid.UUID, subjectType string, subjectID uuid.UUID, assignmentType string, asOf time.Time) (AssignmentRow, error)
 	TruncateAssignment(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, endDate time.Time) error
 	NextAssignmentEffectiveDate(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, after time.Time) (time.Time, bool, error)
 
@@ -167,14 +169,18 @@ type OrgRepository interface {
 	UpdateNodeSliceEffectiveDate(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, effectiveDate time.Time) error
 	UpdateNodeSliceEndDate(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
 	DeleteNodeSlicesFrom(ctx context.Context, tenantID uuid.UUID, nodeID uuid.UUID, from time.Time) error
+	DeleteNodeSliceByID(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID) error
 
 	LockEdgeStartingAt(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, effectiveDate time.Time) (EdgeRow, error)
+	LockEdgeEndingAt(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, endDate time.Time) (EdgeRow, error)
 	DeleteEdgeByID(ctx context.Context, tenantID uuid.UUID, edgeID uuid.UUID) error
 	DeleteEdgesFrom(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, from time.Time) error
 
 	LockAssignmentByID(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID) (AssignmentRow, error)
+	LockAssignmentEndingAtForTimeline(ctx context.Context, tenantID uuid.UUID, subjectType string, subjectID uuid.UUID, assignmentType string, endDate time.Time) (AssignmentRow, error)
 	UpdateAssignmentInPlace(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, patch AssignmentInPlacePatch) error
 	UpdateAssignmentEndDate(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, endDate time.Time) error
+	DeleteAssignmentByID(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID) error
 
 	UpsertPersonnelEvent(ctx context.Context, tenantID uuid.UUID, in PersonnelEventInsert) (PersonnelEventRow, bool, error)
 }
@@ -248,29 +254,31 @@ type EdgeRow struct {
 }
 
 type AssignmentInsert struct {
-	PositionID      uuid.UUID
-	SubjectType     string
-	SubjectID       uuid.UUID
-	Pernr           string
-	AssignmentType  string
-	IsPrimary       bool
-	AllocatedFTE    float64
-	EffectiveDate   time.Time
-	EndDate         time.Time
-	AssignmentSlice uuid.UUID
+	PositionID       uuid.UUID
+	SubjectType      string
+	SubjectID        uuid.UUID
+	Pernr            string
+	AssignmentType   string
+	IsPrimary        bool
+	AllocatedFTE     float64
+	EmploymentStatus string
+	EffectiveDate    time.Time
+	EndDate          time.Time
+	AssignmentSlice  uuid.UUID
 }
 
 type AssignmentRow struct {
-	ID             uuid.UUID
-	PositionID     uuid.UUID
-	SubjectType    string
-	SubjectID      uuid.UUID
-	Pernr          string
-	AssignmentType string
-	IsPrimary      bool
-	AllocatedFTE   float64
-	EffectiveDate  time.Time
-	EndDate        time.Time
+	ID               uuid.UUID
+	PositionID       uuid.UUID
+	SubjectType      string
+	SubjectID        uuid.UUID
+	Pernr            string
+	AssignmentType   string
+	IsPrimary        bool
+	AllocatedFTE     float64
+	EmploymentStatus string
+	EffectiveDate    time.Time
+	EndDate          time.Time
 }
 
 type AssignmentInPlacePatch struct {
@@ -280,22 +288,23 @@ type AssignmentInPlacePatch struct {
 }
 
 type AssignmentViewRow struct {
-	ID             uuid.UUID  `json:"id"`
-	PositionID     uuid.UUID  `json:"position_id"`
-	OrgNodeID      uuid.UUID  `json:"org_node_id"`
-	AssignmentType string     `json:"assignment_type"`
-	IsPrimary      bool       `json:"is_primary"`
-	AllocatedFTE   float64    `json:"allocated_fte"`
-	EffectiveDate  time.Time  `json:"effective_date"`
-	EndDate        time.Time  `json:"end_date"`
-	PositionCode   *string    `json:"position_code,omitempty"`
-	PositionTitle  *string    `json:"position_title,omitempty"`
-	OrgNodeCode    *string    `json:"org_node_code,omitempty"`
-	OrgNodeName    *string    `json:"org_node_name,omitempty"`
-	Pernr          *string    `json:"pernr,omitempty"`
-	SubjectID      *uuid.UUID `json:"subject_id,omitempty"`
-	StartEventType *string    `json:"start_event_type,omitempty"`
-	EndEventType   *string    `json:"end_event_type,omitempty"`
+	ID               uuid.UUID  `json:"id"`
+	PositionID       uuid.UUID  `json:"position_id"`
+	OrgNodeID        uuid.UUID  `json:"org_node_id"`
+	AssignmentType   string     `json:"assignment_type"`
+	IsPrimary        bool       `json:"is_primary"`
+	AllocatedFTE     float64    `json:"allocated_fte"`
+	EmploymentStatus string     `json:"-"`
+	EffectiveDate    time.Time  `json:"effective_date"`
+	EndDate          time.Time  `json:"end_date"`
+	PositionCode     *string    `json:"position_code,omitempty"`
+	PositionTitle    *string    `json:"position_title,omitempty"`
+	OrgNodeCode      *string    `json:"org_node_code,omitempty"`
+	OrgNodeName      *string    `json:"org_node_name,omitempty"`
+	Pernr            *string    `json:"pernr,omitempty"`
+	SubjectID        *uuid.UUID `json:"subject_id,omitempty"`
+	StartEventType   *string    `json:"start_event_type,omitempty"`
+	EndEventType     *string    `json:"end_event_type,omitempty"`
 }
 
 type OrgService struct {
@@ -1088,6 +1097,78 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			return nil, err
 		}
 
+		if isPrimary {
+			if err := lockTimeline(txCtx, "org_assignments", tenantID, fmt.Sprintf("person:%s:primary", personUUID.String())); err != nil {
+				return nil, err
+			}
+
+			existing, err := s.repo.LockAssignmentForTimelineAt(txCtx, tenantID, "person", personUUID, "primary", in.EffectiveDate)
+			if err == nil {
+				status := strings.TrimSpace(existing.EmploymentStatus)
+				if status == "" {
+					status = "active"
+				}
+				if status != "inactive" {
+					return nil, newServiceError(http.StatusConflict, "ORG_PRIMARY_CONFLICT", "primary assignment conflict", nil)
+				}
+				if !in.EffectiveDate.After(existing.EffectiveDate) {
+					return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_USE_CORRECT", "use correct for in-place updates", nil)
+				}
+				newEnd := truncateEndDateFromNewEffectiveDate(in.EffectiveDate)
+				oldValues := map[string]any{
+					"assignment_id":     existing.ID.String(),
+					"effective_date":    existing.EffectiveDate.UTC().Format(time.RFC3339),
+					"end_date":          existing.EndDate.UTC().Format(time.RFC3339),
+					"employment_status": status,
+					"rehire_truncation": true,
+				}
+				if err := s.repo.UpdateAssignmentEndDate(txCtx, tenantID, existing.ID, newEnd); err != nil {
+					return nil, mapPgError(err)
+				}
+				newValues := map[string]any{
+					"assignment_id":     existing.ID.String(),
+					"effective_date":    existing.EffectiveDate.UTC().Format(time.RFC3339),
+					"end_date":          newEnd.UTC().Format(time.RFC3339),
+					"employment_status": status,
+					"rehire_truncation": true,
+				}
+				_, err := s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+					RequestID:       requestID,
+					TransactionTime: txTime,
+					InitiatorID:     initiatorID,
+					ChangeType:      "assignment.updated",
+					EntityType:      "org_assignment",
+					EntityID:        existing.ID,
+					EffectiveDate:   existing.EffectiveDate,
+					EndDate:         newEnd,
+					OldValues:       oldValues,
+					NewValues:       newValues,
+					Meta: func() map[string]any {
+						meta := map[string]any{
+							"reason_code": reasonCode,
+							"reason_note": in.ReasonNote,
+						}
+						addReasonCodeMeta(meta, reasonInfo)
+						return meta
+					}(),
+					Operation:       "Create",
+					FreezeMode:      freeze.Mode,
+					FreezeViolation: freeze.Violation,
+					FreezeCutoffUTC: freeze.CutoffUTC,
+					AffectedAtUTC:   in.EffectiveDate,
+				})
+				if err != nil {
+					return nil, err
+				}
+				rehireEv := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.updated", "org_assignment", existing.ID, existing.EffectiveDate, newEnd)
+				if err := s.enqueueOutboxEvents(txCtx, tenantID, []events.OrgEventV1{rehireEv}); err != nil {
+					return nil, err
+				}
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+		}
+
 		var positionID uuid.UUID
 		if in.PositionID != nil {
 			positionID = *in.PositionID
@@ -1197,15 +1278,16 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		}
 
 		assignmentID, err := s.repo.InsertAssignment(txCtx, tenantID, AssignmentInsert{
-			PositionID:     positionID,
-			SubjectType:    "person",
-			SubjectID:      personUUID,
-			Pernr:          in.Pernr,
-			AssignmentType: assignmentType,
-			IsPrimary:      isPrimary,
-			AllocatedFTE:   allocatedFTE,
-			EffectiveDate:  in.EffectiveDate,
-			EndDate:        endOfTime,
+			PositionID:       positionID,
+			SubjectType:      "person",
+			SubjectID:        personUUID,
+			Pernr:            in.Pernr,
+			AssignmentType:   assignmentType,
+			IsPrimary:        isPrimary,
+			AllocatedFTE:     allocatedFTE,
+			EmploymentStatus: "active",
+			EffectiveDate:    in.EffectiveDate,
+			EndDate:          endOfTime,
 		})
 		if err != nil {
 			return nil, mapPgError(err)
@@ -1502,15 +1584,16 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 		}
 
 		newID, err := s.repo.InsertAssignment(txCtx, tenantID, AssignmentInsert{
-			PositionID:     positionID,
-			SubjectType:    current.SubjectType,
-			SubjectID:      current.SubjectID,
-			Pernr:          current.Pernr,
-			AssignmentType: current.AssignmentType,
-			IsPrimary:      current.IsPrimary,
-			AllocatedFTE:   newAllocatedFTE,
-			EffectiveDate:  in.EffectiveDate,
-			EndDate:        newEnd,
+			PositionID:       positionID,
+			SubjectType:      current.SubjectType,
+			SubjectID:        current.SubjectID,
+			Pernr:            current.Pernr,
+			AssignmentType:   current.AssignmentType,
+			IsPrimary:        current.IsPrimary,
+			AllocatedFTE:     newAllocatedFTE,
+			EmploymentStatus: current.EmploymentStatus,
+			EffectiveDate:    in.EffectiveDate,
+			EndDate:          newEnd,
 		})
 		if err != nil {
 			return nil, mapPgError(err)

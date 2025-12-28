@@ -69,6 +69,7 @@
           "Effective": "Effective",
           "EventType": "Event type",
           "OrgNodeID": "Department",
+          "OrgNodeLongName": "Org long name",
           "Position": "Position"
         }
       },

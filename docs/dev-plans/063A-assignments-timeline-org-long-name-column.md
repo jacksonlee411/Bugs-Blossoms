@@ -1,6 +1,8 @@
 # DEV-PLAN-063A：任职经历列表新增“组织长名称”列（TDD）
 
 **状态**: 草拟中（2025-12-28 04:13 UTC）
+**对齐更新**：
+- 2025-12-28：对齐 DEV-PLAN-064A（已完成）结论：Valid Time 对外仅 `YYYY-MM-DD`；区间语义为 day 粒度闭区间；本文不再使用/依赖 end-exclusive 口径。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：063A（Org → Assignments 任职经历列表增强）。
@@ -13,6 +15,7 @@
 - Valid Time 按天闭区间（SSOT）：`docs/dev-plans/064-effective-date-day-granularity.md`
 - `effective_on/end_on` 双轨停止线与收敛路径（SSOT）：`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`
 - “组织长名称”拼接规则与失败兜底（参考）：`docs/dev-plans/065-org-node-details-long-name.md`
+- 组织长名称投影（SSOT/复用/N+1 预算）：`docs/dev-plans/068-org-node-long-name-projection.md`
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**：
@@ -51,7 +54,7 @@ graph TD
     B --> F[mappers.AssignmentsToTimeline]
     F --> G[timeline.Rows]
     B --> H[labelAsOfDayForRow(row, pageAsOfDay)]
-    B -->|GetNodePath(orgNodeID, labelAsOfDay)| I[OrgService.GetNodePath]
+    B --> I[pkg/orglabels.ResolveOrgNodeLongNames (pair-batch)]
     I --> E
     B --> J[row.OrgNodeLongName]
     B --> K[orgui.AssignmentsTimeline (.templ)]
@@ -59,10 +62,10 @@ graph TD
 ```
 
 ### 3.2 关键设计决策 (ADR 摘要)
-- **决策 1：长路径计算位置（选定：UI Controller hydrate）**
-  - 选项 A：在 `.templ` 内逐行调用 service（不可控、难测、易形成隐式 N+1）。
-  - 选项 B：在 repo SQL 中联表/递归返回全路径（复杂度高、侵入 DB 层，且与 deep-read 后端选择耦合）。
-  - 选项 C（选定）：在 `OrgUIController` 内基于 `OrgService.GetNodePath(asOf)` hydrate，并用 request-scope cache 去重。
+- **决策 1：长路径获取策略（选定：Controller 侧批量投影，SSOT=DEV-PLAN-068）**
+  - 选项 A：在 `.templ` 内逐行调用（不可控、难测、易形成隐式 N+1）。
+  - 选项 B：在 controller 里对每行调用 `OrgService.GetNodePath(asOf)` + request-scope cache（仍是典型 N+1 形态；且难给出明确 query budget 上界）。
+  - 选项 C（选定）：在 `OrgUIController` 内先收集 `(org_node_id, labelAsOfDay)` 对，调用 `pkg/orglabels.ResolveOrgNodeLongNames` 一次性批量 hydrate（query budget 常数；复用 SSOT 能力，避免重复实现）。
 - **决策 2：行级 as-of 语义（选定：对齐 DEV-PLAN-063）**
   - 选项 A：全表使用页面 `effective_date` → 历史行会漂移为“最新路径”。
   - 选项 B：全表使用行 `EffectiveDate` → 历史语义稳定，但当前行在页面切换时不会反映当日路径变化。
@@ -74,7 +77,7 @@ graph TD
   - `OrgNodeLongName string`：组织长名称（默认空字符串，仅展示用）。
 
 ### 4.2 DB / Schema
-- 无 DB 变更、无迁移、无新索引/约束（路径信息来自既有 `GetNodePath(asOf)`）。
+- 无 DB 变更、无迁移、无新索引/约束（长名称为读时派生；投影能力 SSOT 见 DEV-PLAN-068）。
 
 ### 4.3 Valid Time 表达（对齐 064/064A）
 - 页面输入的 Valid Time 仅使用 `effective_date=YYYY-MM-DD`（day）。
@@ -100,32 +103,40 @@ graph TD
 ```go
 pageAsOfDay := normalizeValidTimeDayUTC(parseYYYYMMDD(query.effective_date))
 rowStartDay := normalizeValidTimeDayUTC(row.EffectiveDate)
-rowEndExclusive := row.EndDate.UTC() // 兼容期仍可能是 end-exclusive（见 064/064A）
+rowEndDay := normalizeValidTimeDayUTC(row.EndDate) // day 闭区间：inclusive end_date（对齐 064/064A）
 
 labelAsOfDay := rowStartDay
-if !pageAsOfDay.Before(rowStartDay) && pageAsOfDay.Before(rowEndExclusive) {
+if !pageAsOfDay.Before(rowStartDay) && !pageAsOfDay.After(rowEndDay) {
     labelAsOfDay = pageAsOfDay
 }
 ```
+注：若该任职行为 open-ended（例如 `end_date` 为 NULL / “至今”），则将 `rowEndDay` 视为无限远，`pageAsOfDay >= rowStartDay` 即命中“区间内”。
 
-### 6.2 `OrgNodeLongName` 计算（request-scope 去重）
+### 6.2 `OrgNodeLongName` 计算（批量投影；不做 per-row 查询）
 ```go
-key := orgNodeID.String() + "|" + labelAsOfDay.Format("2006-01-02")
-if v, ok := cache[key]; ok { return v }
-
-path, err := orgSvc.GetNodePath(ctx, tenantID, orgNodeID, labelAsOfDay)
-if err != nil || path == nil { cache[key] = ""; return "" }
-
-parts := []string{}
-for _, n := range path.Path {
-    part := strings.TrimSpace(n.Name)
-    if part == "" { part = strings.TrimSpace(n.Code) }
-    if part == "" { part = n.ID.String() }
-    parts = append(parts, part)
+queries := []orglabels.OrgNodeLongNameQuery{}
+for _, row := range timeline.Rows {
+    if row.OrgNodeID == nil { continue }
+    labelAsOfDay := labelAsOfDayForRow(row, pageAsOfDay) // DEV-PLAN-063
+    queries = append(queries, orglabels.OrgNodeLongNameQuery{
+        TenantID:  tenantID,
+        OrgNodeID: *row.OrgNodeID,
+        AsOfDay:   labelAsOfDay, // day-only
+    })
 }
-out := strings.Join(parts, " / ")
-cache[key] = out
-return out
+
+names, err := orglabels.ResolveOrgNodeLongNames(ctx, queries)
+if err != nil {
+    // 失败兜底：不 500；该列展示 "—"
+}
+
+for i := range timeline.Rows {
+    row := &timeline.Rows[i]
+    if row.OrgNodeID == nil { continue }
+    labelAsOfDay := labelAsOfDayForRow(*row, pageAsOfDay)
+    key := orglabels.OrgNodeLongNameKey{TenantID: tenantID, OrgNodeID: *row.OrgNodeID, AsOfDay: labelAsOfDay}
+    row.OrgNodeLongName = strings.TrimSpace(names[key])
+}
 ```
 
 ### 6.3 示例（不拆分任职行，只看快照）
@@ -141,17 +152,17 @@ return out
 ## 7. 安全与鉴权 (Security & Authz)
 - 不新增/修改 Casbin policy。
 - 页面仍遵循既有 UI 权限：读取为 `org.assignments:read`；写操作为 `org.assignments:assign`（本计划只增加展示列）。
-- 数据隔离：所有路径查询均通过 `tenantID` 调用 `OrgService.GetNodePath`，不得引入跨租户读取路径。
+- 数据隔离：长名称投影查询必须带 `tenantID`（调用 `pkg/orglabels`）；不得引入跨租户读取路径。
 
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 - **依赖**：
-  - `OrgService.GetNodePath(asOf)` 可用（见 `docs/dev-plans/033-org-visualization-and-reporting.md` / `docs/dev-plans/065-org-node-details-long-name.md`）。
+  - 组织长名称投影能力（DEV-PLAN-068）已落地并可复用：`pkg/orglabels`。
   - 行级 as-of 语义以 `docs/dev-plans/063-assignment-timeline-org-labels-by-effective-slice.md` 为准。
   - Valid Time 停止线以 `docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md` 为准。
 - **里程碑**：
   1. [ ] i18n：新增 `Org.UI.Assignments.Table.OrgNodeLongName`，并通过 `make check tr`。
   2. [ ] ViewModel：扩展 `OrgAssignmentRow`，并补齐 mapper 初始化。
-  3. [ ] Controller：hydrate `OrgNodeLongName`（行级 `labelAsOfDay` + request-scope cache + 失败兜底）。
+  3. [ ] Controller：hydrate `OrgNodeLongName`（行级 `labelAsOfDay` + `pkg/orglabels` 批量投影 + 失败兜底）。
   4. [ ] Templ：更新 `assignments.templ` 表头与单元格；执行 `make generate && make css` 并提交生成物。
   5. [ ] 验证与留证：按 DEV-PLAN-044 本地复现并截图（至少 1 张展示新增列与值）。
 
@@ -176,18 +187,18 @@ return out
 ## 11. DEV-PLAN-045 评审（Simple > Easy）
 ### 结构（解耦/边界）
 - [x] 变更局部：仅新增“组织长名称”展示列与对应 hydrate，不引入新 service/新 API/新持久化字段。
-- [x] 边界清晰：长路径计算集中在 `OrgUIController`（request-scope cache 去重），复用 `OrgService.GetNodePath(asOf)`，避免把复杂度塞进模板或 DB 递归 SQL。
+- [x] 边界清晰：hydrate 仍集中在 `OrgUIController`，但长名称解析复用 `pkg/orglabels`（DEV-PLAN-068，SSOT），避免 per-row service 调用与模板内隐式查询。
 - [x] 单一权威表达：Valid Time 对外只使用 `effective_date=YYYY-MM-DD`；对齐 064A 停止线，不新增/扩散 `effective_on/end_on`。
 
 ### 演化（规格/确定性）
 - [x] Spec 可执行：已按 001 模板补齐架构图/ADR/算法/契约/验收标准，实施不需要再“对话式补丁”。
-- [ ] 实施阶段如发现 `GetNodePath` 在时间线行数较大时带来不可接受的延迟，应先更新本计划的性能策略（例如批量化/上界/降级展示）再改实现，避免 Vibe Coding。
+- [x] 性能策略前置：明确采用 `pkg/orglabels` 的 pair-batch 单 SQL 投影，避免 N+1；如后续需要更强约束（例如 query budget 证明/trace 证据），应先更新本计划再改实现。
 
 ### 认知（本质/偶然复杂度）
 - [x] 复杂度对应明确不变量：每条任职行展示“当时路径快照”，并允许通过切换页面 `effective_date` 在有效期内查看指定日期快照（但不拆分任职行）。
 - [x] 偶然复杂度隔离：与 064/064A 的迁移期字段/语义仅通过“停止线”约束进入本计划，不把双轨映射规则扩散为新概念。
 
 ### 维护（可理解/可解释）
-- [x] 5 分钟可解释：计算 `labelAsOfDay` → `GetNodePath(asOf)` → 拼接 → 渲染/兜底；失败路径明确且不影响其他列。
+- [x] 5 分钟可解释：计算 `labelAsOfDay` → 批量投影 `ResolveOrgNodeLongNames` → 渲染/兜底；失败路径明确且不影响其他列。
 
 结论：通过（建议：实现时抽出 `labelAsOfDayForRow` 小 helper 并复用，避免未来复制粘贴漂移）。 

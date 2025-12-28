@@ -31,6 +31,7 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
+	"github.com/iota-uz/iota-sdk/pkg/orglabels"
 )
 
 type OrgUIController struct {
@@ -4084,23 +4085,12 @@ func (c *OrgUIController) orgNodeLongNameFor(r *http.Request, tenantID uuid.UUID
 	if nodeID == uuid.Nil {
 		return ""
 	}
-	path, err := c.org.GetNodePath(r.Context(), tenantID, nodeID, asOf)
-	if err != nil || path == nil {
+
+	longNames, err := orglabels.ResolveOrgNodeLongNamesAsOf(r.Context(), tenantID, asOf, []uuid.UUID{nodeID})
+	if err != nil {
 		return ""
 	}
-
-	parts := make([]string, 0, len(path.Path))
-	for _, n := range path.Path {
-		part := strings.TrimSpace(n.Name)
-		if part == "" {
-			part = strings.TrimSpace(n.Code)
-		}
-		if part == "" {
-			part = n.ID.String()
-		}
-		parts = append(parts, part)
-	}
-	return strings.Join(parts, " / ")
+	return strings.TrimSpace(longNames[nodeID])
 }
 
 func (c *OrgUIController) orgNodeLabelFor(r *http.Request, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) string {
@@ -4171,22 +4161,81 @@ func (c *OrgUIController) hydrateAssignmentsTimelineLabels(r *http.Request, tena
 		pageAsOf = normalizeValidTimeDayUTC(time.Now().UTC())
 	}
 
+	labelAsOfDays := make([]time.Time, len(timeline.Rows))
+	queries := make([]orglabels.OrgNodeLongNameQuery, 0, len(timeline.Rows))
+
 	for i := range timeline.Rows {
 		rowStart := normalizeValidTimeDayUTC(timeline.Rows[i].EffectiveDate)
 		if rowStart.IsZero() {
 			continue
 		}
 
-		rowEnd := timeline.Rows[i].EndDate.UTC()
-		if rowEnd.IsZero() {
+		rowEndDay := normalizeValidTimeDayUTC(timeline.Rows[i].EndDate)
+		if rowEndDay.IsZero() {
 			continue
 		}
 
-		if !pageAsOf.Before(rowStart) && pageAsOf.Before(rowEnd) && !pageAsOf.Equal(rowStart) {
-			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, pageAsOf)
-			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, pageAsOf, strings.TrimSpace(timeline.Rows[i].PositionCode))
+		labelAsOfDay := labelAsOfDayForAssignmentRow(pageAsOf, rowStart, rowEndDay)
+		labelAsOfDays[i] = labelAsOfDay
+
+		if !labelAsOfDay.Equal(rowStart) {
+			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, labelAsOfDay)
+			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, labelAsOfDay, strings.TrimSpace(timeline.Rows[i].PositionCode))
+		}
+
+		if timeline.Rows[i].OrgNodeID != uuid.Nil {
+			queries = append(queries, orglabels.OrgNodeLongNameQuery{
+				OrgNodeID: timeline.Rows[i].OrgNodeID,
+				AsOfDay:   labelAsOfDay,
+			})
 		}
 	}
+
+	if len(queries) == 0 {
+		return
+	}
+
+	longNamesByKey, err := orglabels.ResolveOrgNodeLongNames(r.Context(), tenantID, queries)
+	if err != nil {
+		return
+	}
+
+	for i := range timeline.Rows {
+		if timeline.Rows[i].OrgNodeID == uuid.Nil {
+			continue
+		}
+		labelAsOfDay := labelAsOfDays[i]
+		if labelAsOfDay.IsZero() {
+			continue
+		}
+
+		timeline.Rows[i].OrgNodeLongName = strings.TrimSpace(longNamesByKey[orglabels.OrgNodeLongNameKey{
+			OrgNodeID: timeline.Rows[i].OrgNodeID,
+			AsOfDate:  labelAsOfDay.Format(time.DateOnly),
+		}])
+	}
+}
+
+func labelAsOfDayForAssignmentRow(pageAsOfDay, rowStartDay, rowEndDay time.Time) time.Time {
+	pageAsOfDay = normalizeValidTimeDayUTC(pageAsOfDay)
+	rowStartDay = normalizeValidTimeDayUTC(rowStartDay)
+	rowEndDay = normalizeValidTimeDayUTC(rowEndDay)
+
+	if rowStartDay.IsZero() || rowEndDay.IsZero() {
+		return rowStartDay
+	}
+
+	if openEndedEndDate(rowEndDay) {
+		if !pageAsOfDay.Before(rowStartDay) {
+			return pageAsOfDay
+		}
+		return rowStartDay
+	}
+
+	if !pageAsOfDay.Before(rowStartDay) && !pageAsOfDay.After(rowEndDay) {
+		return pageAsOfDay
+	}
+	return rowStartDay
 }
 
 func tenantAndUserFromContext(r *http.Request) (uuid.UUID, coreuser.User, bool) {
