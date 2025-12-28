@@ -204,5 +204,6 @@ modules/{module}/
 - 任职时间线部门/职位名称按时间切片渲染（DEV-PLAN-063）：`docs/dev-plans/063-assignment-timeline-org-labels-by-effective-slice.md`
 - 生效日期（日粒度）统一：Valid Time=DATE，Audit Time=TIMESTAMPTZ（DEV-PLAN-064）：`docs/dev-plans/064-effective-date-day-granularity.md`
 - 组织架构详情页显示“组织长名称”（DEV-PLAN-065）：`docs/dev-plans/065-org-node-details-long-name.md`
+- 职位分类字段 UI 贯通 + Job Catalog 维护入口（二级目录）（DEV-PLAN-067）：`docs/dev-plans/067-position-classification-ui-and-job-catalog-nav.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
