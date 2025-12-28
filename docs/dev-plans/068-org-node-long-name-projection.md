@@ -1,6 +1,6 @@
 # DEV-PLAN-068：组织长名称投影（OrgNodeLongName Projection）详细设计
 
-**状态**: 规划中（2025-12-28 07:44 UTC）
+**状态**: 规划中（2025-12-28 08:01 UTC）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：在 HRMS 中，几乎所有“列表/报表”都会引用组织信息（任职记录、员工花名册、薪资明细等）；仅展示“部门短名称”在同名部门、频繁 Move/Rename 的场景下歧义很大。
@@ -34,7 +34,7 @@
 - **触发器清单（实施阶段将命中）**：
   - [ ] Go 代码（见 `AGENTS.md`）
   - [ ] DB 读查询/可能涉及 schema（若引入 SQL function/view，则按 `AGENTS.md` 的 DB 门禁执行）
-  - [X] 文档（本计划）：已执行 `make check doc`（docs gate: OK，2025-12-28 05:50 UTC；docs gate: no new files detected，2025-12-28 07:27 UTC；docs gate: no new files detected，2025-12-28 07:44 UTC）
+  - [X] 文档（本计划）：已执行 `make check doc`（docs gate: OK，2025-12-28 05:50 UTC；docs gate: no new files detected，2025-12-28 07:27 UTC；docs gate: no new files detected，2025-12-28 07:44 UTC；docs gate: no new files detected，2025-12-28 08:01 UTC）
 - **SSOT 链接**：
   - 触发器矩阵与本地必跑：`AGENTS.md`
   - 命令入口：`Makefile`
@@ -225,6 +225,24 @@ GROUP BY org_node_id, as_of_day;
 ## 8. 依赖与里程碑 (Dependencies & Milestones)
 - **依赖（SSOT）**：
   - Valid Time day 语义与停止线：`docs/dev-plans/064-effective-date-day-granularity.md`、`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`
+
+### 8.0 实施前置条件（Readiness）
+> 本节用于回答“现在是否能开始写代码”。任一项未满足时，应先补齐/澄清，再进入实现阶段（避免 Vibe Coding）。
+
+1. [ ] **Contract First**：`DEV-PLAN-068`（本文件）已合并到 `main`，且包含：
+   - date-only（对齐 064A）口径；
+   - pair-batch（mixed as-of）单 query 约束；
+   - query budget 数值（1 query）与留证方式；
+   - 现有使用点盘点与改造策略（§8.1）。
+2. [ ] **Schema/索引就绪**（无需新增迁移即可支撑 1-query 投影）：
+   - `org_edges.path` 为 `ltree`，且存在 `org_edges_tenant_path_gist_idx`；
+   - `org_edges.effective_date/end_date` 为 `date`，并按 day 闭区间查询；
+   - `org_node_slices_tenant_node_effective_idx` 存在（as-of lookup 不退化为全表扫描）。
+3. [ ] **接口输入已收紧**：Org Valid Time 输入仅接受 `YYYY-MM-DD`（064A 已完成），实现中不得回退为 RFC3339 兼容分支。
+4. [ ] **性能门禁可执行**：确定 query budget test 的落点与复用数据种子（参考 `modules/org/services/org_057_reports_query_budget_test.go`），并能在 CI/本地可选跳过策略下稳定运行。
+5. [ ] **影响面确认**：完成一次全仓盘点并更新 §8.1（如有新增）：
+   - `rg -n "GetNodePath\\(" modules pkg` 的命中点与“是否需要改造”的结论一致；
+   - 新增/改造的页面不得在 `.templ` 内逐行调用 service 取长路径。
 - **里程碑（建议按 PR 切分）**：
   1. [ ] 引入 `pkg/orglabels`（批量解析 + 拼接/兜底 SSOT）。
   2. [ ] 为 1 个“高行数”用例补齐 query budget 测试，证明无 N+1（参考 `modules/org/services/org_057_reports_query_budget_test.go`）。
