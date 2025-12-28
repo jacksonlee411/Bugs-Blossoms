@@ -202,6 +202,7 @@ modules/{module}/
 - 任职（人员）生效日期 + 操作类型（DEV-PLAN-061A1）：`docs/dev-plans/061A1-person-assignment-effective-date-and-action-type.md`
 - 任职记录（Job Data）入口收敛：唯一写入口（DEV-PLAN-062）：`docs/dev-plans/062-job-data-entry-consolidation.md`
 - 任职时间线部门/职位名称按时间切片渲染（DEV-PLAN-063）：`docs/dev-plans/063-assignment-timeline-org-labels-by-effective-slice.md`
+- 任职经历列表新增“组织长名称”列（DEV-PLAN-063A）：`docs/dev-plans/063A-assignments-timeline-org-long-name-column.md`
 - 生效日期（日粒度）统一：Valid Time=DATE，Audit Time=TIMESTAMPTZ（DEV-PLAN-064）：`docs/dev-plans/064-effective-date-day-granularity.md`
 - Valid Time 字段唯一性评审（DEV-PLAN-064A）：`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`
 - 组织架构详情页显示“组织长名称”（DEV-PLAN-065）：`docs/dev-plans/065-org-node-details-long-name.md`
