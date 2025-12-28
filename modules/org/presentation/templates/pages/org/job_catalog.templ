@@ -71,6 +71,69 @@ type JobCatalogHeaderProps struct {
 	EffectiveDate string
 }
 
+func jobFamilyGroupCode(row *viewmodels.JobFamilyGroupRow) string {
+	if row == nil {
+		return ""
+	}
+	return row.Code
+}
+
+func jobFamilyGroupName(row *viewmodels.JobFamilyGroupRow) string {
+	if row == nil {
+		return ""
+	}
+	return row.Name
+}
+
+func jobFamilyCode(row *viewmodels.JobFamilyRow) string {
+	if row == nil {
+		return ""
+	}
+	return row.Code
+}
+
+func jobFamilyName(row *viewmodels.JobFamilyRow) string {
+	if row == nil {
+		return ""
+	}
+	return row.Name
+}
+
+func jobRoleCode(row *viewmodels.JobRoleRow) string {
+	if row == nil {
+		return ""
+	}
+	return row.Code
+}
+
+func jobRoleName(row *viewmodels.JobRoleRow) string {
+	if row == nil {
+		return ""
+	}
+	return row.Name
+}
+
+func jobLevelCode(row *viewmodels.JobLevelRow) string {
+	if row == nil {
+		return ""
+	}
+	return row.Code
+}
+
+func jobLevelName(row *viewmodels.JobLevelRow) string {
+	if row == nil {
+		return ""
+	}
+	return row.Name
+}
+
+func jobLevelDisplayOrder(row *viewmodels.JobLevelRow) string {
+	if row == nil {
+		return "0"
+	}
+	return fmt.Sprintf("%d", row.DisplayOrder)
+}
+
 templ JobCatalogHeader(props JobCatalogHeaderProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
 	<div class="flex items-center justify-between gap-4 flex-wrap">
@@ -326,7 +389,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
 									Attrs: templ.Attributes{
 										"name":     "code",
-										"value":    ternaryString(isEdit, props.EditFamilyGroup.Code, ""),
+										"value":    jobFamilyGroupCode(props.EditFamilyGroup),
 										"readonly": isEdit,
 									},
 								})
@@ -334,7 +397,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
 									Attrs: templ.Attributes{
 										"name":  "name",
-										"value": ternaryString(isEdit, props.EditFamilyGroup.Name, ""),
+										"value": jobFamilyGroupName(props.EditFamilyGroup),
 									},
 								})
 								@base.Select(&base.SelectProps{
@@ -434,7 +497,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
 										Attrs: templ.Attributes{
 											"name":     "code",
-											"value":    ternaryString(isEdit, props.EditFamily.Code, ""),
+											"value":    jobFamilyCode(props.EditFamily),
 											"readonly": isEdit,
 										},
 									})
@@ -442,7 +505,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
 										Attrs: templ.Attributes{
 											"name":  "name",
-											"value": ternaryString(isEdit, props.EditFamily.Name, ""),
+											"value": jobFamilyName(props.EditFamily),
 										},
 									})
 									@base.Select(&base.SelectProps{
@@ -544,7 +607,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
 										Attrs: templ.Attributes{
 											"name":     "code",
-											"value":    ternaryString(isEdit, props.EditRole.Code, ""),
+											"value":    jobRoleCode(props.EditRole),
 											"readonly": isEdit,
 										},
 									})
@@ -552,7 +615,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
 										Attrs: templ.Attributes{
 											"name":  "name",
-											"value": ternaryString(isEdit, props.EditRole.Name, ""),
+											"value": jobRoleName(props.EditRole),
 										},
 									})
 									@base.Select(&base.SelectProps{
@@ -655,7 +718,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
 										Attrs: templ.Attributes{
 											"name":     "code",
-											"value":    ternaryString(isEdit, props.EditLevel.Code, ""),
+											"value":    jobLevelCode(props.EditLevel),
 											"readonly": isEdit,
 										},
 									})
@@ -663,14 +726,14 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
 										Attrs: templ.Attributes{
 											"name":  "name",
-											"value": ternaryString(isEdit, props.EditLevel.Name, ""),
+											"value": jobLevelName(props.EditLevel),
 										},
 									})
 									@input.Number(&input.Props{
 										Label: pageCtx.T("Org.UI.JobCatalog.Fields.DisplayOrder"),
 										Attrs: templ.Attributes{
 											"name":  "display_order",
-											"value": ternaryString(isEdit, fmt.Sprintf("%d", props.EditLevel.DisplayOrder), "0"),
+											"value": jobLevelDisplayOrder(props.EditLevel),
 										},
 									})
 									@base.Select(&base.SelectProps{
