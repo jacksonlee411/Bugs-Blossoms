@@ -342,3 +342,53 @@ graph TD
 
 ## 11. 运维与监控 (Ops & Monitoring)
 - 本计划不新增运行时监控/开关；排障继续使用现有 request-id 关联与 Playwright trace（如需）。
+
+## 12. UI 验证记录（按 DEV-PLAN-044）
+> 交付口径：不是“我看过了”，而是“我能复现并证明”。本章节给出可复现脚本、证据落点与按页面的评估结论（P0/P1/P2）。
+
+### 12.1 可复现入口（脚本化）
+- 证据脚本：`e2e/tests/org/dev-plan-067-ui-verification.spec.ts`
+  - 覆盖 3 个 viewport：`mobile`（390×844）、`laptop`（1366×768）、`desktop`（1920×1080）
+  - 主路径：`/org/nodes`、`/org/positions`（Create position 抽屉 + Job Catalog 四级级联选择）、`/org/job-catalog`（四级切换）
+  - 关键边界：无权限用户访问 `/org/job-catalog` 显示 `Permission required`
+  - 关键交互：在 Position Create 抽屉里验证 Org node combobox 选中 chip 不重复渲染（避免 HTMX swap 后 Alpine double-init 导致重复）
+- 证据产物目录（不入库）：`tmp/ui-verification/dev-plan-067/latest/`
+  - 注意：Playwright 默认会清理 `e2e/test-results/`，因此证据需落到仓库 `tmp/`（已在 `.gitignore` 排除）。
+- 本地复现命令：`cd e2e && npx playwright test tests/org/dev-plan-067-ui-verification.spec.ts --workers=1 --reporter=list`
+
+### 12.2 页面评估报告（P0/P1/P2）
+#### 12.2.1 `/org/job-catalog`（Job Catalog）
+- 主路径：四级页内分组导航切换（Family Groups / Families / Roles / Levels），Admin 可 Create/Edit，Read 只读。
+- 布局评估：
+  - P0：无
+  - P1：无
+  - P2：移动端下页内分组导航占用首屏高度较多（在 Levels 视图还叠加 3 个父级过滤器），首屏需要滚动才能看到列表区；可考虑在移动端把过滤器折叠为可展开区域或吸顶折叠。
+- 交互评估：
+  - P0（已修复）：`/org/job-catalog` 曾出现 500（nil pointer），原因是模板里对 `props.Edit*` 指针的非惰性求值（Go 先求值参数），已改为 nil-safe helper（见 `modules/org/presentation/templates/pages/org/job_catalog.templ`）。
+  - P1：无
+  - P2：无
+- 证据：`tmp/ui-verification/dev-plan-067/latest/` 下以 `org-job-catalog-*` 命名的截图（含 unauthorized 证据）。
+
+#### 12.2.2 `/org/positions`（职位管理）
+- 主路径：选择组织节点 → 打开 Create/Edit 抽屉 → 维护 `position_type/employment_type/job_*_code` → 保存。
+- 布局评估：
+  - P0：无
+  - P1：无
+  - P2：移动端过滤器区较长，首屏信息密度偏高（但不影响主路径）；可考虑移动端将过滤器折叠或改为“筛选”抽屉。
+- 交互评估：
+  - P0：无
+  - P1：无
+  - P2（已修复）：Position Create 抽屉中的 Org node combobox 在 HTMX swap 后出现选中 chip 重复渲染（Remove 按钮重复）；根因是手动 `Alpine.initTree()` 与 Alpine v3 MutationObserver 重复初始化导致重复克隆，已将 `modules/core/presentation/assets/js/lib/htmx-alpine-init.js` 调整为 no-op 以避免 double-init。
+- 证据：`tmp/ui-verification/dev-plan-067/latest/org-positions*` 截图。
+
+#### 12.2.3 `/org/nodes`（组织架构）
+- 主路径：Tree + Details 双栏；可创建节点并在右侧查看详情。
+- 布局评估：
+  - P0：无
+  - P1：无
+  - P2：移动端双栏纵向堆叠时，Tree 与 Details 卡片高度都较大，首屏有效信息较少；可考虑 Details 在移动端默认折叠或延迟渲染（选中节点后再展示）。
+- 交互评估：
+  - P0：无
+  - P1：无
+  - P2：无
+- 证据：`tmp/ui-verification/dev-plan-067/latest/org-nodes*` 截图。
