@@ -41,6 +41,8 @@ func TestOrgAPIController_Nodes_CreateUpdateMove_EmitsOutboxEvents(t *testing.T)
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
+		"20251228140000_org_assignment_employment_status.sql",
+		"20251228150000_org_gap_free_constraint_triggers.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
@@ -242,6 +244,8 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
+		"20251228140000_org_assignment_employment_status.sql",
+		"20251228150000_org_gap_free_constraint_triggers.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 

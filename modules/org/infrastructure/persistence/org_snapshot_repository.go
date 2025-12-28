@@ -190,6 +190,7 @@ func (r *OrgRepository) ListSnapshotAssignments(ctx context.Context, tenantID uu
 	    'assignment_type', a.assignment_type,
 	    'is_primary', a.is_primary,
 	    'allocated_fte', a.allocated_fte,
+	    'employment_status', a.employment_status,
 	    'effective_date', a.effective_date,
 	    'end_date', a.end_date
 	  ) AS new_values
@@ -197,6 +198,7 @@ func (r *OrgRepository) ListSnapshotAssignments(ctx context.Context, tenantID uu
 	WHERE a.tenant_id = $1
   AND a.effective_date <= $2
   AND a.end_date >= $2
+  AND a.employment_status = 'active'
   AND ($3::uuid IS NULL OR a.id > $3)
 `
 	args := []any{pgUUID(tenantID), pgValidDate(asOf), pgNullableUUID(afterID), limit}

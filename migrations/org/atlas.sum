@@ -1,4 +1,4 @@
-h1:LsOsKk/1LMcDiG6/vxexUq7C299cim7KQftYStNDCwo=
+h1:/X3nxweER9Y0vCWTqABtHquUcGxpHd6VjrJMytFLJHw=
 00001_org_baseline.sql h1:HKEUK9io9zwPWO60nEqXEqYxCigSLmO1D/mRcH82dhQ=
 00002_org_migration_smoke.sql h1:D9VgnC2eBDeHyMVqBzEP1/rtMwdtRkcpCGqPwg1L7Gw=
 20251218005114_org_placeholders_and_event_contracts.sql h1:TSQBkvi1nm7SCw+q2BX6ltB/V2naYuznwC923I2PH88=
@@ -13,3 +13,5 @@ h1:LsOsKk/1LMcDiG6/vxexUq7C299cim7KQftYStNDCwo=
 20251222120000_org_personnel_events.sql h1:4HQRyUYYKhLlH4RkdCeGTYEeAIScuz+9qZyoESE1bSU=
 20251227090000_org_valid_time_day_granularity.sql h1:1PQcs2PdXriGHrheDBFF7QKxIKHjTadjPIcqPAHh3es=
 20251228120000_org_eliminate_effective_on_end_on.sql h1:ShKsvlDf7P5uDS9/rQWKy8yLiU5dod89w25CtD0Futk=
+20251228140000_org_assignment_employment_status.sql h1:Jl3nPTqN7LeBfXgDHoSeoxwdNC+chPCM0wVxT+UrDL0=
+20251228150000_org_gap_free_constraint_triggers.sql h1:Wc+G+TGXxbWDOduKnKlS0hMyd6SSQLDc4EDR7I8wSHs=

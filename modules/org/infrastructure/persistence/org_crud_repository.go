@@ -581,6 +581,7 @@ func (r *OrgRepository) SumAllocatedFTEAt(ctx context.Context, tenantID uuid.UUI
 	WHERE tenant_id=$1
 	  AND position_id=$2
 	  AND assignment_type='primary'
+	  AND employment_status='active'
 	  AND effective_date <= $3
 	  AND end_date >= $3
 	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(asOf)).Scan(&sum); err != nil {
@@ -604,6 +605,7 @@ func (r *OrgRepository) LockAssignmentAt(ctx context.Context, tenantID uuid.UUID
 		assignment_type,
 		is_primary,
 		allocated_fte,
+		employment_status,
 		effective_date,
 		end_date
 FROM org_assignments
@@ -620,6 +622,56 @@ FOR UPDATE
 		&out.AssignmentType,
 		&out.IsPrimary,
 		&out.AllocatedFTE,
+		&out.EmploymentStatus,
+		&out.EffectiveDate,
+		&out.EndDate,
+	); err != nil {
+		return services.AssignmentRow{}, err
+	}
+	return out, nil
+}
+
+func (r *OrgRepository) LockAssignmentForTimelineAt(ctx context.Context, tenantID uuid.UUID, subjectType string, subjectID uuid.UUID, assignmentType string, asOf time.Time) (services.AssignmentRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return services.AssignmentRow{}, err
+	}
+	row := tx.QueryRow(ctx, `
+	SELECT
+		id,
+		position_id,
+		subject_type,
+		subject_id,
+		pernr,
+		assignment_type,
+		is_primary,
+		allocated_fte,
+		employment_status,
+		effective_date,
+		end_date
+	FROM org_assignments
+	WHERE tenant_id=$1
+		AND subject_type=$2
+		AND subject_id=$3
+		AND assignment_type=$4
+		AND effective_date <= $5
+		AND end_date >= $5
+	ORDER BY effective_date DESC
+	LIMIT 1
+	FOR UPDATE
+	`, pgUUID(tenantID), subjectType, pgUUID(subjectID), assignmentType, pgValidDate(asOf))
+
+	var out services.AssignmentRow
+	if err := row.Scan(
+		&out.ID,
+		&out.PositionID,
+		&out.SubjectType,
+		&out.SubjectID,
+		&out.Pernr,
+		&out.AssignmentType,
+		&out.IsPrimary,
+		&out.AllocatedFTE,
+		&out.EmploymentStatus,
 		&out.EffectiveDate,
 		&out.EndDate,
 	); err != nil {
@@ -675,12 +727,13 @@ func (r *OrgRepository) InsertAssignment(ctx context.Context, tenantID uuid.UUID
 		assignment_type,
 			is_primary,
 			allocated_fte,
+			employment_status,
 			effective_date,
 			end_date
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 		RETURNING id
-		`, pgUUID(tenantID), pgUUID(assignment.PositionID), assignment.SubjectType, pgUUID(assignment.SubjectID), assignment.Pernr, assignment.AssignmentType, assignment.IsPrimary, assignment.AllocatedFTE, pgValidDate(assignment.EffectiveDate), pgValidDate(assignment.EndDate)).Scan(&id); err != nil {
+		`, pgUUID(tenantID), pgUUID(assignment.PositionID), assignment.SubjectType, pgUUID(assignment.SubjectID), assignment.Pernr, assignment.AssignmentType, assignment.IsPrimary, assignment.AllocatedFTE, assignment.EmploymentStatus, pgValidDate(assignment.EffectiveDate), pgValidDate(assignment.EndDate)).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	return id, nil
@@ -700,6 +753,7 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 		a.assignment_type,
 		a.is_primary,
 		a.allocated_fte,
+		a.employment_status,
 		a.effective_date,
 		a.end_date,
 		p.code AS position_code,
@@ -767,6 +821,7 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			&v.AssignmentType,
 			&v.IsPrimary,
 			&v.AllocatedFTE,
+			&v.EmploymentStatus,
 			&v.EffectiveDate,
 			&v.EndDate,
 			&positionCode,
@@ -809,6 +864,7 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 		a.assignment_type,
 		a.is_primary,
 		a.allocated_fte,
+		a.employment_status,
 		a.effective_date,
 		a.end_date,
 		(
@@ -857,6 +913,7 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 			&v.AssignmentType,
 			&v.IsPrimary,
 			&v.AllocatedFTE,
+			&v.EmploymentStatus,
 			&v.EffectiveDate,
 			&v.EndDate,
 			&startEventType,

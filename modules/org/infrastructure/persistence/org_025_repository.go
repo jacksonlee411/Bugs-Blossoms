@@ -227,6 +227,15 @@ func (r *OrgRepository) DeleteNodeSlicesFrom(ctx context.Context, tenantID uuid.
 	return err
 }
 
+func (r *OrgRepository) DeleteNodeSliceByID(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID) error {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `DELETE FROM org_node_slices WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID))
+	return err
+}
+
 func (r *OrgRepository) LockEdgeStartingAt(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, effectiveDate time.Time) (services.EdgeRow, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
@@ -246,6 +255,35 @@ WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND effective_date
 LIMIT 1
 FOR UPDATE
 `, pgUUID(tenantID), hierarchyType, pgUUID(childID), pgValidDate(effectiveDate))
+
+	var out services.EdgeRow
+	var parent pgtype.UUID
+	if err := row.Scan(&out.ID, &parent, &out.ChildNodeID, &out.Path, &out.Depth, &out.EffectiveDate, &out.EndDate); err != nil {
+		return services.EdgeRow{}, err
+	}
+	out.ParentNodeID = nullableUUID(parent)
+	return out, nil
+}
+
+func (r *OrgRepository) LockEdgeEndingAt(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childID uuid.UUID, endDate time.Time) (services.EdgeRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return services.EdgeRow{}, err
+	}
+	row := tx.QueryRow(ctx, `
+SELECT
+	id,
+	parent_node_id,
+	child_node_id,
+	path::text,
+	depth,
+	effective_date,
+	end_date
+FROM org_edges
+WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND end_date=$4
+LIMIT 1
+FOR UPDATE
+`, pgUUID(tenantID), hierarchyType, pgUUID(childID), pgValidDate(endDate))
 
 	var out services.EdgeRow
 	var parent pgtype.UUID
@@ -289,6 +327,7 @@ func (r *OrgRepository) LockAssignmentByID(ctx context.Context, tenantID uuid.UU
 		assignment_type,
 		is_primary,
 		allocated_fte,
+		employment_status,
 		effective_date,
 		end_date
 	FROM org_assignments
@@ -305,6 +344,49 @@ func (r *OrgRepository) LockAssignmentByID(ctx context.Context, tenantID uuid.UU
 		&out.AssignmentType,
 		&out.IsPrimary,
 		&out.AllocatedFTE,
+		&out.EmploymentStatus,
+		&out.EffectiveDate,
+		&out.EndDate,
+	); err != nil {
+		return services.AssignmentRow{}, err
+	}
+	return out, nil
+}
+
+func (r *OrgRepository) LockAssignmentEndingAtForTimeline(ctx context.Context, tenantID uuid.UUID, subjectType string, subjectID uuid.UUID, assignmentType string, endDate time.Time) (services.AssignmentRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return services.AssignmentRow{}, err
+	}
+	row := tx.QueryRow(ctx, `
+	SELECT
+		id,
+		position_id,
+		subject_type,
+		subject_id,
+		pernr,
+		assignment_type,
+		is_primary,
+		allocated_fte,
+		employment_status,
+		effective_date,
+		end_date
+	FROM org_assignments
+	WHERE tenant_id=$1 AND subject_type=$2 AND subject_id=$3 AND assignment_type=$4 AND end_date=$5
+	LIMIT 1
+	FOR UPDATE
+	`, pgUUID(tenantID), subjectType, pgUUID(subjectID), assignmentType, pgValidDate(endDate))
+	var out services.AssignmentRow
+	if err := row.Scan(
+		&out.ID,
+		&out.PositionID,
+		&out.SubjectType,
+		&out.SubjectID,
+		&out.Pernr,
+		&out.AssignmentType,
+		&out.IsPrimary,
+		&out.AllocatedFTE,
+		&out.EmploymentStatus,
 		&out.EffectiveDate,
 		&out.EndDate,
 	); err != nil {
@@ -347,6 +429,15 @@ func (r *OrgRepository) UpdateAssignmentEndDate(ctx context.Context, tenantID uu
 		return err
 	}
 	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), pgValidDate(endDate))
+	return err
+}
+
+func (r *OrgRepository) DeleteAssignmentByID(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID) error {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `DELETE FROM org_assignments WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID))
 	return err
 }
 
