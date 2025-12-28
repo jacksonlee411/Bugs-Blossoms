@@ -1,6 +1,6 @@
 # DEV-PLAN-063A：任职经历列表新增“组织长名称”列（TDD）
 
-**状态**: 草拟中（2025-12-28 03:25 UTC）
+**状态**: 草拟中（2025-12-28 04:00 UTC）
 
 ## 1. 背景与上下文 (Context)
 - 入口页面：`/org/assignments?effective_date=2025-12-28&pernr=004`
@@ -10,6 +10,7 @@
 **相关计划/约束**
 - 行级 labelAsOf 语义（避免历史语义被页面 as-of 覆盖）：`docs/dev-plans/063-assignment-timeline-org-labels-by-effective-slice.md`
 - Valid Time 按天闭区间：`docs/dev-plans/064-effective-date-day-granularity.md`
+- `effective_on/end_on` 双轨停止线与收敛路径：`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`
 - “组织长名称”拼接规则与失败兜底：`docs/dev-plans/065-org-node-details-long-name.md`
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
@@ -32,7 +33,7 @@
   - [ ] Go 代码：见 `AGENTS.md`
   - [ ] `.templ` / Tailwind：见 `AGENTS.md`（生成物需提交）
   - [ ] 多语言 JSON：见 `AGENTS.md`
-  - [X] 文档（本计划）：已执行 `make check doc`（docs gate: OK，2025-12-28 02:51 UTC；2025-12-28 03:20 UTC；2025-12-28 03:26 UTC）
+  - [X] 文档（本计划）：已执行 `make check doc`（docs gate: OK，2025-12-28 02:51 UTC；2025-12-28 03:20 UTC；2025-12-28 03:26 UTC；2025-12-28 04:00 UTC）
 - **SSOT 链接**：
   - 触发器矩阵与本地必跑：`AGENTS.md`
   - 命令入口：`Makefile`
@@ -67,6 +68,10 @@
   - 仅做 request-scope 缓存；cache key 必须包含 `(org_node_id, labelAsOfDay)`，确保同一部门在不同日期下的路径不会互相覆盖。
 - **失败兜底**：
   - 若路径查询失败或返回空路径，则 `OrgNodeLongName` 置空，由模板渲染为 `—`，且不影响页面其它列。
+- **对齐 DEV-PLAN-064A 停止线（必须遵守）**：
+  - 不在 Domain/Service/Presentation 引入/新增 `timestamptz` 作为 Valid Time 的输入/输出/判断依据；本计划对外只使用 `YYYY-MM-DD`（页面 `effective_date`）表达 Valid Time。
+  - 在 064 阶段 D 合并前：本计划实现不得新增任何 `effective_on/end_on` 引用（运行时代码/SQL/Schema SSOT）；仅复用既有 `GetNodePath(asOf)` 与 day 口径 helper。
+  - 在 064 阶段 D 合并后：本计划实现应天然满足“运行时代码中无 `effective_on/end_on` 残留”的验收要求（若依赖代码发生重命名/删列，应随 064D 同步调整）。
 
 ### 3.4 行级 as-of 语义示例（不拆分任职行）
 假设工号 `004` 有一条任职记录行：
