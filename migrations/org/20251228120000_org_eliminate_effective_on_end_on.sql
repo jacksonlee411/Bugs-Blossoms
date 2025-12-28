@@ -16,11 +16,11 @@ DROP INDEX IF EXISTS org_node_slices_tenant_node_effective_on_idx;
 DROP INDEX IF EXISTS org_node_slices_tenant_parent_effective_on_idx;
 
 ALTER TABLE org_node_slices
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_node_slices RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_node_slices RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_node_slices ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_node_slices
@@ -37,6 +37,11 @@ ALTER TABLE org_node_slices
 CREATE INDEX org_node_slices_tenant_node_effective_idx ON org_node_slices (tenant_id, org_node_id, effective_date);
 CREATE INDEX org_node_slices_tenant_parent_effective_idx ON org_node_slices (tenant_id, parent_hint, effective_date);
 
+-- atlas:nolint DS103
+ALTER TABLE org_node_slices
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 2) org_edges
 ALTER TABLE org_edges DROP CONSTRAINT IF EXISTS org_edges_single_parent_no_overlap;
 ALTER TABLE org_edges DROP CONSTRAINT IF EXISTS org_edges_tenant_child_no_overlap_on;
@@ -48,11 +53,11 @@ DROP INDEX IF EXISTS org_edges_tenant_child_effective_on_idx;
 DROP INDEX IF EXISTS org_edges_tenant_parent_effective_on_idx;
 
 ALTER TABLE org_edges
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_edges RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_edges RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_edges ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_edges
@@ -65,6 +70,11 @@ ALTER TABLE org_edges
 CREATE INDEX org_edges_tenant_parent_effective_idx ON org_edges (tenant_id, parent_node_id, effective_date);
 CREATE INDEX org_edges_tenant_child_effective_idx ON org_edges (tenant_id, child_node_id, effective_date);
 
+-- atlas:nolint DS103
+ALTER TABLE org_edges
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 3) org_hierarchy_closure
 ALTER TABLE org_hierarchy_closure DROP CONSTRAINT IF EXISTS org_hierarchy_closure_pair_window_no_overlap;
 ALTER TABLE org_hierarchy_closure DROP CONSTRAINT IF EXISTS org_hierarchy_closure_tenant_no_overlap_on;
@@ -74,11 +84,11 @@ DROP INDEX IF EXISTS org_hierarchy_closure_ancestor_range_gist_idx;
 DROP INDEX IF EXISTS org_hierarchy_closure_descendant_range_gist_idx;
 
 ALTER TABLE org_hierarchy_closure
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_hierarchy_closure RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_hierarchy_closure RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_hierarchy_closure ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_hierarchy_closure
@@ -111,6 +121,11 @@ CREATE INDEX org_hierarchy_closure_descendant_range_gist_idx ON org_hierarchy_cl
     daterange(effective_date, end_date + 1, '[)')
 );
 
+-- atlas:nolint DS103
+ALTER TABLE org_hierarchy_closure
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 4) org_positions
 ALTER TABLE org_positions DROP CONSTRAINT IF EXISTS org_positions_code_unique_in_time;
 ALTER TABLE org_positions DROP CONSTRAINT IF EXISTS org_positions_tenant_code_no_overlap_on;
@@ -122,11 +137,11 @@ DROP INDEX IF EXISTS org_positions_tenant_node_effective_on_idx;
 DROP INDEX IF EXISTS org_positions_tenant_code_effective_on_idx;
 
 ALTER TABLE org_positions
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_positions RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_positions RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_positions ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_positions
@@ -139,6 +154,11 @@ ALTER TABLE org_positions
 CREATE INDEX org_positions_tenant_node_effective_idx ON org_positions (tenant_id, org_node_id, effective_date);
 CREATE INDEX org_positions_tenant_code_effective_idx ON org_positions (tenant_id, code, effective_date);
 
+-- atlas:nolint DS103
+ALTER TABLE org_positions
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 5) org_position_slices
 ALTER TABLE org_position_slices DROP CONSTRAINT IF EXISTS org_position_slices_no_overlap;
 ALTER TABLE org_position_slices DROP CONSTRAINT IF EXISTS org_position_slices_tenant_position_no_overlap_on;
@@ -150,11 +170,11 @@ DROP INDEX IF EXISTS org_position_slices_tenant_reports_to_effective_idx;
 DROP INDEX IF EXISTS org_position_slices_tenant_position_effective_on_idx;
 
 ALTER TABLE org_position_slices
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_position_slices RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_position_slices RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_position_slices ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_position_slices
@@ -167,6 +187,11 @@ ALTER TABLE org_position_slices
 CREATE INDEX org_position_slices_tenant_position_effective_idx ON org_position_slices (tenant_id, position_id, effective_date);
 CREATE INDEX org_position_slices_tenant_node_effective_idx ON org_position_slices (tenant_id, org_node_id, effective_date);
 CREATE INDEX org_position_slices_tenant_reports_to_effective_idx ON org_position_slices (tenant_id, reports_to_position_id, effective_date);
+
+-- atlas:nolint DS103
+ALTER TABLE org_position_slices
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
 
 -- 6) org_assignments
 ALTER TABLE org_assignments DROP CONSTRAINT IF EXISTS org_assignments_primary_unique_in_time;
@@ -183,11 +208,11 @@ DROP INDEX IF EXISTS org_assignments_tenant_position_effective_on_idx;
 DROP INDEX IF EXISTS org_assignments_tenant_pernr_effective_on_idx;
 
 ALTER TABLE org_assignments
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_assignments RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_assignments RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_assignments ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_assignments
@@ -240,6 +265,11 @@ CREATE INDEX org_assignments_tenant_subject_effective_idx ON org_assignments (te
 CREATE INDEX org_assignments_tenant_position_effective_idx ON org_assignments (tenant_id, position_id, effective_date);
 CREATE INDEX org_assignments_tenant_pernr_effective_idx ON org_assignments (tenant_id, pernr, effective_date);
 
+-- atlas:nolint DS103
+ALTER TABLE org_assignments
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 7) org_attribute_inheritance_rules
 ALTER TABLE org_attribute_inheritance_rules DROP CONSTRAINT IF EXISTS org_attribute_inheritance_rules_no_overlap;
 ALTER TABLE org_attribute_inheritance_rules DROP CONSTRAINT IF EXISTS org_attribute_inheritance_rules_tenant_no_overlap_on;
@@ -248,11 +278,11 @@ ALTER TABLE org_attribute_inheritance_rules DROP CONSTRAINT IF EXISTS org_attrib
 DROP INDEX IF EXISTS org_attribute_inheritance_rules_tenant_hierarchy_attribute_effective_idx;
 
 ALTER TABLE org_attribute_inheritance_rules
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_attribute_inheritance_rules RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_attribute_inheritance_rules RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_attribute_inheritance_rules ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_attribute_inheritance_rules
@@ -264,6 +294,11 @@ ALTER TABLE org_attribute_inheritance_rules
 
 CREATE INDEX org_attribute_inheritance_rules_tenant_hierarchy_attribute_effective_idx ON org_attribute_inheritance_rules (tenant_id, hierarchy_type, attribute_name, effective_date);
 
+-- atlas:nolint DS103
+ALTER TABLE org_attribute_inheritance_rules
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 8) org_role_assignments
 ALTER TABLE org_role_assignments DROP CONSTRAINT IF EXISTS org_role_assignments_no_overlap;
 ALTER TABLE org_role_assignments DROP CONSTRAINT IF EXISTS org_role_assignments_tenant_no_overlap_on;
@@ -273,11 +308,11 @@ DROP INDEX IF EXISTS org_role_assignments_tenant_node_effective_idx;
 DROP INDEX IF EXISTS org_role_assignments_tenant_subject_effective_idx;
 
 ALTER TABLE org_role_assignments
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_role_assignments RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_role_assignments RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_role_assignments ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_role_assignments
@@ -290,6 +325,11 @@ ALTER TABLE org_role_assignments
 CREATE INDEX org_role_assignments_tenant_node_effective_idx ON org_role_assignments (tenant_id, org_node_id, effective_date);
 CREATE INDEX org_role_assignments_tenant_subject_effective_idx ON org_role_assignments (tenant_id, subject_type, subject_id, effective_date);
 
+-- atlas:nolint DS103
+ALTER TABLE org_role_assignments
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 9) org_security_group_mappings
 ALTER TABLE org_security_group_mappings DROP CONSTRAINT IF EXISTS org_security_group_mappings_no_overlap;
 ALTER TABLE org_security_group_mappings DROP CONSTRAINT IF EXISTS org_security_group_mappings_tenant_no_overlap_on;
@@ -299,11 +339,11 @@ DROP INDEX IF EXISTS org_security_group_mappings_tenant_node_effective_idx;
 DROP INDEX IF EXISTS org_security_group_mappings_tenant_key_effective_idx;
 
 ALTER TABLE org_security_group_mappings
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_security_group_mappings RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_security_group_mappings RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_security_group_mappings ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_security_group_mappings
@@ -316,6 +356,11 @@ ALTER TABLE org_security_group_mappings
 CREATE INDEX org_security_group_mappings_tenant_node_effective_idx ON org_security_group_mappings (tenant_id, org_node_id, effective_date);
 CREATE INDEX org_security_group_mappings_tenant_key_effective_idx ON org_security_group_mappings (tenant_id, security_group_key, effective_date);
 
+-- atlas:nolint DS103
+ALTER TABLE org_security_group_mappings
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 10) org_links
 ALTER TABLE org_links DROP CONSTRAINT IF EXISTS org_links_no_overlap;
 ALTER TABLE org_links DROP CONSTRAINT IF EXISTS org_links_tenant_no_overlap_on;
@@ -325,11 +370,11 @@ DROP INDEX IF EXISTS org_links_tenant_node_effective_idx;
 DROP INDEX IF EXISTS org_links_tenant_object_effective_idx;
 
 ALTER TABLE org_links
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_links RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_links RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_links ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_links
@@ -342,31 +387,43 @@ ALTER TABLE org_links
 CREATE INDEX org_links_tenant_node_effective_idx ON org_links (tenant_id, org_node_id, effective_date);
 CREATE INDEX org_links_tenant_object_effective_idx ON org_links (tenant_id, object_type, object_key, effective_date);
 
+-- atlas:nolint DS103
+ALTER TABLE org_links
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
+
 -- 11) org_audit_logs
 ALTER TABLE org_audit_logs DROP CONSTRAINT IF EXISTS org_audit_logs_effective_check;
 ALTER TABLE org_audit_logs DROP CONSTRAINT IF EXISTS org_audit_logs_effective_on_check;
 
 ALTER TABLE org_audit_logs
-    DROP COLUMN IF EXISTS effective_date,
-    DROP COLUMN IF EXISTS end_date;
-
-ALTER TABLE org_audit_logs RENAME COLUMN effective_on TO effective_date;
-ALTER TABLE org_audit_logs RENAME COLUMN end_on TO end_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+    ALTER COLUMN end_date TYPE date USING CASE
+        WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+        ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+    END;
 ALTER TABLE org_audit_logs ALTER COLUMN end_date SET DEFAULT DATE '9999-12-31';
 
 ALTER TABLE org_audit_logs
     ADD CONSTRAINT org_audit_logs_effective_check CHECK (effective_date <= end_date);
+
+-- atlas:nolint DS103
+ALTER TABLE org_audit_logs
+    DROP COLUMN IF EXISTS effective_on,
+    DROP COLUMN IF EXISTS end_on;
 
 -- 12) org_personnel_events
 DROP INDEX IF EXISTS org_personnel_events_tenant_person_effective_idx;
 DROP INDEX IF EXISTS org_personnel_events_tenant_person_effective_on_idx;
 
 ALTER TABLE org_personnel_events
-    DROP COLUMN IF EXISTS effective_date;
-
-ALTER TABLE org_personnel_events RENAME COLUMN effective_on TO effective_date;
+    ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date;
 
 CREATE INDEX org_personnel_events_tenant_person_effective_idx ON org_personnel_events (tenant_id, person_uuid, effective_date DESC);
+
+-- atlas:nolint DS103
+ALTER TABLE org_personnel_events
+    DROP COLUMN IF EXISTS effective_on;
 
 -- +goose Down
 -- Restore dual-track columns: legacy timestamptz effective_date/end_date + date effective_on/end_on.
