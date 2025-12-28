@@ -249,10 +249,10 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		pageErrs = append(pageErrs, "invalid effective_date")
-		effectiveDate = time.Now().UTC()
+		effectiveDate = normalizeValidTimeDayUTC(time.Now().UTC())
 	}
 	if effectiveDate.IsZero() {
-		effectiveDate = time.Now().UTC()
+		effectiveDate = normalizeValidTimeDayUTC(time.Now().UTC())
 	}
 	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
 
@@ -278,10 +278,7 @@ func (c *OrgUIController) AssignmentsPage(w http.ResponseWriter, r *http.Request
 			return
 		}
 		timeline = mappers.AssignmentsToTimeline(subject, rows)
-		for i := range timeline.Rows {
-			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, effectiveDate)
-			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
-		}
+		c.hydrateAssignmentsTimelineLabels(r, tenantID, timeline, effectiveDate)
 	}
 
 	if htmx.IsHxRequest(r) && htmx.Target(r) == "org-assignments-timeline" {
@@ -1436,12 +1433,7 @@ func (c *OrgUIController) CreateAssignment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	timeline := mappers.AssignmentsToTimeline(subject, rows)
-	if timeline != nil {
-		for i := range timeline.Rows {
-			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, effectiveDate)
-			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
-		}
-	}
+	c.hydrateAssignmentsTimelineLabels(r, tenantID, timeline, effectiveDate)
 	c.writeAssignmentsFormWithOOBTimeline(w, r, tenantID, effectiveDateStr, pernr, timeline)
 }
 
@@ -1760,12 +1752,7 @@ func (c *OrgUIController) TransitionAssignment(w http.ResponseWriter, r *http.Re
 		return
 	}
 	timeline := mappers.AssignmentsToTimeline(subject, rows)
-	if timeline != nil {
-		for i := range timeline.Rows {
-			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, effectiveDate)
-			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
-		}
-	}
+	c.hydrateAssignmentsTimelineLabels(r, tenantID, timeline, effectiveDate)
 	c.writeAssignmentsFormWithOOBTimeline(w, r, tenantID, effectiveDateStr, pernr, timeline)
 }
 
@@ -1986,12 +1973,7 @@ func (c *OrgUIController) UpdateAssignment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	timeline := mappers.AssignmentsToTimeline(subject, rows)
-	if timeline != nil {
-		for i := range timeline.Rows {
-			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, effectiveDate)
-			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, effectiveDate, strings.TrimSpace(timeline.Rows[i].PositionCode))
-		}
-	}
+	c.hydrateAssignmentsTimelineLabels(r, tenantID, timeline, effectiveDate)
 	c.writeAssignmentsFormWithOOBTimeline(w, r, tenantID, effectiveDateStr, pernr, timeline)
 }
 
@@ -2571,6 +2553,34 @@ func (c *OrgUIController) positionLabelFor(r *http.Request, tenantID uuid.UUID, 
 		return strings.TrimSpace(*row.Title)
 	}
 	return label
+}
+
+func (c *OrgUIController) hydrateAssignmentsTimelineLabels(r *http.Request, tenantID uuid.UUID, timeline *viewmodels.OrgAssignmentsTimeline, pageAsOf time.Time) {
+	if timeline == nil || len(timeline.Rows) == 0 {
+		return
+	}
+
+	pageAsOf = normalizeValidTimeDayUTC(pageAsOf)
+	if pageAsOf.IsZero() {
+		pageAsOf = normalizeValidTimeDayUTC(time.Now().UTC())
+	}
+
+	for i := range timeline.Rows {
+		rowStart := normalizeValidTimeDayUTC(timeline.Rows[i].EffectiveDate)
+		if rowStart.IsZero() {
+			continue
+		}
+
+		rowEnd := timeline.Rows[i].EndDate.UTC()
+		if rowEnd.IsZero() {
+			continue
+		}
+
+		if !pageAsOf.Before(rowStart) && pageAsOf.Before(rowEnd) && !pageAsOf.Equal(rowStart) {
+			timeline.Rows[i].OrgNodeLabel = c.orgNodeLabelFor(r, tenantID, timeline.Rows[i].OrgNodeID, pageAsOf)
+			timeline.Rows[i].PositionLabel = c.positionLabelFor(r, tenantID, timeline.Rows[i].PositionID, pageAsOf, strings.TrimSpace(timeline.Rows[i].PositionCode))
+		}
+	}
 }
 
 func tenantAndUserFromContext(r *http.Request) (uuid.UUID, coreuser.User, bool) {

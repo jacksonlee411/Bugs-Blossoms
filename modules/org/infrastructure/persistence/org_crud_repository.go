@@ -710,12 +710,16 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 	SELECT
 		a.id,
 		a.position_id,
-		s.org_node_id,
+		ps.org_node_id,
 		a.assignment_type,
 		a.is_primary,
 		a.allocated_fte,
 		a.effective_date,
 		a.end_date,
+		p.code AS position_code,
+		ps.title AS position_title,
+		n.code AS org_node_code,
+		ns.name AS org_node_name,
 		(
 			SELECT e.event_type
 			FROM org_personnel_events e
@@ -737,11 +741,22 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			LIMIT 1
 		) AS end_event_type
 	FROM org_assignments a
-	JOIN org_position_slices s
-		ON s.tenant_id=a.tenant_id
-		AND s.position_id=a.position_id
-		AND s.effective_date <= a.effective_date
-		AND s.end_date > a.effective_date
+	JOIN org_positions p
+		ON p.tenant_id=a.tenant_id
+		AND p.id=a.position_id
+	JOIN org_position_slices ps
+		ON ps.tenant_id=a.tenant_id
+		AND ps.position_id=a.position_id
+		AND ps.effective_on <= a.effective_on
+		AND ps.end_on >= a.effective_on
+	JOIN org_nodes n
+		ON n.tenant_id=a.tenant_id
+		AND n.id=ps.org_node_id
+	LEFT JOIN org_node_slices ns
+		ON ns.tenant_id=a.tenant_id
+		AND ns.org_node_id=ps.org_node_id
+		AND ns.effective_on <= a.effective_on
+		AND ns.end_on >= a.effective_on
 	WHERE a.tenant_id=$1 AND a.subject_id=$2
 	ORDER BY a.effective_date ASC
 	`, pgUUID(tenantID), pgUUID(subjectID))
@@ -753,6 +768,10 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 	out := make([]services.AssignmentViewRow, 0, 16)
 	for rows.Next() {
 		var v services.AssignmentViewRow
+		var positionCode string
+		var positionTitle pgtype.Text
+		var orgNodeCode string
+		var orgNodeName pgtype.Text
 		var startEventType pgtype.Text
 		var endEventType pgtype.Text
 		if err := rows.Scan(
@@ -764,11 +783,25 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			&v.AllocatedFTE,
 			&v.EffectiveDate,
 			&v.EndDate,
+			&positionCode,
+			&positionTitle,
+			&orgNodeCode,
+			&orgNodeName,
 			&startEventType,
 			&endEventType,
 		); err != nil {
 			return nil, err
 		}
+		if positionCode != "" {
+			c := positionCode
+			v.PositionCode = &c
+		}
+		v.PositionTitle = nullableText(positionTitle)
+		if orgNodeCode != "" {
+			c := orgNodeCode
+			v.OrgNodeCode = &c
+		}
+		v.OrgNodeName = nullableText(orgNodeName)
 		v.StartEventType = nullableText(startEventType)
 		v.EndEventType = nullableText(endEventType)
 		out = append(out, v)
