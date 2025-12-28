@@ -773,6 +773,15 @@ func (r *OrgRepository) DeletePositionSlicesFrom(ctx context.Context, tenantID u
 	return err
 }
 
+func (r *OrgRepository) DeletePositionSliceByID(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID) error {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `DELETE FROM org_position_slices WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID))
+	return err
+}
+
 func (r *OrgRepository) UpdatePositionSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch services.PositionSliceInPlacePatch) error {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {

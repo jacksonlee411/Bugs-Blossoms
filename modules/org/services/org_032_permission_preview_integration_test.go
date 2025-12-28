@@ -51,6 +51,8 @@ func setupOrg032DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, ti
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
+		"20251228140000_org_assignment_employment_status.sql",
+		"20251228150000_org_gap_free_constraint_triggers.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

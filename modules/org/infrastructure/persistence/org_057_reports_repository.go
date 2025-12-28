@@ -49,12 +49,13 @@ WITH pos AS (
 		AND s.position_id = p.id
 		AND s.effective_date <= $2
 		AND s.end_date >= $2
-	LEFT JOIN org_assignments a
-		ON a.tenant_id = p.tenant_id
-		AND a.position_id = p.id
-		AND a.assignment_type = 'primary'
-		AND a.effective_date <= $2
-		AND a.end_date >= $2
+		LEFT JOIN org_assignments a
+			ON a.tenant_id = p.tenant_id
+			AND a.position_id = p.id
+			AND a.assignment_type = 'primary'
+			AND a.employment_status = 'active'
+			AND a.effective_date <= $2
+			AND a.end_date >= $2
 	WHERE p.tenant_id = $1
 		AND s.org_node_id = ANY($3::uuid[])
 		AND s.lifecycle_status = ANY($4::text[])
@@ -157,12 +158,13 @@ WITH vacancies AS (
 		AND s.position_id = p.id
 		AND s.effective_date <= $2
 		AND s.end_date >= $2
-	LEFT JOIN org_assignments a
-		ON a.tenant_id = p.tenant_id
-		AND a.position_id = p.id
-		AND a.assignment_type = 'primary'
-		AND a.effective_date <= $2
-		AND a.end_date >= $2
+		LEFT JOIN org_assignments a
+			ON a.tenant_id = p.tenant_id
+			AND a.position_id = p.id
+			AND a.assignment_type = 'primary'
+			AND a.employment_status = 'active'
+			AND a.effective_date <= $2
+			AND a.end_date >= $2
 	WHERE p.tenant_id = $1
 		AND s.org_node_id = ANY($3::uuid[])
 		AND s.lifecycle_status = ANY($4::text[])
@@ -188,11 +190,12 @@ WITH vacancies AS (
 	FROM vacancies v
 LEFT JOIN LATERAL (
 	SELECT MAX(end_date) AS last_end
-	FROM org_assignments a2
-	WHERE a2.tenant_id = $1
-		AND a2.position_id = v.position_id
-		AND a2.assignment_type = 'primary'
-		AND a2.end_date <= $2
+		FROM org_assignments a2
+		WHERE a2.tenant_id = $1
+			AND a2.position_id = v.position_id
+			AND a2.assignment_type = 'primary'
+			AND a2.employment_status = 'active'
+			AND a2.end_date <= $2
 ) prev ON true
 LEFT JOIN LATERAL (
 	SELECT MIN(effective_date) AS inception
@@ -272,12 +275,13 @@ WITH inception AS (
 				GREATEST(
 					0,
 					(a.effective_date - COALESCE(
-						(SELECT (MAX(end_date) + 1)
-							FROM org_assignments prev
-							WHERE prev.tenant_id = a.tenant_id
-								AND prev.position_id = a.position_id
-								AND prev.assignment_type = 'primary'
-								AND prev.end_date <= a.effective_date),
+							(SELECT (MAX(end_date) + 1)
+								FROM org_assignments prev
+								WHERE prev.tenant_id = a.tenant_id
+									AND prev.position_id = a.position_id
+									AND prev.assignment_type = 'primary'
+									AND prev.employment_status = 'active'
+									AND prev.end_date <= a.effective_date),
 						inc.inception_date
 					))
 				)::int AS ttf_days
@@ -293,10 +297,11 @@ WITH inception AS (
 	JOIN inception inc
 		ON inc.tenant_id = p.tenant_id
 		AND inc.position_id = p.id
-	WHERE a.tenant_id = $1
-		AND a.assignment_type = 'primary'
-		AND a.effective_date >= $2
-		AND a.effective_date < $3
+		WHERE a.tenant_id = $1
+			AND a.assignment_type = 'primary'
+			AND a.employment_status = 'active'
+			AND a.effective_date >= $2
+			AND a.effective_date < $3
 		AND s.capacity_fte = 1.0
 		AND s.org_node_id = ANY($4::uuid[])
 		AND s.lifecycle_status = ANY($5::text[])
@@ -304,12 +309,13 @@ WITH inception AS (
 		AND NOT EXISTS (
 			SELECT 1
 			FROM org_assignments prev2
-			WHERE prev2.tenant_id = a.tenant_id
-				AND prev2.position_id = a.position_id
-					AND prev2.assignment_type = 'primary'
-					AND prev2.effective_date < a.effective_date
-					AND prev2.end_date >= a.effective_date
-			)
+				WHERE prev2.tenant_id = a.tenant_id
+					AND prev2.position_id = a.position_id
+						AND prev2.assignment_type = 'primary'
+						AND prev2.employment_status = 'active'
+						AND prev2.effective_date < a.effective_date
+						AND prev2.end_date >= a.effective_date
+				)
 	)
 	`
 

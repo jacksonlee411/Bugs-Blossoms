@@ -924,10 +924,21 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_INVALID_RESCIND_DATE", "effective_date must be within current window", nil)
 		}
 
+		inactiveEnd := current.EndDate
+		shouldInsertInactive := current.AssignmentType == "primary" && current.IsPrimary
+		status := strings.TrimSpace(current.EmploymentStatus)
+		if status == "" {
+			status = "active"
+		}
+		if shouldInsertInactive && status != "active" {
+			shouldInsertInactive = false
+		}
+
 		oldValues := map[string]any{
-			"assignment_id":  current.ID.String(),
-			"effective_date": current.EffectiveDate.UTC().Format(time.RFC3339),
-			"end_date":       current.EndDate.UTC().Format(time.RFC3339),
+			"assignment_id":     current.ID.String(),
+			"effective_date":    current.EffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":          current.EndDate.UTC().Format(time.RFC3339),
+			"employment_status": status,
 		}
 
 		if err := s.repo.UpdateAssignmentEndDate(txCtx, tenantID, current.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
@@ -940,9 +951,10 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 		}
 
 		newValues := map[string]any{
-			"assignment_id":  updated.ID.String(),
-			"effective_date": updated.EffectiveDate.UTC().Format(time.RFC3339),
-			"end_date":       updated.EndDate.UTC().Format(time.RFC3339),
+			"assignment_id":     updated.ID.String(),
+			"effective_date":    updated.EffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":          updated.EndDate.UTC().Format(time.RFC3339),
+			"employment_status": strings.TrimSpace(updated.EmploymentStatus),
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -974,14 +986,76 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 			return nil, err
 		}
 
-		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.rescinded", "org_assignment", updated.ID, updated.EffectiveDate, updated.EndDate)
+		eventsToEmit := make([]events.OrgEventV1, 0, 2)
+		eventsToEmit = append(eventsToEmit, buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.rescinded", "org_assignment", updated.ID, updated.EffectiveDate, updated.EndDate))
+
+		if shouldInsertInactive {
+			inactiveID, err := s.repo.InsertAssignment(txCtx, tenantID, AssignmentInsert{
+				PositionID:       current.PositionID,
+				SubjectType:      current.SubjectType,
+				SubjectID:        current.SubjectID,
+				Pernr:            current.Pernr,
+				AssignmentType:   current.AssignmentType,
+				IsPrimary:        current.IsPrimary,
+				AllocatedFTE:     current.AllocatedFTE,
+				EmploymentStatus: "inactive",
+				EffectiveDate:    in.EffectiveDate,
+				EndDate:          inactiveEnd,
+			})
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+
+			_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+				RequestID:       requestID,
+				TransactionTime: txTime,
+				InitiatorID:     initiatorID,
+				ChangeType:      "assignment.updated",
+				EntityType:      "org_assignment",
+				EntityID:        inactiveID,
+				EffectiveDate:   in.EffectiveDate,
+				EndDate:         inactiveEnd,
+				OldValues:       map[string]any{},
+				NewValues: map[string]any{
+					"assignment_id":     inactiveID.String(),
+					"effective_date":    in.EffectiveDate.UTC().Format(time.RFC3339),
+					"end_date":          inactiveEnd.UTC().Format(time.RFC3339),
+					"employment_status": "inactive",
+					"position_id":       current.PositionID.String(),
+					"subject_type":      current.SubjectType,
+					"subject_id":        current.SubjectID.String(),
+					"pernr":             current.Pernr,
+					"assignment_type":   current.AssignmentType,
+					"is_primary":        current.IsPrimary,
+					"allocated_fte":     current.AllocatedFTE,
+					"source_assignment": current.ID.String(),
+				},
+				Operation: "Rescind",
+				Meta: func() map[string]any {
+					meta := map[string]any{
+						"reason_code": reasonCode,
+						"reason_note": reasonNote,
+					}
+					addReasonCodeMeta(meta, reasonInfo)
+					return meta
+				}(),
+				FreezeMode:      freeze.Mode,
+				FreezeViolation: freeze.Violation,
+				FreezeCutoffUTC: freeze.CutoffUTC,
+				AffectedAtUTC:   in.EffectiveDate,
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			eventsToEmit = append(eventsToEmit, buildEventV1(requestID, tenantID, initiatorID, txTime, "assignment.updated", "org_assignment", inactiveID, in.EffectiveDate, inactiveEnd))
+		}
+
 		res := &RescindAssignmentResult{
-			AssignmentID:  updated.ID,
-			EffectiveDate: updated.EffectiveDate,
-			EndDate:       updated.EndDate,
-			GeneratedEvents: []events.OrgEventV1{
-				ev,
-			},
+			AssignmentID:    updated.ID,
+			EffectiveDate:   updated.EffectiveDate,
+			EndDate:         updated.EndDate,
+			GeneratedEvents: eventsToEmit,
 		}
 		if err := s.enqueueOutboxEvents(txCtx, tenantID, res.GeneratedEvents); err != nil {
 			return nil, err

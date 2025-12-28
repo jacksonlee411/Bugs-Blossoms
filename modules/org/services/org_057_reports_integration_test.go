@@ -106,14 +106,24 @@ func TestOrg057StaffingVacancies_ComputesVacancySince(t *testing.T) {
 	subjectID := uuid.New()
 	_, err = pool.Exec(ctx, `
 		INSERT INTO org_assignments (
-			tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, effective_date, end_date
+			tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, employment_status, effective_date, end_date
 		)
-		VALUES (
-			$1,$2,'person',$3,'pernr-057-2','primary',true,1.0,
-			($4 AT TIME ZONE 'UTC')::date,
-			($5 AT TIME ZONE 'UTC')::date
-		)
-		`, tenantID, pos.PositionID, subjectID, time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC), time.Date(2025, 2, 9, 0, 0, 0, 0, time.UTC))
+		VALUES
+			(
+				$1,$2,'person',$3,'pernr-057-2','primary',true,1.0,'active',
+				($4 AT TIME ZONE 'UTC')::date,
+				($5 AT TIME ZONE 'UTC')::date
+			),
+			(
+				$1,$2,'person',$3,'pernr-057-2','primary',true,1.0,'inactive',
+				($6 AT TIME ZONE 'UTC')::date,
+				($7 AT TIME ZONE 'UTC')::date
+			)
+		`, tenantID, pos.PositionID, subjectID,
+		time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC),
+		time.Date(2025, 2, 9, 0, 0, 0, 0, time.UTC),
+		time.Date(2025, 2, 10, 0, 0, 0, 0, time.UTC),
+		time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 
 	asOfReport := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
@@ -157,24 +167,31 @@ func TestOrg057StaffingTimeToFill_ComputesSummaryAndBreakdown(t *testing.T) {
 	subjectID := uuid.New()
 	_, err = pool.Exec(ctx, `
 		INSERT INTO org_assignments (
-			tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, effective_date, end_date
+			tenant_id, position_id, subject_type, subject_id, pernr, assignment_type, is_primary, allocated_fte, employment_status, effective_date, end_date
 		)
 		VALUES
 			(
-				$1,$2,'person',$3,'pernr-057-3','primary',true,1.0,
+				$1,$2,'person',$3,'pernr-057-3','primary',true,1.0,'active',
 				($4 AT TIME ZONE 'UTC')::date,
 				($5 AT TIME ZONE 'UTC')::date
 			),
 			(
-				$1,$2,'person',$3,'pernr-057-3','primary',true,1.0,
+				$1,$2,'person',$3,'pernr-057-3','primary',true,1.0,'inactive',
 				($6 AT TIME ZONE 'UTC')::date,
 				($7 AT TIME ZONE 'UTC')::date
+			),
+			(
+				$1,$2,'person',$3,'pernr-057-3','primary',true,1.0,'active',
+				($8 AT TIME ZONE 'UTC')::date,
+				($9 AT TIME ZONE 'UTC')::date
 			)
 		`, tenantID,
 		pos.PositionID,
 		subjectID,
 		time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC),
 		time.Date(2025, 2, 9, 0, 0, 0, 0, time.UTC),
+		time.Date(2025, 2, 10, 0, 0, 0, 0, time.UTC),
+		time.Date(2025, 2, 19, 0, 0, 0, 0, time.UTC),
 		time.Date(2025, 2, 20, 0, 0, 0, 0, time.UTC),
 		time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC),
 	)

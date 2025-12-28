@@ -63,6 +63,9 @@ func mapPgErrorToServiceError(err error) error {
 		}
 	case "23000": // integrity_constraint_violation (e.g. cycle detected trigger)
 		recordWriteConflict("overlap")
+		if strings.HasSuffix(pgErr.ConstraintName, "_gap_free") {
+			return newServiceError(http.StatusConflict, "ORG_TIME_GAP", "time slices must be gap-free", err)
+		}
 		return newServiceError(http.StatusConflict, "ORG_OVERLAP", "integrity constraint violated", err)
 	default:
 		return newServiceError(http.StatusInternalServerError, "ORG_INTERNAL", fmt.Sprintf("database error (%s)", pgErr.Code), err)
