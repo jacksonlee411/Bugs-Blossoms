@@ -414,7 +414,7 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 			{{ currentPos := "" }}
 			{{ hasCurrent := false }}
 			for _, r := range props.Timeline.Rows {
-				if (asOf.Equal(r.EffectiveDate.UTC()) || asOf.After(r.EffectiveDate.UTC())) && asOf.Before(r.EndDate.UTC()) {
+				if validTimeIncludesDay(asOf, r.EffectiveDate, r.EndDate) {
 					{{ currentOrg = strings.TrimSpace(r.OrgNodeLabel) }}
 					{{ currentPos = strings.TrimSpace(r.PositionLabel) }}
 					{{if currentPos == "" {
@@ -476,6 +476,7 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Effective") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.EventType") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeLongName") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
 					if pageCtx.CanAuthz("org.assignments", "assign") {
 						<th class="py-2 pr-2">{ pageCtx.T("Actions") }</th>
@@ -484,7 +485,7 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 			</thead>
 			<tbody>
 				for _, row := range props.Timeline.Rows {
-					{{ canEdit := !asOf.Before(row.EffectiveDate.UTC()) && asOf.Before(row.EndDate.UTC()) }}
+					{{ canEdit := validTimeIncludesDay(asOf, row.EffectiveDate, row.EndDate) }}
 					<tr class="border-b border-surface-400/60">
 						<td class="py-2 pr-2 text-200">{ row.Pernr }</td>
 						<td class="py-2 pr-2 text-200">
@@ -539,6 +540,14 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 }
 							}}
 							{ orgLabel }
+						</td>
+						<td class="py-2 pr-2 text-200">
+							{{ longName := strings.TrimSpace(row.OrgNodeLongName) }}
+							if longName == "" {
+								<span class="text-xs text-400">—</span>
+							} else {
+								{ longName }
+							}
 						</td>
 						<td class="py-2 pr-2 text-200">
 							{{ posLabel := strings.TrimSpace(row.PositionLabel) }}

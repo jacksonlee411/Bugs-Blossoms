@@ -5113,6 +5113,12 @@ func normalizeValidTimeDayUTC(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
+func openEndedEndDate(endDate time.Time) bool {
+	u := endDate.UTC()
+	y, m, d := u.Date()
+	return y == 9999 && m == time.December && d == 31
+}
+
 func formatValidDate(t time.Time) string {
 	if t.IsZero() {
 		return ""
