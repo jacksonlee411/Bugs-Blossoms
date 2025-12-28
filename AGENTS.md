@@ -9,6 +9,7 @@
 - Go 代码：`go fmt ./... && go vet ./... && make check lint && make test`
 - `.templ`/Tailwind 相关：`make generate && make css`，然后 `git status --short` 必须为空
 - 多语言 JSON：`make check tr`
+- 发 PR 前一键对齐 CI（推荐）：`make preflight`
 - 迁移/Schema：`make db migrate up && make db seed`（可选 `make db migrate down`）
 - Authz：`make authz-test && make authz-lint`（以及相关包的 `go test`）
 - 文档新增/整理：`make check doc`
@@ -210,5 +211,7 @@ modules/{module}/
 - 组织/职位/任职时间片删除自动缝补（DEV-PLAN-066）：`docs/dev-plans/066-auto-stitch-time-slices-on-delete.md`
 - 职位分类字段 UI 贯通 + Job Catalog 维护入口（二级目录）（DEV-PLAN-067）：`docs/dev-plans/067-position-classification-ui-and-job-catalog-nav.md`
 - 组织长名称投影（SSOT + 批量解析）（DEV-PLAN-068）：`docs/dev-plans/068-org-node-long-name-projection.md`
+- Org 结构索引（`org_edges.path`）一致性修复（DEV-PLAN-069）：`docs/dev-plans/069-org-long-name-parent-display-mismatch-investigation.md`
+- 基于 `org_edges.path` 生成组织长路径名称（DEV-PLAN-069A）：`docs/dev-plans/069A-org-long-name-generate-from-org-edges-path.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`

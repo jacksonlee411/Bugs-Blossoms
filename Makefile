@@ -537,7 +537,11 @@ watch coverage verbose docker score report ci linux docker-base docker-prod up d
 
 .PHONY: deps db org test css compose setup e2e build graph docs tunnel clean generate check fix superadmin \
         down restart logs local stop reset watch coverage verbose docker score report \
-        dev fmt lint tr doc routing sqlfmt dev-env linux docker-base docker-prod run server sdk-tools install help atlas-install goose-install plan
+        dev fmt lint tr doc routing sqlfmt dev-env linux docker-base docker-prod run server sdk-tools install help atlas-install goose-install plan preflight
+
+# One-shot local preflight aligned with CI "Code Quality & Formatting" (+ tests)
+preflight:
+	bash ./scripts/dev/preflight_pr.sh
 # HRM sqlc generation
 sqlc-generate:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.28.0 generate -f sqlc.yaml
