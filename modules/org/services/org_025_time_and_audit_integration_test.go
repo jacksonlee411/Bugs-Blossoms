@@ -51,6 +51,7 @@ func setupOrg025DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, ti
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(tb, filepath.Join(root, "migrations", "org", f))
@@ -75,27 +76,20 @@ ON CONFLICT (tenant_id) DO UPDATE SET freeze_mode=excluded.freeze_mode, freeze_g
 	nodeB := nodes[2]
 	boundary := asOf.AddDate(0, 1, 0)
 	_, err = pool.Exec(ctx, `
-UPDATE org_node_slices
-SET
-	end_date=$1,
-	end_on = CASE
-		WHEN ($1 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-		ELSE ((($1 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-	END
-WHERE tenant_id=$2 AND org_node_id=$3 AND effective_date=$4
-`, boundary, tenantID, nodeB.ID, asOf)
+	UPDATE org_node_slices
+	SET
+		end_date=(($1 AT TIME ZONE 'UTC')::date - 1)
+	WHERE tenant_id=$2 AND org_node_id=$3 AND effective_date=$4
+	`, boundary, tenantID, nodeB.ID, asOf)
 	require.NoError(tb, err)
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_node_slices (tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date, effective_on, end_on)
-VALUES (
-	$1,$2,$3,$4,$5,$6,$7,
-	($6 AT TIME ZONE 'UTC')::date,
-	CASE
-		WHEN ($7 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-		ELSE ((($7 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-	END
-)
-`, tenantID, nodeB.ID, nodeB.Code, nodeB.DisplayOrder, nodeB.ParentID, boundary, time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
+	INSERT INTO org_node_slices (tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date)
+	VALUES (
+		$1,$2,$3,$4,$5,
+		($6 AT TIME ZONE 'UTC')::date,
+		($7 AT TIME ZONE 'UTC')::date
+	)
+	`, tenantID, nodeB.ID, nodeB.Code, nodeB.DisplayOrder, nodeB.ParentID, boundary, time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC))
 	require.NoError(tb, err)
 
 	repo := persistence.NewOrgRepository()
@@ -161,13 +155,13 @@ WHERE tenant_id=$1 AND hierarchy_type='OrgUnit' AND child_node_id=$2
 
 		var status string
 		err = pool.QueryRow(context.Background(), `
-SELECT status
-FROM org_node_slices
-WHERE tenant_id=$1 AND org_node_id=$2
-  AND effective_date <= $3 AND end_date > $3
-ORDER BY effective_date DESC
-LIMIT 1
-`, tenantID, nodeA, effective).Scan(&status)
+	SELECT status
+	FROM org_node_slices
+	WHERE tenant_id=$1 AND org_node_id=$2
+	  AND effective_date <= $3::date AND end_date >= $3::date
+	ORDER BY effective_date DESC
+	LIMIT 1
+	`, tenantID, nodeA, effective).Scan(&status)
 		require.NoError(t, err)
 		require.Equal(t, "rescinded", status)
 

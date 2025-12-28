@@ -119,7 +119,7 @@ func (a AuditLogInsert) Validate() error {
 	if a.EntityID == uuid.Nil {
 		return fmt.Errorf("entity_id is required")
 	}
-	if a.EffectiveDate.IsZero() || a.EndDate.IsZero() || !a.EffectiveDate.Before(a.EndDate) {
+	if a.EffectiveDate.IsZero() || a.EndDate.IsZero() || a.EffectiveDate.After(a.EndDate) {
 		return fmt.Errorf("effective window is invalid")
 	}
 	return nil

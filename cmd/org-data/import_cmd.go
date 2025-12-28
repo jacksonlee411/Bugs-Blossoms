@@ -32,30 +32,20 @@ type importOptions struct {
 }
 
 func pgDateOnlyUTC(t time.Time) pgtype.Date {
-	if t.IsZero() {
+	u := dateOnlyUTC(t)
+	if u.IsZero() {
 		return pgtype.Date{}
+	}
+	return pgtype.Date{Time: u, Valid: true}
+}
+
+func dateOnlyUTC(t time.Time) time.Time {
+	if t.IsZero() {
+		return time.Time{}
 	}
 	u := t.UTC()
 	y, m, d := u.Date()
-	return pgtype.Date{Time: time.Date(y, m, d, 0, 0, 0, 0, time.UTC), Valid: true}
-}
-
-func pgEffectiveOnFromEffectiveDate(effectiveDate time.Time) pgtype.Date {
-	return pgDateOnlyUTC(effectiveDate)
-}
-
-func pgEndOnFromEndDate(endDate time.Time) pgtype.Date {
-	if endDate.IsZero() {
-		return pgtype.Date{}
-	}
-
-	u := endDate.UTC()
-	y, m, d := u.Date()
-	if y == 9999 && m == time.December && d == 31 {
-		return pgtype.Date{Time: time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC), Valid: true}
-	}
-
-	return pgDateOnlyUTC(u.Add(-time.Microsecond))
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
 func newImportCmd() *cobra.Command {
@@ -390,6 +380,7 @@ func parseNodesCSV(path string) ([]nodeCSVRow, error) {
 		if err != nil {
 			return nil, fmt.Errorf("line %d: effective_date: %w", line, err)
 		}
+		effectiveDate = dateOnlyUTC(effectiveDate)
 
 		var endDate time.Time
 		endProvided := false
@@ -398,7 +389,7 @@ func parseNodesCSV(path string) ([]nodeCSVRow, error) {
 			if err != nil {
 				return nil, fmt.Errorf("line %d: end_date: %w", line, err)
 			}
-			endDate = t
+			endDate = dateOnlyUTC(t)
 			endProvided = true
 		}
 
@@ -503,6 +494,7 @@ func parsePositionsCSVIfExists(path string) ([]positionCSVRow, error) {
 		if err != nil {
 			return nil, fmt.Errorf("line %d: effective_date: %w", line, err)
 		}
+		effectiveDate = dateOnlyUTC(effectiveDate)
 
 		var endDate time.Time
 		endProvided := false
@@ -511,7 +503,7 @@ func parsePositionsCSVIfExists(path string) ([]positionCSVRow, error) {
 			if err != nil {
 				return nil, fmt.Errorf("line %d: end_date: %w", line, err)
 			}
-			endDate = t
+			endDate = dateOnlyUTC(t)
 			endProvided = true
 		}
 
@@ -604,6 +596,7 @@ func parseAssignmentsCSVIfExists(path string) ([]assignmentCSVRow, error) {
 		if err != nil {
 			return nil, fmt.Errorf("line %d: effective_date: %w", line, err)
 		}
+		effectiveDate = dateOnlyUTC(effectiveDate)
 
 		var endDate time.Time
 		endProvided := false
@@ -612,7 +605,7 @@ func parseAssignmentsCSVIfExists(path string) ([]assignmentCSVRow, error) {
 			if err != nil {
 				return nil, fmt.Errorf("line %d: end_date: %w", line, err)
 			}
-			endDate = t
+			endDate = dateOnlyUTC(t)
 			endProvided = true
 		}
 
@@ -727,17 +720,17 @@ func validateAndNormalizeNodes(rows *[]nodeCSVRow, nodesByCode map[string]uuid.U
 			i := idxs[j]
 			if !(*rows)[i].endDateProvided {
 				if j+1 < len(idxs) {
-					(*rows)[i].endDate = (*rows)[idxs[j+1]].effectiveDate
+					(*rows)[i].endDate = (*rows)[idxs[j+1]].effectiveDate.AddDate(0, 0, -1)
 				} else {
 					(*rows)[i].endDate = maxEndDate
 				}
 			}
-			if !(*rows)[i].effectiveDate.Before((*rows)[i].endDate) {
-				return "", fmt.Errorf("line %d: effective_date must be < end_date", (*rows)[i].line)
+			if (*rows)[i].effectiveDate.After((*rows)[i].endDate) {
+				return "", fmt.Errorf("line %d: effective_date must be <= end_date", (*rows)[i].line)
 			}
 			if j+1 < len(idxs) {
 				next := (*rows)[idxs[j+1]]
-				if (*rows)[i].endDate.After(next.effectiveDate) {
+				if !(*rows)[i].endDate.Before(next.effectiveDate) {
 					return "", fmt.Errorf("line %d: overlapping time windows for code=%s", (*rows)[i].line, code)
 				}
 			}
@@ -805,7 +798,7 @@ func validateParentReferences(nodes []nodeCSVRow, rootCode string) error {
 
 	parentAt := func(code string, t time.Time) (*string, bool) {
 		for _, r := range intervals[code] {
-			if !t.Before(r.effectiveDate) && t.Before(r.endDate) {
+			if !t.Before(r.effectiveDate) && !t.After(r.endDate) {
 				if r.parentCode == nil || strings.TrimSpace(*r.parentCode) == "" {
 					return nil, true
 				}
@@ -850,7 +843,7 @@ func validateCycles(nodes []nodeCSVRow, edges []edgeRow, strict bool) error {
 
 	parentAt := func(code string, t time.Time) (*string, bool) {
 		for _, e := range intervals[code] {
-			if !t.Before(e.effectiveDate) && t.Before(e.endDate) {
+			if !t.Before(e.effectiveDate) && !t.After(e.endDate) {
 				return e.parentCode, true
 			}
 		}
@@ -939,15 +932,15 @@ func normalizePositions(rows []positionCSVRow, nodesByCode map[string]uuid.UUID)
 			i := idxs[j]
 			if !rows[i].endDateProvided {
 				if j+1 < len(idxs) {
-					rows[i].endDate = rows[idxs[j+1]].effectiveDate
+					rows[i].endDate = rows[idxs[j+1]].effectiveDate.AddDate(0, 0, -1)
 				} else {
 					rows[i].endDate = maxEndDate
 				}
 			}
-			if !rows[i].effectiveDate.Before(rows[i].endDate) {
-				return nil, fmt.Errorf("line %d: effective_date must be < end_date", rows[i].line)
+			if rows[i].effectiveDate.After(rows[i].endDate) {
+				return nil, fmt.Errorf("line %d: effective_date must be <= end_date", rows[i].line)
 			}
-			if j+1 < len(idxs) && rows[i].endDate.After(rows[idxs[j+1]].effectiveDate) {
+			if j+1 < len(idxs) && !rows[i].endDate.Before(rows[idxs[j+1]].effectiveDate) {
 				return nil, fmt.Errorf("line %d: overlapping time windows for position code=%s", rows[i].line, code)
 			}
 		}
@@ -1008,15 +1001,15 @@ func normalizeAssignments(tenantID uuid.UUID, rows []assignmentCSVRow, positions
 			i := idxs[j]
 			if !rows[i].endDateProvided {
 				if j+1 < len(idxs) {
-					rows[i].endDate = rows[idxs[j+1]].effectiveDate
+					rows[i].endDate = rows[idxs[j+1]].effectiveDate.AddDate(0, 0, -1)
 				} else {
 					rows[i].endDate = maxEndDate
 				}
 			}
-			if !rows[i].effectiveDate.Before(rows[i].endDate) {
-				return nil, nil, fmt.Errorf("line %d: effective_date must be < end_date", rows[i].line)
+			if rows[i].effectiveDate.After(rows[i].endDate) {
+				return nil, nil, fmt.Errorf("line %d: effective_date must be <= end_date", rows[i].line)
 			}
-			if j+1 < len(idxs) && rows[i].endDate.After(rows[idxs[j+1]].effectiveDate) {
+			if j+1 < len(idxs) && !rows[i].endDate.Before(rows[idxs[j+1]].effectiveDate) {
 				return nil, nil, fmt.Errorf("line %d: overlapping time windows for pernr=%s", rows[i].line, rows[i].pernr)
 			}
 		}
@@ -1025,7 +1018,7 @@ func normalizeAssignments(tenantID uuid.UUID, rows []assignmentCSVRow, positions
 	resolvePositionID := func(code string, t time.Time) (uuid.UUID, error) {
 		slices := positionsByCode[code]
 		for _, s := range slices {
-			if !t.Before(s.effectiveDate) && t.Before(s.endDate) {
+			if !t.Before(s.effectiveDate) && !t.After(s.endDate) {
 				return s.id, nil
 			}
 		}
@@ -1272,11 +1265,11 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_node_slices (
-					tenant_id, id, org_node_id, name, i18n_names, status, legal_entity_id, company_code, location_id,
-					display_order, parent_hint, manager_user_id, effective_date, end_date, effective_on, end_on
-				) VALUES (
-					$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16
-				)`,
+						tenant_id, id, org_node_id, name, i18n_names, status, legal_entity_id, company_code, location_id,
+						display_order, parent_hint, manager_user_id, effective_date, end_date
+					) VALUES (
+						$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+					)`,
 			data.tenantID,
 			ins.id,
 			nodeID,
@@ -1289,10 +1282,8 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 			r.displayOrder,
 			parentHint,
 			r.managerUserID,
-			r.effectiveDate,
-			r.endDate,
-			pgEffectiveOnFromEffectiveDate(r.effectiveDate),
-			pgEndOnFromEndDate(r.endDate),
+			pgDateOnlyUTC(r.effectiveDate),
+			pgDateOnlyUTC(r.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_node_slices(%s): %w", r.line, r.code, err))
 		}
@@ -1314,18 +1305,18 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_positions (
-						tenant_id, id, org_node_id, code, title, status, is_auto_created, effective_date, end_date, effective_on, end_on
-					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			data.tenantID, p.id, p.orgNodeID, p.code, p.title, p.status, p.isAutoCreated, p.effectiveDate, p.endDate, pgEffectiveOnFromEffectiveDate(p.effectiveDate), pgEndOnFromEndDate(p.endDate),
+							tenant_id, id, org_node_id, code, title, status, is_auto_created, effective_date, end_date
+						) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			data.tenantID, p.id, p.orgNodeID, p.code, p.title, p.status, p.isAutoCreated, pgDateOnlyUTC(p.effectiveDate), pgDateOnlyUTC(p.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_positions(%s): %w", p.line, p.code, err))
 		}
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_position_slices (
-						tenant_id, id, position_id, org_node_id, title, lifecycle_status, capacity_fte, effective_date, end_date, effective_on, end_on
-					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			data.tenantID, sliceID, p.id, p.orgNodeID, p.title, p.status, 1.0, p.effectiveDate, p.endDate, pgEffectiveOnFromEffectiveDate(p.effectiveDate), pgEndOnFromEndDate(p.endDate),
+							tenant_id, id, position_id, org_node_id, title, lifecycle_status, capacity_fte, effective_date, end_date
+						) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			data.tenantID, sliceID, p.id, p.orgNodeID, p.title, p.status, 1.0, pgDateOnlyUTC(p.effectiveDate), pgDateOnlyUTC(p.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slices(%s): %w", p.line, p.code, err))
 		}
@@ -1336,9 +1327,9 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_assignments (
-					tenant_id, id, position_id, subject_id, pernr, is_primary, effective_date, end_date, effective_on, end_on
-				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-			data.tenantID, a.id, a.positionID, a.subjectID, a.pernr, true, a.effectiveDate, a.endDate, pgEffectiveOnFromEffectiveDate(a.effectiveDate), pgEndOnFromEndDate(a.endDate),
+						tenant_id, id, position_id, subject_id, pernr, is_primary, effective_date, end_date
+					) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+			data.tenantID, a.id, a.positionID, a.subjectID, a.pernr, true, pgDateOnlyUTC(a.effectiveDate), pgDateOnlyUTC(a.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_assignments(pernr=%s): %w", a.line, a.pernr, err))
 		}
@@ -1383,7 +1374,7 @@ func insertEdges(ctx context.Context, tx pgx.Tx, data normalizedData) error {
 			if e.childCode != code {
 				continue
 			}
-			if !t.Before(e.effectiveDate) && t.Before(e.endDate) {
+			if !t.Before(e.effectiveDate) && !t.After(e.endDate) {
 				return e.parentCode, true
 			}
 		}
@@ -1426,9 +1417,9 @@ func insertEdges(ctx context.Context, tx pgx.Tx, data normalizedData) error {
 			}
 			if _, err := tx.Exec(
 				ctx,
-				`INSERT INTO org_edges (tenant_id, id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
-					 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-				data.tenantID, e.id, "OrgUnit", parentID, childID, e.effectiveDate, e.endDate, pgEffectiveOnFromEffectiveDate(e.effectiveDate), pgEndOnFromEndDate(e.endDate),
+				`INSERT INTO org_edges (tenant_id, id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
+						 VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+				data.tenantID, e.id, "OrgUnit", parentID, childID, pgDateOnlyUTC(e.effectiveDate), pgDateOnlyUTC(e.endDate),
 			); err != nil {
 				return withCode(exitDBWrite, fmt.Errorf("insert org_edges(child=%s): %w", e.childCode, err))
 			}

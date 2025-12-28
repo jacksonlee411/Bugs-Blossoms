@@ -92,15 +92,15 @@ flowchart TD
 | `change_type` | `text` | `not null` |  | 例如 `node.updated/assignment.rescinded`（对齐 022） |
 | `entity_type` | `text` | `not null` + check |  | `org_node/org_edge/org_position/org_assignment` |
 | `entity_id` | `uuid` | `not null` |  | 变更实体 id（口径见 §7.4） |
-| `effective_on` | `date` | `not null` |  | 受影响有效期窗 start（Valid Time，day） |
-| `end_on` | `date` | `not null` |  | 受影响有效期窗 end（Valid Time，day，含） |
+| `effective_date` | `date` | `not null` |  | 受影响有效期窗 start（Valid Time，day） |
+| `end_date` | `date` | `not null` |  | 受影响有效期窗 end（Valid Time，day，含） |
 | `old_values` | `jsonb` | `null` |  | 可省略（Create 可空） |
 | `new_values` | `jsonb` | `not null` | `'{}'::jsonb` | 变更后快照（或被撤销实体快照） |
 | `meta` | `jsonb` | `not null` | `'{}'::jsonb` | `{"operation":"ShiftBoundary","freeze_mode":"shadow",...}` |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 
 约束/索引建议：
-- `check (effective_on <= end_on)`
+- `check (effective_date <= end_date)`
 - `check (entity_type in ('org_node','org_edge','org_position','org_assignment'))`
 - `btree (tenant_id, transaction_time desc)`
 - `btree (tenant_id, entity_type, entity_id, transaction_time desc)`

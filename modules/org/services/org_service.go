@@ -696,7 +696,7 @@ func (s *OrgService) UpdateNode(ctx context.Context, tenantID uuid.UUID, request
 			newEnd = next
 		}
 
-		if err := s.repo.TruncateNodeSlice(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.TruncateNodeSlice(txCtx, tenantID, current.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 
@@ -880,7 +880,7 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 			}
 		}
 
-		if err := s.repo.TruncateEdge(txCtx, tenantID, movedEdge.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.TruncateEdge(txCtx, tenantID, movedEdge.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 		newEdgeID, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, &in.NewParentID, in.NodeID, in.EffectiveDate, movedEdge.EndDate)
@@ -903,7 +903,7 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 		if hasNext && next.Before(newEnd) {
 			newEnd = next
 		}
-		if err := s.repo.TruncateNodeSlice(txCtx, tenantID, currentSlice.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.TruncateNodeSlice(txCtx, tenantID, currentSlice.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 		_, err = s.repo.InsertNodeSlice(txCtx, tenantID, in.NodeID, NodeSliceInsert{
@@ -927,7 +927,7 @@ func (s *OrgService) MoveNode(ctx context.Context, tenantID uuid.UUID, requestID
 			if e.ChildNodeID == in.NodeID {
 				continue
 			}
-			if err := s.repo.TruncateEdge(txCtx, tenantID, e.ID, in.EffectiveDate); err != nil {
+			if err := s.repo.TruncateEdge(txCtx, tenantID, e.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
 			if _, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, e.ParentNodeID, e.ChildNodeID, in.EffectiveDate, e.EndDate); err != nil {
@@ -1497,7 +1497,7 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 			}
 		}
 
-		if err := s.repo.TruncateAssignment(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.TruncateAssignment(txCtx, tenantID, current.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 

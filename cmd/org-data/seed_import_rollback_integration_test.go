@@ -48,6 +48,7 @@ func TestOrgData_SeedImport_ApplyAndRollbackByManifest(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(t, filepath.Join(root, "migrations", "org", f))

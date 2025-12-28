@@ -269,10 +269,10 @@ WHERE b.is_active = TRUE AND b.status = 'ready';
 输入：`tenant_id, subject=person:{pernr}, effective_date(d)`（day）
 
 1. 查询 primary assignment as-of：
-   - `org_assignments where tenant_id=? and pernr=? and assignment_type='primary' and effective_on<=d and d<=end_on`
+   - `org_assignments where tenant_id=? and pernr=? and assignment_type='primary' and effective_date<=d and d<=end_date`
    - 若无 → 404 `ORG_ASSIGNMENT_NOT_FOUND_AT_DATE`
 2. 查询 position as-of → 得到 `org_node_id`：
-   - `org_positions where tenant_id=? and id=$position_id and effective_on<=d and d<=end_on`
+   - `org_positions where tenant_id=? and id=$position_id and effective_date<=d and d<=end_date`
 3. 复用 6.1 的节点路径查询。
 
 ### 6.3 `org_reporting_nodes` build（离线，允许递归）

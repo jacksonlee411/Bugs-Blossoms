@@ -1860,12 +1860,12 @@ func (c *OrgAPIController) ShiftBoundaryNode(w http.ResponseWriter, r *http.Requ
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
 		return
 	}
-	target, err := parseRequiredEffectiveDate(req.TargetEffectiveDate)
+	target, err := parseRequiredValidDate("target_effective_date", req.TargetEffectiveDate)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "target_effective_date is required")
 		return
 	}
-	newStart, err := parseRequiredEffectiveDate(req.NewEffectiveDate)
+	newStart, err := parseRequiredValidDate("new_effective_date", req.NewEffectiveDate)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "new_effective_date is required")
 		return
@@ -2570,12 +2570,12 @@ func (c *OrgAPIController) ShiftBoundaryPosition(w http.ResponseWriter, r *http.
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
 		return
 	}
-	target, err := parseRequiredEffectiveDate(req.TargetEffectiveDate)
+	target, err := parseRequiredValidDate("target_effective_date", req.TargetEffectiveDate)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "target_effective_date is required")
 		return
 	}
-	newStart, err := parseRequiredEffectiveDate(req.NewEffectiveDate)
+	newStart, err := parseRequiredValidDate("new_effective_date", req.NewEffectiveDate)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "new_effective_date is required")
 		return
@@ -3474,12 +3474,12 @@ func (c *OrgAPIController) Batch(w http.ResponseWriter, r *http.Request) {
 				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "payload is invalid")
 				return
 			}
-			target, err := parseRequiredEffectiveDate(body.TargetEffectiveDate)
+			target, err := parseRequiredValidDate("target_effective_date", body.TargetEffectiveDate)
 			if err != nil {
 				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "target_effective_date is required")
 				return
 			}
-			newStart, err := parseRequiredEffectiveDate(body.NewEffectiveDate)
+			newStart, err := parseRequiredValidDate("new_effective_date", body.NewEffectiveDate)
 			if err != nil {
 				writeBatchCommandError(w, requestID, i, cmdType, http.StatusUnprocessableEntity, "ORG_BATCH_INVALID_COMMAND", "new_effective_date is required")
 				return
@@ -4426,11 +4426,11 @@ func (c *OrgAPIController) executePreflightCommand(ctx context.Context, tenantID
 		if err := json.Unmarshal(payload, &body); err != nil {
 			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "payload is invalid", Cause: err}
 		}
-		targetDate, err := parseRequiredEffectiveDate(body.TargetEffectiveDate)
+		targetDate, err := parseRequiredValidDate("target_effective_date", body.TargetEffectiveDate)
 		if err != nil {
 			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "target_effective_date is required", Cause: err}
 		}
-		newDate, err := parseRequiredEffectiveDate(body.NewEffectiveDate)
+		newDate, err := parseRequiredValidDate("new_effective_date", body.NewEffectiveDate)
 		if err != nil {
 			return &services.ServiceError{Status: http.StatusUnprocessableEntity, Code: "ORG_PREFLIGHT_INVALID_COMMAND", Message: "new_effective_date is required", Cause: err}
 		}
@@ -5073,30 +5073,35 @@ func ensureRequestID(r *http.Request) string {
 	return v
 }
 
-func parseEffectiveDate(v string) (time.Time, error) {
+func parseOptionalValidDate(field, v string) (time.Time, error) {
 	v = strings.TrimSpace(v)
 	if v == "" {
 		return time.Time{}, nil
 	}
-	if t, err := time.Parse("2006-01-02", v); err == nil {
-		return normalizeValidTimeDayUTC(t), nil
-	}
-	t, err := time.Parse(time.RFC3339, v)
+	t, err := time.Parse("2006-01-02", v)
 	if err != nil {
-		return time.Time{}, err
+		return time.Time{}, fmt.Errorf("%s must be YYYY-MM-DD", field)
 	}
 	return normalizeValidTimeDayUTC(t), nil
 }
 
-func parseRequiredEffectiveDate(v string) (time.Time, error) {
-	t, err := parseEffectiveDate(v)
+func parseRequiredValidDate(field, v string) (time.Time, error) {
+	t, err := parseOptionalValidDate(field, v)
 	if err != nil {
 		return time.Time{}, err
 	}
 	if t.IsZero() {
-		return time.Time{}, errors.New("effective_date is required")
+		return time.Time{}, fmt.Errorf("%s is required", field)
 	}
 	return t, nil
+}
+
+func parseEffectiveDate(v string) (time.Time, error) {
+	return parseOptionalValidDate("effective_date", v)
+}
+
+func parseRequiredEffectiveDate(v string) (time.Time, error) {
+	return parseRequiredValidDate("effective_date", v)
 }
 
 func normalizeValidTimeDayUTC(t time.Time) time.Time {
@@ -5124,7 +5129,7 @@ func formatValidEndDateFromEndDate(endDate time.Time) string {
 	if y == 9999 && m == time.December && d == 31 {
 		return "9999-12-31"
 	}
-	return u.Add(-time.Microsecond).Format(time.DateOnly)
+	return normalizeValidTimeDayUTC(u).Format(time.DateOnly)
 }
 
 func decodeJSON(body io.ReadCloser, out any) error {

@@ -45,14 +45,13 @@ func (r *OrgRepository) UpsertPersonnelEvent(ctx context.Context, tenantID uuid.
 	  person_uuid,
 	  pernr,
 	  effective_date,
-	  effective_on,
 	  reason_code,
 	  payload
 	)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 	ON CONFLICT (tenant_id, request_id) DO NOTHING
 	RETURNING id, request_id, initiator_id, event_type, person_uuid, pernr, effective_date, reason_code, payload, created_at, updated_at
-	`, pgUUID(tenantID), requestID, pgUUID(in.InitiatorID), eventType, pgUUID(in.PersonUUID), pernr, in.EffectiveDate, pgEffectiveOnFromEffectiveDate(in.EffectiveDate), reasonCode, payload).Scan(
+	`, pgUUID(tenantID), requestID, pgUUID(in.InitiatorID), eventType, pgUUID(in.PersonUUID), pernr, pgValidDate(in.EffectiveDate), reasonCode, payload).Scan(
 		&row.ID,
 		&row.RequestID,
 		&initiator,

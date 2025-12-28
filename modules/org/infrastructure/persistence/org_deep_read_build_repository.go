@@ -54,7 +54,6 @@ func (r *OrgRepository) BuildDeepReadSnapshot(ctx context.Context, tenantID uuid
 
 	asOfDate = time.Date(asOfDate.UTC().Year(), asOfDate.UTC().Month(), asOfDate.UTC().Day(), 0, 0, 0, 0, time.UTC)
 	asOfDateStr := asOfDate.Format("2006-01-02")
-	asOfTS := asOfDate
 	lockKey := deepReadLockKey("snapshot", tenantID.String(), hierarchyType, asOfDateStr)
 
 	ctx = composables.WithPool(ctx, pool)
@@ -76,14 +75,14 @@ func (r *OrgRepository) BuildDeepReadSnapshot(ctx context.Context, tenantID uuid
 			}
 
 			return tx.QueryRow(txCtx, `
-WITH RECURSIVE edges_asof AS (
-	SELECT parent_node_id, child_node_id
-	FROM org_edges
-	WHERE tenant_id=$1
-	  AND hierarchy_type=$2
-	  AND effective_date <= $3
-	  AND end_date > $3
-),
+	WITH RECURSIVE edges_asof AS (
+		SELECT parent_node_id, child_node_id
+		FROM org_edges
+		WHERE tenant_id=$1
+		  AND hierarchy_type=$2
+		  AND effective_date <= $3
+		  AND end_date >= $3
+	),
 closure AS (
 	SELECT e.child_node_id AS ancestor_node_id, e.child_node_id AS descendant_node_id, 0 AS depth
 	FROM edges_asof e
@@ -104,7 +103,7 @@ dedup AS (
 )
 SELECT COUNT(*)::bigint, COALESCE(MAX(depth), 0)::int
 FROM dedup
-`, pgUUID(tenantID), hierarchyType, asOfTS, orgDeepReadMaxDepth).Scan(&out.RowCount, &out.MaxDepth)
+	`, pgUUID(tenantID), hierarchyType, pgValidDate(asOfDate), orgDeepReadMaxDepth).Scan(&out.RowCount, &out.MaxDepth)
 		})
 		return out, err
 	}
@@ -142,14 +141,14 @@ INSERT INTO org_hierarchy_snapshots (
 	descendant_node_id,
 	depth
 )
-WITH RECURSIVE edges_asof AS (
-	SELECT parent_node_id, child_node_id
-	FROM org_edges
-	WHERE tenant_id=$1
-	  AND hierarchy_type=$2
-	  AND effective_date <= $3
-	  AND end_date > $3
-),
+	WITH RECURSIVE edges_asof AS (
+		SELECT parent_node_id, child_node_id
+		FROM org_edges
+		WHERE tenant_id=$1
+		  AND hierarchy_type=$2
+		  AND effective_date <= $3
+		  AND end_date >= $3
+	),
 closure AS (
 	SELECT e.child_node_id AS ancestor_node_id, e.child_node_id AS descendant_node_id, 0 AS depth
 	FROM edges_asof e
@@ -177,7 +176,7 @@ SELECT
 	descendant_node_id,
 	depth
 FROM dedup
-`, pgUUID(tenantID), hierarchyType, asOfTS, orgDeepReadMaxDepth, asOfDateStr, pgUUID(buildID))
+`, pgUUID(tenantID), hierarchyType, pgValidDate(asOfDate), orgDeepReadMaxDepth, asOfDateStr, pgUUID(buildID))
 		if err != nil {
 			return err
 		}
@@ -342,9 +341,7 @@ VALUES ($1,$2,$3,'building',false,$4)
 		descendant_node_id,
 		depth,
 		effective_date,
-		end_date,
-		effective_on,
-		end_on
+		end_date
 	)
 	WITH RECURSIVE edges AS (
 		SELECT parent_node_id, child_node_id, effective_date, end_date
@@ -369,7 +366,7 @@ closure AS (
 	FROM closure c
 	JOIN edges e ON e.parent_node_id = c.descendant_node_id
 	WHERE c.depth < $3
-	  AND GREATEST(c.effective_date, e.effective_date) < LEAST(c.end_date, e.end_date)
+	  AND GREATEST(c.effective_date, e.effective_date) <= LEAST(c.end_date, e.end_date)
 ),
 dedup AS (
 	SELECT DISTINCT ancestor_node_id, descendant_node_id, depth, effective_date, end_date
@@ -383,12 +380,7 @@ dedup AS (
 		descendant_node_id,
 		depth,
 		effective_date,
-		end_date,
-		(effective_date AT TIME ZONE 'UTC')::date AS effective_on,
-		CASE
-			WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-			ELSE (((end_date AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-		END AS end_on
+		end_date
 	FROM dedup
 	`, pgUUID(tenantID), hierarchyType, orgDeepReadMaxDepth, pgUUID(buildID))
 		if err != nil {

@@ -114,10 +114,10 @@ VALUES ($1,$2,'OrgUnit','ROOT',true)
 
 	var endedCount int
 	err = pool.QueryRow(ctx, `
-SELECT count(*)
-FROM org_assignments
-WHERE tenant_id = $1 AND subject_id = $2 AND end_date = $3
-`, tenantID, personUUID, terminationDate).Scan(&endedCount)
+	SELECT count(*)
+	FROM org_assignments
+	WHERE tenant_id = $1 AND subject_id = $2 AND end_date = $3
+	`, tenantID, personUUID, terminationDate.AddDate(0, 0, -1)).Scan(&endedCount)
 	require.NoError(t, err)
 	require.Equal(t, 2, endedCount)
 

@@ -22,9 +22,9 @@ func (r *OrgRepository) HasChildrenAt(ctx context.Context, tenantID uuid.UUID, n
 SELECT EXISTS(
 	SELECT 1
 	FROM org_edges
-	WHERE tenant_id=$1 AND hierarchy_type='OrgUnit' AND parent_node_id=$2 AND effective_date <= $3 AND end_date > $3
+	WHERE tenant_id=$1 AND hierarchy_type='OrgUnit' AND parent_node_id=$2 AND effective_date <= $3 AND end_date >= $3
 )
-`, pgUUID(tenantID), pgUUID(nodeID), asOf.UTC()).Scan(&exists); err != nil {
+`, pgUUID(tenantID), pgUUID(nodeID), pgValidDate(asOf)).Scan(&exists); err != nil {
 		return false, err
 	}
 	return exists, nil
@@ -40,9 +40,9 @@ func (r *OrgRepository) HasPositionsAt(ctx context.Context, tenantID uuid.UUID, 
 SELECT EXISTS(
 	SELECT 1
 	FROM org_positions
-	WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date <= $3 AND end_date > $3
+	WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date <= $3 AND end_date >= $3
 )
-`, pgUUID(tenantID), pgUUID(nodeID), asOf.UTC()).Scan(&exists); err != nil {
+`, pgUUID(tenantID), pgUUID(nodeID), pgValidDate(asOf)).Scan(&exists); err != nil {
 		return false, err
 	}
 	return exists, nil
@@ -71,7 +71,7 @@ FROM org_node_slices
 WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date=$3
 LIMIT 1
 FOR UPDATE
-`, pgUUID(tenantID), pgUUID(nodeID), effectiveDate.UTC())
+`, pgUUID(tenantID), pgUUID(nodeID), pgValidDate(effectiveDate))
 
 	return scanNodeSliceRow(row)
 }
@@ -99,7 +99,7 @@ FROM org_node_slices
 WHERE tenant_id=$1 AND org_node_id=$2 AND end_date=$3
 LIMIT 1
 FOR UPDATE
-`, pgUUID(tenantID), pgUUID(nodeID), endDate.UTC())
+`, pgUUID(tenantID), pgUUID(nodeID), pgValidDate(endDate))
 
 	return scanNodeSliceRow(row)
 }
@@ -205,7 +205,7 @@ func (r *OrgRepository) UpdateNodeSliceEffectiveDate(ctx context.Context, tenant
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET effective_date=$3, effective_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), effectiveDate.UTC(), pgEffectiveOnFromEffectiveDate(effectiveDate))
+	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET effective_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), pgValidDate(effectiveDate))
 	return err
 }
 
@@ -214,7 +214,7 @@ func (r *OrgRepository) UpdateNodeSliceEndDate(ctx context.Context, tenantID uui
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET end_date=$3, end_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate.UTC(), pgEndOnFromEndDate(endDate))
+	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET end_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), pgValidDate(endDate))
 	return err
 }
 
@@ -223,7 +223,7 @@ func (r *OrgRepository) DeleteNodeSlicesFrom(ctx context.Context, tenantID uuid.
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `DELETE FROM org_node_slices WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date >= $3`, pgUUID(tenantID), pgUUID(nodeID), from.UTC())
+	_, err = tx.Exec(ctx, `DELETE FROM org_node_slices WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date >= $3`, pgUUID(tenantID), pgUUID(nodeID), pgValidDate(from))
 	return err
 }
 
@@ -245,7 +245,7 @@ FROM org_edges
 WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND effective_date=$4
 LIMIT 1
 FOR UPDATE
-`, pgUUID(tenantID), hierarchyType, pgUUID(childID), effectiveDate.UTC())
+`, pgUUID(tenantID), hierarchyType, pgUUID(childID), pgValidDate(effectiveDate))
 
 	var out services.EdgeRow
 	var parent pgtype.UUID
@@ -270,7 +270,7 @@ func (r *OrgRepository) DeleteEdgesFrom(ctx context.Context, tenantID uuid.UUID,
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `DELETE FROM org_edges WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND effective_date >= $4`, pgUUID(tenantID), hierarchyType, pgUUID(childID), from.UTC())
+	_, err = tx.Exec(ctx, `DELETE FROM org_edges WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND effective_date >= $4`, pgUUID(tenantID), hierarchyType, pgUUID(childID), pgValidDate(from))
 	return err
 }
 
@@ -346,7 +346,7 @@ func (r *OrgRepository) UpdateAssignmentEndDate(ctx context.Context, tenantID uu
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3, end_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), endDate.UTC(), pgEndOnFromEndDate(endDate))
+	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), pgValidDate(endDate))
 	return err
 }
 

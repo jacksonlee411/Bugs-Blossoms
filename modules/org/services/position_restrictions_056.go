@@ -121,7 +121,7 @@ func (s *OrgService) SetPositionRestrictions(ctx context.Context, tenantID uuid.
 			return nil, err
 		}
 
-		if err := s.repo.TruncatePositionSlice(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.TruncatePositionSlice(txCtx, tenantID, current.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 		sliceID, err := s.repo.InsertPositionSlice(txCtx, tenantID, in.PositionID, PositionSliceInsert{

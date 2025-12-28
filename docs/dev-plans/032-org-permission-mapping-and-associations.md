@@ -3,7 +3,7 @@
 **状态**: 已评审（2025-12-18 12:00 UTC）— 按 `docs/dev-plans/001-technical-design-template.md` 补齐可编码契约
 **实施状态**: 已落地（2025-12-19）；Readiness：`docs/dev-records/DEV-PLAN-032-READINESS.md`
 **对齐更新**：
-- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；DB 约束以 `effective_on/end_on`（`date`）与 `daterange(...,'[)')` 映射为准。
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；DB 约束以 `effective_date/end_date`（`date`）与 `daterange(effective_date, end_date + 1, '[)')` 映射为准。
 
 ## 0. 进度速记
 - 本计划交付“可有效期化的映射表 + 只读权限预览接口”，用于支撑后续 workflow/报表/下游集成的 scope 计算与对账。
@@ -74,7 +74,7 @@ flowchart TD
 
 ### 3.2 关键设计决策（ADR 摘要）
 1. **有效期化（选定）**
-   - `org_security_group_mappings` 与 `org_links` 的 Valid Time 统一按天闭区间 `[effective_date, end_date]`；DB 约束使用 `effective_on/end_on`（`date`）并通过 `daterange(effective_on, end_on + 1, '[)')` 映射实现 no-overlap（SSOT：DEV-PLAN-064）。
+   - `org_security_group_mappings` 与 `org_links` 的 Valid Time 统一按天闭区间 `[effective_date, end_date]`；DB 约束通过 `daterange(effective_date, end_date + 1, '[)')` 映射实现 no-overlap（SSOT：DEV-PLAN-064）。
 2. **继承标记用“对子树生效”表达（选定）**
    - 每条 security group mapping 持有 `applies_to_subtree`；preview 通过 `org_edges.path`（ltree）在 as-of 视图上计算祖先/子树关系，并返回 `source_org_node_id` 便于解释。
 3. **执行面不生成策略（选定）**
@@ -83,7 +83,7 @@ flowchart TD
    - 为保证 preflight/change-request/dry-run 能复用同一合同，本计划新增的写操作同时提供单条接口与 batch command type（见 §5.5）。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
-> 约定：PostgreSQL 17；Valid Time 按天闭区间 `[effective_date, end_date]`（`YYYY-MM-DD`）；DB 约束使用 `daterange(effective_on, end_on + 1, '[)')`；EXCLUDE 依赖 `btree_gist`（由 021 baseline 已启用）。
+> 约定：PostgreSQL 17；Valid Time 按天闭区间 `[effective_date, end_date]`（`YYYY-MM-DD`）；DB 约束使用 `daterange(effective_date, end_date + 1, '[)')`；EXCLUDE 依赖 `btree_gist`（由 021 baseline 已启用）。
 
 ### 4.1 `org_security_group_mappings`
 **用途**：把“安全组（security group）”绑定到 OrgNode，并声明是否对子树继承；用于权限 scope 预览与后续下游订阅。
@@ -95,23 +95,21 @@ flowchart TD
 | `org_node_id` | `uuid` | `not null` |  | FK → `org_nodes`（tenant 隔离） |
 | `security_group_key` | `text` | `not null` |  | 安全组标识（v1 为字符串 key，不做跨模块 FK） |
 | `applies_to_subtree` | `boolean` | `not null` | `false` | `true`=对子树继承；`false`=仅本节点 |
-| `effective_date` | `timestamptz` | `not null` |  | legacy（兼容期保留；Phase D 清理） |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` | legacy（exclusive；兼容期保留；Phase D 清理） |
-| `effective_on` | `date` | `not null` |  | 生效日（day） |
-| `end_on` | `date` | `not null` | `'9999-12-31'` | 失效日（最后有效日，含） |
+| `effective_date` | `date` | `not null` |  | 生效日（day） |
+| `end_date` | `date` | `not null` | `'9999-12-31'` | 失效日（最后有效日，含） |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束/索引（v1 选定）**
-- `check (effective_on <= end_on)`
+- `check (effective_date <= end_date)`
 - `check (char_length(trim(security_group_key)) > 0)`
 - FK（tenant 隔离）：
   - `fk (tenant_id, org_node_id) -> org_nodes (tenant_id, id) on delete restrict`
 - no-overlap（同 node + 同 key 的时间片不重叠）：
-  - `exclude using gist (tenant_id with =, org_node_id with =, security_group_key with =, daterange(effective_on, end_on + 1, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, org_node_id with =, security_group_key with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 索引：
-  - `btree (tenant_id, org_node_id, effective_on)`
-  - `btree (tenant_id, security_group_key, effective_on)`
+  - `btree (tenant_id, org_node_id, effective_date)`
+  - `btree (tenant_id, security_group_key, effective_date)`
 
 ### 4.2 `org_links`
 **用途**：把 OrgNode 与外部业务对象（project/cost_center/…）建立多对多关联；支持有效期化与反查。
@@ -125,15 +123,13 @@ flowchart TD
 | `object_key` | `text` | `not null` |  | 外部对象 key（例如 project_code/cost_center_code） |
 | `link_type` | `text` | `not null` + check |  | v1：`owns/uses/reports_to/custom` |
 | `metadata` | `jsonb` | `not null` | `'{}'` | 扩展信息（必须是 object） |
-| `effective_date` | `timestamptz` | `not null` |  | legacy（兼容期保留；Phase D 清理） |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` | legacy（exclusive；兼容期保留；Phase D 清理） |
-| `effective_on` | `date` | `not null` |  | 生效日（day） |
-| `end_on` | `date` | `not null` | `'9999-12-31'` | 失效日（最后有效日，含） |
+| `effective_date` | `date` | `not null` |  | 生效日（day） |
+| `end_date` | `date` | `not null` | `'9999-12-31'` | 失效日（最后有效日，含） |
 | `created_at` | `timestamptz` | `not null` | `now()` |  |
 | `updated_at` | `timestamptz` | `not null` | `now()` |  |
 
 **约束/索引（v1 选定）**
-- `check (effective_on <= end_on)`
+- `check (effective_date <= end_date)`
 - `check (char_length(trim(object_key)) > 0)`
 - `check (jsonb_typeof(metadata) = 'object')`
 - `check (object_type in ('project','cost_center','budget_item','custom'))`
@@ -141,10 +137,10 @@ flowchart TD
 - FK（tenant 隔离）：
   - `fk (tenant_id, org_node_id) -> org_nodes (tenant_id, id) on delete restrict`
 - no-overlap（同 node + 同对象 + 同 link_type 的时间片不重叠）：
-  - `exclude using gist (tenant_id with =, org_node_id with =, object_type with =, object_key with =, link_type with =, daterange(effective_on, end_on + 1, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, org_node_id with =, object_type with =, object_key with =, link_type with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 索引：
-  - `btree (tenant_id, org_node_id, effective_on)`
-  - `btree (tenant_id, object_type, object_key, effective_on)`
+  - `btree (tenant_id, org_node_id, effective_date)`
+  - `btree (tenant_id, object_type, object_key, effective_date)`
 
 ### 4.3 迁移策略（Org Atlas+Goose）
 - schema 源 SSOT：`modules/org/infrastructure/persistence/schema/org-schema.sql`
@@ -374,18 +370,18 @@ flowchart TD
 
 ## 6. 核心逻辑与算法 (Business Logic & Algorithms)
 ### 6.1 as-of 选择（通用）
-- 任何 as-of 查询以 day 语义 `effective_date <= d AND d <= end_date` 取片段（DB 约束映射：`daterange(effective_on, end_on + 1, '[)')`；SSOT：DEV-PLAN-064）。
+- 任何 as-of 查询以 day 语义 `effective_date <= d AND d <= end_date` 取片段（DB 约束映射：`daterange(effective_date, end_date + 1, '[)')`；SSOT：DEV-PLAN-064）。
 - `effective_date` 输入一律使用 `YYYY-MM-DD`（兼容期允许 RFC3339，但会先归一化为 UTC date）。
 
 ### 6.2 Permission Preview：安全组继承计算（v1）
 输入：`tenant_id, org_node_id, d`
 
 1. 取目标节点在 as-of 的路径：
-   - `SELECT path, depth FROM org_edges WHERE tenant_id=? AND child_node_id=? AND effective_on<=d AND d<=end_on`
+   - `SELECT path, depth FROM org_edges WHERE tenant_id=? AND child_node_id=? AND effective_date<=d AND d<=end_date`
    - 若不存在：404 `ORG_NODE_NOT_FOUND_AT_DATE`
 2. 计算“对该节点生效”的 mapping：
    - 候选条件：
-     - mapping 本身在 as-of 生效：`m.effective_on<=d AND d<=m.end_on`
+     - mapping 本身在 as-of 生效：`m.effective_date<=d AND d<=m.end_date`
      - mapping 绑定节点在 as-of 存在：join `org_edges` as-of 获取 `m_node_path/m_node_depth`
    - 生效规则（v1）：
      - 若 `m.applies_to_subtree=true`：当且仅当 `target_path <@ m_node_path`（目标在其子树内）时生效

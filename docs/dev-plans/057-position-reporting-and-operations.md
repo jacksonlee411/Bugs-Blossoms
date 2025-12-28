@@ -145,7 +145,7 @@ flowchart TD
   - （可选）对 scope 查询热点补充 covering index（需先用 034 的 load runner 证明收益）
 - `org_assignments`：
   - `btree (tenant_id, position_id, effective_date)`
-  - （可选）`gist (tenant_id, position_id, daterange(effective_on,end_on+1,'[)'))`
+  - （可选）`gist (tenant_id, position_id, daterange(effective_date,end_date+1,'[)'))`
 
 ## 5. 接口契约 (API Contracts)
 > 约定：内部 API 前缀 `/org/api`；JSON-only；Authz/403 payload 对齐 026；Valid Time 一律 `YYYY-MM-DD`（兼容期允许 RFC3339 但会归一化并回显为 `YYYY-MM-DD`；SSOT：DEV-PLAN-064）。

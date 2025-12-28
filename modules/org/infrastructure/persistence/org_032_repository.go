@@ -45,13 +45,13 @@ WHERE tenant_id = $1
 		i++
 	}
 	if filter.AsOf != nil && !filter.AsOf.IsZero() {
-		q += "\n  AND effective_date <= $" + itoa(i) + "\n  AND end_date > $" + itoa(i)
-		args = append(args, filter.AsOf.UTC())
+		q += "\n  AND effective_date <= $" + itoa(i) + "\n  AND end_date >= $" + itoa(i)
+		args = append(args, pgValidDate(*filter.AsOf))
 		i++
 	}
 	if filter.CursorAt != nil && filter.CursorID != nil && !filter.CursorAt.IsZero() && *filter.CursorID != uuid.Nil {
 		q += "\n  AND (effective_date, id) < ($" + itoa(i) + ", $" + itoa(i+1) + ")"
-		args = append(args, filter.CursorAt.UTC(), pgUUID(*filter.CursorID))
+		args = append(args, pgValidDate(*filter.CursorAt), pgUUID(*filter.CursorID))
 		i += 2
 	}
 
@@ -101,13 +101,11 @@ func (r *OrgRepository) InsertSecurityGroupMapping(ctx context.Context, tenantID
 	  security_group_key,
 	  applies_to_subtree,
 	  effective_date,
-	  end_date,
-	  effective_on,
-	  end_on
+	  end_date
 	)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+	VALUES ($1,$2,$3,$4,$5,$6)
 	RETURNING id
-	`, pgUUID(tenantID), pgUUID(in.OrgNodeID), in.SecurityGroupKey, in.AppliesToSubtree, in.EffectiveDate, in.EndDate, pgEffectiveOnFromEffectiveDate(in.EffectiveDate), pgEndOnFromEndDate(in.EndDate)).Scan(&id)
+	`, pgUUID(tenantID), pgUUID(in.OrgNodeID), in.SecurityGroupKey, in.AppliesToSubtree, pgValidDate(in.EffectiveDate), pgValidDate(in.EndDate)).Scan(&id)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -157,9 +155,9 @@ func (r *OrgRepository) UpdateSecurityGroupMappingEndDate(ctx context.Context, t
 	}
 	_, err = tx.Exec(ctx, `
 	UPDATE org_security_group_mappings
-	SET end_date=$3, end_on=$4, updated_at=now()
+	SET end_date=$3, updated_at=now()
 	WHERE tenant_id=$1 AND id=$2
-	`, pgUUID(tenantID), pgUUID(id), endDate, pgEndOnFromEndDate(endDate))
+	`, pgUUID(tenantID), pgUUID(id), pgValidDate(endDate))
 	return err
 }
 
@@ -189,9 +187,9 @@ FROM org_security_group_mappings
 WHERE tenant_id=$1
   AND org_node_id = ANY($2::uuid[])
   AND effective_date <= $3
-  AND end_date > $3
+  AND end_date >= $3
 ORDER BY effective_date DESC, id DESC
-`, pgUUID(tenantID), orgNodeIDs, asOf)
+`, pgUUID(tenantID), orgNodeIDs, pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -260,13 +258,13 @@ WHERE tenant_id = $1
 		i++
 	}
 	if filter.AsOf != nil && !filter.AsOf.IsZero() {
-		q += "\n  AND effective_date <= $" + itoa(i) + "\n  AND end_date > $" + itoa(i)
-		args = append(args, filter.AsOf.UTC())
+		q += "\n  AND effective_date <= $" + itoa(i) + "\n  AND end_date >= $" + itoa(i)
+		args = append(args, pgValidDate(*filter.AsOf))
 		i++
 	}
 	if filter.CursorAt != nil && filter.CursorID != nil && !filter.CursorAt.IsZero() && *filter.CursorID != uuid.Nil {
 		q += "\n  AND (effective_date, id) < ($" + itoa(i) + ", $" + itoa(i+1) + ")"
-		args = append(args, filter.CursorAt.UTC(), pgUUID(*filter.CursorID))
+		args = append(args, pgValidDate(*filter.CursorAt), pgUUID(*filter.CursorID))
 		i += 2
 	}
 
@@ -322,13 +320,11 @@ func (r *OrgRepository) InsertOrgLink(ctx context.Context, tenantID uuid.UUID, i
 	  link_type,
 	  metadata,
 	  effective_date,
-	  end_date,
-	  effective_on,
-	  end_on
+	  end_date
 	)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+	VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
 	RETURNING id
-	`, pgUUID(tenantID), pgUUID(in.OrgNodeID), in.ObjectType, in.ObjectKey, in.LinkType, in.Metadata, in.EffectiveDate, in.EndDate, pgEffectiveOnFromEffectiveDate(in.EffectiveDate), pgEndOnFromEndDate(in.EndDate)).Scan(&id)
+	`, pgUUID(tenantID), pgUUID(in.OrgNodeID), in.ObjectType, in.ObjectKey, in.LinkType, in.Metadata, pgValidDate(in.EffectiveDate), pgValidDate(in.EndDate)).Scan(&id)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -384,9 +380,9 @@ func (r *OrgRepository) UpdateOrgLinkEndDate(ctx context.Context, tenantID uuid.
 	}
 	_, err = tx.Exec(ctx, `
 	UPDATE org_links
-	SET end_date=$3, end_on=$4, updated_at=now()
+	SET end_date=$3, updated_at=now()
 	WHERE tenant_id=$1 AND id=$2
-	`, pgUUID(tenantID), pgUUID(id), endDate, pgEndOnFromEndDate(endDate))
+	`, pgUUID(tenantID), pgUUID(id), pgValidDate(endDate))
 	return err
 }
 
@@ -418,10 +414,10 @@ FROM org_links
 WHERE tenant_id=$1
   AND org_node_id=$2
   AND effective_date <= $3
-  AND end_date > $3
+  AND end_date >= $3
 ORDER BY object_type ASC, object_key ASC, link_type ASC, id ASC
 LIMIT $4
-`, pgUUID(tenantID), pgUUID(orgNodeID), asOf.UTC(), limit)
+`, pgUUID(tenantID), pgUUID(orgNodeID), pgValidDate(asOf), limit)
 	if err != nil {
 		return nil, err
 	}

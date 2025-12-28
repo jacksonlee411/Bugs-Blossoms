@@ -167,11 +167,11 @@ func (s *OrgService) RescindSecurityGroupMapping(ctx context.Context, tenantID u
 		if err != nil {
 			return nil, mapPgError(err)
 		}
-		if !in.EffectiveDate.After(current.EffectiveDate) || !in.EffectiveDate.Before(current.EndDate) {
+		if !in.EffectiveDate.After(current.EffectiveDate) || in.EffectiveDate.After(current.EndDate) {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_INVALID_RESCIND_DATE", "effective_date must be within current window", nil)
 		}
 
-		if err := s.repo.UpdateSecurityGroupMappingEndDate(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.UpdateSecurityGroupMappingEndDate(txCtx, tenantID, current.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 
@@ -358,11 +358,11 @@ func (s *OrgService) RescindOrgLink(ctx context.Context, tenantID uuid.UUID, req
 		if err != nil {
 			return nil, mapPgError(err)
 		}
-		if !in.EffectiveDate.After(current.EffectiveDate) || !in.EffectiveDate.Before(current.EndDate) {
+		if !in.EffectiveDate.After(current.EffectiveDate) || in.EffectiveDate.After(current.EndDate) {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_INVALID_RESCIND_DATE", "effective_date must be within current window", nil)
 		}
 
-		if err := s.repo.UpdateOrgLinkEndDate(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.UpdateOrgLinkEndDate(txCtx, tenantID, current.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 

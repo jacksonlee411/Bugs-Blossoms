@@ -2,7 +2,7 @@
 
 **状态**: 已完成（Schema + Service + API 最小闭环收口；见 §8.3 实施记录）（2025-12-20 18:36 UTC）
 **对齐更新**：
-- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；schema/约束示例以 `effective_on/end_on`（`date`）与 `daterange(...,'[)')` 映射为准。
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；schema/约束示例以 `effective_date/end_date`（`date`）与 `daterange(effective_date, end_date + 1, '[)')` 映射为准。
 
 > 本计划按 [DEV-PLAN-001](001-technical-design-template.md) 的结构补齐“可直接编码”的详细设计（Level 4-5），并以 [DEV-PLAN-052](052-position-contract-freeze-and-decisions.md) 的契约冻结为准：若本计划与 052 冲突，以 052 为 SSOT。
 
@@ -115,14 +115,14 @@ CREATE TABLE org_position_slices (
 
   effective_date timestamptz NOT NULL, -- legacy（B1 双轨；待 DEV-PLAN-064 阶段 D 清理）
   end_date timestamptz NOT NULL DEFAULT '9999-12-31', -- legacy（exclusive 上界）
-  effective_on date NOT NULL,
-  end_on date NOT NULL DEFAULT DATE '9999-12-31',
+  effective_date date NOT NULL,
+  end_date date NOT NULL DEFAULT DATE '9999-12-31',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
 
   CONSTRAINT org_position_slices_tenant_id_id_key UNIQUE (tenant_id, id),
   CONSTRAINT org_position_slices_effective_check CHECK (effective_date < end_date), -- legacy（半开区间）
-  CONSTRAINT org_position_slices_effective_on_check CHECK (effective_on <= end_on),
+  CONSTRAINT org_position_slices_effective_check CHECK (effective_date <= end_date),
   CONSTRAINT org_position_slices_profile_is_object_check CHECK (jsonb_typeof(profile) = 'object'),
   CONSTRAINT org_position_slices_lifecycle_status_check CHECK (lifecycle_status IN ('planned','active','inactive','rescinded')),
   CONSTRAINT org_position_slices_capacity_fte_check CHECK (capacity_fte > 0),
@@ -147,7 +147,7 @@ ALTER TABLE org_position_slices
   EXCLUDE USING gist (
     tenant_id gist_uuid_ops WITH =,
     position_id gist_uuid_ops WITH =,
-    daterange(effective_on, end_on + 1, '[)') WITH &&
+    daterange(effective_date, end_date + 1, '[)') WITH &&
   );
 
 CREATE INDEX org_position_slices_tenant_position_effective_idx
@@ -157,7 +157,7 @@ CREATE INDEX org_position_slices_tenant_org_node_effective_idx
   ON org_position_slices (tenant_id, org_node_id, effective_date); -- legacy（B1 双轨）
 
 CREATE INDEX org_position_slices_tenant_position_effective_on_idx
-  ON org_position_slices (tenant_id, position_id, effective_on);
+  ON org_position_slices (tenant_id, position_id, effective_date);
 ```
 
 #### 4.1.2 调整：`org_positions`（稳定实体）

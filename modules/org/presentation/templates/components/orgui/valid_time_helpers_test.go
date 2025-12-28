@@ -23,12 +23,12 @@ func TestFormatValidEndDateFromEndDate(t *testing.T) {
 		}
 	})
 
-	t.Run("exclusive-midnight", func(t *testing.T) {
+	t.Run("midnight", func(t *testing.T) {
 		endDate := time.Date(2025, 12, 28, 0, 0, 0, 0, time.UTC)
 		if openEndedEndDate(endDate) {
 			t.Fatalf("expected openEndedEndDate=false")
 		}
-		if got := formatValidEndDateFromEndDate(endDate); got != "2025-12-27" {
+		if got := formatValidEndDateFromEndDate(endDate); got != "2025-12-28" {
 			t.Fatalf("unexpected end date: %q", got)
 		}
 	})

@@ -1,16 +1,16 @@
 # DEV-PLAN-064：生效日期（日粒度）统一：Valid Time=DATE，Audit Time=TIMESTAMPTZ
 
-**状态**: Phase 1（Org）已落地（B1 双轨：date 列已引入并双写；legacy timestamp 列待清理）（2025-12-27 11:45 UTC）
+**状态**: Phase 1（Org）已落地（Valid Time=date；legacy 清理完成，date-only 收敛）（2025-12-28 UTC）
 
 > 目标：将“业务生效日期/有效期（Valid Time）”从 `timestamptz`（秒/微秒级）收敛为 **day（date）粒度**，对齐 SAP HCM（`BEGDA/ENDDA`）与 PeopleSoft（`EFFDT/EFFSEQ`）的 HR 习惯；同时明确 **时间戳（秒/微秒级）仅用于操作/审计时间（Audit/Tx Time）**（如 `created_at/updated_at/transaction_time`）。
 
 ## 0. 已完成事项（2025-12-27）
-- Phase 1（Org）按 B1 双轨落地：DB 新增 `effective_on/end_on`（date），按 UTC 归一化回填，并增加 `daterange(effective_on, end_on + 1, '[)')` 的 EXCLUDE 约束与索引；Schema SSOT 已同步。
-- Go 层写路径已双写 `effective_on/end_on`；读/输出契约已收敛为 `YYYY-MM-DD`（兼容 RFC3339 输入，但会归一化为 date 并回显为 day string）。
+- Phase 1（Org）已收敛：Valid Time 字段统一为 `date effective_date/end_date`，并增加 `daterange(effective_date, end_date + 1, '[)')` 的 EXCLUDE 约束与索引；Schema SSOT 已同步。
+- Go 层写/读路径已切到 date-only；API 输入只接受 `YYYY-MM-DD`（不再接受 RFC3339 timestamp 作为 Valid Time）。
 - Cursor（`effective_date:...:id:...`）已改为 day string，并在解析时兼容 legacy RFC3339。
 - 已跑门禁并通过：`go fmt ./...`、`go vet ./...`、`make check lint`、`make test`、`make check doc`、`make org lint`、`GOOSE_TABLE=goose_db_version_org make org migrate up`、`make authz-test && make authz-lint`。
 - 12.2 中 Phase 1 DEV-PLAN 清单收敛已完成：A 类/B 类文档已修订或复核，并在各文档头部记录“对齐更新”（以避免继续传播旧的 timestamp/半开区间口径）。
-- 未完成：阶段 D（清理 legacy timestamp 列/旧约束）与阶段 E（停止接受 RFC3339 输入）仍待后续 PR。
+- 已完成：阶段 D（清理 legacy 列/旧约束）与阶段 E（停止接受 RFC3339 输入）。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：HR 用户对“结束日期当天是否有效”的一致性诉求；对齐 SAP HCM / PeopleSoft 的 day 粒度 effective dating 心智模型。
@@ -107,7 +107,7 @@ graph TD
 本计划落地后，“Valid Time=date（日粒度）”成为唯一权威表达。以下文档/契约需要在实施过程中同步更新（以避免继续传播旧的“timestamptz + 半开区间”口径）：
 - `docs/dev-plans/020-organization-lifecycle.md`（已对齐为 day 闭区间口径）
 - `docs/dev-plans/021-org-schema-and-constraints.md`（已对齐为 Valid Time=date + `daterange(...,'[)')` 映射；legacy 双轨已标注）
-- `docs/dev-plans/053-position-core-schema-service-api.md`（已对齐：以 `effective_on/end_on`（date）为准；legacy 双轨已标注）
+- `docs/dev-plans/053-position-core-schema-service-api.md`（已对齐：以 `effective_date/end_date`（date）为准）
 原则：
 - 文档层面：统一描述为“按天闭区间（最后有效日）”，并明确 DB 约束使用 `daterange(effective_date, end_date + 1, '[)')` 的映射方式。
 - 代码层面：所有“as-of 判定/截断”必须以 date 口径集中实现，禁止在散落的 SQL/templ 中重复定义边界语义。
@@ -173,35 +173,24 @@ graph TD
 ### 4.3.1 Schema 变更示例（以 `org_node_slices` 为例）
 > 目的：把“类型/约束/索引策略”落到可执行级别，其他表按相同模式迁移（以 schema SSOT 为准逐一落地）。
 
-1) 新增 date 列（B1 双轨）：
+示例（date-only 形态）：
 ```sql
 ALTER TABLE org_node_slices
-  ADD COLUMN effective_on date NOT NULL,
-  ADD COLUMN end_on date NOT NULL DEFAULT '9999-12-31';
-```
-
-2) 回填（UTC 归一化，规则见 4.4）：
-```sql
-UPDATE org_node_slices
-SET
-  effective_on = (effective_date AT TIME ZONE 'UTC')::date,
-	  end_on = CASE
-	    WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-	    ELSE (((end_date AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-	  END;
-```
-
-3) 约束与索引（保持“同键区间不重叠”的强约束能力）：
-```sql
-ALTER TABLE org_node_slices
-  ADD CONSTRAINT org_node_slices_effective_on_check CHECK (effective_on <= end_on);
+  ALTER COLUMN effective_date TYPE date USING (effective_date AT TIME ZONE 'UTC')::date,
+  ALTER COLUMN end_date TYPE date USING CASE
+    WHEN (end_date AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
+    ELSE ((end_date AT TIME ZONE 'UTC') - interval '1 microsecond')::date
+  END;
 
 ALTER TABLE org_node_slices
-  ADD CONSTRAINT org_node_slices_no_overlap_on
+  ADD CONSTRAINT org_node_slices_effective_check CHECK (effective_date <= end_date);
+
+ALTER TABLE org_node_slices
+  ADD CONSTRAINT org_node_slices_no_overlap
   EXCLUDE USING gist (
     tenant_id WITH =,
     org_node_id WITH =,
-    daterange(effective_on, end_on + 1, '[)') WITH &&
+    daterange(effective_date, end_date + 1, '[)') WITH &&
   );
 ```
 
@@ -218,33 +207,10 @@ ALTER TABLE org_node_slices
   - 否则：`end_date_date = (((end_date AT TIME ZONE 'UTC') - interval '1 microsecond'))::date`
     - 解释：对任意 `end_date`（exclusive）减去一个最小时间单位后再取 date，能正确覆盖“非 00:00 的 end_date”与“刚好 00:00 的边界”（00:00 会回落到前一日，符合“最后有效日”）。
 
-### 4.5 迁移策略（选定：B1 双列迁移，最终收敛为 date-only）
-为保证可回滚与可观测性，本计划选定 **B1（新增 date 列 + 双写/回填）** 为默认路径；B2（直接改列类型）仅允许在明确接受停机窗口与表规模评估通过时采用，且不作为默认执行路径。
+### 4.5 迁移策略（已实施：date-only 收敛）
+本计划已完成最终收敛：Org in-scope 表的 Valid Time 字段统一为 `date effective_date/end_date`，并以 `daterange(effective_date, end_date + 1, '[)')` 实现 no-overlap 强约束；同时 API 层停止接受 RFC3339 timestamp 作为 Valid Time 输入。
 
-1) **阶段 A：接口与类型先收敛为 day（兼容期）**
-   - 输入：所有 `effective_date/end_date` 在 Controller/Service 边界统一归一化为 day（UTC date）。
-   - 兼容：短期允许 RFC3339，但会被归一化为 UTC date 并回显为 `YYYY-MM-DD`；并打点观测调用方是否仍在传 timestamp。
-
-2) **阶段 B：Schema 引入 date 列并回填（不改变读路径）**
-   - 为每张 in-scope 表新增 `effective_on date NOT NULL`、`end_on date NOT NULL`（列名后续可在最终阶段重命名为 `effective_date/end_date`，以避免双语义混用）。
-   - 按“4.4 数据归一化规则”回填 `effective_on/end_on`。
-   - 为 `effective_on/end_on` 增加 check/exclude（使用 `daterange(effective_on, end_on + 1, '[)')`），但暂不删除旧的 `tstzrange` 约束（双轨并行，以便验证一致性）。
-
-3) **阶段 C：应用双写并切换读路径（一次部署内保持可回滚）**
-   - 写入：所有创建/截断/续接同时写 `timestamptz` 列与 `date` 列（`effective_on/end_on`）。
-   - 读取：as-of 查询改为 date 口径（优先用 `effective_on/end_on`），并在关键链路增加一致性断言（例如在集成测试中对比 timestamp 口径与 date 口径结果）。
-
-4) **阶段 D：清理旧列与旧约束（收敛）**
-   - 删除旧的 `timestamptz effective_date/end_date` 约束与索引，迁移为 date-only 版本（`daterange`）。
-   - 视代码可读性决定是否做列重命名（例如 `effective_on -> effective_date`，`end_on -> end_date`）并同步更新代码，最终做到“Valid Time 字段名与类型一致，不存在双轨”。
-
-5) **阶段 E：收紧兼容（结束 RFC3339）**
-   - API 层将 RFC3339 输入从“兼容归一化”升级为“422 拒绝”，确保外部契约不再漂移回 timestamp。
-
-回滚策略（与阶段绑定）：
-- 阶段 A/B：可直接回滚应用或回滚迁移（旧列仍为权威）。
-- 阶段 C：读路径切换建议受控（配置开关或小步发布）；回滚可切回旧读路径。
-- 阶段 D：一旦删旧列，回滚成本显著增加，因此必须在阶段 C 的观测与验证完成后再进入。
+历史“分阶段迁移/回滚验证”的讨论与权衡见：`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`。
 
 ## 5. 接口契约 (API Contracts)
 ### 5.1 Query / Form / JSON（统一约定）
@@ -315,10 +281,10 @@ ALTER TABLE org_node_slices
 ### 9.2 里程碑（执行顺序）
 1. [x] 完成 Phase 1 范围核对：逐表确认 Valid Time 字段与 in-scope 清单（含 `org_audit_logs` 的字段归类）。
 2. [x] 阶段 A：完成 Controller/DTO date-only 收敛（兼容期策略 + 观测指标）。
-3. [x] 阶段 B：完成 Org schema/migrations：新增 `effective_on/end_on`（date）、回填、并行 check/exclude（daterange）。
+3. [x] 阶段 B：完成 Org schema/migrations：Valid Time 字段迁移为 `date`，并添加 `daterange` check/exclude 约束与索引。
 4. [x] 阶段 C：完成 Repository/Service：双写 + 读路径切换为 date 口径；补齐边界日/相邻段测试。
-5. [ ] 阶段 D：清理旧列/旧约束，收敛为 date-only；同步更新引用旧契约的 SSOT 文档（见 3.4）。
-6. [ ] 阶段 E：收紧 API：停止接受 RFC3339 timestamp 作为 Valid Time 输入；事件保持 `*.v1`，并完成 `EffectiveWindow` day 粒度序列化收敛。
+5. [x] 阶段 D：清理旧列/旧约束，收敛为 date-only；同步更新引用旧契约的 SSOT 文档（见 3.4）。
+6. [x] 阶段 E：收紧 API：停止接受 RFC3339 timestamp 作为 Valid Time 输入；事件保持 `*.v1`，并完成 `EffectiveWindow` day 粒度序列化收敛。
 7. [x] Readiness：按 `AGENTS.md` 触发器运行并记录结果（见 0），更新状态为“准备就绪/已批准”。
 
 ## 10. 运维与监控 (Ops & Monitoring)
@@ -331,7 +297,7 @@ ALTER TABLE org_node_slices
   - 回填后，date 口径 as-of 查询与旧 timestamp 口径结果一致（除“结束日包含”的语义变化外，必须明确并可解释）。
   - 覆盖 open-ended（`9999-12-31`）与边界日（`D`、`D-1`）场景。
 - 约束有效性：
-  - 相邻段允许：`prev.end_on + 1 day == next.effective_on`
+- 相邻段允许：`prev.end_date + 1 day == next.effective_date`
   - 重叠段拒绝：EXCLUDE 约束应阻止插入/更新产生 overlap。
 - 兼容期行为：
   - RFC3339 输入会被归一化并回显为 `YYYY-MM-DD`；兼容期结束后返回 422/400（按 5.3）。

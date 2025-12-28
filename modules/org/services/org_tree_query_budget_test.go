@@ -68,6 +68,7 @@ func TestOrgTreeQueryBudget(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -227,15 +228,8 @@ func seedOrgTree(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantI
 
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_node_slices
-				(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date, effective_on, end_on)
-				VALUES (
-					$1,$2,$3,$4,$5,$6,$7,
-					($6 AT TIME ZONE 'UTC')::date,
-					CASE
-						WHEN ($7 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-						ELSE ((($7 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-					END
-				)`,
+					(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date)
+					VALUES ($1,$2,$3,$4,$5,$6::date,$7::date)`,
 			tenantID, n.ID, n.Code, n.DisplayOrder, n.ParentID, asOf, endDate,
 		)
 		require.NoError(tb, err)
@@ -243,15 +237,8 @@ func seedOrgTree(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantI
 
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_edges
-				(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
-				VALUES (
-					$1,$2,$3,$4,$5,$6,
-					($5 AT TIME ZONE 'UTC')::date,
-					CASE
-						WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-						ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-					END
-				)`,
+					(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
+					VALUES ($1,$2,$3,$4,$5::date,$6::date)`,
 			tenantID, "OrgUnit", n.ParentID, n.ID, asOf, endDate,
 		)
 		require.NoError(tb, err)

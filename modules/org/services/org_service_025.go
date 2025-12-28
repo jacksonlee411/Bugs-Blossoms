@@ -240,14 +240,14 @@ func (s *OrgService) RescindNode(ctx context.Context, tenantID uuid.UUID, reques
 					return nil, err
 				}
 			} else {
-				if err := s.repo.TruncateEdge(txCtx, tenantID, edgeAt.ID, in.EffectiveDate); err != nil {
+				if err := s.repo.TruncateEdge(txCtx, tenantID, edgeAt.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 					return nil, mapPgError(err)
 				}
 			}
 		}
 
 		if target.EffectiveDate.Before(in.EffectiveDate) {
-			if err := s.repo.TruncateNodeSlice(txCtx, tenantID, target.ID, in.EffectiveDate); err != nil {
+			if err := s.repo.TruncateNodeSlice(txCtx, tenantID, target.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
 		}
@@ -364,11 +364,11 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 		if err != nil {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_NOT_FOUND_AT_DATE", "target slice not found", err)
 		}
-		if !in.NewEffectiveDate.Before(target.EndDate) {
-			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date must be before target end_date", nil)
+		if in.NewEffectiveDate.After(target.EndDate) {
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date must be on/before target end_date", nil)
 		}
 
-		prev, err := s.repo.LockNodeSliceEndingAt(txCtx, tenantID, in.NodeID, in.TargetEffectiveDate)
+		prev, err := s.repo.LockNodeSliceEndingAt(txCtx, tenantID, in.NodeID, truncateEndDateFromNewEffectiveDate(in.TargetEffectiveDate))
 		if err != nil {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_SWALLOW", "previous slice not found", err)
 		}
@@ -405,11 +405,11 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 			if err := s.repo.UpdateNodeSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
 				return nil, mapPgError(err)
 			}
-			if err := s.repo.UpdateNodeSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
+			if err := s.repo.UpdateNodeSliceEndDate(txCtx, tenantID, prev.ID, truncateEndDateFromNewEffectiveDate(in.NewEffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
 		} else {
-			if err := s.repo.UpdateNodeSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
+			if err := s.repo.UpdateNodeSliceEndDate(txCtx, tenantID, prev.ID, truncateEndDateFromNewEffectiveDate(in.NewEffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
 			if err := s.repo.UpdateNodeSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
@@ -421,7 +421,7 @@ func (s *OrgService) ShiftBoundaryNode(ctx context.Context, tenantID uuid.UUID, 
 			"slice_id":       prev.ID.String(),
 			"org_node_id":    in.NodeID.String(),
 			"effective_date": prev.EffectiveDate.UTC().Format(time.RFC3339),
-			"end_date":       in.NewEffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":       truncateEndDateFromNewEffectiveDate(in.NewEffectiveDate).UTC().Format(time.RFC3339),
 		}
 		targetNew := map[string]any{
 			"slice_id":       target.ID.String(),
@@ -584,7 +584,7 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 				}
 				continue
 			}
-			if err := s.repo.TruncateEdge(txCtx, tenantID, e.ID, in.EffectiveDate); err != nil {
+			if err := s.repo.TruncateEdge(txCtx, tenantID, e.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
 			if _, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, e.ParentNodeID, e.ChildNodeID, in.EffectiveDate, e.EndDate); err != nil {
@@ -602,7 +602,7 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 					return nil, err
 				}
 			} else {
-				if err := s.repo.TruncateNodeSlice(txCtx, tenantID, nodeSlice.ID, in.EffectiveDate); err != nil {
+				if err := s.repo.TruncateNodeSlice(txCtx, tenantID, nodeSlice.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 					return nil, err
 				}
 				_, err := s.repo.InsertNodeSlice(txCtx, tenantID, in.NodeID, NodeSliceInsert{
@@ -920,7 +920,7 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 			})
 			return nil, err
 		}
-		if !in.EffectiveDate.After(current.EffectiveDate) || !in.EffectiveDate.Before(current.EndDate) {
+		if !in.EffectiveDate.After(current.EffectiveDate) || in.EffectiveDate.After(current.EndDate) {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_INVALID_RESCIND_DATE", "effective_date must be within current window", nil)
 		}
 
@@ -930,7 +930,7 @@ func (s *OrgService) RescindAssignment(ctx context.Context, tenantID uuid.UUID, 
 			"end_date":       current.EndDate.UTC().Format(time.RFC3339),
 		}
 
-		if err := s.repo.UpdateAssignmentEndDate(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.UpdateAssignmentEndDate(txCtx, tenantID, current.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 

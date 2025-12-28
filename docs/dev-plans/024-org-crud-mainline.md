@@ -324,8 +324,8 @@ flowchart TD
 
 **算法（同一事务内）**：
 1. 读取并锁定在 `X` 的 as-of subtree：
-   - 读出 `moved_path`：`SELECT path FROM org_edges WHERE tenant_id=? AND child_node_id=? AND effective_on<=X AND X<=end_on FOR UPDATE`
-   - 列出 subtree edges：`SELECT parent_node_id, child_node_id, depth, end_on FROM org_edges WHERE tenant_id=? AND effective_on<=X AND X<=end_on AND path <@ moved_path ORDER BY depth ASC FOR UPDATE`
+   - 读出 `moved_path`：`SELECT path FROM org_edges WHERE tenant_id=? AND child_node_id=? AND effective_date<=X AND X<=end_date FOR UPDATE`
+   - 列出 subtree edges：`SELECT parent_node_id, child_node_id, depth, end_date FROM org_edges WHERE tenant_id=? AND effective_date<=X AND X<=end_date AND path <@ moved_path ORDER BY depth ASC FOR UPDATE`
 2. 先处理被移动节点自身：
    - 将其当前 edge `E` 的 `end_date` 更新为 `X`（`E.effective_date < X` 前置已保证）。
    - 插入新 edge：`(parent_node_id=new_parent_id, child_node_id=org_node_id, effective_date=X, end_date=E.end_date_original)`。

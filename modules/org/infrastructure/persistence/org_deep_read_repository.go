@@ -76,7 +76,7 @@ WITH target AS (
 	  AND hierarchy_type=$2
 	  AND child_node_id=$3
 	  AND effective_date <= $4
-	  AND end_date > $4
+	  AND end_date >= $4
 	ORDER BY effective_date DESC
 	LIMIT 1
 )
@@ -86,10 +86,10 @@ JOIN org_edges e
 	ON e.tenant_id=$1
 	AND e.hierarchy_type=$2
 	AND e.effective_date <= $4
-	AND e.end_date > $4
+	AND e.end_date >= $4
 	AND e.path @> target.path
 ORDER BY (target.depth - e.depth) ASC, e.child_node_id ASC
-`, pgUUID(tenantID), hierarchyType, pgUUID(descendantNodeID), asOf)
+`, pgUUID(tenantID), hierarchyType, pgUUID(descendantNodeID), pgValidDate(asOf))
 		if err != nil {
 			return nil, err
 		}
@@ -119,9 +119,10 @@ ORDER BY (target.depth - e.depth) ASC, e.child_node_id ASC
 	  AND hierarchy_type=$2
 	  AND build_id=$3
 	  AND descendant_node_id=$4
-	  AND tstzrange(effective_date, end_date, '[)') @> $5::timestamptz
+	  AND effective_date <= $5
+	  AND end_date >= $5
 	ORDER BY depth ASC, ancestor_node_id ASC
-	`, pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(descendantNodeID), asOf)
+	`, pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(descendantNodeID), pgValidDate(asOf))
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +197,7 @@ WITH target AS (
 	  AND hierarchy_type=$2
 	  AND child_node_id=$3
 	  AND effective_date <= $4
-	  AND end_date > $4
+	  AND end_date >= $4
 	ORDER BY effective_date DESC
 	LIMIT 1
 )
@@ -206,10 +207,10 @@ JOIN org_edges e
 	ON e.tenant_id=$1
 	AND e.hierarchy_type=$2
 	AND e.effective_date <= $4
-	AND e.end_date > $4
+	AND e.end_date >= $4
 	AND e.path <@ target.path
 ORDER BY (e.depth - target.depth) ASC, e.child_node_id ASC
-`, pgUUID(tenantID), hierarchyType, pgUUID(ancestorNodeID), asOf)
+`, pgUUID(tenantID), hierarchyType, pgUUID(ancestorNodeID), pgValidDate(asOf))
 		if err != nil {
 			return nil, err
 		}
@@ -239,9 +240,10 @@ ORDER BY (e.depth - target.depth) ASC, e.child_node_id ASC
 	  AND hierarchy_type=$2
 	  AND build_id=$3
 	  AND ancestor_node_id=$4
-	  AND tstzrange(effective_date, end_date, '[)') @> $5::timestamptz
+	  AND effective_date <= $5
+	  AND end_date >= $5
 	ORDER BY depth ASC, descendant_node_id ASC
-	`, pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(ancestorNodeID), asOf)
+	`, pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(ancestorNodeID), pgValidDate(asOf))
 		if err != nil {
 			return nil, err
 		}

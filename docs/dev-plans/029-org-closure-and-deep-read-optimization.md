@@ -2,7 +2,7 @@
 
 **状态**: 已实施（2025-12-19 UTC）
 **对齐更新**：
-- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；闭包表/快照表的 as-of 与不重叠约束以 `effective_on/end_on`（`date`）与 `daterange(..., '[)')` 映射为准。
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；闭包表/快照表的 as-of 与不重叠约束以 `effective_date/end_date`（`date`）与 `daterange(effective_date, end_date + 1, '[)')` 映射为准。
 
 ## 0. 进度速记
 - 本计划对应 `docs/dev-plans/020-organization-lifecycle.md` 的步骤 9：为“全树/深层级读取”提供可扩展的读模型，热点查询禁止递归 CTE，优先走闭包表/快照。
@@ -95,7 +95,7 @@ flowchart TD
 ## 4. 数据模型与约束 (Data Model & Constraints)
 > **标准**：必须精确到字段类型、空值约束、索引策略及数据库级约束（check/exclude/fk）。
 >
-> 约定：Postgres 17；Valid Time 语义按天闭区间 `[effective_date, end_date]`（`YYYY-MM-DD`）；DB 约束/查询以 `effective_on/end_on`（`date`）为准，并用 `daterange(effective_on, end_on + 1, '[)')` 映射实现 no-overlap（SSOT：DEV-PLAN-064）；`hierarchy_type` M1 固定 `OrgUnit`（与 021 对齐）。
+> 约定：Postgres 17；Valid Time 语义按天闭区间 `[effective_date, end_date]`（`YYYY-MM-DD`）；DB 约束/查询以 `effective_date/end_date`（`date`）为准，并用 `daterange(effective_date, end_date + 1, '[)')` 映射实现 no-overlap（SSOT：DEV-PLAN-064）；`hierarchy_type` M1 固定 `OrgUnit`（与 021 对齐）。
 
 ### 4.1 `org_hierarchy_closure_builds`（闭包 build 元数据）
 **用途**：记录 closure build，并维护“每租户/层级一个 active build”指针，支持秒级切换与回滚。
@@ -127,23 +127,21 @@ flowchart TD
 | `ancestor_node_id` | `uuid` | `not null` |  | 祖先节点 |
 | `descendant_node_id` | `uuid` | `not null` |  | 后代节点 |
 | `depth` | `int` | `not null` + check |  | 祖先到后代的距离（0=self） |
-| `effective_date` | `timestamptz` | `not null` |  | legacy（兼容期保留；Phase D 清理） |
-| `end_date` | `timestamptz` | `not null` | `'9999-12-31'` | legacy（exclusive；兼容期保留；Phase D 清理） |
-| `effective_on` | `date` | `not null` |  | 生效日（day） |
-| `end_on` | `date` | `not null` | `'9999-12-31'` | 失效日（最后有效日，含） |
+| `effective_date` | `date` | `not null` |  | 生效日（day） |
+| `end_date` | `date` | `not null` | `'9999-12-31'` | 失效日（最后有效日，含） |
 
 **约束/索引（建议）**：
-- `check (effective_on <= end_on)`
+- `check (effective_date <= end_date)`
 - `check (depth >= 0)`
 - FK（tenant 隔离）：
   - `fk (tenant_id, ancestor_node_id) -> org_nodes (tenant_id, id) on delete restrict`
   - `fk (tenant_id, descendant_node_id) -> org_nodes (tenant_id, id) on delete restrict`
   - `fk (tenant_id, hierarchy_type, build_id) -> org_hierarchy_closure_builds (tenant_id, hierarchy_type, build_id) on delete cascade`
 - 防重叠（同 build 下同一对 ancestor/descendant 的有效期窗不重叠）：
-  - `exclude using gist (tenant_id with =, hierarchy_type with =, build_id with =, ancestor_node_id with =, descendant_node_id with =, daterange(effective_on, end_on + 1, '[)') with &&)`
+  - `exclude using gist (tenant_id with =, hierarchy_type with =, build_id with =, ancestor_node_id with =, descendant_node_id with =, daterange(effective_date, end_date + 1, '[)') with &&)`
 - 查询索引（表达式索引，建议）：
-  - `gist (tenant_id, hierarchy_type, build_id, ancestor_node_id, daterange(effective_on, end_on + 1, '[)'))`
-  - `gist (tenant_id, hierarchy_type, build_id, descendant_node_id, daterange(effective_on, end_on + 1, '[)'))`
+  - `gist (tenant_id, hierarchy_type, build_id, ancestor_node_id, daterange(effective_date, end_date + 1, '[)'))`
+  - `gist (tenant_id, hierarchy_type, build_id, descendant_node_id, daterange(effective_date, end_date + 1, '[)'))`
   - `btree (tenant_id, hierarchy_type, build_id, ancestor_node_id, depth, descendant_node_id)`
 
 ### 4.3 `org_hierarchy_snapshot_builds`（快照 build 元数据）
@@ -222,7 +220,7 @@ flowchart TD
 输入：`tenant_id, hierarchy_type, as_of_date`（UTC），以及 `org_edges` 的 as-of 视图。
 
 1. 取 as-of edges：
-   - `effective_on <= as_of_date AND as_of_date <= end_on`（Valid Time day；SSOT：DEV-PLAN-064）。
+   - `effective_date <= as_of_date AND as_of_date <= end_date`（Valid Time day；SSOT：DEV-PLAN-064）。
 2. 生成 closure pairs（离线允许递归 CTE）：
    - base：self（depth=0）、parent→child（depth=1）
    - recursion：ancestor→descendant（depth+1）
@@ -235,7 +233,7 @@ flowchart TD
 ### 6.2 Temporal closure build（在需要“任意 effective_date as-of”时落地）
 输入：`tenant_id, hierarchy_type`，以及全量 `org_edges` 时间片。
 
-1. 生成 base rows（self + parent→child）并携带有效期窗（day 闭区间）`[effective_on,end_on]`。
+1. 生成 base rows（self + parent→child）并携带有效期窗（day 闭区间）`[effective_date,end_date]`。
 2. 递归扩展时对有效期做 intersection（祖先链上任一 edge 不存在则该窗不存在）。
 3. 写入 `org_hierarchy_closure`（绑定 new `build_id`），并确保同 pair 的窗不重叠（EXCLUDE 兜底）。
 4. 标记 build ready 并切换 active。
@@ -245,7 +243,7 @@ flowchart TD
 
 - **子树 descendants**（给定 `ancestor_node_id`）：
   - `snapshot`：按 `as_of_date` 找 active snapshot build → 查 snapshots where `ancestor_node_id=$id`
-  - `closure`：按 `effective_date`（day）找 active closure build → 查 closure where `ancestor_node_id=$id AND daterange(effective_on,end_on+1,'[)') @> $as_of_date`
+  - `closure`：按 `effective_date`（day）找 active closure build → 查 closure where `ancestor_node_id=$id AND daterange(effective_date,end_date+1,'[)') @> $as_of_date`
   - `edges`：基线（ltree 前缀查询）作为回退
 - **祖先链 ancestors**（给定 `descendant_node_id`）：
   - 同上（按 descendant_id 方向索引）
