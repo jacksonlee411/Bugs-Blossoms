@@ -7,18 +7,18 @@ import (
 )
 
 type OrgAssignmentRow struct {
-	ID            uuid.UUID
-	PositionID    uuid.UUID
-	OrgNodeID     uuid.UUID
-	Pernr         string
-	PositionCode  string
-	OrgNodeLabel  string
+	ID              uuid.UUID
+	PositionID      uuid.UUID
+	OrgNodeID       uuid.UUID
+	Pernr           string
+	PositionCode    string
+	OrgNodeLabel    string
 	OrgNodeLongName string
-	PositionLabel string
-	OperationType string
-	EndEventType  string
-	EffectiveDate time.Time
-	EndDate       time.Time
+	PositionLabel   string
+	OperationType   string
+	EndEventType    string
+	EffectiveDate   time.Time
+	EndDate         time.Time
 }
 
 type OrgAssignmentsTimeline struct {

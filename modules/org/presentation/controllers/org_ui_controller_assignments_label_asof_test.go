@@ -52,4 +52,3 @@ func TestLabelAsOfDayForAssignmentRow(t *testing.T) {
 		}
 	})
 }
-
