@@ -4,6 +4,7 @@
 
 ## 1. 背景与上下文 (Context)
 - **SSOT（时间语义）**：Valid Time=DATE（日粒度闭区间），Audit/Tx Time=TIMESTAMPTZ（见 `docs/dev-plans/064-effective-date-day-granularity.md`）。
+- **行业对标（R401）**：`docs/dev-records/R401-HRMS 时态数据与性能优化.md` 指出：仅依赖应用层维护时态连续性在高并发下容易产生竞态；Oracle DateTrack 通过 DB 侧触发器维护时间连续性（防断层）。本计划在“写逻辑仍由 Service 显式执行”的前提下，引入 DB 侧 commit-time 校验门禁（见 4.7），把 gap-free 从“约定”升级为“不可违背的不变量”。
 - **现状问题**：
   - Postgres 的 `EXCLUDE USING gist (... daterange(effective_date, end_date + 1, '[)') WITH &&)` 只保证**不重叠**，不会阻止“中间删除导致的 gap（空洞）”。
   - 目前 Org 核心链路（组织架构、职位、任职等）写路径主要依赖“插入时截断/续接”或“ShiftBoundary”来维持自然拼接；但当用户执行“删除某条时间片/记录”时，如果仅做 `DELETE`，时间轴会出现空洞，从而破坏“相邻切片自然连贯”的心智与下游推导。
@@ -22,10 +23,12 @@
 
 本计划**不**覆盖“删除实体”（例如删除 org_node / org_position 本体）这类生命周期语义。
 
-### 1.3 时间字段命名与唯一性（对齐 DEV-PLAN-064A）
-为避免同一“有效期”概念出现两套字段、两套口径而导致实现期漂移，本计划以 DEV-PLAN-064A 的决策为前提：
-- 数据库表中 Valid Time 仅保留 `effective_date/end_date`（`date`，day 粒度闭区间）。
-- 禁止再引入第二套“同义字段”（无论在 schema、SQL、还是运行时代码中）。
+### 1.3 依赖与前置条件：仅在 DEV-PLAN-064 阶段 D 之后实施
+为避免在 064 的 B1 双轨阶段引入偶然复杂度，DEV-PLAN-066 **仅在 DEV-PLAN-064 阶段 D 合并完成后**实施（参考 `docs/dev-plans/064-effective-date-day-granularity.md` 与 `docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`）。阶段 D 的收敛是本计划的硬前置条件：
+- DB schema 中 Valid Time 的唯一权威表达为 `effective_date/end_date`（`date`，day 闭区间）。
+- `effective_on/end_on` 已被彻底移除（schema/SQL/Go 运行时代码中不再出现；历史迁移文件除外）。
+- legacy `timestamptz effective_date/end_date` 已被清理，不再存在同名混用风险（以阶段 D 的最终 schema 为准）。
+- 本计划不提供任何双轨兼容逻辑；若环境仍处于阶段 C/B1，请先完成阶段 D 再推进 066。
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 目标
@@ -35,6 +38,7 @@
   - `org_position_slices`（职位属性切片）
   - `org_assignments`（任职切片）
 - [ ] 删除中间切片后，自动更新相邻切片的结束/起始边界，使时间轴**无 gap、无 overlap**（overlap 由 DB EXCLUDE 兜底，gap 由本计划补齐）。
+- [ ] 增加数据库侧“只校验不修复”的 gap-free 门禁：同一时间线 key 下提交时必须满足自然拼接，否则事务回滚（用于防止绕过 Service 写路径直接落库 gap）。
 - [ ] 删除行为具备与现有“Correct/ShiftBoundary”一致的：
   - 事务与行级锁（避免并发写入撕裂）
   - freeze 窗口校验（遵循 org_settings）
@@ -42,7 +46,7 @@
 - [ ] 增加集成测试覆盖“删除中间切片自动缝补”的关键场景。
 
 ### 2.2 非目标
-- 不引入 DB 触发器来强制 gap-free（保持写逻辑在 Service 层，避免隐式副作用）。
+- 不引入“在 DB 侧自动缝补/隐式改写数据”的触发器（缝补逻辑仍由 Service 显式执行；DB 侧仅做约束校验门禁）。
 - 不把系统扩展为双时态（Bi-temporal）；仅处理 Valid Time（day）维度上的自然拼接。
 - 不新增事件版本（topic 保持 `*.v1`，与 DEV-PLAN-064 的约束一致）。
 - 不在本计划中解决“同日多次生效（EFFSEQ）”问题（仍遵循 DEV-PLAN-064 的前提限制）。
@@ -73,13 +77,18 @@ Valid Time 的业务语义为 day 闭区间 `[effective_date, end_date]`（均�
 - `org_position_slices`：`(tenant_id, position_id)`
 - `org_assignments`：`(tenant_id, subject_type, subject_id, assignment_type)`（以现有 EXCLUDE 约束 key 为准）
 
+并发写入需要额外强调：仅靠 “锁定 T 与 P” 容易在“缺失相邻片 / 新写入路径忘记同样锁序 / 幻读”时漏掉互斥。为将“同一条时间线的写操作”串行化，本计划在事务内按时间线 key 获取 `pg_advisory_xact_lock`（v1 固化 lock key 计算方式）：
+- `lock_key = hashtextextended(format('%s:%s:%s', table_name, tenant_id, timeline_key_text), 0)`（`bigint`）
+- `timeline_key_text` 的构成按 4.1 的 key 顺序拼接（例如 `org_edges`：`hierarchy_type:child_node_id`；`org_assignments`：`subject_type:subject_id:assignment_type`）
+- 允许 hash 碰撞：碰撞只会带来额外串行化，不影响正确性
+
 ### 4.2 写入权威表达（避免两套写法）
 本计划实现只允许读写 `effective_date/end_date`（`date`）。任何层面出现“同义字段/第二套边界表达”都视为违反唯一性原则，直接打回。
 
 ### 4.3 核心算法：DeleteSliceAndStitch（确定顺序，避免 EXCLUDE 瞬时冲突）
 输入（v1）：`target_effective_date`（UTC day boundary），`reason_code/reason_note` 等审计元信息。
 
-1) 开启事务；锁定目标切片 `T`（`SELECT ... FOR UPDATE`）。
+1) 开启事务；获取“时间线级”互斥（`pg_advisory_xact_lock`）；锁定目标切片 `T`（`SELECT ... FOR UPDATE`）。
 2) `affected_at = T.effective_date`，并据此执行 freezeCheck。
 3) 锁定上一片 `P`（同一时间线 key）：
    - 优先按“自然拼接边界相等”定位：`P.end_date + 1 day == T.effective_date`。
@@ -113,7 +122,7 @@ Valid Time 的业务语义为 day 闭区间 `[effective_date, end_date]`（均�
 - 目标/上一片定位：需要补齐 Repository 锁定能力（以 `effective_date/end_date` 边界相等为准，`FOR UPDATE`）
 - 缝补更新：需要补齐 `UpdateEdgeEndDate`
 - 删除：可复用现有 `DeleteEdgeByID`（按 `id` 删除）
-- 副作用：边关系变化可能影响 closure/build/snapshot；实现阶段需明确复用既有“写入后失效/重建触发”路径，并用集成测试验证读路径一致性。
+- 副作用：边关系变化可能影响 closure/build/snapshot；实现阶段需明确复用既有“写入后失效/重建触发”路径，并用集成测试验证读路径一致性。对齐 R401 的建议：避免在命令写事务内同步触发大规模级联重算，优先采用 Outbox 驱动的异步刷新（最终一致性）。
 
 #### 4.4.4 `org_assignments`
 - 时间线 key：`(tenant_id, subject_type, subject_id, assignment_type)`（与 EXCLUDE 约束一致）
@@ -133,6 +142,28 @@ Valid Time 的业务语义为 day 闭区间 `[effective_date, end_date]`（均�
 Auto-Stitch 可能因“延长相邻切片窗口”触发其他约束失败（例如 sibling-name-unique 的时间窗口扩大后发生冲突）：
 - 约束失败时整体回滚，并返回与现有写路径一致的业务错误映射（`409/422`，由 `mapPgError`/service error 策略决定）。
 - v1 不做任何隐式 fallback（例如改用 merge-into-next），避免行为不可解释。
+
+另外，若 DB 侧 gap-free 校验门禁（见 4.7）失败，也会在事务提交阶段回滚；v1 固化将其映射为 `409 ORG_TIME_GAP`（见 4.8），避免客户端误以为是随机 DB 故障。
+
+### 4.7 数据库约束：commit 时校验 gap-free（不做隐式修复）
+> 目的：将“gap-free”从“约定/习惯”升级为“不可违背的不变量”，同时保持缝补逻辑显式在 Service 层，避免 DB 隐式改写数据。
+
+对齐 `docs/dev-records/R401-HRMS 时态数据与性能优化.md` 的行业对标结论：时态连续性属于“数据质量硬约束”，更适合落在 Postgres Constraints/Triggers 作为最后一道门禁，而不是依赖应用层约定。
+
+建议为各时间片表增加 **DEFERRABLE CONSTRAINT TRIGGER**（仅校验，不修复），在事务提交时检查同一时间线 key 下是否满足自然拼接：
+- 触发时机：`AFTER INSERT OR UPDATE OR DELETE`，`DEFERRABLE INITIALLY DEFERRED`（提交时统一校验，避免中间态干扰）。
+- 校验范围（v1 固化）：以“受影响的时间线 key”为粒度，**校验该 key 下所有切片的相邻边界**（O(n)；n 通常较小且仅对变更 key 生效）。若未来遇到性能瓶颈，再评估引入 transition table 去重或邻域校验（不在 v1 范围内）。
+- 校验规则：按 `effective_date` 升序，要求任意相邻两片满足 `prev.end_date + 1 day == next.effective_date`；首片不要求有 `prev`。
+- 实现建议：以 `daterange(effective_date, end_date + 1, '[)')` 作为唯一的 Period 表达（与 no-overlap 的 EXCLUDE 约束同源），并尽量使用 range 运算符以复用 GiST 索引能力。
+
+这样即便有人绕过 Service 直接执行 `DELETE` 或不按 066 算法更新边界，最终也无法提交产生 gap 的状态；同时 DB 不会“偷偷帮你缝补”，避免隐式副作用与审计漂移。
+
+### 4.8 错误码与排障（v1 固化）
+- DB 门禁失败：constraint trigger 函数使用 `ERRCODE = 'integrity_constraint_violation'`（`SQLSTATE 23000`）并设置 `CONSTRAINT = 'org_*_gap_free'`；错误信息必须包含 `tenant_id` 与时间线 key，便于定位。
+- Service 映射：`modules/org/services/pg_errors.go` 增加分支，把 `Code==23000 && ConstraintName ~ '_gap_free$'` 映射为 `409 ORG_TIME_GAP`（message：`time slices must be gap-free`）。
+- 排障 SQL（示例：按任意时间片表的时间线 key 定位断层）：
+  - `SELECT effective_date, end_date, lag(end_date) OVER (ORDER BY effective_date) AS prev_end_date FROM ... WHERE ... ORDER BY effective_date;`
+  - 任意一行满足 `prev_end_date IS NOT NULL AND prev_end_date + 1 <> effective_date` 即为 gap。
 
 ## 5. 接口契约（API / UI）
 ### 5.1 Service 层接口（建议）
@@ -157,11 +188,14 @@ Auto-Stitch 可能因“延长相邻切片窗口”触发其他约束失败（�
   - 删除最后一段（`T.end_date=end_of_time`）后，上一段延长至 `end_of_time`
   - 删除第一段（无 `P`）时不做缝补，但不产生“中间 gap”
   - 约束冲突时回滚并返回可解释错误
+- [ ] DB 侧 gap-free 校验门禁生效：绕过 Service 的写入（例如仅 `DELETE T`）无法提交产生 gap 的状态。
 - [ ] 审计日志与事件发布行为符合现有约定（topic 仍为 `*.v1`）。
 
 ## 7. 里程碑与实施步骤 (Milestones)
 1. [ ] 明确每类实体的“时间线 key”与删除入口（UI/API/内部调用点）。
 2. [ ] 补齐 Repository 能力缺口（以 4.4 为清单），避免引入新 package（仅在现有 repo 内补函数）。
-3. [ ] 实现 Service：`Delete*SliceAndStitch`（复用 freeze、audit、outbox、cache invalidation 模板；算法顺序遵循 4.3）。
-4. [ ] 新增集成测试覆盖关键场景（对齐既有 `ShiftBoundary*` 测试风格，并显式验证 `end_date==next.effective_date` 与 day 口径等价性）。
-5. [ ] Readiness：按 `AGENTS.md` 的触发器执行并记录（必要时创建 `docs/dev-records/DEV-PLAN-066-READINESS.md`）。
+3. [ ] 写路径并发门禁：在相关 Service 写路径中引入时间线级 `pg_advisory_xact_lock`（对齐 4.1/4.3），确保同一时间线写入串行化。
+4. [ ] 实现 Service：`Delete*SliceAndStitch`（复用 freeze、audit、outbox、cache invalidation 模板；算法顺序遵循 4.3）。
+5. [ ] 数据库门禁：为时间片表增加 4.7 的 gap-free 校验（DEFERRABLE CONSTRAINT TRIGGER，仅校验不修复）；必要时在启用前做一次数据审计/修复，避免把历史脏数据直接“锁死”。
+6. [ ] 新增集成测试覆盖关键场景（对齐既有 `ShiftBoundary*` 测试风格，并显式验证 `end_date==next.effective_date` 与 day 口径等价性）。
+7. [ ] Readiness：按 `AGENTS.md` 的触发器执行并记录（必要时创建 `docs/dev-records/DEV-PLAN-066-READINESS.md`）。
