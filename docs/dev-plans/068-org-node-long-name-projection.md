@@ -1,6 +1,6 @@
 # DEV-PLAN-068：组织长名称投影（OrgNodeLongName Projection）详细设计
 
-**状态**: 规划中（2025-12-28 05:44 UTC）
+**状态**: 规划中（2025-12-28 07:44 UTC）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：在 HRMS 中，几乎所有“列表/报表”都会引用组织信息（任职记录、员工花名册、薪资明细等）；仅展示“部门短名称”在同名部门、频繁 Move/Rename 的场景下歧义很大。
@@ -13,7 +13,7 @@
 - 行级 as-of 语义（任职时间线 label）：`docs/dev-plans/063-assignment-timeline-org-labels-by-effective-slice.md`
 - 任职经历列表新增长名称列（局部用例）：`docs/dev-plans/063A-assignments-timeline-org-long-name-column.md`
 - 组织节点详情页长名称（拼接/兜底规则参考）：`docs/dev-plans/065-org-node-details-long-name.md`
-- Valid Time day 粒度与迁移停止线：`docs/dev-plans/064-effective-date-day-granularity.md`、`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`
+- Valid Time day 粒度与迁移停止线：`docs/dev-plans/064-effective-date-day-granularity.md`、`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`（064A 已完成：Org 已收敛为 date-only）
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
@@ -21,7 +21,7 @@
 - [ ] 提供 **批量解析** 接口，确保列表/报表不会因“每行取路径”引入 N+1（查询次数与行数无关，或仅与 `distinct(as_of_day)` 有关）。
 - [ ] 明确 **as-of 正确性**：长名称必须基于 `as_of_day` 查询当时的 `org_edges`（上级链）与 `org_node_slices`（名称切片），不得返回“当前最新路径”覆盖历史语义。
 - [ ] 统一拼接/兜底规则（与 065 对齐）：`name` 为空回退 `code`，再回退 `id`。
-- [ ] 对齐 064A 停止线：对外（Query/Form/JSON）只暴露 `YYYY-MM-DD`（day）；本能力不引入/扩散新的 `effective_on/end_on` 对外契约。
+- [ ] 对齐 064A（已完成）结论：Valid Time 对外只接受 `YYYY-MM-DD`（day）；本能力不引入/扩散 `effective_on/end_on`（且禁止重新引入双轨字段名与 `tstzrange` 口径）。
 
 ### 2.2 非目标 (Out of Scope)
 - 不新增持久化字段（不在表上新增 `long_name` 存储列），仅在读时派生。
@@ -34,7 +34,7 @@
 - **触发器清单（实施阶段将命中）**：
   - [ ] Go 代码（见 `AGENTS.md`）
   - [ ] DB 读查询/可能涉及 schema（若引入 SQL function/view，则按 `AGENTS.md` 的 DB 门禁执行）
-  - [X] 文档（本计划）：已执行 `make check doc`（docs gate: OK，2025-12-28 05:50 UTC）
+  - [X] 文档（本计划）：已执行 `make check doc`（docs gate: OK，2025-12-28 05:50 UTC；docs gate: no new files detected，2025-12-28 07:27 UTC；docs gate: no new files detected，2025-12-28 07:44 UTC）
 - **SSOT 链接**：
   - 触发器矩阵与本地必跑：`AGENTS.md`
   - 命令入口：`Makefile`
@@ -69,8 +69,8 @@ graph TD
 
 ### 4.2 DB/Schema
 - Phase 1（推荐最小落地）：不新增表/列，仅复用：
-  - 组织关系：`org_edges`（有效期内的 `path/depth`）
-  - 组织名称切片：`org_node_slices`（有效期内的 `name`）
+  - 组织关系：`org_edges`（Valid Time：`date effective_date/end_date` 闭区间；读时获取 `path/depth`）
+  - 组织名称切片：`org_node_slices`（Valid Time：`date effective_date/end_date` 闭区间；读时获取 `name`）
   - 组织编码：`org_nodes.code`
 - Phase 2（可选）：若 SQL 报表需要“可 join 的长名称”，再单独开计划引入 DB function/view（避免提前引入迁移与门禁负担）。
 
@@ -78,10 +78,15 @@ graph TD
 ### 5.1 Go 侧共享能力（建议 SSOT）
 > 目的：让各模块只依赖 `pkg/**`，避免跨模块导入 `modules/org/**` 破坏 cleanarchguard。
 
-- 新增包：`pkg/orglabels`
-- 对外接口（示例）：
-  - `ResolveOrgNodeLongNamesAsOf(ctx, tenantID, asOfDay, orgNodeIDs) -> map[uuid]longName`
-  - `ResolveOrgNodeLongNames(ctx, tenantID, queries[] {OrgNodeID, AsOfDay}) -> map[key]longName`（内部按 `AsOfDay` 分组批量执行）
+- 新增包：`pkg/orglabels`（组织长名称投影 SSOT）
+- **依赖约束（必须）**：
+  - `pkg/orglabels` 仅依赖 `pkg/**` 与 DB 驱动（pgx），不得导入 `modules/org/**`（避免跨模块依赖与 cleanarchguard 风险）。
+  - 查询通过 `composables.UseTx`（优先）或 `composables.UsePool` 获取连接，继承调用方事务边界（避免“看不见的二次连接”）。
+- **对外接口（确定版）**：
+  - `ResolveOrgNodeLongNamesAsOf(ctx, tenantID uuid.UUID, asOfDay time.Time, orgNodeIDs []uuid.UUID) (map[uuid.UUID]string, error)`：单 as-of day，**预算：1 query**。
+  - `ResolveOrgNodeLongNames(ctx, tenantID uuid.UUID, queries []OrgNodeLongNameQuery) (map[OrgNodeLongNameKey]string, error)`：mixed as-of（pair-batch），**预算：1 query**（不得按 `queries` 循环，也不得按 `distinct(as_of_day)` 分组后逐组查询）。
+  - `type OrgNodeLongNameQuery struct { OrgNodeID uuid.UUID; AsOfDay time.Time }`
+  - `type OrgNodeLongNameKey struct { OrgNodeID uuid.UUID; AsOfDate string }`（`AsOfDate` 必须归一化为 `YYYY-MM-DD`）
 - 失败路径：对单个节点缺失/路径缺失不 panic；由调用方决定“空值/—”兜底（UI 不应 500）。
 
 ### 5.2 拼接/兜底规则（SSOT）
@@ -96,12 +101,12 @@ graph TD
 适用于“按任职行切片展示”的列表（如任职经历/时间线），定义：
 - `pageAsOfDay`：页面 query 的 `effective_date` 归一化为 UTC day；
 - `rowStartDay`：行的 `EffectiveDate` 归一化为 UTC day；
-- `rowEndExclusive`：行的 `EndDate`（兼容期可能仍为 end-exclusive 时间戳，保持与既有查询一致）。
+- `rowEndDay`：行的 `EndDate` 归一化为 UTC day（对外 `end_date`，day 闭区间右端点；open-ended 为 `9999-12-31`）。
 
 规则（伪代码）：
 ```go
 labelAsOfDay := rowStartDay
-if !pageAsOfDay.Before(rowStartDay) && pageAsOfDay.Before(rowEndExclusive) {
+if !pageAsOfDay.Before(rowStartDay) && !pageAsOfDay.After(rowEndDay) {
     labelAsOfDay = pageAsOfDay
 }
 ```
@@ -112,6 +117,94 @@ if !pageAsOfDay.Before(rowStartDay) && pageAsOfDay.Before(rowEndExclusive) {
 约束：不得对每行调用 `GetNodePath`（会导致每个节点至少 3 次 DB round-trip：`NodeExistsAt` + `ListAncestorsAsOf` + `ListOrgNodesAsOf`）。
 
 对比（现有模式参考）：DEV-PLAN-063 已将 `/org/assignments` 时间线“部门/职位 label”做成 **repo SQL 联表一次取回**，且仅对“pageAsOf 命中行”做有限覆盖查询，避免随行数线性增长；068 的长名称投影必须沿用这一思路：**批量 hydrate**，不把路径解析隐藏在模板或逐行 service 调用里。
+
+#### 6.2.1 单 as-of day（1 Query）
+适用：报表/列表以“单一 `effective_date`（as-of）”渲染全表（例如花名册、薪资明细表某日快照）。
+
+SQL 形状（示意，真实实现以 `pkg/orglabels` 为准）：
+```sql
+WITH target AS (
+  SELECT e.child_node_id AS org_node_id, e.path
+  FROM org_edges e
+  WHERE e.tenant_id=$1
+    AND e.hierarchy_type='OrgUnit'
+    AND e.child_node_id = ANY($2::uuid[])
+    AND e.effective_date <= $3::date
+    AND e.end_date >= $3::date
+),
+ancestors AS (
+  SELECT t.org_node_id, e.child_node_id AS ancestor_id, e.depth
+  FROM target t
+  JOIN org_edges e
+    ON e.tenant_id=$1
+   AND e.hierarchy_type='OrgUnit'
+   AND e.effective_date <= $3::date
+   AND e.end_date >= $3::date
+   AND e.path @> t.path
+),
+parts AS (
+  SELECT a.org_node_id, a.depth,
+         COALESCE(NULLIF(BTRIM(ns.name),''), NULLIF(BTRIM(n.code),''), n.id::text) AS part
+  FROM ancestors a
+  JOIN org_nodes n
+    ON n.tenant_id=$1 AND n.id=a.ancestor_id
+  LEFT JOIN org_node_slices ns
+    ON ns.tenant_id=$1 AND ns.org_node_id=a.ancestor_id
+   AND ns.effective_date <= $3::date AND ns.end_date >= $3::date
+)
+SELECT org_node_id,
+       string_agg(part, ' / ' ORDER BY depth ASC) AS long_name
+FROM parts
+GROUP BY org_node_id;
+```
+
+#### 6.2.2 mixed as-of（pair-batch，1 Query）
+适用：同一页面/列表内，每行的 `labelAsOfDay` 可能不同（例如任职时间线：默认行起始日，且允许在“有效期内”用页面 `effective_date` 查看快照）。
+
+约束：不得按 `distinct(as_of_day)` 分组逐组查询（在“每行一个起始日”的时间线场景会退化为近似 N 次查询）。
+
+SQL 形状（示意）：
+```sql
+WITH input AS (
+  SELECT *
+  FROM unnest($2::uuid[], $3::date[]) AS q(org_node_id, as_of_day)
+),
+target AS (
+  SELECT i.org_node_id, i.as_of_day, e.path
+  FROM input i
+  JOIN org_edges e
+    ON e.tenant_id=$1
+   AND e.hierarchy_type='OrgUnit'
+   AND e.child_node_id=i.org_node_id
+   AND e.effective_date <= i.as_of_day
+   AND e.end_date >= i.as_of_day
+),
+ancestors AS (
+  SELECT t.org_node_id, t.as_of_day, e.child_node_id AS ancestor_id, e.depth
+  FROM target t
+  JOIN org_edges e
+    ON e.tenant_id=$1
+   AND e.hierarchy_type='OrgUnit'
+   AND e.effective_date <= t.as_of_day
+   AND e.end_date >= t.as_of_day
+   AND e.path @> t.path
+),
+parts AS (
+  SELECT a.org_node_id, a.as_of_day, a.depth,
+         COALESCE(NULLIF(BTRIM(ns.name),''), NULLIF(BTRIM(n.code),''), n.id::text) AS part
+  FROM ancestors a
+  JOIN org_nodes n
+    ON n.tenant_id=$1 AND n.id=a.ancestor_id
+  LEFT JOIN org_node_slices ns
+    ON ns.tenant_id=$1 AND ns.org_node_id=a.ancestor_id
+   AND ns.effective_date <= a.as_of_day AND ns.end_date >= a.as_of_day
+)
+SELECT org_node_id,
+       as_of_day,
+       string_agg(part, ' / ' ORDER BY depth ASC) AS long_name
+FROM parts
+GROUP BY org_node_id, as_of_day;
+```
 
 ### 6.3 示例：不拆分任职行，只看快照
 假设工号 `004` 有一条任职行：`2025-12-01 → 2025-12-31`（同一部门节点 `A`），且：
@@ -138,12 +231,25 @@ if !pageAsOfDay.Before(rowStartDay) && pageAsOfDay.Before(rowEndExclusive) {
   3. [ ] 逐步迁移：优先替换 065（节点详情长名称）与 063A（任职经历长名称列）的 per-node `GetNodePath` 为批量 projector（如证明性能有风险）。
   4. [ ] 形成复用清单：在新报表/列表中禁止按行取路径，统一通过 projector。
 
+### 8.1 现有使用点盘点与改造策略
+> 目的：落地时避免“先实现新能力、旧代码继续各自为政”，同时避免无收益的重构。
+
+**截至 2025-12-28：仓库内已使用组织长路径/长名称的入口**
+- Org 节点详情面板（DEV-PLAN-065）：`modules/org/presentation/controllers/org_ui_controller.go` 的 `orgNodeLongNameFor` 调用 `OrgService.GetNodePath` 拼接单节点长名称（单节点、单次调用，不构成 N+1）。
+- Org API（DEV-PLAN-033）：`GET /org/api/nodes/{id}:path` 提供路径查询（主要用于调试/交互），不直接提供 long_name。
+
+**是否需要改造（结论）**
+- 节点详情面板：不强制改造（单节点查询可接受）；但建议在 `pkg/orglabels` 落地后将拼接/兜底逻辑迁移为复用投影，减少重复与未来漂移。
+- 任职经历列表“组织长名称”列（DEV-PLAN-063A）：若采用 per-row `GetNodePath` 将形成典型 N+1，必须改为使用 `pkg/orglabels` 批量投影（优先 `ResolveOrgNodeLongNames` 的 pair-batch），或等价的单 SQL hydrate。
+- 未来新增列表/报表：禁止在 `.templ` 内逐行调用 service；必须在 controller/service 层批量 hydrate（并以 query budget test 留证）。
+
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **正确性（必须）**
   - [ ] 在“部门更名/上级调整”的样例数据下，不同 `effective_date` 看到的长路径不同且与当日一致（而非最新路径）。
   - [ ] 当 `effective_date` 不落在任职行有效期内，历史行回退为行起始日快照（避免全表漂移）。
+  - [ ] 覆盖右闭边界：当 `effective_date == end_date`（day）时，该行仍应被视为“区间内”，并按该日渲染长路径快照。
 - **性能（必须）**
-  - [ ] 在 1000 节点规模（或等价高行数报表）下，解析长名称的 DB 查询次数为常数（或仅与 `distinct(as_of_day)` 成正比），无按行线性增长。
+  - [ ] 在 1000 节点规模（或等价高行数报表）下，解析长名称的 DB 查询次数为常数：`ResolveOrgNodeLongNamesAsOf` 为 1 query；`ResolveOrgNodeLongNames`（pair-batch）为 1 query；不得随行数或 `distinct(as_of_day)` 增长。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - 不引入 Feature Flag/监控项（仓库级原则见 `AGENTS.md`）；以 query budget 测试与门禁保证性能退化可见。
@@ -152,16 +258,21 @@ if !pageAsOfDay.Before(rowStartDay) && pageAsOfDay.Before(rowEndExclusive) {
 ### 结构（解耦/边界）
 - [x] SSOT 清晰：把“组织长名称”定义为共享投影能力，避免页面各自实现导致漂移。
 - [x] 边界清晰：仅解决“长名称读取与批量化”，不引入写时派生/持久化写放大。
+- [x] 依赖可预测：`pkg/orglabels` 不导入 `modules/org/**`，跨模块复用不会形成循环依赖或隐式跨层导入。
 
 ### 演化（规格/确定性）
 - [x] 规格可执行：定义输入输出、拼接规则、labelAsOfDay 语义、以及“不拆分任职行”的明确非目标。
-- [ ] 实施阶段若发现“多 as-of day 分组”仍带来高 query count，应先更新本计划（例如引入 pair-batch 查询或 DB function），再改实现，避免隐式补丁扩散。
+- [x] 契约确定：接口签名、key 结构与 query budget 已写死（`ResolveOrgNodeLongNamesAsOf`=1 query；`ResolveOrgNodeLongNames`(pair-batch)=1 query）。
+- [x] mixed as-of 不退化：明确 pair-batch 单 query，并禁止按 `distinct(as_of_day)` 分组逐组查询。
+- [ ] 若 pair-batch 在极端输入规模下不可接受，应先更新本计划（例如引入 DB function/view 并纳入迁移门禁），再改实现，避免即兴绕过预算。
 
 ### 认知（本质/偶然复杂度）
 - [x] 本质复杂度明确：路径与名称都是 effective-dated，必须按 as-of day 取当时快照。
 - [x] 偶然复杂度隔离：与 064A 的迁移期字段只通过停止线约束进入本计划，不把双轨列作为新对外概念扩散。
+- [x] 对齐 064A：Org Valid Time 为 `date effective_date/end_date`（day 闭区间），Valid Time 输入只接受 `YYYY-MM-DD`。
 
 ### 维护（可理解/可解释）
 - [x] 5 分钟可解释：确定 as-of → 批量取 path nodes → 按规则拼接 → hydrate 到 viewmodel/DTO。
+- [x] 迁移口径明确：§8.1 盘点现有使用点与改造优先级（避免“新能力落地但旧逻辑继续漂移”）。
 
-结论：通过（注意：禁止在 `.templ` 内按行调用 service；所有长名称必须在 controller/service 层批量 hydrate）。 
+结论：通过（实现阶段必须用 query budget test 留证；且禁止在 `.templ` 内按行调用 service，所有长名称必须在 controller/service 层批量 hydrate）。 
