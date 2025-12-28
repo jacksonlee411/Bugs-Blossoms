@@ -1,6 +1,6 @@
 # DEV-PLAN-068：组织长名称投影（OrgNodeLongName Projection）详细设计
 
-**状态**: 规划中（2025-12-28 05:44 UTC）
+**状态**: 规划中（2025-12-28 07:25 UTC）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：在 HRMS 中，几乎所有“列表/报表”都会引用组织信息（任职记录、员工花名册、薪资明细等）；仅展示“部门短名称”在同名部门、频繁 Move/Rename 的场景下歧义很大。
@@ -13,7 +13,7 @@
 - 行级 as-of 语义（任职时间线 label）：`docs/dev-plans/063-assignment-timeline-org-labels-by-effective-slice.md`
 - 任职经历列表新增长名称列（局部用例）：`docs/dev-plans/063A-assignments-timeline-org-long-name-column.md`
 - 组织节点详情页长名称（拼接/兜底规则参考）：`docs/dev-plans/065-org-node-details-long-name.md`
-- Valid Time day 粒度与迁移停止线：`docs/dev-plans/064-effective-date-day-granularity.md`、`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`
+- Valid Time day 粒度与迁移停止线：`docs/dev-plans/064-effective-date-day-granularity.md`、`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`（064A 已完成：Org 已收敛为 date-only）
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
@@ -21,7 +21,7 @@
 - [ ] 提供 **批量解析** 接口，确保列表/报表不会因“每行取路径”引入 N+1（查询次数与行数无关，或仅与 `distinct(as_of_day)` 有关）。
 - [ ] 明确 **as-of 正确性**：长名称必须基于 `as_of_day` 查询当时的 `org_edges`（上级链）与 `org_node_slices`（名称切片），不得返回“当前最新路径”覆盖历史语义。
 - [ ] 统一拼接/兜底规则（与 065 对齐）：`name` 为空回退 `code`，再回退 `id`。
-- [ ] 对齐 064A 停止线：对外（Query/Form/JSON）只暴露 `YYYY-MM-DD`（day）；本能力不引入/扩散新的 `effective_on/end_on` 对外契约。
+- [ ] 对齐 064A（已完成）结论：Valid Time 对外只接受 `YYYY-MM-DD`（day）；本能力不引入/扩散 `effective_on/end_on`（且禁止重新引入双轨字段名与 `tstzrange` 口径）。
 
 ### 2.2 非目标 (Out of Scope)
 - 不新增持久化字段（不在表上新增 `long_name` 存储列），仅在读时派生。
@@ -34,7 +34,7 @@
 - **触发器清单（实施阶段将命中）**：
   - [ ] Go 代码（见 `AGENTS.md`）
   - [ ] DB 读查询/可能涉及 schema（若引入 SQL function/view，则按 `AGENTS.md` 的 DB 门禁执行）
-  - [X] 文档（本计划）：已执行 `make check doc`（docs gate: OK，2025-12-28 05:50 UTC）
+  - [X] 文档（本计划）：已执行 `make check doc`（docs gate: OK，2025-12-28 05:50 UTC；docs gate: no new files detected，2025-12-28 07:27 UTC）
 - **SSOT 链接**：
   - 触发器矩阵与本地必跑：`AGENTS.md`
   - 命令入口：`Makefile`
@@ -69,8 +69,8 @@ graph TD
 
 ### 4.2 DB/Schema
 - Phase 1（推荐最小落地）：不新增表/列，仅复用：
-  - 组织关系：`org_edges`（有效期内的 `path/depth`）
-  - 组织名称切片：`org_node_slices`（有效期内的 `name`）
+  - 组织关系：`org_edges`（Valid Time：`date effective_date/end_date` 闭区间；读时获取 `path/depth`）
+  - 组织名称切片：`org_node_slices`（Valid Time：`date effective_date/end_date` 闭区间；读时获取 `name`）
   - 组织编码：`org_nodes.code`
 - Phase 2（可选）：若 SQL 报表需要“可 join 的长名称”，再单独开计划引入 DB function/view（避免提前引入迁移与门禁负担）。
 
@@ -96,12 +96,12 @@ graph TD
 适用于“按任职行切片展示”的列表（如任职经历/时间线），定义：
 - `pageAsOfDay`：页面 query 的 `effective_date` 归一化为 UTC day；
 - `rowStartDay`：行的 `EffectiveDate` 归一化为 UTC day；
-- `rowEndExclusive`：行的 `EndDate`（兼容期可能仍为 end-exclusive 时间戳，保持与既有查询一致）。
+- `rowEndDay`：行的 `EndDate` 归一化为 UTC day（对外 `end_date`，day 闭区间右端点；open-ended 为 `9999-12-31`）。
 
 规则（伪代码）：
 ```go
 labelAsOfDay := rowStartDay
-if !pageAsOfDay.Before(rowStartDay) && pageAsOfDay.Before(rowEndExclusive) {
+if !pageAsOfDay.Before(rowStartDay) && !pageAsOfDay.After(rowEndDay) {
     labelAsOfDay = pageAsOfDay
 }
 ```
@@ -142,6 +142,7 @@ if !pageAsOfDay.Before(rowStartDay) && pageAsOfDay.Before(rowEndExclusive) {
 - **正确性（必须）**
   - [ ] 在“部门更名/上级调整”的样例数据下，不同 `effective_date` 看到的长路径不同且与当日一致（而非最新路径）。
   - [ ] 当 `effective_date` 不落在任职行有效期内，历史行回退为行起始日快照（避免全表漂移）。
+  - [ ] 覆盖右闭边界：当 `effective_date == end_date`（day）时，该行仍应被视为“区间内”，并按该日渲染长路径快照。
 - **性能（必须）**
   - [ ] 在 1000 节点规模（或等价高行数报表）下，解析长名称的 DB 查询次数为常数（或仅与 `distinct(as_of_day)` 成正比），无按行线性增长。
 
