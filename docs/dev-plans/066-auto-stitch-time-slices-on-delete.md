@@ -69,18 +69,27 @@ Valid Time 的业务语义为 day 闭区间 `[effective_date, end_date]`（均�
 - 若不存在上一片（删除的是最早切片）：仅删除 `T`，时间线从下一片开始（不视为“中间 gap”）。
 - v1 不提供 merge-into-next（把下一片起点前移）的能力；若未来确需支持，再另起决策（避免实现期出现隐式 fallback）。
 
+### 3.3 “无 gap”不等于“全程有效/在职”
+本计划要求的 gap-free 是**时间轴连续性不变量**：任意一天都应被某条切片覆盖；这不代表业务状态永远为“有效/在职”。对齐 SAP HCM 的做法：通过“状态切片”表达正常的暂停/无效期间，而不是把这段时间留空。
+
+典型示例（同构于组织/职位/任职）：
+- 组织停用→启用：停用期间是“无效”切片，不是 gap。
+- 职位停用→启用：停用期间是“inactive”切片，不是 gap（`org_position_slices.lifecycle_status` 已具备）。
+- 离职→再入职：离职生效日起到再入职前一天，是“无效/非在职”切片，不是 gap。
+- 待岗/暂离→返岗：暂离期间同样用“无效/非在职”切片表达。
+
 ## 4. 设计方案（Service-First，事务内缝补）
 ### 4.1 作用范围与时间线 key
 为保证“找得到相邻切片”，每类表必须明确其“时间线 key”（同 key 下时间片应自然拼接）：
 - `org_node_slices`：`(tenant_id, org_node_id)`
 - `org_edges`：`(tenant_id, hierarchy_type, child_node_id)`
 - `org_position_slices`：`(tenant_id, position_id)`
-- `org_assignments`：`(tenant_id, subject_type, subject_id, assignment_type)`（以现有 EXCLUDE 约束 key 为准）
+- `org_assignments`（primary 时间线）：`(tenant_id, subject_type, subject_id, assignment_type)` 且 `assignment_type='primary'`（仅对 primary 启用 gap-free 门禁；其他类型不强制）
 
-并发写入需要额外强调：仅靠 “锁定 T 与 P” 容易在“缺失相邻片 / 新写入路径忘记同样锁序 / 幻读”时漏掉互斥。为将“同一条时间线的写操作”串行化，本计划在事务内按时间线 key 获取 `pg_advisory_xact_lock`（v1 固化 lock key 计算方式）：
-- `lock_key = hashtextextended(format('%s:%s:%s', table_name, tenant_id, timeline_key_text), 0)`（`bigint`）
+并发写入需要额外强调：仅靠 “锁定 T 与 P” 容易在“缺失相邻片 / 新写入路径忘记同样锁序 / 幻读”时漏掉互斥。为将“同一条时间线的写操作”串行化，本计划在事务内按时间线 key 获取 `pg_advisory_xact_lock`（v1 固化 lock key 计算方式；对齐既有 `hashtext` 用法）：
+- `pg_advisory_xact_lock(hashtext(lock_key_text))`（碰撞只会带来额外串行化，不影响正确性）
 - `timeline_key_text` 的构成按 4.1 的 key 顺序拼接（例如 `org_edges`：`hierarchy_type:child_node_id`；`org_assignments`：`subject_type:subject_id:assignment_type`）
-- 允许 hash 碰撞：碰撞只会带来额外串行化，不影响正确性
+- `lock_key_text = format('%s:%s:%s', table_name, tenant_id, timeline_key_text)`
 
 ### 4.2 写入权威表达（避免两套写法）
 本计划实现只允许读写 `effective_date/end_date`（`date`）。任何层面出现“同义字段/第二套边界表达”都视为违反唯一性原则，直接打回。
@@ -120,12 +129,14 @@ Valid Time 的业务语义为 day 闭区间 `[effective_date, end_date]`（均�
 #### 4.4.3 `org_edges`
 - 时间线 key：`(tenant_id, hierarchy_type, child_node_id)`
 - 目标/上一片定位：需要补齐 Repository 锁定能力（以 `effective_date/end_date` 边界相等为准，`FOR UPDATE`）
-- 缝补更新：需要补齐 `UpdateEdgeEndDate`
+- 缝补更新：可复用现有 `TruncateEdge`（本质是 `UPDATE ... SET end_date=?`，同时适用于“截断/延长”）
 - 删除：可复用现有 `DeleteEdgeByID`（按 `id` 删除）
 - 副作用：边关系变化可能影响 closure/build/snapshot；实现阶段需明确复用既有“写入后失效/重建触发”路径，并用集成测试验证读路径一致性。对齐 R401 的建议：避免在命令写事务内同步触发大规模级联重算，优先采用 Outbox 驱动的异步刷新（最终一致性）。
 
 #### 4.4.4 `org_assignments`
-- 时间线 key：`(tenant_id, subject_type, subject_id, assignment_type)`（与 EXCLUDE 约束一致）
+- 时间线 key（primary）：`(tenant_id, subject_type, subject_id, assignment_type)` 且 `assignment_type='primary'`
+- 字段约束（v1）：在 `org_assignments` 增加“在职状态”列（例如 `employment_status`：`active|inactive`），用于填充离职/停用/暂离等期间，避免以“无记录”表示正常状态。
+  - 示例：离职生效日 `2025-12-28` ⇒ 写入 `[2025-12-28, 9999-12-31]` 的 `employment_status='inactive'` 切片（而不是留下空洞）。
 - 目标定位（v1）：通过 `assignment_id` 锁定 `T`（`FOR UPDATE`），并以 `T.effective_date` 作为边界。
 - 上一片定位：需要补齐 Repository 锁定能力：按时间线 key 查找 `end_date == T.effective_date - 1 day` 的 `P`（`FOR UPDATE`）。
 - 缝补更新：`UPDATE ... SET end_date = T.end_date`
@@ -152,6 +163,7 @@ Auto-Stitch 可能因“延长相邻切片窗口”触发其他约束失败（�
 
 建议为各时间片表增加 **DEFERRABLE CONSTRAINT TRIGGER**（仅校验，不修复），在事务提交时检查同一时间线 key 下是否满足自然拼接：
 - 触发时机：`AFTER INSERT OR UPDATE OR DELETE`，`DEFERRABLE INITIALLY DEFERRED`（提交时统一校验，避免中间态干扰）。
+- 覆盖范围（v1）：对 `org_assignments` **仅对 `assignment_type='primary'` 的时间线**启用 gap-free 校验；其他表按各自时间线 key 全量启用。
 - 校验范围（v1 固化）：以“受影响的时间线 key”为粒度，**校验该 key 下所有切片的相邻边界**（O(n)；n 通常较小且仅对变更 key 生效）。若未来遇到性能瓶颈，再评估引入 transition table 去重或邻域校验（不在 v1 范围内）。
 - 校验规则：按 `effective_date` 升序，要求任意相邻两片满足 `prev.end_date + 1 day == next.effective_date`；首片不要求有 `prev`。
 - 实现建议：以 `daterange(effective_date, end_date + 1, '[)')` 作为唯一的 Period 表达（与 no-overlap 的 EXCLUDE 约束同源），并尽量使用 range 运算符以复用 GiST 索引能力。

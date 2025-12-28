@@ -51,6 +51,7 @@
 
 - DO NOT USE `sed` 做文件内容修改。
 - 未经用户明确批准，禁止通过 `git checkout --` / `git restore` / `git reset` / `git clean` 丢弃或回退未提交改动。
+- 新增数据库表（新建迁移中的 `CREATE TABLE` 或 schema 中新增表）前，必须获得用户手工确认。
 
 ### 3.3 契约文档优先（Contract First）
 
