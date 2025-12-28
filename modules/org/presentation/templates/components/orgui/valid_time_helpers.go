@@ -2,6 +2,31 @@ package orgui
 
 import "time"
 
+func validTimeIncludesDay(asOf, startDate, endDate time.Time) bool {
+	if asOf.IsZero() {
+		return false
+	}
+	if startDate.IsZero() {
+		return false
+	}
+	if endDate.IsZero() {
+		return false
+	}
+	asOfDay := formatValidTimeDay(asOf)
+	startDay := formatValidTimeDay(startDate)
+	endDay := formatValidTimeDay(endDate)
+	if openEndedEndDate(endDay) {
+		return !asOfDay.Before(startDay)
+	}
+	return !asOfDay.Before(startDay) && !asOfDay.After(endDay)
+}
+
+func formatValidTimeDay(t time.Time) time.Time {
+	u := t.UTC()
+	y, m, d := u.Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
 func formatValidDate(t time.Time) string {
 	if t.IsZero() {
 		return ""

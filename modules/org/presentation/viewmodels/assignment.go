@@ -13,6 +13,7 @@ type OrgAssignmentRow struct {
 	Pernr         string
 	PositionCode  string
 	OrgNodeLabel  string
+	OrgNodeLongName string
 	PositionLabel string
 	OperationType string
 	EndEventType  string

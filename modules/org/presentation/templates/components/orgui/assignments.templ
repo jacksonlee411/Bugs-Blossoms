@@ -410,16 +410,16 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 		}
 	} else {
 		if props.SwapSummary {
-			{{ currentOrg := "" }}
-			{{ currentPos := "" }}
-			{{ hasCurrent := false }}
-			for _, r := range props.Timeline.Rows {
-				if (asOf.Equal(r.EffectiveDate.UTC()) || asOf.After(r.EffectiveDate.UTC())) && asOf.Before(r.EndDate.UTC()) {
-					{{ currentOrg = strings.TrimSpace(r.OrgNodeLabel) }}
-					{{ currentPos = strings.TrimSpace(r.PositionLabel) }}
-					{{if currentPos == "" {
-	currentPos = strings.TrimSpace(r.PositionCode)
-}
+				{{ currentOrg := "" }}
+				{{ currentPos := "" }}
+				{{ hasCurrent := false }}
+				for _, r := range props.Timeline.Rows {
+					if validTimeIncludesDay(asOf, r.EffectiveDate, r.EndDate) {
+						{{ currentOrg = strings.TrimSpace(r.OrgNodeLabel) }}
+						{{ currentPos = strings.TrimSpace(r.PositionLabel) }}
+						{{if currentPos == "" {
+		currentPos = strings.TrimSpace(r.PositionCode)
+	}
 					}}
 					{{ hasCurrent = true }}
 					{{ break }}
@@ -471,21 +471,22 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 		}
 		<table class="w-full table-auto border-collapse text-sm">
 			<thead class="border-b border-surface-400 text-left text-300">
-				<tr>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Pernr") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Effective") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.EventType") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
-					if pageCtx.CanAuthz("org.assignments", "assign") {
-						<th class="py-2 pr-2">{ pageCtx.T("Actions") }</th>
-					}
-				</tr>
+					<tr>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Pernr") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Effective") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.EventType") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeLongName") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
+						if pageCtx.CanAuthz("org.assignments", "assign") {
+							<th class="py-2 pr-2">{ pageCtx.T("Actions") }</th>
+						}
+					</tr>
 			</thead>
-			<tbody>
-				for _, row := range props.Timeline.Rows {
-					{{ canEdit := !asOf.Before(row.EffectiveDate.UTC()) && asOf.Before(row.EndDate.UTC()) }}
-					<tr class="border-b border-surface-400/60">
+				<tbody>
+					for _, row := range props.Timeline.Rows {
+						{{ canEdit := validTimeIncludesDay(asOf, row.EffectiveDate, row.EndDate) }}
+						<tr class="border-b border-surface-400/60">
 						<td class="py-2 pr-2 text-200">{ row.Pernr }</td>
 						<td class="py-2 pr-2 text-200">
 							{ formatValidDate(row.EffectiveDate) } →
@@ -532,20 +533,28 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 								{ endLabel }
 							}
 						</td>
-						<td class="py-2 pr-2 text-200">
-							{{ orgLabel := strings.TrimSpace(row.OrgNodeLabel) }}
-							{{if orgLabel == "" {
-	orgLabel = pageCtx.T("Org.UI.Shared.NotFound")
-}
-							}}
-							{ orgLabel }
-						</td>
-						<td class="py-2 pr-2 text-200">
-							{{ posLabel := strings.TrimSpace(row.PositionLabel) }}
-							{{if posLabel == "" {
-	posLabel = strings.TrimSpace(row.PositionCode)
-}
-							}}
+							<td class="py-2 pr-2 text-200">
+								{{ orgLabel := strings.TrimSpace(row.OrgNodeLabel) }}
+								{{if orgLabel == "" {
+		orgLabel = pageCtx.T("Org.UI.Shared.NotFound")
+	}
+								}}
+								{ orgLabel }
+							</td>
+							<td class="py-2 pr-2 text-200">
+								{{ longName := strings.TrimSpace(row.OrgNodeLongName) }}
+								if longName == "" {
+									<span class="text-xs text-400">—</span>
+								} else {
+									{ longName }
+								}
+							</td>
+							<td class="py-2 pr-2 text-200">
+								{{ posLabel := strings.TrimSpace(row.PositionLabel) }}
+								{{if posLabel == "" {
+		posLabel = strings.TrimSpace(row.PositionCode)
+	}
+								}}
 							{{if posLabel == "" {
 	posLabel = pageCtx.T("Org.UI.Shared.NotFound")
 }

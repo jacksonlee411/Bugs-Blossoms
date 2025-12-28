@@ -64,19 +64,20 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 		if r.Pernr != nil && strings.TrimSpace(*r.Pernr) != "" {
 			p = strings.TrimSpace(*r.Pernr)
 		}
-		out = append(out, viewmodels.OrgAssignmentRow{
-			ID:            r.ID,
-			PositionID:    r.PositionID,
-			OrgNodeID:     r.OrgNodeID,
-			Pernr:         p,
-			PositionCode:  code,
-			OrgNodeLabel:  strings.TrimSpace(orgLabel),
-			PositionLabel: strings.TrimSpace(posLabel),
-			OperationType: startEventType,
-			EndEventType:  endEventType,
-			EffectiveDate: r.EffectiveDate,
-			EndDate:       r.EndDate,
-		})
+			out = append(out, viewmodels.OrgAssignmentRow{
+				ID:            r.ID,
+				PositionID:    r.PositionID,
+				OrgNodeID:     r.OrgNodeID,
+				Pernr:         p,
+				PositionCode:  code,
+				OrgNodeLabel:  strings.TrimSpace(orgLabel),
+				OrgNodeLongName: "",
+				PositionLabel: strings.TrimSpace(posLabel),
+				OperationType: startEventType,
+				EndEventType:  endEventType,
+				EffectiveDate: r.EffectiveDate,
+				EndDate:       r.EndDate,
+			})
 	}
 	return &viewmodels.OrgAssignmentsTimeline{
 		Subject: subject,
