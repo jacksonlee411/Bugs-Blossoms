@@ -77,6 +77,7 @@ func TestOrg028QueryBudget(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -117,19 +118,16 @@ func seed028RulesAndRoles(tb testing.TB, ctx context.Context, pool *pgxpool.Pool
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 
 	_, err := pool.Exec(ctx, `
-		INSERT INTO org_attribute_inheritance_rules
-			(tenant_id, hierarchy_type, attribute_name, can_override, effective_date, end_date, effective_on, end_on)
-		VALUES
-			(
-				$1,'OrgUnit','company_code',true,$2,$3,
-				($2 AT TIME ZONE 'UTC')::date,
-				CASE
-					WHEN ($3 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-					ELSE ((($3 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-				END
-			)
-		ON CONFLICT DO NOTHING
-		`, tenantID, asOf, endDate)
+			INSERT INTO org_attribute_inheritance_rules
+				(tenant_id, hierarchy_type, attribute_name, can_override, effective_date, end_date)
+			VALUES
+				(
+					$1,'OrgUnit','company_code',true,
+					($2 AT TIME ZONE 'UTC')::date,
+					($3 AT TIME ZONE 'UTC')::date
+				)
+			ON CONFLICT DO NOTHING
+			`, tenantID, asOf, endDate)
 	require.NoError(tb, err)
 
 	rootID := buildPerfNodes(tb, tenantID, count, profile, seed)[0].ID
@@ -144,19 +142,16 @@ func seed028RulesAndRoles(tb testing.TB, ctx context.Context, pool *pgxpool.Pool
 
 	subjectID := uuid.NewSHA1(uuid.NameSpaceOID, []byte(tenantID.String()+":user:1"))
 	_, err = pool.Exec(ctx, `
-		INSERT INTO org_role_assignments
-			(tenant_id, role_id, subject_type, subject_id, org_node_id, effective_date, end_date, effective_on, end_on)
-		VALUES
-			(
-				$1,$2,'user',$3,$4,$5,$6,
-				($5 AT TIME ZONE 'UTC')::date,
-				CASE
-					WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-					ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-				END
-			)
-		ON CONFLICT DO NOTHING
-		`, tenantID, roleID, subjectID, rootID, asOf, endDate)
+			INSERT INTO org_role_assignments
+				(tenant_id, role_id, subject_type, subject_id, org_node_id, effective_date, end_date)
+			VALUES
+				(
+					$1,$2,'user',$3,$4,
+					($5 AT TIME ZONE 'UTC')::date,
+					($6 AT TIME ZONE 'UTC')::date
+				)
+			ON CONFLICT DO NOTHING
+			`, tenantID, roleID, subjectID, rootID, asOf, endDate)
 	require.NoError(tb, err)
 }
 

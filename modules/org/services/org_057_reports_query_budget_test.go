@@ -54,6 +54,7 @@ func TestOrg057StaffingSummaryQueryBudget(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -75,28 +76,22 @@ func TestOrg057StaffingSummaryQueryBudget(t *testing.T) {
 	smallPosID := uuid.New()
 	largePosID := uuid.New()
 	_, err := pool.Exec(ctx, `
-INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date, effective_on, end_on)
-VALUES (
-	$1,$2,$3,$4,'active',false,$5,$6,
-	($5 AT TIME ZONE 'UTC')::date,
-	CASE
-		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-	END
-)
-`, smallTenantID, smallPosID, smallRoot, "POS-SMALL", asOf, endDate)
+	INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
+	VALUES (
+		$1,$2,$3,$4,'active',false,
+		($5 AT TIME ZONE 'UTC')::date,
+		($6 AT TIME ZONE 'UTC')::date
+	)
+	`, smallTenantID, smallPosID, smallRoot, "POS-SMALL", asOf, endDate)
 	require.NoError(t, err)
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date, effective_on, end_on)
-VALUES (
-	$1,$2,$3,$4,'active',false,$5,$6,
-	($5 AT TIME ZONE 'UTC')::date,
-	CASE
-		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-	END
-)
-`, largeTenantID, largePosID, largeRoot, "POS-LARGE", asOf, endDate)
+	INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
+	VALUES (
+		$1,$2,$3,$4,'active',false,
+		($5 AT TIME ZONE 'UTC')::date,
+		($6 AT TIME ZONE 'UTC')::date
+	)
+	`, largeTenantID, largePosID, largeRoot, "POS-LARGE", asOf, endDate)
 	require.NoError(t, err)
 
 	repo := persistence.NewOrgRepository()

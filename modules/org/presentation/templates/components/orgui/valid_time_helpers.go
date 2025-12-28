@@ -20,7 +20,7 @@ func formatValidEndDateFromEndDate(endDate time.Time) string {
 	if y == 9999 && m == time.December && d == 31 {
 		return "9999-12-31"
 	}
-	return u.Add(-time.Microsecond).Format(time.DateOnly)
+	return formatValidDate(u)
 }
 
 func openEndedEndDate(endDate time.Time) bool {

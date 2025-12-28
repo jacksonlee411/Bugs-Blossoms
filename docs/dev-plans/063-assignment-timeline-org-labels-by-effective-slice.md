@@ -77,7 +77,7 @@ graph TD
   - **选项 B**：所有行都用 `row.EffectiveDate` 解析 label → 历史语义正确，但 summary/当前行在页面 as-of 切换时不随之变化（语义不一致）。
   - **选项 C（选定）**：默认用 `row.EffectiveDate`；当页面 `asOf` 落在该行区间内时改用页面 `asOf`（与现有 “current row/canEdit” 判定一致）。
 - **决策 2：落点选择（选定：Repo 联表 hydrate，避免 N+1）**
-  - `ListAssignmentsTimeline` 一次 SQL 联表取回行起始日（rowStart）的 `position_code/title` 与 `org_node_name/code`（as-of 口径使用 `effective_on/end_on`，对齐 DEV-PLAN-064）。
+  - `ListAssignmentsTimeline` 一次 SQL 联表取回行起始日（rowStart）的 `position_code/title` 与 `org_node_name/code`（as-of 口径使用 `effective_date/end_date`，对齐 DEV-PLAN-064）。
   - UI 组装 timeline 时直接使用行级字段生成 label；仅当页面 `effective_date` 落在该行区间内时，对该行用 `pageAsOf` 做覆盖查询（有上界：每个 `assignment_type` 至多 1 行）。
 - **决策 3：失败路径不阻断页面渲染（选定）**
   - OrgNode label lookup 失败：fallback `nodeID.String()`。

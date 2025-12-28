@@ -38,7 +38,7 @@ func TestOrgAPIController_ChangeRequests_RequestIDIsIdempotent(t *testing.T) {
 	}
 
 	payload := map[string]any{
-		"effective_date": "2025-01-01T00:00:00Z",
+		"effective_date": "2025-01-01",
 		"commands": []any{
 			map[string]any{
 				"type":    "node.create",
@@ -97,7 +97,7 @@ func TestOrgAPIController_ChangeRequests_ImmutableAfterSubmit(t *testing.T) {
 	}
 
 	payload := map[string]any{
-		"effective_date": "2025-01-01T00:00:00Z",
+		"effective_date": "2025-01-01",
 		"commands": []any{
 			map[string]any{
 				"type":    "node.create",
@@ -190,7 +190,7 @@ func TestOrgAPIController_Preflight_InvalidCommandReturnsCommandIndexMeta(t *tes
 	u := newTestOrgUser(tenantID)
 
 	body := mustJSON(t, map[string]any{
-		"effective_date": "2025-01-01T00:00:00Z",
+		"effective_date": "2025-01-01",
 		"commands": []any{
 			map[string]any{
 				"type": "node.create",
@@ -233,6 +233,7 @@ func TestOrgAPIController_Preflight_SuccessHasNoSideEffects(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
@@ -244,7 +245,7 @@ func TestOrgAPIController_Preflight_SuccessHasNoSideEffects(t *testing.T) {
 	}
 
 	body := mustJSON(t, map[string]any{
-		"effective_date": "2025-01-01T00:00:00Z",
+		"effective_date": "2025-01-01",
 		"commands": []any{
 			map[string]any{
 				"type":    "node.create",

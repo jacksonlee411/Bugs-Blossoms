@@ -2,7 +2,7 @@
 
 **状态**: 已完成（2025-12-23）
 **对齐更新**：
-- 2025-12-27：对齐 DEV-PLAN-064：Valid Time 统一按天（`YYYY-MM-DD`）闭区间语义；对外 `effective_date/end_date` 一律按 day string 表达；落库兼容期双写 legacy `timestamptz effective_date` + `date effective_on`。
+- 2025-12-27：对齐 DEV-PLAN-064：Valid Time 统一按天（`YYYY-MM-DD`）闭区间语义；对外 `effective_date/end_date` 一律按 day string 表达；落库字段统一为 `date effective_date/end_date`（不再存在双轨）。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
@@ -174,8 +174,7 @@ CREATE TABLE IF NOT EXISTS org_personnel_events (
     event_type text NOT NULL,
     person_uuid uuid NOT NULL,
     pernr text NOT NULL,
-    effective_date timestamptz NOT NULL, -- legacy（B1 双轨；待 DEV-PLAN-064 阶段 D 清理）
-    effective_on date NOT NULL,
+    effective_date date NOT NULL,
     reason_code text NOT NULL,
     payload jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -189,10 +188,7 @@ CREATE TABLE IF NOT EXISTS org_personnel_events (
 );
 
 CREATE INDEX IF NOT EXISTS org_personnel_events_tenant_person_effective_idx
-ON org_personnel_events (tenant_id, person_uuid, effective_date DESC); -- legacy（B1 双轨）
-
-CREATE INDEX IF NOT EXISTS org_personnel_events_tenant_person_effective_on_idx
-ON org_personnel_events (tenant_id, person_uuid, effective_on DESC);
+ON org_personnel_events (tenant_id, person_uuid, effective_date DESC);
 ```
 
 ### 4.4 迁移策略

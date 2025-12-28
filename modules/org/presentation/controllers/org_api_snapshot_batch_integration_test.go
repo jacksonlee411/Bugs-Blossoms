@@ -60,6 +60,7 @@ func TestOrgAPIController_GetSnapshot_PaginatesWithCursor(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	})
 
 	asOf := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
@@ -144,6 +145,7 @@ func TestOrgAPIController_Batch_DryRunHasNoSideEffects(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
@@ -156,7 +158,7 @@ func TestOrgAPIController_Batch_DryRunHasNoSideEffects(t *testing.T) {
 
 	body := mustJSON(t, map[string]any{
 		"dry_run":        true,
-		"effective_date": "2025-01-01T00:00:00Z",
+		"effective_date": "2025-01-01",
 		"commands": []any{
 			map[string]any{
 				"type":    "node.create",
@@ -204,6 +206,7 @@ func TestOrgAPIController_Batch_InvalidCommandReturnsCommandIndexMeta(t *testing
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	})
 
 	withOrgRolloutEnabled(t, tenantID)
@@ -215,7 +218,7 @@ func TestOrgAPIController_Batch_InvalidCommandReturnsCommandIndexMeta(t *testing
 
 	body := mustJSON(t, map[string]any{
 		"dry_run":        true,
-		"effective_date": "2025-01-01T00:00:00Z",
+		"effective_date": "2025-01-01",
 		"commands": []any{
 			map[string]any{
 				"type": "node.create",
@@ -314,30 +317,24 @@ func seedOrgTestTree(tb testing.TB, pool *pgxpool.Pool, tenantID uuid.UUID, asOf
 	}
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_node_slices
-				(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date, effective_on, end_on)
-				VALUES (
-					$1,$2,$3,$4,$5,$6,$7,
-					($6 AT TIME ZONE 'UTC')::date,
-					CASE
-						WHEN ($7 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-						ELSE ((($7 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-					END
-				)`,
+					(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date)
+					VALUES (
+						$1,$2,$3,$4,$5,
+						($6 AT TIME ZONE 'UTC')::date,
+						($7 AT TIME ZONE 'UTC')::date
+					)`,
 			tenantID, n.ID, n.Code, n.DisplayOrder, n.ParentID, asOf, endDate,
 		)
 		require.NoError(tb, err)
 	}
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_edges
-				(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
-				VALUES (
-					$1,$2,$3,$4,$5,$6,
-					($5 AT TIME ZONE 'UTC')::date,
-					CASE
-						WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-						ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-					END
-				)`,
+					(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
+					VALUES (
+						$1,$2,$3,$4,
+						($5 AT TIME ZONE 'UTC')::date,
+						($6 AT TIME ZONE 'UTC')::date
+					)`,
 			tenantID, "OrgUnit", n.ParentID, n.ID, asOf, endDate,
 		)
 		require.NoError(tb, err)

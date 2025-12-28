@@ -40,8 +40,8 @@ func TestNormalizeNodes_EndDateAutoFill(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// first slice end_date should auto-fill to next effective_date
-	if got := data.nodeSlices[0].endDate; !got.Equal(time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC)) {
+	// first slice end_date should auto-fill to the day before the next effective_date (day-granularity, inclusive end_date)
+	if got := data.nodeSlices[0].endDate; !got.Equal(time.Date(2025, 1, 31, 0, 0, 0, 0, time.UTC)) {
 		t.Fatalf("unexpected end_date: %s", got.Format(time.RFC3339))
 	}
 	// last slice end_date should be maxEndDate

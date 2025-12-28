@@ -384,11 +384,11 @@ func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UU
 			}
 			return nil, mapPgError(err)
 		}
-		if !in.NewEffectiveDate.Before(target.EndDate) {
-			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date must be before target end_date", nil)
+		if in.NewEffectiveDate.After(target.EndDate) {
+			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_INVERTED", "new_effective_date must be on/before target end_date", nil)
 		}
 
-		prev, err := s.repo.LockPositionSliceEndingAt(txCtx, tenantID, in.PositionID, in.TargetEffectiveDate)
+		prev, err := s.repo.LockPositionSliceEndingAt(txCtx, tenantID, in.PositionID, truncateEndDateFromNewEffectiveDate(in.TargetEffectiveDate))
 		if err != nil {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_SHIFTBOUNDARY_SWALLOW", "previous slice not found", err)
 		}
@@ -426,11 +426,11 @@ func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UU
 			if err := s.repo.UpdatePositionSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
 				return nil, mapPgError(err)
 			}
-			if err := s.repo.UpdatePositionSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
+			if err := s.repo.UpdatePositionSliceEndDate(txCtx, tenantID, prev.ID, truncateEndDateFromNewEffectiveDate(in.NewEffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
 		} else {
-			if err := s.repo.UpdatePositionSliceEndDate(txCtx, tenantID, prev.ID, in.NewEffectiveDate); err != nil {
+			if err := s.repo.UpdatePositionSliceEndDate(txCtx, tenantID, prev.ID, truncateEndDateFromNewEffectiveDate(in.NewEffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
 			if err := s.repo.UpdatePositionSliceEffectiveDate(txCtx, tenantID, target.ID, in.NewEffectiveDate); err != nil {
@@ -442,7 +442,7 @@ func (s *OrgService) ShiftBoundaryPosition(ctx context.Context, tenantID uuid.UU
 			"slice_id":       prev.ID.String(),
 			"position_id":    in.PositionID.String(),
 			"effective_date": prev.EffectiveDate.UTC().Format(time.RFC3339),
-			"end_date":       in.NewEffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":       truncateEndDateFromNewEffectiveDate(in.NewEffectiveDate).UTC().Format(time.RFC3339),
 		}
 		targetNew := map[string]any{
 			"slice_id":       target.ID.String(),
@@ -882,7 +882,7 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 			return nil, err
 		}
 
-		if err := s.repo.TruncatePositionSlice(txCtx, tenantID, current.ID, in.EffectiveDate); err != nil {
+		if err := s.repo.TruncatePositionSlice(txCtx, tenantID, current.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 			return nil, mapPgError(err)
 		}
 
@@ -1466,7 +1466,7 @@ func (s *OrgService) RescindPosition(ctx context.Context, tenantID uuid.UUID, re
 			return nil, err
 		}
 		if target.EffectiveDate.Before(in.EffectiveDate) {
-			if err := s.repo.TruncatePositionSlice(txCtx, tenantID, target.ID, in.EffectiveDate); err != nil {
+			if err := s.repo.TruncatePositionSlice(txCtx, tenantID, target.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
 		}

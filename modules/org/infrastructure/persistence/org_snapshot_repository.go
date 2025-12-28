@@ -35,17 +35,17 @@ JOIN org_node_slices s
   ON s.tenant_id = n.tenant_id
   AND s.org_node_id = n.id
   AND s.effective_date <= $2
-  AND s.end_date > $2
+  AND s.end_date >= $2
 LEFT JOIN org_edges e
   ON e.tenant_id = n.tenant_id
   AND e.child_node_id = n.id
   AND e.hierarchy_type = 'OrgUnit'
   AND e.effective_date <= $2
-  AND e.end_date > $2
+  AND e.end_date >= $2
 WHERE n.tenant_id = $1
   AND ($3::uuid IS NULL OR n.id > $3)
 `
-	args := []any{pgUUID(tenantID), asOf, pgNullableUUID(afterID), limit}
+	args := []any{pgUUID(tenantID), pgValidDate(asOf), pgNullableUUID(afterID), limit}
 	q += " ORDER BY n.id ASC LIMIT $4"
 
 	rows, err := tx.Query(ctx, q, args...)
@@ -91,10 +91,10 @@ FROM org_edges e
 WHERE e.tenant_id = $1
   AND e.hierarchy_type = 'OrgUnit'
   AND e.effective_date <= $2
-  AND e.end_date > $2
+  AND e.end_date >= $2
   AND ($3::uuid IS NULL OR e.id > $3)
 `
-	args := []any{pgUUID(tenantID), asOf, pgNullableUUID(afterID), limit}
+	args := []any{pgUUID(tenantID), pgValidDate(asOf), pgNullableUUID(afterID), limit}
 	q += " ORDER BY e.id ASC LIMIT $4"
 
 	rows, err := tx.Query(ctx, q, args...)
@@ -143,11 +143,11 @@ func (r *OrgRepository) ListSnapshotPositions(ctx context.Context, tenantID uuid
 	  ON s.tenant_id = p.tenant_id
 	  AND s.position_id = p.id
 	  AND s.effective_date <= $2
-	  AND s.end_date > $2
+	  AND s.end_date >= $2
 	WHERE p.tenant_id = $1
 	  AND ($3::uuid IS NULL OR p.id > $3)
 	`
-	args := []any{pgUUID(tenantID), asOf, pgNullableUUID(afterID), limit}
+	args := []any{pgUUID(tenantID), pgValidDate(asOf), pgNullableUUID(afterID), limit}
 	q += " ORDER BY p.id ASC LIMIT $4"
 
 	rows, err := tx.Query(ctx, q, args...)
@@ -196,10 +196,10 @@ func (r *OrgRepository) ListSnapshotAssignments(ctx context.Context, tenantID uu
 	FROM org_assignments a
 	WHERE a.tenant_id = $1
   AND a.effective_date <= $2
-  AND a.end_date > $2
+  AND a.end_date >= $2
   AND ($3::uuid IS NULL OR a.id > $3)
 `
-	args := []any{pgUUID(tenantID), asOf, pgNullableUUID(afterID), limit}
+	args := []any{pgUUID(tenantID), pgValidDate(asOf), pgNullableUUID(afterID), limit}
 	q += " ORDER BY a.id ASC LIMIT $4"
 
 	rows, err := tx.Query(ctx, q, args...)

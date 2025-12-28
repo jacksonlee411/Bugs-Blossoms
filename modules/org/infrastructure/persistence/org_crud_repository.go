@@ -73,11 +73,9 @@ func (r *OrgRepository) InsertNodeSlice(ctx context.Context, tenantID uuid.UUID,
 		parent_hint,
 		manager_user_id,
 		effective_date,
-		end_date,
-		effective_on,
-		end_on
+		end_date
 	)
-	VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+	VALUES ($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 	RETURNING id
 		`,
 		pgUUID(tenantID),
@@ -91,10 +89,8 @@ func (r *OrgRepository) InsertNodeSlice(ctx context.Context, tenantID uuid.UUID,
 		slice.DisplayOrder,
 		pgNullableUUID(slice.ParentHint),
 		pgNullableInt8(slice.ManagerUserID),
-		slice.EffectiveDate,
-		slice.EndDate,
-		pgEffectiveOnFromEffectiveDate(slice.EffectiveDate),
-		pgEndOnFromEndDate(slice.EndDate),
+		pgValidDate(slice.EffectiveDate),
+		pgValidDate(slice.EndDate),
 	).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
@@ -108,10 +104,10 @@ func (r *OrgRepository) InsertEdge(ctx context.Context, tenantID uuid.UUID, hier
 	}
 	var id uuid.UUID
 	if err := tx.QueryRow(ctx, `
-	INSERT INTO org_edges (tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
-	VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+	INSERT INTO org_edges (tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
+	VALUES ($1,$2,$3,$4,$5,$6)
 	RETURNING id
-	`, pgUUID(tenantID), hierarchyType, pgNullableUUID(parentID), pgUUID(childID), effectiveDate, endDate, pgEffectiveOnFromEffectiveDate(effectiveDate), pgEndOnFromEndDate(endDate)).Scan(&id); err != nil {
+	`, pgUUID(tenantID), hierarchyType, pgNullableUUID(parentID), pgUUID(childID), pgValidDate(effectiveDate), pgValidDate(endDate)).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	return id, nil
@@ -127,8 +123,8 @@ func (r *OrgRepository) NodeExistsAt(ctx context.Context, tenantID uuid.UUID, no
 SELECT EXISTS(
 	SELECT 1
 	FROM org_edges
-	WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND effective_date <= $4 AND end_date > $4
-)`, pgUUID(tenantID), hierarchyType, pgUUID(nodeID), asOf).Scan(&exists); err != nil {
+	WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND effective_date <= $4 AND end_date >= $4
+)`, pgUUID(tenantID), hierarchyType, pgUUID(nodeID), pgValidDate(asOf)).Scan(&exists); err != nil {
 		return false, err
 	}
 	return exists, nil
@@ -184,10 +180,10 @@ func (r *OrgRepository) GetNodeSliceAt(ctx context.Context, tenantID uuid.UUID, 
 		effective_date,
 		end_date
 	FROM org_node_slices
-	WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date <= $3 AND end_date > $3
+	WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date <= $3 AND end_date >= $3
 	ORDER BY effective_date DESC
 	LIMIT 1
-	`, pgUUID(tenantID), pgUUID(nodeID), asOf)
+	`, pgUUID(tenantID), pgUUID(nodeID), pgValidDate(asOf))
 
 	var out services.NodeSliceRow
 	var i18nRaw []byte
@@ -247,11 +243,11 @@ SELECT
 	effective_date,
 	end_date
 FROM org_node_slices
-WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date <= $3 AND end_date > $3
+WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date <= $3 AND end_date >= $3
 ORDER BY effective_date DESC
 LIMIT 1
 FOR UPDATE
-`, pgUUID(tenantID), pgUUID(nodeID), asOf)
+`, pgUUID(tenantID), pgUUID(nodeID), pgValidDate(asOf))
 
 	var out services.NodeSliceRow
 	var i18nRaw []byte
@@ -295,7 +291,7 @@ func (r *OrgRepository) TruncateNodeSlice(ctx context.Context, tenantID uuid.UUI
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET end_date=$3, end_on=$4 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate, pgEndOnFromEndDate(endDate))
+	_, err = tx.Exec(ctx, `UPDATE org_node_slices SET end_date=$3 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), pgValidDate(endDate))
 	return err
 }
 
@@ -312,7 +308,7 @@ FROM org_node_slices
 WHERE tenant_id=$1 AND org_node_id=$2 AND effective_date > $3
 ORDER BY effective_date ASC
 LIMIT 1
-`, pgUUID(tenantID), pgUUID(nodeID), after).Scan(&next)
+`, pgUUID(tenantID), pgUUID(nodeID), pgValidDate(after)).Scan(&next)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return time.Time{}, false, nil
 	}
@@ -338,11 +334,11 @@ SELECT
 	effective_date,
 	end_date
 FROM org_edges
-WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND effective_date <= $4 AND end_date > $4
+WHERE tenant_id=$1 AND hierarchy_type=$2 AND child_node_id=$3 AND effective_date <= $4 AND end_date >= $4
 ORDER BY effective_date DESC
 LIMIT 1
 FOR UPDATE
-`, pgUUID(tenantID), hierarchyType, pgUUID(childID), asOf)
+`, pgUUID(tenantID), hierarchyType, pgUUID(childID), pgValidDate(asOf))
 
 	var out services.EdgeRow
 	var parent pgtype.UUID
@@ -368,10 +364,10 @@ SELECT
 	effective_date,
 	end_date
 FROM org_edges
-WHERE tenant_id=$1 AND hierarchy_type=$2 AND effective_date <= $3 AND end_date > $3 AND path <@ $4::ltree
+WHERE tenant_id=$1 AND hierarchy_type=$2 AND effective_date <= $3 AND end_date >= $3 AND path <@ $4::ltree
 ORDER BY depth ASC
 FOR UPDATE
-`, pgUUID(tenantID), hierarchyType, asOf, movedPath)
+`, pgUUID(tenantID), hierarchyType, pgValidDate(asOf), movedPath)
 	if err != nil {
 		return nil, err
 	}
@@ -395,7 +391,7 @@ func (r *OrgRepository) TruncateEdge(ctx context.Context, tenantID uuid.UUID, ed
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_edges SET end_date=$3, end_on=$4 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(edgeID), endDate, pgEndOnFromEndDate(endDate))
+	_, err = tx.Exec(ctx, `UPDATE org_edges SET end_date=$3 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(edgeID), pgValidDate(endDate))
 	return err
 }
 
@@ -409,9 +405,9 @@ func (r *OrgRepository) PositionExistsAt(ctx context.Context, tenantID uuid.UUID
 	SELECT EXISTS(
 		SELECT 1
 		FROM org_position_slices
-		WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date > $3
+		WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date >= $3
 	)
-	`, pgUUID(tenantID), pgUUID(positionID), asOf).Scan(&exists); err != nil {
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(asOf)).Scan(&exists); err != nil {
 		return false, err
 	}
 	return exists, nil
@@ -432,21 +428,17 @@ func (r *OrgRepository) InsertAutoPosition(ctx context.Context, tenantID uuid.UU
 			status,
 			is_auto_created,
 			effective_date,
-			end_date,
-			effective_on,
-			end_on
+			end_date
 		)
-		VALUES ($1,$2,$3,$4,'active',true,$5,$6,$7,$8)
+		VALUES ($1,$2,$3,$4,'active',true,$5,$6)
 		ON CONFLICT (id) DO NOTHING
 		`,
 		pgUUID(tenantID),
 		pgUUID(positionID),
 		pgUUID(orgNodeID),
 		code,
-		effectiveDate,
-		time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC),
-		pgEffectiveOnFromEffectiveDate(effectiveDate),
-		pgEndOnFromEndDate(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)),
+		pgValidDate(effectiveDate),
+		pgValidDate(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)),
 	)
 	if err != nil {
 		return err
@@ -460,11 +452,9 @@ func (r *OrgRepository) InsertAutoPosition(ctx context.Context, tenantID uuid.UU
 			lifecycle_status,
 			capacity_fte,
 			effective_date,
-			end_date,
-			effective_on,
-			end_on
+			end_date
 		)
-		SELECT $1,$2,$3,'active',1.0,$4,$5,$6,$7
+		SELECT $1,$2,$3,'active',1.0,$4,$5
 		WHERE NOT EXISTS (
 			SELECT 1
 			FROM org_position_slices s
@@ -474,10 +464,8 @@ func (r *OrgRepository) InsertAutoPosition(ctx context.Context, tenantID uuid.UU
 		pgUUID(tenantID),
 		pgUUID(positionID),
 		pgUUID(orgNodeID),
-		effectiveDate,
-		time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC),
-		pgEffectiveOnFromEffectiveDate(effectiveDate),
-		pgEndOnFromEndDate(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)),
+		pgValidDate(effectiveDate),
+		pgValidDate(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)),
 	)
 	return err
 }
@@ -491,10 +479,10 @@ func (r *OrgRepository) GetPositionOrgNodeAt(ctx context.Context, tenantID uuid.
 	if err := tx.QueryRow(ctx, `
 	SELECT org_node_id
 	FROM org_position_slices
-	WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date > $3
+	WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date >= $3
 	ORDER BY effective_date DESC
 	LIMIT 1
-	`, pgUUID(tenantID), pgUUID(positionID), asOf).Scan(&orgNodeID); err != nil {
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(asOf)).Scan(&orgNodeID); err != nil {
 		return uuid.Nil, err
 	}
 	return orgNodeID, nil
@@ -527,11 +515,11 @@ func (r *OrgRepository) LockPositionSliceAt(ctx context.Context, tenantID uuid.U
 		effective_date,
 		end_date
 	FROM org_position_slices
-	WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date > $3
+	WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date >= $3
 	ORDER BY effective_date DESC
 	LIMIT 1
 	FOR UPDATE
-	`, pgUUID(tenantID), pgUUID(positionID), asOf)
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(asOf))
 
 	var out services.PositionSliceRow
 	var title pgtype.Text
@@ -594,8 +582,8 @@ func (r *OrgRepository) SumAllocatedFTEAt(ctx context.Context, tenantID uuid.UUI
 	  AND position_id=$2
 	  AND assignment_type='primary'
 	  AND effective_date <= $3
-	  AND end_date > $3
-	`, pgUUID(tenantID), pgUUID(positionID), asOf).Scan(&sum); err != nil {
+	  AND end_date >= $3
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(asOf)).Scan(&sum); err != nil {
 		return 0, err
 	}
 	return sum, nil
@@ -618,10 +606,10 @@ func (r *OrgRepository) LockAssignmentAt(ctx context.Context, tenantID uuid.UUID
 		allocated_fte,
 		effective_date,
 		end_date
-	FROM org_assignments
-	WHERE tenant_id=$1 AND id=$2 AND effective_date <= $3 AND end_date > $3
-	FOR UPDATE
-	`, pgUUID(tenantID), pgUUID(assignmentID), asOf)
+FROM org_assignments
+WHERE tenant_id=$1 AND id=$2 AND effective_date <= $3 AND end_date >= $3
+FOR UPDATE
+	`, pgUUID(tenantID), pgUUID(assignmentID), pgValidDate(asOf))
 	var out services.AssignmentRow
 	if err := row.Scan(
 		&out.ID,
@@ -645,7 +633,7 @@ func (r *OrgRepository) TruncateAssignment(ctx context.Context, tenantID uuid.UU
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3, end_on=$4 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), endDate, pgEndOnFromEndDate(endDate))
+	_, err = tx.Exec(ctx, `UPDATE org_assignments SET end_date=$3 WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(assignmentID), pgValidDate(endDate))
 	return err
 }
 
@@ -661,7 +649,7 @@ FROM org_assignments
 WHERE tenant_id=$1 AND id=$2 AND effective_date > $3
 ORDER BY effective_date ASC
 LIMIT 1
-`, pgUUID(tenantID), pgUUID(assignmentID), after).Scan(&next)
+`, pgUUID(tenantID), pgUUID(assignmentID), pgValidDate(after)).Scan(&next)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return time.Time{}, false, nil
 	}
@@ -688,13 +676,11 @@ func (r *OrgRepository) InsertAssignment(ctx context.Context, tenantID uuid.UUID
 			is_primary,
 			allocated_fte,
 			effective_date,
-			end_date,
-			effective_on,
-			end_on
+			end_date
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		RETURNING id
-		`, pgUUID(tenantID), pgUUID(assignment.PositionID), assignment.SubjectType, pgUUID(assignment.SubjectID), assignment.Pernr, assignment.AssignmentType, assignment.IsPrimary, assignment.AllocatedFTE, assignment.EffectiveDate, assignment.EndDate, pgEffectiveOnFromEffectiveDate(assignment.EffectiveDate), pgEndOnFromEndDate(assignment.EndDate)).Scan(&id); err != nil {
+		`, pgUUID(tenantID), pgUUID(assignment.PositionID), assignment.SubjectType, pgUUID(assignment.SubjectID), assignment.Pernr, assignment.AssignmentType, assignment.IsPrimary, assignment.AllocatedFTE, pgValidDate(assignment.EffectiveDate), pgValidDate(assignment.EndDate)).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
 	return id, nil
@@ -726,7 +712,7 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type IN ('hire', 'transfer')
-				AND e.effective_on = a.effective_on
+				AND e.effective_date = a.effective_date
 			ORDER BY e.created_at DESC
 			LIMIT 1
 		) AS start_event_type,
@@ -736,7 +722,7 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type = 'termination'
-				AND e.effective_on = a.end_on
+				AND e.effective_date = a.end_date
 			ORDER BY e.created_at DESC
 			LIMIT 1
 		) AS end_event_type
@@ -747,16 +733,16 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 	JOIN org_position_slices ps
 		ON ps.tenant_id=a.tenant_id
 		AND ps.position_id=a.position_id
-		AND ps.effective_on <= a.effective_on
-		AND ps.end_on >= a.effective_on
+		AND ps.effective_date <= a.effective_date
+		AND ps.end_date >= a.effective_date
 	JOIN org_nodes n
 		ON n.tenant_id=a.tenant_id
 		AND n.id=ps.org_node_id
 	LEFT JOIN org_node_slices ns
 		ON ns.tenant_id=a.tenant_id
 		AND ns.org_node_id=ps.org_node_id
-		AND ns.effective_on <= a.effective_on
-		AND ns.end_on >= a.effective_on
+		AND ns.effective_date <= a.effective_date
+		AND ns.end_date >= a.effective_date
 	WHERE a.tenant_id=$1 AND a.subject_id=$2
 	ORDER BY a.effective_date ASC
 	`, pgUUID(tenantID), pgUUID(subjectID))
@@ -831,7 +817,7 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 			WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type IN ('hire', 'transfer')
-				AND e.effective_on = a.effective_on
+				AND e.effective_date = a.effective_date
 			ORDER BY e.created_at DESC
 			LIMIT 1
 		) AS start_event_type,
@@ -841,7 +827,7 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 			WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type = 'termination'
-				AND e.effective_on = a.end_on
+				AND e.effective_date = a.end_date
 			ORDER BY e.created_at DESC
 			LIMIT 1
 		) AS end_event_type
@@ -850,10 +836,10 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 		ON s.tenant_id=a.tenant_id
 		AND s.position_id=a.position_id
 		AND s.effective_date <= $3
-		AND s.end_date > $3
-	WHERE a.tenant_id=$1 AND a.subject_id=$2 AND a.effective_date <= $3 AND a.end_date > $3
+		AND s.end_date >= $3
+	WHERE a.tenant_id=$1 AND a.subject_id=$2 AND a.effective_date <= $3 AND a.end_date >= $3
 	ORDER BY a.effective_date DESC
-	`, pgUUID(tenantID), pgUUID(subjectID), asOf)
+	`, pgUUID(tenantID), pgUUID(subjectID), pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}

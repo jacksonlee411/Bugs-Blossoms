@@ -51,6 +51,7 @@ func setupOrg053DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -135,7 +136,7 @@ ORDER BY effective_date ASC
 	require.NoError(t, rows.Err())
 	require.Len(t, got, 2)
 	require.True(t, got[0].EffectiveDate.Equal(asOf))
-	require.True(t, got[0].EndDate.Equal(newStart))
+	require.True(t, got[0].EndDate.Equal(newStart.AddDate(0, 0, -1)))
 	require.True(t, got[1].EffectiveDate.Equal(newStart))
 	require.True(t, got[1].EndDate.Equal(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)))
 }

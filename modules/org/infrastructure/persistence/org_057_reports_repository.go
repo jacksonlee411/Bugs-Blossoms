@@ -32,7 +32,6 @@ func (r *OrgRepository) GetStaffingSummaryReport(
 	if err != nil {
 		return services.StaffingSummaryDBResult{}, err
 	}
-	asOf = asOf.UTC()
 	if len(orgNodeIDs) == 0 {
 		return services.StaffingSummaryDBResult{}, nil
 	}
@@ -49,13 +48,13 @@ WITH pos AS (
 		ON s.tenant_id = p.tenant_id
 		AND s.position_id = p.id
 		AND s.effective_date <= $2
-		AND s.end_date > $2
+		AND s.end_date >= $2
 	LEFT JOIN org_assignments a
 		ON a.tenant_id = p.tenant_id
 		AND a.position_id = p.id
 		AND a.assignment_type = 'primary'
 		AND a.effective_date <= $2
-		AND a.end_date > $2
+		AND a.end_date >= $2
 	WHERE p.tenant_id = $1
 		AND s.org_node_id = ANY($3::uuid[])
 		AND s.lifecycle_status = ANY($4::text[])
@@ -71,7 +70,7 @@ SELECT
 	COALESCE(SUM(occupied_fte), 0)::float8 AS occupied_fte,
 	COALESCE(SUM(GREATEST(capacity_fte - occupied_fte, 0)), 0)::float8 AS available_fte
 FROM pos
-`, pgUUID(tenantID), asOf, orgNodeIDs, lifecycleStatuses, includeSystem)
+`, pgUUID(tenantID), pgValidDate(asOf), orgNodeIDs, lifecycleStatuses, includeSystem)
 
 	var out services.StaffingSummaryDBResult
 	if err := row.Scan(
@@ -97,7 +96,7 @@ SELECT
 FROM pos
 GROUP BY position_type
 ORDER BY position_type ASC
-`, pgUUID(tenantID), asOf, orgNodeIDs, lifecycleStatuses, includeSystem)
+`, pgUUID(tenantID), pgValidDate(asOf), orgNodeIDs, lifecycleStatuses, includeSystem)
 	if err != nil {
 		return services.StaffingSummaryDBResult{}, err
 	}
@@ -137,7 +136,6 @@ func (r *OrgRepository) ListStaffingVacanciesReport(
 	if err != nil {
 		return services.StaffingVacanciesDBResult{}, err
 	}
-	asOf = asOf.UTC()
 	if len(orgNodeIDs) == 0 || limit <= 0 {
 		return services.StaffingVacanciesDBResult{}, nil
 	}
@@ -158,13 +156,13 @@ WITH vacancies AS (
 		ON s.tenant_id = p.tenant_id
 		AND s.position_id = p.id
 		AND s.effective_date <= $2
-		AND s.end_date > $2
+		AND s.end_date >= $2
 	LEFT JOIN org_assignments a
 		ON a.tenant_id = p.tenant_id
 		AND a.position_id = p.id
 		AND a.assignment_type = 'primary'
 		AND a.effective_date <= $2
-		AND a.end_date > $2
+		AND a.end_date >= $2
 	WHERE p.tenant_id = $1
 		AND s.org_node_id = ANY($3::uuid[])
 		AND s.lifecycle_status = ANY($4::text[])
@@ -175,19 +173,19 @@ WITH vacancies AS (
 	ORDER BY p.id ASC
 	LIMIT $7
 )
-SELECT
-	v.position_id,
-	v.position_code,
-	v.org_node_id,
-	v.position_type,
-	v.capacity_fte,
-	v.occupied_fte,
-	COALESCE(prev.last_end, inc.inception) AS vacancy_since,
-	GREATEST(
-		0,
-		(($2 AT TIME ZONE 'UTC')::date - (COALESCE(prev.last_end, inc.inception) AT TIME ZONE 'UTC')::date)
-	)::int AS vacancy_age_days
-FROM vacancies v
+	SELECT
+		v.position_id,
+		v.position_code,
+		v.org_node_id,
+		v.position_type,
+		v.capacity_fte,
+		v.occupied_fte,
+		COALESCE(prev.last_end + 1, inc.inception) AS vacancy_since,
+		GREATEST(
+			0,
+			($2::date - COALESCE(prev.last_end + 1, inc.inception))
+		)::int AS vacancy_age_days
+	FROM vacancies v
 LEFT JOIN LATERAL (
 	SELECT MAX(end_date) AS last_end
 	FROM org_assignments a2
@@ -203,7 +201,7 @@ LEFT JOIN LATERAL (
 		AND s2.position_id = v.position_id
 ) inc ON true
 ORDER BY v.position_id ASC
-`, pgUUID(tenantID), asOf, orgNodeIDs, lifecycleStatuses, includeSystem, pgNullableUUID(cursor), limitPlusOne)
+`, pgUUID(tenantID), pgValidDate(asOf), orgNodeIDs, lifecycleStatuses, includeSystem, pgNullableUUID(cursor), limitPlusOne)
 	if err != nil {
 		return services.StaffingVacanciesDBResult{}, err
 	}
@@ -257,8 +255,6 @@ func (r *OrgRepository) GetStaffingTimeToFillReport(
 	if err != nil {
 		return services.StaffingTimeToFillDBResult{}, err
 	}
-	from = from.UTC()
-	to = to.UTC()
 	if len(orgNodeIDs) == 0 {
 		return services.StaffingTimeToFillDBResult{}, nil
 	}
@@ -270,30 +266,30 @@ WITH inception AS (
 	WHERE tenant_id = $1
 	GROUP BY tenant_id, position_id
 ),
-events AS (
-	SELECT
-		COALESCE(NULLIF(btrim(s.position_type), ''), 'unknown') AS position_type,
-		GREATEST(
-			0,
-			((a.effective_date AT TIME ZONE 'UTC')::date - (COALESCE(
-				(SELECT MAX(end_date)
-					FROM org_assignments prev
-					WHERE prev.tenant_id = a.tenant_id
-						AND prev.position_id = a.position_id
-						AND prev.assignment_type = 'primary'
-						AND prev.end_date <= a.effective_date),
-				inc.inception_date
-			) AT TIME ZONE 'UTC')::date)
-		)::int AS ttf_days
-	FROM org_assignments a
+	events AS (
+			SELECT
+				COALESCE(NULLIF(btrim(s.position_type), ''), 'unknown') AS position_type,
+				GREATEST(
+					0,
+					(a.effective_date - COALESCE(
+						(SELECT (MAX(end_date) + 1)
+							FROM org_assignments prev
+							WHERE prev.tenant_id = a.tenant_id
+								AND prev.position_id = a.position_id
+								AND prev.assignment_type = 'primary'
+								AND prev.end_date <= a.effective_date),
+						inc.inception_date
+					))
+				)::int AS ttf_days
+		FROM org_assignments a
 	JOIN org_positions p
 		ON p.tenant_id = a.tenant_id
 		AND p.id = a.position_id
-	JOIN org_position_slices s
-		ON s.tenant_id = p.tenant_id
-		AND s.position_id = p.id
-		AND s.effective_date <= a.effective_date
-		AND s.end_date > a.effective_date
+		JOIN org_position_slices s
+			ON s.tenant_id = p.tenant_id
+			AND s.position_id = p.id
+			AND s.effective_date <= a.effective_date
+			AND s.end_date >= a.effective_date
 	JOIN inception inc
 		ON inc.tenant_id = p.tenant_id
 		AND inc.position_id = p.id
@@ -310,12 +306,12 @@ events AS (
 			FROM org_assignments prev2
 			WHERE prev2.tenant_id = a.tenant_id
 				AND prev2.position_id = a.position_id
-				AND prev2.assignment_type = 'primary'
-				AND prev2.effective_date < a.effective_date
-				AND prev2.end_date > a.effective_date
-		)
-)
-`
+					AND prev2.assignment_type = 'primary'
+					AND prev2.effective_date < a.effective_date
+					AND prev2.end_date >= a.effective_date
+			)
+	)
+	`
 
 	var q string
 	switch groupBy {
@@ -351,7 +347,7 @@ FROM events
 `
 	}
 
-	rows, err := tx.Query(ctx, q, pgUUID(tenantID), from, to, orgNodeIDs, lifecycleStatuses, includeSystem)
+	rows, err := tx.Query(ctx, q, pgUUID(tenantID), pgValidDate(from), pgValidDate(to), orgNodeIDs, lifecycleStatuses, includeSystem)
 	if err != nil {
 		return services.StaffingTimeToFillDBResult{}, err
 	}

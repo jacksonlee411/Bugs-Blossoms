@@ -98,10 +98,10 @@ WHERE tenant_id=$1 AND hierarchy_type=$2 AND as_of_date=$3::date AND build_id=$4
 		)) AS attributes
 		FROM org_nodes n
 		JOIN org_node_slices s
-			ON s.tenant_id = n.tenant_id
-			AND s.org_node_id = n.id
-			AND s.effective_date <= $3
-			AND s.end_date > $3
+				ON s.tenant_id = n.tenant_id
+				AND s.org_node_id = n.id
+				AND s.effective_date <= $3
+				AND s.end_date >= $3
 		WHERE n.tenant_id = $1
 	)`, `
 	paths AS (
@@ -115,10 +115,10 @@ WHERE tenant_id=$1 AND hierarchy_type=$2 AND as_of_date=$3::date AND build_id=$4
 			ON an.tenant_id = s.tenant_id
 			AND an.id = s.ancestor_node_id
 		JOIN org_node_slices ans
-			ON ans.tenant_id = an.tenant_id
-			AND ans.org_node_id = an.id
-			AND ans.effective_date <= $3
-			AND ans.end_date > $3
+				ON ans.tenant_id = an.tenant_id
+				AND ans.org_node_id = an.id
+				AND ans.effective_date <= $3
+				AND ans.end_date >= $3
 		WHERE s.tenant_id = $1
 			AND s.hierarchy_type = $2
 			AND s.as_of_date = $4::date
@@ -145,11 +145,11 @@ WHERE tenant_id=$1 AND hierarchy_type=$2 AND as_of_date=$3::date AND build_id=$4
 		AND m.org_node_id = snap.ancestor_node_id
 		WHERE snap.tenant_id = $1
 			AND snap.hierarchy_type = $2
-			AND snap.as_of_date = $4::date
-			AND snap.build_id = $5
-			AND m.effective_date <= $3
-			AND m.end_date > $3
-			AND (m.applies_to_subtree OR m.org_node_id = snap.descendant_node_id)
+				AND snap.as_of_date = $4::date
+				AND snap.build_id = $5
+				AND m.effective_date <= $3
+				AND m.end_date >= $3
+				AND (m.applies_to_subtree OR m.org_node_id = snap.descendant_node_id)
 		ORDER BY snap.descendant_node_id, m.security_group_key, snap.depth ASC, m.org_node_id ASC
 	)`, `
 	sg AS (
@@ -179,11 +179,11 @@ WHERE tenant_id=$1 AND hierarchy_type=$2 AND as_of_date=$3::date AND build_id=$4
 			'link_type', link_type
 		) ORDER BY object_type ASC, object_key ASC, link_type ASC) AS links
 	FROM org_links
-		WHERE tenant_id = $1
-			AND effective_date <= $3
-			AND end_date > $3
-		GROUP BY org_node_id
-	)`)
+			WHERE tenant_id = $1
+				AND effective_date <= $3
+				AND end_date >= $3
+			GROUP BY org_node_id
+		)`)
 			joins = append(joins, "LEFT JOIN l ON l.org_node_id = n.org_node_id")
 			linksSelect = `COALESCE(l.links, '[]'::jsonb)`
 		}
@@ -231,7 +231,7 @@ SELECT
 	` + strings.Join(joins, "\n") + `
 	`
 
-		tag, err := tx.Exec(txCtx, query, pgUUID(tenantID), hierarchyType, asOfTS, asOfDateStr, pgUUID(buildID))
+		tag, err := tx.Exec(txCtx, query, pgUUID(tenantID), hierarchyType, pgValidDate(asOfTS), asOfDateStr, pgUUID(buildID))
 		if err != nil {
 			return err
 		}

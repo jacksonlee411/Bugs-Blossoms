@@ -81,7 +81,7 @@ func (s *OrgService) TransitionAssignment(ctx context.Context, tenantID uuid.UUI
 		if !in.EffectiveDate.After(anchor.EffectiveDate) {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_USE_CORRECT", "use correct for in-place updates", nil)
 		}
-		if !in.EffectiveDate.Before(anchor.EndDate) {
+		if in.EffectiveDate.After(anchor.EndDate) {
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_INVALID_BODY", "effective_date must be within current window", nil)
 		}
 

@@ -36,6 +36,7 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251220200000_org_job_catalog_profiles_and_validation_modes.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -48,29 +49,23 @@ func seedOrgPosition(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, ten
 	tb.Helper()
 
 	_, err := pool.Exec(ctx, `
-INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date, effective_on, end_on)
-VALUES (
-	$1,$2,$3,$4,'active',false,$5,$6,
-	($5 AT TIME ZONE 'UTC')::date,
-	CASE
-		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-	END
-)
-`, tenantID, positionID, orgNodeID, code, effectiveDate, endDate)
+	INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
+	VALUES (
+		$1,$2,$3,$4,'active',false,
+		($5 AT TIME ZONE 'UTC')::date,
+		($6 AT TIME ZONE 'UTC')::date
+	)
+	`, tenantID, positionID, orgNodeID, code, effectiveDate, endDate)
 	require.NoError(tb, err)
 
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date, effective_on, end_on)
-VALUES (
-	$1,$2,$3,'active',$4::numeric(9,2),$5,$6,
-	($5 AT TIME ZONE 'UTC')::date,
-	CASE
-		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-	END
-)
-`, tenantID, positionID, orgNodeID, capacityFTE, effectiveDate, endDate)
+	INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date)
+	VALUES (
+		$1,$2,$3,'active',$4::numeric(9,2),
+		($5 AT TIME ZONE 'UTC')::date,
+		($6 AT TIME ZONE 'UTC')::date
+	)
+	`, tenantID, positionID, orgNodeID, capacityFTE, effectiveDate, endDate)
 	require.NoError(tb, err)
 }
 
@@ -247,11 +242,11 @@ VALUES ($1,$2,'OrgUnit','ROOT',true)
 
 	require.Equal(t, posA, timeline[0].PositionID)
 	require.True(t, timeline[0].EffectiveDate.UTC().Equal(asOf))
-	require.True(t, timeline[0].EndDate.UTC().Equal(d2))
+	require.True(t, timeline[0].EndDate.UTC().Equal(d2.AddDate(0, 0, -1)))
 
 	require.Equal(t, posB, timeline[1].PositionID)
 	require.True(t, timeline[1].EffectiveDate.UTC().Equal(d2))
-	require.True(t, timeline[1].EndDate.UTC().Equal(d3))
+	require.True(t, timeline[1].EndDate.UTC().Equal(d3.AddDate(0, 0, -1)))
 
 	require.Equal(t, posA, timeline[2].PositionID)
 	require.True(t, timeline[2].EffectiveDate.UTC().Equal(d3))
@@ -347,7 +342,7 @@ VALUES ($1,$2,'OrgUnit','ROOT',true)
 	var newEnd time.Time
 	err = pool.QueryRow(ctx, `SELECT end_date FROM org_assignments WHERE tenant_id=$1 AND id=$2`, tenantID, created.AssignmentID).Scan(&newEnd)
 	require.NoError(t, err)
-	require.True(t, newEnd.UTC().Equal(d2))
+	require.True(t, newEnd.UTC().Equal(d2.AddDate(0, 0, -1)))
 
 	var createReason string
 	err = pool.QueryRow(ctx, `SELECT meta->>'reason_code' FROM org_audit_logs WHERE tenant_id=$1 AND request_id=$2`, tenantID, "req-create").Scan(&createReason)

@@ -40,6 +40,7 @@ func TestOrgAPIController_Nodes_CreateUpdateMove_EmitsOutboxEvents(t *testing.T)
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
@@ -50,7 +51,7 @@ func TestOrgAPIController_Nodes_CreateUpdateMove_EmitsOutboxEvents(t *testing.T)
 		org: orgsvc.NewOrgService(persistence.NewOrgRepository()),
 	}
 
-	asOf := "2025-01-01T00:00:00Z"
+	asOf := "2025-01-01"
 
 	// Create root.
 	var rootID uuid.UUID
@@ -102,7 +103,7 @@ func TestOrgAPIController_Nodes_CreateUpdateMove_EmitsOutboxEvents(t *testing.T)
 	// Update child by introducing a new slice at a later effective_date.
 	{
 		body := mustJSON(t, map[string]any{
-			"effective_date": "2025-02-01T00:00:00Z",
+			"effective_date": "2025-02-01",
 			"name":           "Dept A v2",
 		})
 		req := newOrgAPIRequestWithBody(t, http.MethodPatch, "/org/api/nodes/"+childID.String(), tenantID, u, body)
@@ -140,7 +141,7 @@ func TestOrgAPIController_Nodes_CreateUpdateMove_EmitsOutboxEvents(t *testing.T)
 	}
 	{
 		body := mustJSON(t, map[string]any{
-			"effective_date": "2025-03-01T00:00:00Z",
+			"effective_date": "2025-03-01",
 			"new_parent_id":  parentBID,
 		})
 		req := newOrgAPIRequestWithBody(t, http.MethodPost, "/org/api/nodes/"+childID.String()+":move", tenantID, u, body)
@@ -160,12 +161,12 @@ func TestOrgAPIController_Nodes_CreateUpdateMove_EmitsOutboxEvents(t *testing.T)
 			context.Background(),
 			`
 SELECT parent_node_id
-FROM org_edges
-WHERE tenant_id=$1 AND hierarchy_type='OrgUnit' AND child_node_id=$2
-  AND effective_date <= $3 AND end_date > $3
-ORDER BY effective_date DESC
-LIMIT 1
-`,
+	FROM org_edges
+	WHERE tenant_id=$1 AND hierarchy_type='OrgUnit' AND child_node_id=$2
+	  AND effective_date <= $3::date AND end_date >= $3::date
+	ORDER BY effective_date DESC
+	LIMIT 1
+	`,
 			tenantID,
 			childID,
 			time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
@@ -240,6 +241,7 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
@@ -261,7 +263,7 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 	}
 
 	// Create root node (required for auto-position path).
-	asOf := "2025-01-01T00:00:00Z"
+	asOf := "2025-01-01"
 	var nodeID uuid.UUID
 	{
 		body := mustJSON(t, map[string]any{

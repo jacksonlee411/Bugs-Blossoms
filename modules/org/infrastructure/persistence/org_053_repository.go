@@ -30,11 +30,9 @@ func (r *OrgRepository) InsertPosition(ctx context.Context, tenantID uuid.UUID, 
 			status,
 			is_auto_created,
 			effective_date,
-			end_date,
-			effective_on,
-			end_on
+			end_date
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		RETURNING id
 		`,
 		pgUUID(tenantID),
@@ -44,10 +42,8 @@ func (r *OrgRepository) InsertPosition(ctx context.Context, tenantID uuid.UUID, 
 		pgNullableText(in.Title),
 		strings.TrimSpace(in.LegacyStatus),
 		in.IsAutoCreated,
-		in.EffectiveDate.UTC(),
-		in.EndDate.UTC(),
-		pgEffectiveOnFromEffectiveDate(in.EffectiveDate),
-		pgEndOnFromEndDate(in.EndDate),
+		pgValidDate(in.EffectiveDate),
+		pgValidDate(in.EndDate),
 	).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
@@ -99,11 +95,9 @@ func (r *OrgRepository) InsertPositionSlice(ctx context.Context, tenantID uuid.U
 			cost_center_code,
 			profile,
 			effective_date,
-			end_date,
-			effective_on,
-			end_on
+			end_date
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18,$19,$20)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16::jsonb,$17,$18)
 		RETURNING id
 		`,
 		pgUUID(tenantID),
@@ -122,10 +116,8 @@ func (r *OrgRepository) InsertPositionSlice(ctx context.Context, tenantID uuid.U
 		pgNullableUUID(in.JobProfileID),
 		pgNullableText(in.CostCenterCode),
 		profile,
-		in.EffectiveDate.UTC(),
-		in.EndDate.UTC(),
-		pgEffectiveOnFromEffectiveDate(in.EffectiveDate),
-		pgEndOnFromEndDate(in.EndDate),
+		pgValidDate(in.EffectiveDate),
+		pgValidDate(in.EndDate),
 	).Scan(&id); err != nil {
 		return uuid.Nil, err
 	}
@@ -159,10 +151,10 @@ func (r *OrgRepository) GetPositionSliceAt(ctx context.Context, tenantID uuid.UU
 		effective_date,
 		end_date
 	FROM org_position_slices
-	WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date > $3
+	WHERE tenant_id=$1 AND position_id=$2 AND effective_date <= $3 AND end_date >= $3
 	ORDER BY effective_date DESC
 	LIMIT 1
-	`, pgUUID(tenantID), pgUUID(positionID), asOf.UTC())
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(asOf))
 
 	var out services.PositionSliceRow
 	var title pgtype.Text
@@ -242,7 +234,7 @@ func (r *OrgRepository) LockPositionSliceStartingAt(ctx context.Context, tenantI
 	WHERE tenant_id=$1 AND position_id=$2 AND effective_date=$3
 	LIMIT 1
 	FOR UPDATE
-	`, pgUUID(tenantID), pgUUID(positionID), effectiveDate.UTC())
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(effectiveDate))
 
 	var out services.PositionSliceRow
 	var title pgtype.Text
@@ -322,7 +314,7 @@ func (r *OrgRepository) LockPositionSliceEndingAt(ctx context.Context, tenantID 
 	WHERE tenant_id=$1 AND position_id=$2 AND end_date=$3
 	LIMIT 1
 	FOR UPDATE
-	`, pgUUID(tenantID), pgUUID(positionID), endDate.UTC())
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(endDate))
 
 	var out services.PositionSliceRow
 	var title pgtype.Text
@@ -381,7 +373,7 @@ func (r *OrgRepository) UpdatePositionSliceEffectiveDate(ctx context.Context, te
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET effective_date=$3, effective_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), effectiveDate.UTC(), pgEffectiveOnFromEffectiveDate(effectiveDate))
+	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET effective_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), pgValidDate(effectiveDate))
 	return err
 }
 
@@ -390,7 +382,7 @@ func (r *OrgRepository) UpdatePositionSliceEndDate(ctx context.Context, tenantID
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET end_date=$3, end_on=$4, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), endDate.UTC(), pgEndOnFromEndDate(endDate))
+	_, err = tx.Exec(ctx, `UPDATE org_position_slices SET end_date=$3, updated_at=now() WHERE tenant_id=$1 AND id=$2`, pgUUID(tenantID), pgUUID(sliceID), pgValidDate(endDate))
 	return err
 }
 
@@ -406,7 +398,7 @@ func (r *OrgRepository) NextPositionSliceEffectiveDate(ctx context.Context, tena
 	WHERE tenant_id=$1 AND position_id=$2 AND effective_date > $3
 	ORDER BY effective_date ASC
 	LIMIT 1
-	`, pgUUID(tenantID), pgUUID(positionID), after.UTC()).Scan(&next)
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(after)).Scan(&next)
 	if err != nil {
 		if err == pgx.ErrNoRows {
 			return time.Time{}, false, nil
@@ -507,7 +499,6 @@ func (r *OrgRepository) ListPositionsAsOf(ctx context.Context, tenantID uuid.UUI
 	if err != nil {
 		return nil, err
 	}
-	asOf = asOf.UTC()
 
 	limit := filter.Limit
 	if limit <= 0 || limit > 200 {
@@ -540,16 +531,16 @@ func (r *OrgRepository) ListPositionsAsOf(ctx context.Context, tenantID uuid.UUI
 		ON s.tenant_id = p.tenant_id
 		AND s.position_id = p.id
 		AND s.effective_date <= $2
-		AND s.end_date > $2
+		AND s.end_date >= $2
 	LEFT JOIN org_assignments a
 		ON a.tenant_id = p.tenant_id
 		AND a.position_id = p.id
 		AND a.assignment_type = 'primary'
 		AND a.effective_date <= $2
-		AND a.end_date > $2
+		AND a.end_date >= $2
 	WHERE p.tenant_id = $1
 	`
-	args := []any{pgUUID(tenantID), asOf}
+	args := []any{pgUUID(tenantID), pgValidDate(asOf)}
 	argPos := 3
 
 	if len(filter.OrgNodeIDs) > 0 {
@@ -659,7 +650,6 @@ func (r *OrgRepository) GetPositionAsOf(ctx context.Context, tenantID uuid.UUID,
 	if err != nil {
 		return services.PositionViewRow{}, err
 	}
-	asOf = asOf.UTC()
 
 	row := tx.QueryRow(ctx, `
 	SELECT
@@ -693,13 +683,13 @@ func (r *OrgRepository) GetPositionAsOf(ctx context.Context, tenantID uuid.UUID,
 		ON s.tenant_id = p.tenant_id
 		AND s.position_id = p.id
 		AND s.effective_date <= $3
-		AND s.end_date > $3
+		AND s.end_date >= $3
 	LEFT JOIN org_assignments a
 		ON a.tenant_id = p.tenant_id
 		AND a.position_id = p.id
 		AND a.assignment_type = 'primary'
 		AND a.effective_date <= $3
-		AND a.end_date > $3
+		AND a.end_date >= $3
 	WHERE p.tenant_id=$1 AND p.id=$2
 	GROUP BY
 		p.id,
@@ -721,7 +711,7 @@ func (r *OrgRepository) GetPositionAsOf(ctx context.Context, tenantID uuid.UUID,
 		s.profile,
 		s.effective_date,
 		s.end_date
-	`, pgUUID(tenantID), pgUUID(positionID), asOf)
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(asOf))
 
 	var out services.PositionViewRow
 	var title pgtype.Text
@@ -779,7 +769,7 @@ func (r *OrgRepository) DeletePositionSlicesFrom(ctx context.Context, tenantID u
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `DELETE FROM org_position_slices WHERE tenant_id=$1 AND position_id=$2 AND effective_date >= $3`, pgUUID(tenantID), pgUUID(positionID), from.UTC())
+	_, err = tx.Exec(ctx, `DELETE FROM org_position_slices WHERE tenant_id=$1 AND position_id=$2 AND effective_date >= $3`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(from))
 	return err
 }
 
@@ -886,9 +876,9 @@ func (r *OrgRepository) HasPositionSubordinatesAt(ctx context.Context, tenantID 
 		  AND reports_to_position_id=$2
 		  AND lifecycle_status <> 'rescinded'
 		  AND effective_date <= $3
-		  AND end_date > $3
+		  AND end_date >= $3
 	)
-	`, pgUUID(tenantID), pgUUID(positionID), asOf.UTC()).Scan(&exists); err != nil {
+	`, pgUUID(tenantID), pgUUID(positionID), pgValidDate(asOf)).Scan(&exists); err != nil {
 		return false, err
 	}
 	return exists, nil

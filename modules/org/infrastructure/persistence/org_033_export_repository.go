@@ -54,17 +54,17 @@ JOIN org_node_slices s
 	ON s.tenant_id = n.tenant_id
 	AND s.org_node_id = n.id
 	AND s.effective_date <= $3
-	AND s.end_date > $3
+	AND s.end_date >= $3
 LEFT JOIN org_edges e
 	ON e.tenant_id = n.tenant_id
 	AND e.child_node_id = n.id
 	AND e.hierarchy_type = $4
 	AND e.effective_date <= $3
-	AND e.end_date > $3
+	AND e.end_date >= $3
 WHERE n.tenant_id = $1
   AND n.id = ANY($2::uuid[])
 ORDER BY n.id ASC
-`, pgUUID(tenantID), nodeIDs, asOf, hierarchyType)
+`, pgUUID(tenantID), nodeIDs, pgValidDate(asOf), hierarchyType)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ WITH target AS (
 	  AND hierarchy_type=$2
 	  AND child_node_id=$3
 	  AND effective_date <= $4
-	  AND end_date > $4
+	  AND end_date >= $4
 	ORDER BY effective_date DESC
 	LIMIT 1
 )
@@ -131,13 +131,13 @@ JOIN org_edges e
 	ON e.tenant_id=$1
 	AND e.hierarchy_type=$2
 	AND e.effective_date <= $4
-	AND e.end_date > $4
+	AND e.end_date >= $4
 	AND e.path <@ target.path
 WHERE ($5::uuid IS NULL OR e.child_node_id > $5::uuid)
   AND ($6::int IS NULL OR (e.depth - target.depth) <= $6::int)
 ORDER BY e.child_node_id ASC
 LIMIT $7
-`, pgUUID(tenantID), hierarchyType, pgUUID(rootNodeID), asOf, pgNullableUUID(afterNodeID), maxDepth, limit)
+	`, pgUUID(tenantID), hierarchyType, pgUUID(rootNodeID), pgValidDate(asOf), pgNullableUUID(afterNodeID), maxDepth, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -168,12 +168,13 @@ WHERE tenant_id=$1
   AND hierarchy_type=$2
   AND build_id=$3
   AND ancestor_node_id=$4
-  AND tstzrange(effective_date, end_date, '[)') @> $5::timestamptz
+  AND effective_date <= $5
+  AND end_date >= $5
   AND ($6::uuid IS NULL OR descendant_node_id > $6::uuid)
   AND ($7::int IS NULL OR depth <= $7::int)
 ORDER BY descendant_node_id ASC
 LIMIT $8
-`, pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(rootNodeID), asOf, pgNullableUUID(afterNodeID), maxDepth, limit)
+	`, pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(rootNodeID), pgValidDate(asOf), pgNullableUUID(afterNodeID), maxDepth, limit)
 		if err != nil {
 			return nil, err
 		}
@@ -256,7 +257,7 @@ WITH targets AS (
 	  AND hierarchy_type=$2
 	  AND child_node_id = ANY($3::uuid[])
 	  AND effective_date <= $4
-	  AND end_date > $4
+		  AND end_date >= $4
 	ORDER BY child_node_id, effective_date DESC
 ),
 rels AS (
@@ -269,7 +270,7 @@ rels AS (
 		ON e.tenant_id=$1
 		AND e.hierarchy_type=$2
 		AND e.effective_date <= $4
-		AND e.end_date > $4
+			AND e.end_date >= $4
 		AND e.path @> t.path
 ),
 best AS (
@@ -282,9 +283,9 @@ best AS (
 	JOIN org_security_group_mappings m
 		ON m.tenant_id = $1
 		AND m.org_node_id = r.ancestor_node_id
-	WHERE m.effective_date <= $4
-		AND m.end_date > $4
-		AND (m.applies_to_subtree OR m.org_node_id = r.descendant_node_id)
+		WHERE m.effective_date <= $4
+			AND m.end_date >= $4
+			AND (m.applies_to_subtree OR m.org_node_id = r.descendant_node_id)
 	ORDER BY r.descendant_node_id, m.security_group_key, r.depth ASC, m.org_node_id ASC
 ),
 best_dedup AS (
@@ -295,7 +296,7 @@ best_dedup AS (
 SELECT org_node_id, array_agg(security_group_key ORDER BY min_depth ASC, security_group_key ASC) AS keys
 FROM best_dedup
 GROUP BY org_node_id
-`, pgUUID(tenantID), hierarchyType, nodeIDs, asOf)
+	`, pgUUID(tenantID), hierarchyType, nodeIDs, pgValidDate(asOf))
 		if err != nil {
 			return nil, err
 		}
@@ -312,7 +313,8 @@ WITH rels AS (
 	  AND hierarchy_type=$2
 	  AND build_id=$3
 	  AND descendant_node_id = ANY($4::uuid[])
-	  AND tstzrange(effective_date, end_date, '[)') @> $5::timestamptz
+	  AND effective_date <= $5
+	  AND end_date >= $5
 ),
 best AS (
 	SELECT DISTINCT ON (r.descendant_node_id, m.security_group_key)
@@ -324,8 +326,8 @@ best AS (
 	JOIN org_security_group_mappings m
 		ON m.tenant_id = $1
 		AND m.org_node_id = r.ancestor_node_id
-	WHERE m.effective_date <= $5
-		AND m.end_date > $5
+		WHERE m.effective_date <= $5
+			AND m.end_date >= $5
 		AND (m.applies_to_subtree OR m.org_node_id = r.descendant_node_id)
 	ORDER BY r.descendant_node_id, m.security_group_key, r.depth ASC, m.org_node_id ASC
 ),
@@ -337,7 +339,7 @@ best_dedup AS (
 SELECT org_node_id, array_agg(security_group_key ORDER BY min_depth ASC, security_group_key ASC) AS keys
 FROM best_dedup
 GROUP BY org_node_id
-`, pgUUID(tenantID), hierarchyType, pgUUID(buildID), nodeIDs, asOf)
+	`, pgUUID(tenantID), hierarchyType, pgUUID(buildID), nodeIDs, pgValidDate(asOf))
 		if err != nil {
 			return nil, err
 		}
@@ -367,8 +369,8 @@ best AS (
 	JOIN org_security_group_mappings m
 		ON m.tenant_id = $1
 		AND m.org_node_id = r.ancestor_node_id
-	WHERE m.effective_date <= $6
-		AND m.end_date > $6
+		WHERE m.effective_date <= $6
+			AND m.end_date >= $6
 		AND (m.applies_to_subtree OR m.org_node_id = r.descendant_node_id)
 	ORDER BY r.descendant_node_id, m.security_group_key, r.depth ASC, m.org_node_id ASC
 ),
@@ -380,7 +382,7 @@ best_dedup AS (
 SELECT org_node_id, array_agg(security_group_key ORDER BY min_depth ASC, security_group_key ASC) AS keys
 FROM best_dedup
 GROUP BY org_node_id
-`, pgUUID(tenantID), hierarchyType, asOfDate, pgUUID(buildID), nodeIDs, asOf)
+	`, pgUUID(tenantID), hierarchyType, asOfDate, pgUUID(buildID), nodeIDs, pgValidDate(asOf))
 		if err != nil {
 			return nil, err
 		}
@@ -426,9 +428,9 @@ FROM org_links
 WHERE tenant_id=$1
   AND org_node_id = ANY($2::uuid[])
   AND effective_date <= $3
-  AND end_date > $3
+  AND end_date >= $3
 ORDER BY org_node_id ASC, object_type ASC, object_key ASC, link_type ASC
-`, pgUUID(tenantID), nodeIDs, asOf)
+`, pgUUID(tenantID), nodeIDs, pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}

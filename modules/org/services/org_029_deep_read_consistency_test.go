@@ -50,6 +50,7 @@ func TestOrg029DeepReadConsistency(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -126,6 +127,7 @@ func TestOrg029RoleAssignmentsConsistency(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -154,16 +156,13 @@ RETURNING id
 	subjectID := uuid.NewSHA1(uuid.NameSpaceOID, []byte("subject:029"))
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_role_assignments (tenant_id, role_id, subject_type, subject_id, org_node_id, effective_date, end_date, effective_on, end_on)
-VALUES (
-	$1,$2,'user',$3,$4,$5,$6,
-	($5 AT TIME ZONE 'UTC')::date,
-	CASE
-		WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-		ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-	END
-)
-	`, tenantID, roleID, subjectID, rootID, asOfDate, endDate)
+	INSERT INTO org_role_assignments (tenant_id, role_id, subject_type, subject_id, org_node_id, effective_date, end_date)
+	VALUES (
+		$1,$2,'user',$3,$4,
+		($5 AT TIME ZONE 'UTC')::date,
+		($6 AT TIME ZONE 'UTC')::date
+	)
+		`, tenantID, roleID, subjectID, rootID, asOfDate, endDate)
 	require.NoError(t, err)
 
 	repo := persistence.NewOrgRepository()
@@ -218,6 +217,7 @@ func TestOrg029DeepReadQueryBudget(t *testing.T) {
 		"20251221090000_org_reason_code_mode.sql",
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
+		"20251228120000_org_eliminate_effective_on_end_on.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -286,30 +286,24 @@ func seedOrgTreeFromNodes(tb testing.TB, ctx context.Context, pool *pgxpool.Pool
 	}
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_node_slices
-				(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date, effective_on, end_on)
-				VALUES (
-					$1,$2,$3,$4,$5,$6,$7,
-					($6 AT TIME ZONE 'UTC')::date,
-					CASE
-						WHEN ($7 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-						ELSE ((($7 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-					END
-				)`,
+					(tenant_id, org_node_id, name, display_order, parent_hint, effective_date, end_date)
+					VALUES (
+						$1,$2,$3,$4,$5,
+						($6 AT TIME ZONE 'UTC')::date,
+						($7 AT TIME ZONE 'UTC')::date
+					)`,
 			tenantID, n.ID, n.Code, n.DisplayOrder, n.ParentID, asOf, endDate,
 		)
 		require.NoError(tb, err)
 	}
 	for _, n := range nodes {
 		_, err := pool.Exec(ctx, `INSERT INTO org_edges
-				(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date, effective_on, end_on)
-				VALUES (
-					$1,$2,$3,$4,$5,$6,
-					($5 AT TIME ZONE 'UTC')::date,
-					CASE
-						WHEN ($6 AT TIME ZONE 'UTC')::date = DATE '9999-12-31' THEN DATE '9999-12-31'
-						ELSE ((($6 AT TIME ZONE 'UTC') - interval '1 microsecond'))::date
-					END
-				)`,
+					(tenant_id, hierarchy_type, parent_node_id, child_node_id, effective_date, end_date)
+					VALUES (
+						$1,$2,$3,$4,
+						($5 AT TIME ZONE 'UTC')::date,
+						($6 AT TIME ZONE 'UTC')::date
+					)`,
 			tenantID, "OrgUnit", n.ParentID, n.ID, asOf, endDate,
 		)
 		require.NoError(tb, err)

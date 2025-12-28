@@ -37,16 +37,16 @@ JOIN org_node_slices s
 	ON s.tenant_id = n.tenant_id
 	AND s.org_node_id = n.id
 	AND s.effective_date <= $2
-	AND s.end_date > $2
+	AND s.end_date >= $2
 JOIN org_edges e
 	ON e.tenant_id = n.tenant_id
 	AND e.child_node_id = n.id
 	AND e.hierarchy_type = $3
 	AND e.effective_date <= $2
-	AND e.end_date > $2
+	AND e.end_date >= $2
 WHERE n.tenant_id = $1
 ORDER BY e.depth ASC, s.display_order ASC, s.name ASC
-`, pgUUID(tenantID), asOf, hierarchyType)
+`, pgUUID(tenantID), pgValidDate(asOf), hierarchyType)
 	if err != nil {
 		return nil, err
 	}
@@ -92,13 +92,13 @@ func (r *OrgRepository) ListHierarchyAsOfRecursive(ctx context.Context, tenantID
 			ON s.tenant_id = n.tenant_id
 			AND s.org_node_id = n.id
 			AND s.effective_date <= $2
-			AND s.end_date > $2
+			AND s.end_date >= $2
 		JOIN org_edges e
 			ON e.tenant_id = n.tenant_id
 			AND e.child_node_id = n.id
 			AND e.hierarchy_type = $3
 			AND e.effective_date <= $2
-			AND e.end_date > $2
+			AND e.end_date >= $2
 		WHERE n.tenant_id = $1
 			AND e.parent_node_id IS NULL
 
@@ -118,7 +118,7 @@ func (r *OrgRepository) ListHierarchyAsOfRecursive(ctx context.Context, tenantID
 			AND e.parent_node_id = tree.id
 			AND e.hierarchy_type = $3
 			AND e.effective_date <= $2
-			AND e.end_date > $2
+			AND e.end_date >= $2
 		JOIN org_nodes n
 			ON n.tenant_id = $1
 			AND n.id = e.child_node_id
@@ -126,12 +126,12 @@ func (r *OrgRepository) ListHierarchyAsOfRecursive(ctx context.Context, tenantID
 			ON s.tenant_id = n.tenant_id
 			AND s.org_node_id = n.id
 			AND s.effective_date <= $2
-			AND s.end_date > $2
+			AND s.end_date >= $2
 	)
 	SELECT id, code, name, parent_node_id, depth, display_order, status
 	FROM tree
 	ORDER BY depth ASC, display_order ASC, name ASC
-	`, pgUUID(tenantID), asOf, hierarchyType)
+	`, pgUUID(tenantID), pgValidDate(asOf), hierarchyType)
 	if err != nil {
 		return nil, err
 	}

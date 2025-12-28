@@ -28,9 +28,9 @@ func (r *OrgRepository) ListAttributeInheritanceRulesAsOf(ctx context.Context, t
 	WHERE tenant_id=$1
 		AND hierarchy_type=$2
 		AND effective_date <= $3
-		AND end_date > $3
+		AND end_date >= $3
 	ORDER BY attribute_name ASC
-	`, pgUUID(tenantID), hierarchyType, asOf)
+	`, pgUUID(tenantID), hierarchyType, pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -74,8 +74,8 @@ func (r *OrgRepository) ListNodeAttributesAsOf(ctx context.Context, tenantID uui
 	WHERE tenant_id=$1
 		AND org_node_id = ANY($2)
 		AND effective_date <= $3
-		AND end_date > $3
-	`, pgUUID(tenantID), pgtype.FlatArray[uuid.UUID](nodeIDs), asOf)
+		AND end_date >= $3
+	`, pgUUID(tenantID), pgtype.FlatArray[uuid.UUID](nodeIDs), pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -172,10 +172,10 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 			AND hierarchy_type=$2
 			AND child_node_id=$3
 			AND effective_date <= $4
-			AND end_date > $4
+			AND end_date >= $4
 		ORDER BY effective_date DESC
 		LIMIT 1
-		`, pgUUID(tenantID), hierarchyType, pgUUID(orgNodeID), asOf).Scan(&path)
+		`, pgUUID(tenantID), hierarchyType, pgUUID(orgNodeID), pgValidDate(asOf)).Scan(&path)
 			if err != nil {
 				return nil, err
 			}
@@ -199,13 +199,13 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 			AND e.hierarchy_type=$2
 			AND e.child_node_id=a.org_node_id
 			AND e.effective_date <= $4
-			AND e.end_date > $4
+			AND e.end_date >= $4
 		WHERE a.tenant_id=$1
 			AND a.effective_date <= $4
-			AND a.end_date > $4
+			AND a.end_date >= $4
 			AND e.path @> $3::ltree
 		`
-			q.args = []any{pgUUID(tenantID), hierarchyType, path, asOf}
+			q.args = []any{pgUUID(tenantID), hierarchyType, path, pgValidDate(asOf)}
 		case services.DeepReadBackendClosure:
 			buildID, err := activeClosureBuildID(ctx, tx, tenantID, hierarchyType)
 			if err != nil {
@@ -232,12 +232,13 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 				AND c.build_id=$3
 				AND c.ancestor_node_id=a.org_node_id
 				AND c.descendant_node_id=$4
-				AND tstzrange(c.effective_date, c.end_date, '[)') @> $5::timestamptz
+				AND c.effective_date <= $5
+				AND c.end_date >= $5
 			WHERE a.tenant_id=$1
 				AND a.effective_date <= $5
-				AND a.end_date > $5
+				AND a.end_date >= $5
 			`
-			q.args = []any{pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(orgNodeID), asOf}
+			q.args = []any{pgUUID(tenantID), hierarchyType, pgUUID(buildID), pgUUID(orgNodeID), pgValidDate(asOf)}
 		case services.DeepReadBackendSnapshot:
 			asOfDate := asOf.UTC().Format("2006-01-02")
 			buildID, err := activeSnapshotBuildID(ctx, tx, tenantID, hierarchyType, asOfDate)
@@ -268,9 +269,9 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 			AND s.descendant_node_id=$5
 		WHERE a.tenant_id=$1
 			AND a.effective_date <= $6
-			AND a.end_date > $6
+			AND a.end_date >= $6
 		`
-			q.args = []any{pgUUID(tenantID), hierarchyType, asOfDate, pgUUID(buildID), pgUUID(orgNodeID), asOf}
+			q.args = []any{pgUUID(tenantID), hierarchyType, asOfDate, pgUUID(buildID), pgUUID(orgNodeID), pgValidDate(asOf)}
 		default:
 			return nil, fmt.Errorf("unsupported deep read backend: %s", backend)
 		}
@@ -292,9 +293,9 @@ func (r *OrgRepository) ListRoleAssignmentsAsOf(
 		WHERE a.tenant_id=$1
 			AND a.org_node_id=$2
 			AND a.effective_date <= $3
-			AND a.end_date > $3
+			AND a.end_date >= $3
 		`
-		q.args = []any{pgUUID(tenantID), pgUUID(orgNodeID), asOf}
+		q.args = []any{pgUUID(tenantID), pgUUID(orgNodeID), pgValidDate(asOf)}
 	}
 
 	if roleCode != nil && strings.TrimSpace(*roleCode) != "" {
@@ -357,10 +358,10 @@ func (r *OrgRepository) GetEdgeAt(ctx context.Context, tenantID uuid.UUID, hiera
 		AND hierarchy_type=$2
 		AND child_node_id=$3
 		AND effective_date <= $4
-		AND end_date > $4
+		AND end_date >= $4
 	ORDER BY effective_date DESC
 	LIMIT 1
-	`, pgUUID(tenantID), hierarchyType, pgUUID(childID), asOf)
+	`, pgUUID(tenantID), hierarchyType, pgUUID(childID), pgValidDate(asOf))
 
 	var out services.EdgeRow
 	var parent pgtype.UUID
