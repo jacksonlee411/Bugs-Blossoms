@@ -207,5 +207,6 @@ modules/{module}/
 - Valid Time 字段唯一性评审（DEV-PLAN-064A）：`docs/dev-plans/064A-effective-on-end-on-dual-track-assessment.md`
 - 组织架构详情页显示“组织长名称”（DEV-PLAN-065）：`docs/dev-plans/065-org-node-details-long-name.md`
 - 组织/职位/任职时间片删除自动缝补（DEV-PLAN-066）：`docs/dev-plans/066-auto-stitch-time-slices-on-delete.md`
+- 职位分类字段 UI 贯通 + Job Catalog 维护入口（二级目录）（DEV-PLAN-067）：`docs/dev-plans/067-position-classification-ui-and-job-catalog-nav.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
