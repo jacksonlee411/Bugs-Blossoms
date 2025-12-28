@@ -31,6 +31,7 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 	"github.com/iota-uz/iota-sdk/pkg/htmx"
 	"github.com/iota-uz/iota-sdk/pkg/middleware"
+	"github.com/iota-uz/iota-sdk/pkg/orglabels"
 )
 
 type OrgUIController struct {
@@ -2478,23 +2479,12 @@ func (c *OrgUIController) orgNodeLongNameFor(r *http.Request, tenantID uuid.UUID
 	if nodeID == uuid.Nil {
 		return ""
 	}
-	path, err := c.org.GetNodePath(r.Context(), tenantID, nodeID, asOf)
-	if err != nil || path == nil {
+
+	longNames, err := orglabels.ResolveOrgNodeLongNamesAsOf(r.Context(), tenantID, asOf, []uuid.UUID{nodeID})
+	if err != nil {
 		return ""
 	}
-
-	parts := make([]string, 0, len(path.Path))
-	for _, n := range path.Path {
-		part := strings.TrimSpace(n.Name)
-		if part == "" {
-			part = strings.TrimSpace(n.Code)
-		}
-		if part == "" {
-			part = n.ID.String()
-		}
-		parts = append(parts, part)
-	}
-	return strings.Join(parts, " / ")
+	return strings.TrimSpace(longNames[nodeID])
 }
 
 func (c *OrgUIController) orgNodeLabelFor(r *http.Request, tenantID uuid.UUID, nodeID uuid.UUID, asOf time.Time) string {
