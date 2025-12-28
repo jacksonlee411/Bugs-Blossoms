@@ -9,6 +9,7 @@
 - Go 代码：`go fmt ./... && go vet ./... && make check lint && make test`
 - `.templ`/Tailwind 相关：`make generate && make css`，然后 `git status --short` 必须为空
 - 多语言 JSON：`make check tr`
+- 发 PR 前一键对齐 CI（推荐）：`make preflight`
 - 迁移/Schema：`make db migrate up && make db seed`（可选 `make db migrate down`）
 - Authz：`make authz-test && make authz-lint`（以及相关包的 `go test`）
 - 文档新增/整理：`make check doc`
