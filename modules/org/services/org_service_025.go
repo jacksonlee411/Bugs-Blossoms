@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -590,6 +591,32 @@ func (s *OrgService) CorrectMoveNode(ctx context.Context, tenantID uuid.UUID, re
 			if _, err := s.repo.InsertEdge(txCtx, tenantID, hierarchyType, e.ParentNodeID, e.ChildNodeID, in.EffectiveDate, e.EndDate); err != nil {
 				return nil, mapPgError(err)
 			}
+		}
+
+		newMovedEdge, err := s.repo.LockEdgeStartingAt(txCtx, tenantID, hierarchyType, in.NodeID, in.EffectiveDate)
+		if err != nil {
+			return nil, err
+		}
+		affectedEdges, err := s.repo.CountDescendantEdgesNeedingPathRewriteFrom(txCtx, tenantID, hierarchyType, in.EffectiveDate, movedEdge.Path)
+		if err != nil {
+			return nil, err
+		}
+		if affectedEdges > maxEdgesPathRewrite {
+			return nil, newServiceError(
+				http.StatusUnprocessableEntity,
+				"ORG_PREFLIGHT_TOO_LARGE",
+				fmt.Sprintf(
+					"subtree path rewrite impact is too large (affected_edges=%d, limit=%d, effective_date=%s, node_id=%s)",
+					affectedEdges,
+					maxEdgesPathRewrite,
+					in.EffectiveDate.UTC().Format(time.DateOnly),
+					in.NodeID.String(),
+				),
+				nil,
+			)
+		}
+		if _, err := s.repo.RewriteDescendantEdgesPathPrefixFrom(txCtx, tenantID, hierarchyType, in.EffectiveDate, movedEdge.Path, newMovedEdge.Path); err != nil {
+			return nil, err
 		}
 
 		nodeSlice, err := s.repo.LockNodeSliceAt(txCtx, tenantID, in.NodeID, in.EffectiveDate)

@@ -386,6 +386,50 @@ FOR UPDATE
 	return out, rows.Err()
 }
 
+func (r *OrgRepository) CountDescendantEdgesNeedingPathRewriteFrom(ctx context.Context, tenantID uuid.UUID, hierarchyType string, fromDate time.Time, oldPrefix string) (int, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, `
+SELECT count(*) AS affected_edges
+FROM org_edges e
+WHERE e.tenant_id=$1
+  AND e.hierarchy_type=$2
+  AND e.effective_date >= $3::date
+  AND e.path <@ $4::ltree
+  AND nlevel(e.path) > nlevel($4::ltree)
+`, pgUUID(tenantID), hierarchyType, pgValidDate(fromDate), oldPrefix).Scan(&count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+func (r *OrgRepository) RewriteDescendantEdgesPathPrefixFrom(ctx context.Context, tenantID uuid.UUID, hierarchyType string, fromDate time.Time, oldPrefix string, newPrefix string) (int64, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	ct, err := tx.Exec(ctx, `
+UPDATE org_edges e
+SET
+  path  = ($5::ltree) || subpath(e.path, nlevel($4::ltree)),
+  depth = nlevel(($5::ltree) || subpath(e.path, nlevel($4::ltree))) - 1
+WHERE e.tenant_id=$1
+  AND e.hierarchy_type=$2
+  AND e.effective_date >= $3::date
+  AND e.path <@ $4::ltree
+  AND nlevel(e.path) > nlevel($4::ltree)
+`, pgUUID(tenantID), hierarchyType, pgValidDate(fromDate), oldPrefix, newPrefix)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
+}
+
 func (r *OrgRepository) TruncateEdge(ctx context.Context, tenantID uuid.UUID, edgeID uuid.UUID, endDate time.Time) error {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
