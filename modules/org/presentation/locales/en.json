@@ -80,13 +80,29 @@
       },
       "NodePanel": {
         "Title": "Details",
-        "Empty": "Select a node from the tree, or create a new one."
+        "Empty": "Select a node from the tree, or create a new one.",
+        "Records": {
+          "NodeSlicesTitle": "Node records",
+          "EdgeSlicesTitle": "Parent records",
+          "Empty": "No records yet.",
+          "ParentAtStart": "Parent at start",
+          "Root": "Root",
+          "Actions": {
+            "View": "View",
+            "Correct": "Correct",
+            "Delete": "Delete",
+            "CorrectMove": "Correct move",
+            "DeleteEdge": "Delete move"
+          }
+        }
       },
       "Actions": {
         "Create": "Create",
         "Edit": "Edit",
         "Save": "Save",
-        "Move": "Move"
+        "Move": "Move",
+        "Correct": "Correct",
+        "CorrectMove": "Correct move"
       },
       "Positions": {
         "MetaTitle": "Positions",
@@ -184,10 +200,18 @@
       },
       "Node": {
         "CreateTitle": "Create node",
-        "EditTitle": "Edit node",
-        "MoveTitle": "Move node",
+        "EditTitle": "Edit (Insert)",
+        "MoveTitle": "Change parent (Insert)",
+        "CorrectTitle": "Correct record",
+        "CorrectMoveTitle": "Correct move",
+        "DeleteSliceTitle": "Delete record",
+        "DeleteEdgeSliceTitle": "Delete move",
+        "DeleteSliceWarning": "This deletes the record at the effective date and stitches the timeline.",
+        "DeleteEdgeSliceEarliestWarning": "The first edge slice cannot be deleted.",
         "EffectiveDate": {
-          "Help": "This change takes effect on this date (different from the page as-of date)."
+          "Help": "This change takes effect on this date (different from the page as-of date).",
+          "CorrectHelp": "This corrects the record at this date (record start).",
+          "CorrectMoveHelp": "This corrects the move record at this date (edge slice start)."
         },
         "Parent": {
           "Placeholder": "Search nodes…",
@@ -195,12 +219,18 @@
         },
         "Status": {
           "Active": "Active",
-          "Inactive": "Inactive"
+          "Inactive": "Inactive",
+          "Rescinded": "Rescinded"
         },
         "Actions": {
           "NewChild": "New child",
-          "Edit": "Edit",
-          "Move": "Change parent"
+          "Edit": "Edit (Insert)",
+          "Move": "Change parent (Insert)"
+        },
+        "Errors": {
+          "RequiresEdgesAdminForCorrectMove": "This operation requires admin permissions to correct the move record.",
+          "RequiresNodesAdminForCorrect": "This operation requires admin permissions to correct the record.",
+          "RequiresEdgesWriteForMove": "This operation requires write permissions to change parent (Insert)."
         },
         "Fields": {
           "Code": "Code",
@@ -212,7 +242,9 @@
           "ParentHint": "Parent hint",
           "Parent": "Parent",
           "NewParent": "New parent",
-          "I18nNames": "i18n names"
+          "I18nNames": "i18n names",
+          "ReasonCode": "Reason code",
+          "ReasonNote": "Reason note"
         }
       }
     }

@@ -21,6 +21,8 @@ const (
 	NodeFormCreate NodeFormMode = "create"
 	NodeFormEdit   NodeFormMode = "edit"
 	NodeFormMove   NodeFormMode = "move"
+	NodeFormCorrect NodeFormMode = "correct"
+	NodeFormCorrectMove NodeFormMode = "correct-move"
 )
 
 type NodeFormProps struct {
@@ -29,6 +31,8 @@ type NodeFormProps struct {
 	Node                 *viewmodels.OrgNodeDetails
 	ParentID             *uuid.UUID
 	ParentLabel          string
+	NewParentID          string
+	NewParentLabel       string
 	Errors               map[string]string
 	FormError            string
 	SearchParentEndpoint string
@@ -40,10 +44,11 @@ templ NodeForm(props NodeFormProps) {
 	{{ action := "" }}
 	{{ method := "post" }}
 	{{ showCode := false }}
-	{{ showParent := false }}
-	{{ showMoveParent := false }}
-	{{ submitLabel := "" }}
-	{{ nodeID := "" }}
+		{{ showParent := false }}
+		{{ showMoveParent := false }}
+		{{ submitLabel := "" }}
+		{{ effectiveHelpKey := "Org.UI.Node.EffectiveDate.Help" }}
+		{{ nodeID := "" }}
 	{{ codeValue := "" }}
 	{{ nameValue := "" }}
 	{{ statusValue := "active" }}
@@ -57,27 +62,40 @@ templ NodeForm(props NodeFormProps) {
 		{{ displayOrderValue = fmt.Sprintf("%d", props.Node.DisplayOrder) }}
 		{{ i18nNamesValue = props.Node.I18nNamesJSON }}
 	}
-	switch props.Mode {
-		case NodeFormCreate:
-			{{ title = pageCtx.T("Org.UI.Node.CreateTitle") }}
-			{{ action = "/org/nodes" }}
+		switch props.Mode {
+			case NodeFormCreate:
+				{{ title = pageCtx.T("Org.UI.Node.CreateTitle") }}
+				{{ action = "/org/nodes" }}
 			{{ method = "post" }}
 			{{ showCode = true }}
 			{{ showParent = props.ParentID == nil }}
 			{{ submitLabel = pageCtx.T("Org.UI.Actions.Create") }}
-		case NodeFormEdit:
-			{{ title = pageCtx.T("Org.UI.Node.EditTitle") }}
-			{{ action = fmt.Sprintf("/org/nodes/%s", nodeID) }}
-			{{ method = "patch" }}
-			{{ submitLabel = pageCtx.T("Org.UI.Actions.Save") }}
-		case NodeFormMove:
-			{{ title = pageCtx.T("Org.UI.Node.MoveTitle") }}
-			{{ action = fmt.Sprintf("/org/nodes/%s:move", nodeID) }}
-			{{ method = "post" }}
-			{{ showMoveParent = true }}
-			{{ submitLabel = pageCtx.T("Org.UI.Actions.Move") }}
-	}
-	<div class="space-y-3">
+			case NodeFormEdit:
+				{{ title = pageCtx.T("Org.UI.Node.EditTitle") }}
+				{{ action = fmt.Sprintf("/org/nodes/%s", nodeID) }}
+				{{ method = "patch" }}
+				{{ submitLabel = pageCtx.T("Org.UI.Actions.Save") }}
+			case NodeFormMove:
+				{{ title = pageCtx.T("Org.UI.Node.MoveTitle") }}
+				{{ action = fmt.Sprintf("/org/nodes/%s:move", nodeID) }}
+				{{ method = "post" }}
+				{{ showMoveParent = true }}
+				{{ submitLabel = pageCtx.T("Org.UI.Actions.Move") }}
+			case NodeFormCorrect:
+				{{ title = pageCtx.T("Org.UI.Node.CorrectTitle") }}
+				{{ action = fmt.Sprintf("/org/nodes/%s:correct", nodeID) }}
+				{{ method = "post" }}
+				{{ submitLabel = pageCtx.T("Org.UI.Actions.Correct") }}
+				{{ effectiveHelpKey = "Org.UI.Node.EffectiveDate.CorrectHelp" }}
+			case NodeFormCorrectMove:
+				{{ title = pageCtx.T("Org.UI.Node.CorrectMoveTitle") }}
+				{{ action = fmt.Sprintf("/org/nodes/%s:correct-move", nodeID) }}
+				{{ method = "post" }}
+				{{ showMoveParent = true }}
+				{{ submitLabel = pageCtx.T("Org.UI.Actions.CorrectMove") }}
+				{{ effectiveHelpKey = "Org.UI.Node.EffectiveDate.CorrectMoveHelp" }}
+		}
+		<div class="space-y-3">
 		<div class="flex items-center justify-between gap-3">
 			<div class="text-sm font-semibold text-100">{ title }</div>
 			if props.Node != nil && props.Mode != NodeFormCreate {
@@ -97,7 +115,7 @@ templ NodeForm(props NodeFormProps) {
 		if props.FormError != "" {
 			<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
 		}
-		<form
+			<form
 			class="space-y-3"
 			hx-target="#org-node-panel"
 			hx-swap="innerHTML"
@@ -107,17 +125,28 @@ templ NodeForm(props NodeFormProps) {
 				hx-post={ fmt.Sprintf("%s?effective_date=%s", action, props.EffectiveDate) }
 			}
 		>
-			<div>
-				<label class="block text-xs font-medium text-200" for="org-node-effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
-				<input
-					id="org-node-effective-date"
-					type="date"
-					name="effective_date"
-					value={ props.EffectiveDate }
-					class="mt-1 w-full rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
-				/>
-				<div class="mt-1 text-xs text-400">{ pageCtx.T("Org.UI.Node.EffectiveDate.Help") }</div>
-			</div>
+				<div>
+					<label class="block text-xs font-medium text-200" for="org-node-effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
+					if props.Mode == NodeFormCorrect || props.Mode == NodeFormCorrectMove {
+						<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+						<input
+							id="org-node-effective-date"
+							type="date"
+							value={ props.EffectiveDate }
+							disabled
+							class="mt-1 w-full rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100 opacity-80"
+						/>
+					} else {
+						<input
+							id="org-node-effective-date"
+							type="date"
+							name="effective_date"
+							value={ props.EffectiveDate }
+							class="mt-1 w-full rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
+						/>
+					}
+					<div class="mt-1 text-xs text-400">{ pageCtx.T(effectiveHelpKey) }</div>
+				</div>
 			if props.ParentID != nil {
 				<input type="hidden" name="parent_id" value={ props.ParentID.String() }/>
 				<div class="rounded-md border border-surface-400 bg-surface-300 p-3 text-xs text-200">
@@ -141,25 +170,25 @@ templ NodeForm(props NodeFormProps) {
 					},
 				})
 			}
-			if props.Mode == NodeFormCreate || props.Mode == NodeFormEdit {
-				@input.Text(&input.Props{
-					Label: pageCtx.T("Org.UI.Node.Fields.Name"),
-					Error: props.Errors["name"],
+				if props.Mode == NodeFormCreate || props.Mode == NodeFormEdit || props.Mode == NodeFormCorrect {
+					@input.Text(&input.Props{
+						Label: pageCtx.T("Org.UI.Node.Fields.Name"),
+						Error: props.Errors["name"],
 					Attrs: templ.Attributes{
 						"name":  "name",
 						"value": nameValue,
 					},
 				})
-				@base.Select(&base.SelectProps{
-					Label: pageCtx.T("Org.UI.Node.Fields.Status"),
-					Error: props.Errors["status"],
+					@base.Select(&base.SelectProps{
+						Label: pageCtx.T("Org.UI.Node.Fields.Status"),
+						Error: props.Errors["status"],
 					Attrs: templ.Attributes{
 						"name": "status",
 					},
-				}) {
-					<option value="active" selected?={ statusValue == "active" }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
-					<option value="inactive" selected?={ statusValue == "inactive" }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
-				}
+					}) {
+						<option value="active" selected?={ statusValue == "active" }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
+						<option value="retired" selected?={ statusValue == "retired" || statusValue == "inactive" }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
+					}
 				@input.Text(&input.Props{
 					Label: pageCtx.T("Org.UI.Node.Fields.DisplayOrder"),
 					Error: props.Errors["display_order"],
@@ -198,21 +227,24 @@ templ NodeForm(props NodeFormProps) {
 					<div class="mt-1 text-xs text-400">{ pageCtx.T("Org.UI.Node.Parent.Help") }</div>
 				</div>
 			}
-			if showMoveParent {
-				<div>
-					<div data-testid="org-node-new-parent-combobox">
+				if showMoveParent {
+					<div>
+						<div data-testid="org-node-new-parent-combobox">
 						@base.Combobox(base.ComboboxProps{
 							Searchable:   true,
 							Label:        pageCtx.T("Org.UI.Node.Fields.NewParent"),
 							Name:         "new_parent_id",
 							Endpoint:     props.SearchParentEndpoint,
 							Placeholder:  pageCtx.T("Org.UI.Node.Parent.Placeholder"),
-							NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
-						}) {
-							<!-- options loaded via HTMX -->
-						}
+								NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+							}) {
+								if strings.TrimSpace(props.NewParentID) != "" {
+									<option value={ strings.TrimSpace(props.NewParentID) } selected>{ strings.TrimSpace(props.NewParentLabel) }</option>
+								}
+								<!-- options loaded via HTMX -->
+							}
+						</div>
 					</div>
-				</div>
 			}
 			<div class="flex items-center justify-end gap-2 pt-2">
 				@button.Primary(button.Props{
