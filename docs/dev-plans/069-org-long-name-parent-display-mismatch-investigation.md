@@ -1,8 +1,13 @@
 # DEV-PLAN-069：Org 结构索引（`org_edges.path`）一致性修复详细设计
 
-**状态**: 草拟中（2025-12-28 22:40 UTC）
+**状态**: 已完成（2025-12-29 03:27 UTC）— 已合并至 main（PR #157/#162）；Readiness：`docs/dev-records/DEV-PLAN-069-READINESS.md`
 
 > 本计划以 `docs/dev-plans/001-technical-design-template.md` 为规范化模板：在保留专项调查证据的同时，把 “A + C（写入止血 + 存量治理）” 方案细化到可直接编码的技术详细设计（TDD）。
+
+> 完成情况登记（以 main 为准）：
+> - 写入止血（A）：`modules/org/services/org_service.go`、`modules/org/services/org_service_025.go`
+> - 存量治理（C）脚本：`scripts/org/069_org_edges_path_inconsistency.sql`、`scripts/org/069_org_edges_path_inconsistency_count.sql`、`scripts/org/069_fix_org_edges_path_one_batch.sql`
+> - 集成测试：`modules/org/services/org_069_edges_path_consistency_integration_test.go`
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**: Org UI 线上/本地问题复现（见“附录 A：本次问题数据库核对”）。
@@ -16,11 +21,11 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**:
-  - [ ] 把 `org_edges.path/depth` 明确为结构索引 SSOT，并补齐写路径的维护逻辑，使 Move/CorrectMove 不再引入新的跨切片 `path` 不一致。
-  - [ ] 提供离线巡检与修复方案，把既有不一致数据修复到可依赖状态（作为 068 的正确性 gate）。
-  - [ ] Move/CorrectMove 的“路径级联更新”必须受 preflight/预算控制，超限时返回稳定错误码（优先复用 `ORG_PREFLIGHT_TOO_LARGE`）。
-  - [ ] 对本 case（`bc70...`）在 `as-of=2025-12-28` 的长名称输出恢复为完整祖先链。
-  - [ ] 通过 `go fmt ./... && go vet ./... && make check lint && make test`（Go 触发器门禁）。
+  - [X] 把 `org_edges.path/depth` 明确为结构索引 SSOT，并补齐写路径的维护逻辑，使 Move/CorrectMove 不再引入新的跨切片 `path` 不一致。
+  - [X] 提供离线巡检与修复方案，把既有不一致数据修复到可依赖状态（作为 068 的正确性 gate）。
+  - [X] Move/CorrectMove 的“路径级联更新”必须受 preflight/预算控制，超限时返回稳定错误码（优先复用 `ORG_PREFLIGHT_TOO_LARGE`）。
+  - [X] 对本 case（`bc70...`）在 `as-of=2025-12-28` 的长名称输出恢复为完整祖先链。
+  - [X] 通过 `go fmt ./... && go vet ./... && make check lint && make test`（Go 触发器门禁）。
 - **非目标 (Out of Scope)**:
   - 不把 long_name 持久化到写模型（不在 `org_edges/org_node_slices` 增加 long_name 字段）。
   - 不引入在线递归作为默认计算方式（读时递归仅可作为临时兜底，不纳入本计划主线）。
@@ -333,11 +338,11 @@ ORDER BY c.effective_date DESC;
   - 本计划是 DEV-PLAN-068 的正确性前置条件：068 的 long_name 计算同样依赖 `org_edges.path`。
   - 与 068 不存在目标冲突：069 修复的是结构索引底座一致性；068 的“读时派生 long_name”仍成立，但其正确性依赖 069 的不变量。
 - **里程碑**:
-  1. [ ] 在 `MoveNode`/`CorrectMoveNode` 事务内落地 A（preflight + prefix rewrite）。
-  2. [ ] 新增/补齐集成测试：覆盖“回溯生效日移动祖先 + 后代未来切片 + long_name 不缺段”的回归。
-  3. [ ] 落地 C（巡检 SQL 固化 + 离线修复执行方式），记录 baseline 与修复进度。
-  4. [ ] （如启用）重建 `org_hierarchy_*` / `org_reporting_nodes`。
-  5. [ ] Readiness：按项目约定补充对应 readiness 记录。
+  1. [X] 在 `MoveNode`/`CorrectMoveNode` 事务内落地 A（preflight + prefix rewrite）。
+  2. [X] 新增/补齐集成测试：覆盖“回溯生效日移动祖先 + 后代未来切片 + long_name 不缺段”的回归。
+  3. [X] 落地 C（巡检 SQL 固化 + 离线修复执行方式），记录 baseline 与修复进度。
+  4. [X] （如启用）重建 `org_hierarchy_*` / `org_reporting_nodes` — N/A（本计划未把派生表重建作为 gate；需要时按各自构建流程执行）。
+  5. [X] Readiness：按项目约定补充对应 readiness 记录。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **本 case 验收**（`as-of=2025-12-28`）：

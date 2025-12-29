@@ -1,6 +1,6 @@
 # DEV-PLAN-069 Readiness
 
-**状态**：Ready to Close（待 PR 合并）
+**状态**：已合并（2025-12-29 03:27 UTC）— DEV-PLAN-069 已落地到 main（PR #157/#162）
 
 ## 关闭条件（本地已满足）
 - 写入止血（A）：`MoveNode`/`CorrectMoveNode` 在事务内对后代未来切片做 `org_edges.path/depth` 前缀重写，并带 `ORG_PREFLIGHT_TOO_LARGE` 预算保护。
@@ -15,4 +15,3 @@
   - `scripts/org/069_fix_org_edges_path_one_batch.sql`
 - 新增测试：
   - `modules/org/services/org_069_edges_path_consistency_integration_test.go`
-
