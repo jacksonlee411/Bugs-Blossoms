@@ -8,11 +8,30 @@ import (
 	"github.com/iota-uz/iota-sdk/components/base/button"
 	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
 	"github.com/iota-uz/iota-sdk/pkg/composables"
+	"github.com/iota-uz/iota-sdk/pkg/types"
 )
+
+func nodeStatusLabel(pageCtx types.PageContextProvider, code string) string {
+	code = strings.TrimSpace(code)
+	switch code {
+	case "":
+		return "—"
+	case "active":
+		return pageCtx.T("Org.UI.Node.Status.Active")
+	case "inactive", "retired":
+		return pageCtx.T("Org.UI.Node.Status.Inactive")
+	case "rescinded":
+		return pageCtx.T("Org.UI.Node.Status.Rescinded")
+	default:
+		return code
+	}
+}
 
 type NodeDetailsProps struct {
 	EffectiveDate string
 	Node          *viewmodels.OrgNodeDetails
+	NodeRecords   []viewmodels.OrgNodeSliceRecord
+	EdgeRecords   []viewmodels.OrgEdgeSliceRecord
 }
 
 templ NodeDetails(props NodeDetailsProps) {
@@ -35,7 +54,7 @@ templ NodeDetails(props NodeDetailsProps) {
 					</div>
 					<div class="mt-1 text-xs text-300 flex flex-wrap items-center gap-x-4 gap-y-1">
 						<span>{ pageCtx.T("Org.UI.Node.Fields.Code") }: <span class="text-200">{ props.Node.Code }</span></span>
-						<span>{ pageCtx.T("Org.UI.Node.Fields.Status") }: <span class="text-200">{ props.Node.Status }</span></span>
+						<span>{ pageCtx.T("Org.UI.Node.Fields.Status") }: <span class="text-200">{ nodeStatusLabel(pageCtx, props.Node.Status) }</span></span>
 						<span>{ pageCtx.T("Org.UI.Node.Fields.DisplayOrder") }: <span class="text-200">{ fmt.Sprintf("%d", props.Node.DisplayOrder) }</span></span>
 					</div>
 				</div>
@@ -115,6 +134,167 @@ templ NodeDetails(props NodeDetailsProps) {
 							}
 						}
 					</div>
+				</div>
+			</div>
+			<div class="space-y-4 pt-2">
+				<div class="space-y-2">
+					<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.NodePanel.Records.NodeSlicesTitle") }</div>
+					if len(props.NodeRecords) == 0 {
+						<div class="text-sm text-300">{ pageCtx.T("Org.UI.NodePanel.Records.Empty") }</div>
+					} else {
+						<ul class="space-y-2">
+							for _, rec := range props.NodeRecords {
+								<li class={ "rounded-md border border-surface-400 bg-surface-300 p-3", templ.KV("border-brand-500/40 bg-brand-500/10", rec.ActiveAtAsOf) }>
+									<div class="flex items-center justify-between gap-3">
+										<div class="text-sm text-100">
+											{ formatValidDate(rec.EffectiveDate) } →
+											if openEndedEndDate(rec.EndDate) {
+												{ pageCtx.T("Org.UI.Shared.Present") }
+											} else {
+												{ formatValidEndDateFromEndDate(rec.EndDate) }
+											}
+										</div>
+										<div class="flex items-center gap-2">
+											@button.Secondary(button.Props{
+												Size:  button.SizeSM,
+												Class: "px-2 py-1",
+												Attrs: templ.Attributes{
+													"type":        "button",
+													"hx-get":      fmt.Sprintf("/org/nodes/%s?effective_date=%s", props.Node.ID.String(), formatValidDate(rec.EffectiveDate)),
+													"hx-target":   "#org-node-panel",
+													"hx-swap":     "innerHTML",
+													"hx-push-url": fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", formatValidDate(rec.EffectiveDate), props.Node.ID.String()),
+												},
+											}) {
+												{ pageCtx.T("Org.UI.NodePanel.Records.Actions.View") }
+											}
+											if pageCtx.CanAuthz("org.nodes", "admin") {
+												@button.Secondary(button.Props{
+													Size:  button.SizeSM,
+													Class: "px-2 py-1",
+													Attrs: templ.Attributes{
+														"type":        "button",
+														"hx-get":      fmt.Sprintf("/org/nodes/%s?effective_date=%s&view=correct", props.Node.ID.String(), formatValidDate(rec.EffectiveDate)),
+														"hx-target":   "#org-node-panel",
+														"hx-swap":     "innerHTML",
+														"hx-push-url": fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", formatValidDate(rec.EffectiveDate), props.Node.ID.String()),
+													},
+												}) {
+													{ pageCtx.T("Org.UI.NodePanel.Records.Actions.Correct") }
+												}
+												@button.Danger(button.Props{
+													Size:  button.SizeSM,
+													Class: "px-2 py-1",
+													Attrs: templ.Attributes{
+														"type":        "button",
+														"hx-get":      fmt.Sprintf("/org/nodes/%s?effective_date=%s&view=delete-slice", props.Node.ID.String(), formatValidDate(rec.EffectiveDate)),
+														"hx-target":   "#org-node-panel",
+														"hx-swap":     "innerHTML",
+														"hx-push-url": fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", formatValidDate(rec.EffectiveDate), props.Node.ID.String()),
+													},
+												}) {
+													{ pageCtx.T("Org.UI.NodePanel.Records.Actions.Delete") }
+												}
+											}
+										</div>
+									</div>
+									<div class="mt-1 text-xs text-200">{ strings.TrimSpace(rec.Name) }</div>
+									<div class="mt-1 text-xs text-400">{ nodeStatusLabel(pageCtx, rec.Status) }</div>
+								</li>
+							}
+						</ul>
+					}
+				</div>
+				<div class="space-y-2">
+					<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.NodePanel.Records.EdgeSlicesTitle") }</div>
+					if len(props.EdgeRecords) == 0 {
+						<div class="text-sm text-300">{ pageCtx.T("Org.UI.NodePanel.Records.Empty") }</div>
+					} else {
+						<ul class="space-y-2">
+							for _, rec := range props.EdgeRecords {
+								<li class={ "rounded-md border border-surface-400 bg-surface-300 p-3", templ.KV("border-brand-500/40 bg-brand-500/10", rec.ActiveAtAsOf) }>
+									<div class="flex items-center justify-between gap-3">
+										<div class="text-sm text-100">
+											{ formatValidDate(rec.EffectiveDate) } →
+											if openEndedEndDate(rec.EndDate) {
+												{ pageCtx.T("Org.UI.Shared.Present") }
+											} else {
+												{ formatValidEndDateFromEndDate(rec.EndDate) }
+											}
+										</div>
+										<div class="flex items-center gap-2">
+											@button.Secondary(button.Props{
+												Size:  button.SizeSM,
+												Class: "px-2 py-1",
+												Attrs: templ.Attributes{
+													"type":        "button",
+													"hx-get":      fmt.Sprintf("/org/nodes/%s?effective_date=%s", props.Node.ID.String(), formatValidDate(rec.EffectiveDate)),
+													"hx-target":   "#org-node-panel",
+													"hx-swap":     "innerHTML",
+													"hx-push-url": fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", formatValidDate(rec.EffectiveDate), props.Node.ID.String()),
+												},
+											}) {
+												{ pageCtx.T("Org.UI.NodePanel.Records.Actions.View") }
+											}
+											if pageCtx.CanAuthz("org.edges", "admin") && !props.Node.IsRoot {
+												@button.Secondary(button.Props{
+													Size:  button.SizeSM,
+													Class: "px-2 py-1",
+													Attrs: templ.Attributes{
+														"type":        "button",
+														"hx-get":      fmt.Sprintf("/org/nodes/%s?effective_date=%s&view=correct-move", props.Node.ID.String(), formatValidDate(rec.EffectiveDate)),
+														"hx-target":   "#org-node-panel",
+														"hx-swap":     "innerHTML",
+														"hx-push-url": fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", formatValidDate(rec.EffectiveDate), props.Node.ID.String()),
+													},
+												}) {
+													{ pageCtx.T("Org.UI.NodePanel.Records.Actions.CorrectMove") }
+												}
+												@button.Danger(button.Props{
+													Size:  button.SizeSM,
+													Class: "px-2 py-1",
+													Attrs: templ.Attributes{
+														"type":        "button",
+														"disabled":    rec.IsEarliest,
+														"hx-get":      fmt.Sprintf("/org/nodes/%s?effective_date=%s&view=delete-edge-slice", props.Node.ID.String(), formatValidDate(rec.EffectiveDate)),
+														"hx-target":   "#org-node-panel",
+														"hx-swap":     "innerHTML",
+														"hx-push-url": fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", formatValidDate(rec.EffectiveDate), props.Node.ID.String()),
+													},
+												}) {
+													{ pageCtx.T("Org.UI.NodePanel.Records.Actions.DeleteEdge") }
+												}
+											}
+										</div>
+									</div>
+									<div class="mt-1 text-xs text-300">
+										{ pageCtx.T("Org.UI.NodePanel.Records.ParentAtStart") }:
+										if rec.ParentNodeID == nil {
+											<span class="text-400">{ pageCtx.T("Org.UI.NodePanel.Records.Root") }</span>
+										} else {
+											{{ name := "" }}
+											{{ code := "" }}
+											if rec.ParentNameAtStart != nil {
+												{{ name = strings.TrimSpace(*rec.ParentNameAtStart) }}
+											}
+											if rec.ParentCode != nil {
+												{{ code = strings.TrimSpace(*rec.ParentCode) }}
+											}
+											if name != "" && code != "" {
+												<span class="text-200">{ fmt.Sprintf("%s (%s)", name, code) }</span>
+											} else if name != "" {
+												<span class="text-200">{ name }</span>
+											} else if code != "" {
+												<span class="text-200">{ code }</span>
+											} else {
+												<span class="font-mono text-xs text-200">{ rec.ParentNodeID.String() }</span>
+											}
+										}
+									</div>
+								</li>
+							}
+						</ul>
+					}
 				</div>
 			</div>
 		</div>

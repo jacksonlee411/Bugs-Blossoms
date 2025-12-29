@@ -78,16 +78,32 @@
 				"Empty": "暂无节点",
 				"NewNode": "新建节点"
 			},
-			"NodePanel": {
-				"Title": "详情",
-				"Empty": "请先从组织树选择一个节点，或新建节点。"
-			},
-			"Actions": {
-				"Create": "创建",
-				"Edit": "编辑",
-				"Save": "保存",
-				"Move": "移动"
-			},
+				"NodePanel": {
+					"Title": "详情",
+					"Empty": "请先从组织树选择一个节点，或新建节点。",
+					"Records": {
+						"NodeSlicesTitle": "节点属性记录",
+						"EdgeSlicesTitle": "上级关系记录",
+						"Empty": "暂无记录。",
+						"ParentAtStart": "记录起点上级",
+						"Root": "根",
+						"Actions": {
+							"View": "查看",
+							"Correct": "修改记录",
+							"Delete": "删除记录",
+							"CorrectMove": "修正移动",
+							"DeleteEdge": "撤销移动"
+						}
+					}
+				},
+				"Actions": {
+					"Create": "创建",
+					"Edit": "编辑",
+					"Save": "保存",
+					"Move": "移动",
+					"Correct": "更正",
+					"CorrectMove": "修正移动"
+				},
 			"Positions": {
 				"MetaTitle": "职位管理",
 				"Title": "职位管理",
@@ -182,39 +198,55 @@
 					"DisplayOrder": "排序"
 				}
 			},
-				"Node": {
-					"CreateTitle": "新建节点",
-					"EditTitle": "编辑节点",
-					"MoveTitle": "变更上级",
-					"EffectiveDate": {
-						"Help": "本次变更从该日期起生效（与页面右上角“生效视图”不同）。"
-					},
-					"Parent": {
-						"Placeholder": "搜索节点…",
-						"Help": "可按名称或编码搜索"
-					},
-				"Status": {
-					"Active": "启用",
-					"Inactive": "停用"
-				},
-				"Actions": {
-					"NewChild": "新建子节点",
-					"Edit": "编辑",
-					"Move": "变更上级"
-				},
-					"Fields": {
-						"Code": "编码",
-						"Name": "名称",
-						"LongName": "组织长名称",
-						"Status": "状态",
-						"DisplayOrder": "排序",
-						"EffectiveWindow": "生效区间",
-						"ParentHint": "上级提示",
-						"Parent": "上级",
-						"NewParent": "新上级",
-						"I18nNames": "多语言名称"
+					"Node": {
+						"CreateTitle": "新建节点",
+						"EditTitle": "编辑（Insert）",
+						"MoveTitle": "变更上级（Insert）",
+						"CorrectTitle": "修改记录（更正）",
+						"CorrectMoveTitle": "修正移动",
+						"DeleteSliceTitle": "删除记录",
+						"DeleteEdgeSliceTitle": "撤销移动",
+						"DeleteSliceWarning": "将删除该生效起点的记录，并自动缝补时间轴。",
+						"DeleteEdgeSliceEarliestWarning": "最早一条上级关系记录不能删除。",
+						"EffectiveDate": {
+							"Help": "本次变更从该日期起生效（与页面右上角“生效视图”不同）。",
+							"CorrectHelp": "将更正该日期起点的记录（就地更正）。",
+							"CorrectMoveHelp": "将修正该日期起点的移动记录（edge slice 起点）。"
+						},
+						"Parent": {
+							"Placeholder": "搜索节点…",
+							"Help": "可按名称或编码搜索"
+						},
+						"Status": {
+							"Active": "启用",
+							"Inactive": "停用",
+							"Rescinded": "撤销"
+						},
+						"Actions": {
+							"NewChild": "新建子节点",
+							"Edit": "编辑（Insert）",
+							"Move": "变更上级（Insert）"
+						},
+						"Errors": {
+							"RequiresEdgesAdminForCorrectMove": "该操作需要更高权限（admin）才能修正移动记录。",
+							"RequiresNodesAdminForCorrect": "该操作需要更高权限（admin）才能更正记录。",
+							"RequiresEdgesWriteForMove": "该操作需要 write 权限才能变更上级（Insert）。"
+						},
+						"Fields": {
+							"Code": "编码",
+							"Name": "名称",
+							"LongName": "组织长名称",
+							"Status": "状态",
+							"DisplayOrder": "排序",
+							"EffectiveWindow": "生效区间",
+							"ParentHint": "上级提示",
+							"Parent": "上级",
+							"NewParent": "新上级",
+							"I18nNames": "多语言名称",
+							"ReasonCode": "原因编码",
+							"ReasonNote": "原因说明"
+						}
 					}
 				}
 			}
 		}
-	}

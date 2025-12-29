@@ -16,3 +16,15 @@ p, role:core.superadmin, org.security_group_mappings, *, global, allow
 p, role:core.superadmin, org.links, *, global, allow
 p, role:core.superadmin, org.permission_preview, *, global, allow
 p, role:core.superadmin, org.ops, *, global, allow
+
+p, role:org.orgchart.viewer, org.hierarchies, read, *, allow
+
+p, role:org.orgchart.editor, org.hierarchies, read, *, allow
+p, role:org.orgchart.editor, org.nodes, write, *, allow
+p, role:org.orgchart.editor, org.edges, write, *, allow
+
+p, role:org.orgchart.admin, org.hierarchies, read, *, allow
+p, role:org.orgchart.admin, org.nodes, write, *, allow
+p, role:org.orgchart.admin, org.nodes, admin, *, allow
+p, role:org.orgchart.admin, org.edges, write, *, allow
+p, role:org.orgchart.admin, org.edges, admin, *, allow

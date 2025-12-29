@@ -1,0 +1,210 @@
+package orgui
+
+import (
+	"fmt"
+	"strings"
+
+	icons "github.com/iota-uz/icons/phosphor"
+	"github.com/iota-uz/iota-sdk/components/base/button"
+	"github.com/iota-uz/iota-sdk/components/base/input"
+	"github.com/iota-uz/iota-sdk/modules/org/presentation/viewmodels"
+	"github.com/iota-uz/iota-sdk/pkg/composables"
+)
+
+type NodeDeleteSliceFormProps struct {
+	EffectiveDate string
+	Node          *viewmodels.OrgNodeDetails
+	ReasonCode    string
+	ReasonNote    string
+	Errors        map[string]string
+	FormError     string
+}
+
+templ NodeDeleteSliceForm(props NodeDeleteSliceFormProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if props.Node == nil {
+		<div class="text-sm text-300">{ pageCtx.T("Org.UI.NodePanel.Empty") }</div>
+	} else {
+		<div class="space-y-3">
+			<div class="flex items-center justify-between gap-3">
+				<div class="text-sm font-semibold text-100">{ pageCtx.T("Org.UI.Node.DeleteSliceTitle") }</div>
+				@button.Ghost(button.Props{
+					Size: button.SizeSM,
+					Icon: icons.X(icons.Props{Size: "18"}),
+					Attrs: templ.Attributes{
+						"type":      "button",
+						"hx-get":    fmt.Sprintf("/org/nodes/%s?effective_date=%s", props.Node.ID.String(), props.EffectiveDate),
+						"hx-target": "#org-node-panel",
+						"hx-swap":   "innerHTML",
+					},
+				}) {
+					{ pageCtx.T("Cancel") }
+				}
+			</div>
+			if props.FormError != "" {
+				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
+			}
+			<div class="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+				{ pageCtx.T("Org.UI.Node.DeleteSliceWarning") }
+			</div>
+			<form
+				class="space-y-3"
+				hx-target="#org-node-panel"
+				hx-swap="innerHTML"
+				hx-post={ fmt.Sprintf("/org/nodes/%s:delete-slice?effective_date=%s", props.Node.ID.String(), props.EffectiveDate) }
+			>
+				<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+				<div>
+					<label class="block text-xs font-medium text-200" for="org-node-delete-effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
+					<input
+						id="org-node-delete-effective-date"
+						type="date"
+						value={ props.EffectiveDate }
+						disabled
+						class="mt-1 w-full rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100 opacity-80"
+					/>
+				</div>
+				@input.Text(&input.Props{
+					Label: pageCtx.T("Org.UI.Node.Fields.ReasonCode"),
+					Error: props.Errors["reason_code"],
+					Attrs: templ.Attributes{
+						"name":  "reason_code",
+						"value": props.ReasonCode,
+					},
+				})
+				@input.TextArea(&input.TextAreaProps{
+					Label: pageCtx.T("Org.UI.Node.Fields.ReasonNote"),
+					Value: props.ReasonNote,
+					Attrs: templ.Attributes{
+						"name": "reason_note",
+					},
+				})
+				<div class="flex items-center justify-end gap-2 pt-2">
+					@button.Danger(button.Props{
+						Size: button.SizeSM,
+						Attrs: templ.Attributes{
+							"type": "submit",
+						},
+					}) {
+						{ pageCtx.T("Org.UI.NodePanel.Records.Actions.Delete") }
+					}
+				</div>
+			</form>
+		</div>
+	}
+}
+
+type EdgeDeleteSliceFormProps struct {
+	EffectiveDate string
+	Node          *viewmodels.OrgNodeDetails
+	EdgeRecord    *viewmodels.OrgEdgeSliceRecord
+	ReasonCode    string
+	ReasonNote    string
+	Errors        map[string]string
+	FormError     string
+}
+
+templ EdgeDeleteSliceForm(props EdgeDeleteSliceFormProps) {
+	{{ pageCtx := composables.UsePageCtx(ctx) }}
+	if props.Node == nil {
+		<div class="text-sm text-300">{ pageCtx.T("Org.UI.NodePanel.Empty") }</div>
+	} else {
+		<div class="space-y-3">
+			<div class="flex items-center justify-between gap-3">
+				<div class="text-sm font-semibold text-100">{ pageCtx.T("Org.UI.Node.DeleteEdgeSliceTitle") }</div>
+				@button.Ghost(button.Props{
+					Size: button.SizeSM,
+					Icon: icons.X(icons.Props{Size: "18"}),
+					Attrs: templ.Attributes{
+						"type":      "button",
+						"hx-get":    fmt.Sprintf("/org/nodes/%s?effective_date=%s", props.Node.ID.String(), props.EffectiveDate),
+						"hx-target": "#org-node-panel",
+						"hx-swap":   "innerHTML",
+					},
+				}) {
+					{ pageCtx.T("Cancel") }
+				}
+			</div>
+			if props.FormError != "" {
+				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">{ props.FormError }</div>
+			}
+			if props.EdgeRecord != nil && props.EdgeRecord.IsEarliest {
+				<div class="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+					{ pageCtx.T("Org.UI.Node.DeleteEdgeSliceEarliestWarning") }
+				</div>
+			}
+			<form
+				class="space-y-3"
+				hx-target="#org-node-panel"
+				hx-swap="innerHTML"
+				hx-post={ fmt.Sprintf("/org/nodes/%s:delete-edge-slice?effective_date=%s", props.Node.ID.String(), props.EffectiveDate) }
+			>
+				<input type="hidden" name="effective_date" value={ props.EffectiveDate }/>
+				<div>
+					<label class="block text-xs font-medium text-200" for="org-edge-delete-effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
+					<input
+						id="org-edge-delete-effective-date"
+						type="date"
+						value={ props.EffectiveDate }
+						disabled
+						class="mt-1 w-full rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100 opacity-80"
+					/>
+				</div>
+				if props.EdgeRecord != nil {
+					<div class="rounded-md border border-surface-400 bg-surface-300 p-3 text-xs text-200">
+						<div class="text-400">{ pageCtx.T("Org.UI.NodePanel.Records.ParentAtStart") }</div>
+						<div class="mt-1">
+							if props.EdgeRecord.ParentNodeID == nil {
+								<span class="text-400">{ pageCtx.T("Org.UI.NodePanel.Records.Root") }</span>
+							} else {
+								{{ name := "" }}
+								{{ code := "" }}
+								if props.EdgeRecord.ParentNameAtStart != nil {
+									{{ name = strings.TrimSpace(*props.EdgeRecord.ParentNameAtStart) }}
+								}
+								if props.EdgeRecord.ParentCode != nil {
+									{{ code = strings.TrimSpace(*props.EdgeRecord.ParentCode) }}
+								}
+								if name != "" && code != "" {
+									{ fmt.Sprintf("%s (%s)", name, code) }
+								} else if name != "" {
+									{ name }
+								} else if code != "" {
+									{ code }
+								} else {
+									<span class="font-mono text-xs">{ props.EdgeRecord.ParentNodeID.String() }</span>
+								}
+							}
+						</div>
+					</div>
+				}
+				@input.Text(&input.Props{
+					Label: pageCtx.T("Org.UI.Node.Fields.ReasonCode"),
+					Error: props.Errors["reason_code"],
+					Attrs: templ.Attributes{
+						"name":  "reason_code",
+						"value": props.ReasonCode,
+					},
+				})
+				@input.TextArea(&input.TextAreaProps{
+					Label: pageCtx.T("Org.UI.Node.Fields.ReasonNote"),
+					Value: props.ReasonNote,
+					Attrs: templ.Attributes{
+						"name": "reason_note",
+					},
+				})
+				<div class="flex items-center justify-end gap-2 pt-2">
+					@button.Danger(button.Props{
+						Size: button.SizeSM,
+						Attrs: templ.Attributes{
+							"type":     "submit",
+							"disabled": props.EdgeRecord != nil && props.EdgeRecord.IsEarliest,
+						},
+					}) {
+						{ pageCtx.T("Org.UI.NodePanel.Records.Actions.DeleteEdge") }
+					}
+				</div>
+			</form>
+		</div>
+	}
+}

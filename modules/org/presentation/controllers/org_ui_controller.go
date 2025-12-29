@@ -77,6 +77,10 @@ func (c *OrgUIController) Register(r *mux.Router) {
 	router.HandleFunc("/nodes/{id}", c.NodePanel).Methods(http.MethodGet)
 	router.HandleFunc("/nodes/{id}", c.UpdateNode).Methods(http.MethodPatch)
 	router.HandleFunc("/nodes/{id}:move", c.MoveNode).Methods(http.MethodPost)
+	router.HandleFunc("/nodes/{id}:correct", c.CorrectNode).Methods(http.MethodPost)
+	router.HandleFunc("/nodes/{id}:delete-slice", c.DeleteNodeSliceAndStitch).Methods(http.MethodPost)
+	router.HandleFunc("/nodes/{id}:correct-move", c.CorrectMoveNode).Methods(http.MethodPost)
+	router.HandleFunc("/nodes/{id}:delete-edge-slice", c.DeleteEdgeSliceAndStitch).Methods(http.MethodPost)
 
 	router.HandleFunc("/assignments/form", c.AssignmentForm).Methods(http.MethodGet)
 	router.HandleFunc("/assignments", c.CreateAssignment).Methods(http.MethodPost)
@@ -143,6 +147,8 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
 	ensureOrgPageCapabilities(r, orgNodesAuthzObject, "write")
 	ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "write")
+	ensureOrgPageCapabilities(r, orgNodesAuthzObject, "admin")
+	ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "admin")
 
 	statusCode := http.StatusOK
 	var errs []string
@@ -200,10 +206,30 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var nodeRecords []viewmodels.OrgNodeSliceRecord
+	var edgeRecords []viewmodels.OrgEdgeSliceRecord
+	if selectedNodeID != nil && selected != nil {
+		slices, err := c.org.ListNodeSlicesTimeline(r.Context(), tenantID, *selectedNodeID)
+		if err != nil {
+			errs = append(errs, err.Error())
+		} else {
+			nodeRecords = nodeSliceRecordsFromRows(slices, effectiveDate)
+		}
+
+		edges, err := c.org.ListEdgesTimelineAsChild(r.Context(), tenantID, "OrgUnit", *selectedNodeID)
+		if err != nil {
+			errs = append(errs, err.Error())
+		} else {
+			edgeRecords = edgeSliceRecordsFromRows(edges, effectiveDate)
+		}
+	}
+
 	props := orgtemplates.NodesPageProps{
 		EffectiveDate: effectiveDateStr,
 		Tree:          tree,
 		SelectedNode:  selected,
+		NodeRecords:   nodeRecords,
+		EdgeRecords:   edgeRecords,
 		Errors:        errs,
 	}
 	if statusCode != http.StatusOK {
@@ -3794,9 +3820,93 @@ func (c *OrgUIController) NodePanel(w http.ResponseWriter, r *http.Request) {
 			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
+	case "correct":
+		if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgNodesAuthzObject, "admin") {
+			return
+		}
+		details, err := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+			Mode:                 orgui.NodeFormCorrect,
+			EffectiveDate:        effectiveDateStr,
+			Node:                 details,
+			Errors:               map[string]string{},
+			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	case "delete-slice":
+		if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgNodesAuthzObject, "admin") {
+			return
+		}
+		details, err := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		templ.Handler(orgui.NodeDeleteSliceForm(orgui.NodeDeleteSliceFormProps{
+			EffectiveDate: effectiveDateStr,
+			Node:          details,
+			ReasonCode:    "delete",
+			ReasonNote:    "",
+			Errors:        map[string]string{},
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	case "correct-move":
+		if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgEdgesAuthzObject, "admin") {
+			return
+		}
+		details, err := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+			Mode:                 orgui.NodeFormCorrectMove,
+			EffectiveDate:        effectiveDateStr,
+			Node:                 details,
+			Errors:               map[string]string{},
+			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	case "delete-edge-slice":
+		if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgEdgesAuthzObject, "admin") {
+			return
+		}
+		details, err := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		edgeRows, err := c.org.ListEdgesTimelineAsChild(r.Context(), tenantID, "OrgUnit", nodeID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		edgeRecords := edgeSliceRecordsFromRows(edgeRows, effectiveDate)
+		var target *viewmodels.OrgEdgeSliceRecord
+		for i := range edgeRecords {
+			if normalizeValidTimeDayUTC(edgeRecords[i].EffectiveDate).Equal(normalizeValidTimeDayUTC(effectiveDate)) {
+				target = &edgeRecords[i]
+				break
+			}
+		}
+		templ.Handler(orgui.EdgeDeleteSliceForm(orgui.EdgeDeleteSliceFormProps{
+			EffectiveDate: effectiveDateStr,
+			Node:          details,
+			EdgeRecord:    target,
+			ReasonCode:    "delete",
+			ReasonNote:    "",
+			Errors:        map[string]string{},
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
 	default:
 		ensureOrgPageCapabilities(r, orgNodesAuthzObject, "write")
 		ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "write")
+		ensureOrgPageCapabilities(r, orgNodesAuthzObject, "admin")
+		ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "admin")
 		c.writeNodePanelWithOOBTree(w, r, tenantID, nodeID, effectiveDateStr, effectiveDate)
 		return
 	}
@@ -3923,14 +4033,15 @@ func (c *OrgUIController) UpdateNode(w http.ResponseWriter, r *http.Request) {
 	name := strings.TrimSpace(r.FormValue("name"))
 	status := strings.TrimSpace(r.FormValue("status"))
 	displayOrder, _ := strconv.Atoi(strings.TrimSpace(r.FormValue("display_order")))
+	i18nRaw := strings.TrimSpace(r.FormValue("i18n_names"))
 
-	i18nNames, i18nErr := parseI18nNames(strings.TrimSpace(r.FormValue("i18n_names")))
+	i18nNames, i18nErr := parseI18nNames(i18nRaw)
 	if i18nErr != nil {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
 			Mode:                 orgui.NodeFormEdit,
 			EffectiveDate:        effectiveDateStr,
-			Node:                 &viewmodels.OrgNodeDetails{ID: nodeID, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: strings.TrimSpace(r.FormValue("i18n_names"))},
+			Node:                 &viewmodels.OrgNodeDetails{ID: nodeID, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: i18nRaw},
 			Errors:               map[string]string{"i18n_names": i18nErr.Error()},
 			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
 		}), templ.WithStreaming()).ServeHTTP(w, r)
@@ -3948,13 +4059,37 @@ func (c *OrgUIController) UpdateNode(w http.ResponseWriter, r *http.Request) {
 		DisplayOrder:  &displayOrder,
 	})
 	if err != nil {
+		var svcErr *services.ServiceError
+		useCorrect := errors.As(err, &svcErr) && svcErr.Code == "ORG_USE_CORRECT"
+		canNodesAdmin := false
+		if useCorrect {
+			state := authz.ViewStateFromContext(r.Context())
+			allowed, _, capErr := authzutil.CheckCapability(r.Context(), state, tenantID, currentUser, orgNodesAuthzObject, "admin")
+			canNodesAdmin = capErr == nil && allowed
+			if capErr == nil && allowed {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+					Mode:                 orgui.NodeFormCorrect,
+					EffectiveDate:        effectiveDateStr,
+					Node:                 &viewmodels.OrgNodeDetails{ID: nodeID, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: i18nRaw},
+					Errors:               map[string]string{},
+					FormError:            svcErr.Message,
+					SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+				}), templ.WithStreaming()).ServeHTTP(w, r)
+				return
+			}
+		}
+
 		formErr, fieldErrs, statusCode := mapServiceErrorToForm(err)
+		if useCorrect && !canNodesAdmin {
+			pageCtx := composables.UsePageCtx(r.Context())
+			formErr = pageCtx.T("Org.UI.Node.Errors.RequiresNodesAdminForCorrect")
+		}
 		w.WriteHeader(statusCode)
-		details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
 		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
 			Mode:                 orgui.NodeFormEdit,
 			EffectiveDate:        effectiveDateStr,
-			Node:                 details,
+			Node:                 &viewmodels.OrgNodeDetails{ID: nodeID, Name: name, Status: status, DisplayOrder: displayOrder, I18nNamesJSON: i18nRaw},
 			Errors:               fieldErrs,
 			FormError:            formErr,
 			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
@@ -4002,6 +4137,9 @@ func (c *OrgUIController) MoveNode(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if details == nil {
+			details = &viewmodels.OrgNodeDetails{ID: nodeID}
+		}
 		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
 			Mode:                 orgui.NodeFormMove,
 			EffectiveDate:        effectiveDateStr,
@@ -4020,16 +4158,409 @@ func (c *OrgUIController) MoveNode(w http.ResponseWriter, r *http.Request) {
 		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
+		var svcErr *services.ServiceError
+		useCorrectMove := errors.As(err, &svcErr) && svcErr.Code == "ORG_USE_CORRECT_MOVE"
+		canEdgesAdmin := false
+		if useCorrectMove {
+			state := authz.ViewStateFromContext(r.Context())
+			allowed, _, capErr := authzutil.CheckCapability(r.Context(), state, tenantID, currentUser, orgEdgesAuthzObject, "admin")
+			canEdgesAdmin = capErr == nil && allowed
+			if capErr == nil && allowed {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+				if details == nil {
+					details = &viewmodels.OrgNodeDetails{ID: nodeID}
+				}
+				newParentLabel := c.orgNodeLabelFor(r, tenantID, newParentID, effectiveDate)
+				templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+					Mode:                 orgui.NodeFormCorrectMove,
+					EffectiveDate:        effectiveDateStr,
+					Node:                 details,
+					NewParentID:          newParentID.String(),
+					NewParentLabel:       newParentLabel,
+					Errors:               map[string]string{},
+					FormError:            svcErr.Message,
+					SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+				}), templ.WithStreaming()).ServeHTTP(w, r)
+				return
+			}
+		}
+
 		formErr, fieldErrs, statusCode := mapServiceErrorToForm(err)
+		if useCorrectMove && !canEdgesAdmin {
+			pageCtx := composables.UsePageCtx(r.Context())
+			formErr = pageCtx.T("Org.UI.Node.Errors.RequiresEdgesAdminForCorrectMove")
+		}
 		w.WriteHeader(statusCode)
 		details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if details == nil {
+			details = &viewmodels.OrgNodeDetails{ID: nodeID}
+		}
+		newParentLabel := c.orgNodeLabelFor(r, tenantID, newParentID, effectiveDate)
 		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
 			Mode:                 orgui.NodeFormMove,
 			EffectiveDate:        effectiveDateStr,
 			Node:                 details,
+			NewParentID:          newParentID.String(),
+			NewParentLabel:       newParentLabel,
 			Errors:               fieldErrs,
 			FormError:            formErr,
 			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	htmx.PushUrl(w, fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", effectiveDateStr, nodeID.String()))
+	c.writeNodePanelWithOOBTree(w, r, tenantID, nodeID, effectiveDateStr, effectiveDate)
+}
+
+func (c *OrgUIController) CorrectNode(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgNodesAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgNodesAuthzObject, "admin") {
+		return
+	}
+
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	nameRaw := strings.TrimSpace(r.FormValue("name"))
+	statusRaw := strings.TrimSpace(r.FormValue("status"))
+	displayOrderRaw := strings.TrimSpace(r.FormValue("display_order"))
+	displayOrder, _ := strconv.Atoi(displayOrderRaw)
+	i18nRaw := strings.TrimSpace(r.FormValue("i18n_names"))
+
+	var i18nNames map[string]string
+	if i18nRaw != "" {
+		parsed, i18nErr := parseI18nNames(i18nRaw)
+		if i18nErr != nil {
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+				Mode:                 orgui.NodeFormCorrect,
+				EffectiveDate:        effectiveDateStr,
+				Node:                 &viewmodels.OrgNodeDetails{ID: nodeID, Name: nameRaw, Status: statusRaw, DisplayOrder: displayOrder, I18nNamesJSON: i18nRaw},
+				Errors:               map[string]string{"i18n_names": i18nErr.Error()},
+				SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+			}), templ.WithStreaming()).ServeHTTP(w, r)
+			return
+		}
+		i18nNames = parsed
+	}
+
+	var name *string
+	if nameRaw != "" {
+		name = &nameRaw
+	}
+	var status *string
+	if statusRaw != "" {
+		status = &statusRaw
+	}
+	var displayOrderPtr *int
+	if displayOrderRaw != "" {
+		displayOrderPtr = &displayOrder
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	requestID := ensureRequestID(r)
+	_, err = c.org.CorrectNode(r.Context(), tenantID, requestID, initiatorID, services.CorrectNodeInput{
+		NodeID:       nodeID,
+		AsOf:         effectiveDate,
+		Name:         name,
+		I18nNames:    i18nNames,
+		Status:       status,
+		DisplayOrder: displayOrderPtr,
+	})
+	if err != nil {
+		formErr, fieldErrs, statusCode := mapServiceErrorToForm(err)
+		w.WriteHeader(statusCode)
+		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+			Mode:                 orgui.NodeFormCorrect,
+			EffectiveDate:        effectiveDateStr,
+			Node:                 &viewmodels.OrgNodeDetails{ID: nodeID, Name: nameRaw, Status: statusRaw, DisplayOrder: displayOrder, I18nNamesJSON: i18nRaw},
+			Errors:               fieldErrs,
+			FormError:            formErr,
+			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	htmx.PushUrl(w, fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", effectiveDateStr, nodeID.String()))
+	c.writeNodePanelWithOOBTree(w, r, tenantID, nodeID, effectiveDateStr, effectiveDate)
+}
+
+func (c *OrgUIController) DeleteNodeSliceAndStitch(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgNodesAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgNodesAuthzObject, "admin") {
+		return
+	}
+
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	reasonCode := strings.TrimSpace(r.FormValue("reason_code"))
+	reasonNoteRaw := strings.TrimSpace(r.FormValue("reason_note"))
+	var reasonNote *string
+	if reasonNoteRaw != "" {
+		reasonNote = &reasonNoteRaw
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	requestID := ensureRequestID(r)
+	_, err = c.org.DeleteNodeSliceAndStitch(r.Context(), tenantID, requestID, initiatorID, services.DeleteNodeSliceAndStitchInput{
+		NodeID:              nodeID,
+		TargetEffectiveDate: effectiveDate,
+		ReasonCode:          reasonCode,
+		ReasonNote:          reasonNote,
+	})
+	if err != nil {
+		formErr, fieldErrs, statusCode := mapServiceErrorToForm(err)
+		w.WriteHeader(statusCode)
+		details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if details == nil {
+			details = &viewmodels.OrgNodeDetails{ID: nodeID}
+		}
+		templ.Handler(orgui.NodeDeleteSliceForm(orgui.NodeDeleteSliceFormProps{
+			EffectiveDate: effectiveDateStr,
+			Node:          details,
+			ReasonCode:    reasonCode,
+			ReasonNote:    reasonNoteRaw,
+			Errors:        fieldErrs,
+			FormError:     formErr,
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	htmx.PushUrl(w, fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", effectiveDateStr, nodeID.String()))
+	c.writeNodePanelWithOOBTree(w, r, tenantID, nodeID, effectiveDateStr, effectiveDate)
+}
+
+func (c *OrgUIController) CorrectMoveNode(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgEdgesAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgEdgesAuthzObject, "admin") {
+		return
+	}
+
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	newParentRaw := strings.TrimSpace(r.FormValue("new_parent_id"))
+	newParentID, err := uuid.Parse(newParentRaw)
+	if err != nil {
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if details == nil {
+			details = &viewmodels.OrgNodeDetails{ID: nodeID}
+		}
+		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+			Mode:                 orgui.NodeFormCorrectMove,
+			EffectiveDate:        effectiveDateStr,
+			Node:                 details,
+			Errors:               map[string]string{"new_parent_id": "invalid new_parent_id"},
+			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	requestID := ensureRequestID(r)
+	_, err = c.org.CorrectMoveNode(r.Context(), tenantID, requestID, initiatorID, services.CorrectMoveNodeInput{
+		NodeID:        nodeID,
+		EffectiveDate: effectiveDate,
+		NewParentID:   newParentID,
+	})
+	if err != nil {
+		var svcErr *services.ServiceError
+		useMove := errors.As(err, &svcErr) && svcErr.Code == "ORG_USE_MOVE"
+		canEdgesWrite := false
+		if useMove {
+			state := authz.ViewStateFromContext(r.Context())
+			allowed, _, capErr := authzutil.CheckCapability(r.Context(), state, tenantID, currentUser, orgEdgesAuthzObject, "write")
+			canEdgesWrite = capErr == nil && allowed
+			if capErr == nil && allowed {
+				w.WriteHeader(http.StatusUnprocessableEntity)
+				details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+				if details == nil {
+					details = &viewmodels.OrgNodeDetails{ID: nodeID}
+				}
+				newParentLabel := c.orgNodeLabelFor(r, tenantID, newParentID, effectiveDate)
+				templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+					Mode:                 orgui.NodeFormMove,
+					EffectiveDate:        effectiveDateStr,
+					Node:                 details,
+					NewParentID:          newParentID.String(),
+					NewParentLabel:       newParentLabel,
+					Errors:               map[string]string{},
+					FormError:            svcErr.Message,
+					SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+				}), templ.WithStreaming()).ServeHTTP(w, r)
+				return
+			}
+		}
+
+		formErr, fieldErrs, statusCode := mapServiceErrorToForm(err)
+		if useMove && !canEdgesWrite {
+			pageCtx := composables.UsePageCtx(r.Context())
+			formErr = pageCtx.T("Org.UI.Node.Errors.RequiresEdgesWriteForMove")
+		}
+		w.WriteHeader(statusCode)
+		details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if details == nil {
+			details = &viewmodels.OrgNodeDetails{ID: nodeID}
+		}
+		newParentLabel := c.orgNodeLabelFor(r, tenantID, newParentID, effectiveDate)
+		templ.Handler(orgui.NodeForm(orgui.NodeFormProps{
+			Mode:                 orgui.NodeFormCorrectMove,
+			EffectiveDate:        effectiveDateStr,
+			Node:                 details,
+			NewParentID:          newParentID.String(),
+			NewParentLabel:       newParentLabel,
+			Errors:               fieldErrs,
+			FormError:            formErr,
+			SearchParentEndpoint: fmt.Sprintf("/org/nodes/search?effective_date=%s", effectiveDateStr),
+		}), templ.WithStreaming()).ServeHTTP(w, r)
+		return
+	}
+
+	htmx.PushUrl(w, fmt.Sprintf("/org/nodes?effective_date=%s&node_id=%s", effectiveDateStr, nodeID.String()))
+	c.writeNodePanelWithOOBTree(w, r, tenantID, nodeID, effectiveDateStr, effectiveDate)
+}
+
+func (c *OrgUIController) DeleteEdgeSliceAndStitch(w http.ResponseWriter, r *http.Request) {
+	tenantID, currentUser, ok := tenantAndUserFromContext(r)
+	if !ok {
+		layouts.WriteAuthzForbiddenResponse(w, r, orgEdgesAuthzObject, "admin")
+		return
+	}
+	if !ensureOrgRolloutEnabled(w, r, tenantID) {
+		return
+	}
+	if !ensureOrgAuthzUI(w, r, tenantID, currentUser, orgEdgesAuthzObject, "admin") {
+		return
+	}
+
+	nodeID, err := uuid.Parse(mux.Vars(r)["id"])
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	effectiveDate, err := effectiveDateFromWriteForm(r)
+	if err != nil || effectiveDate.IsZero() {
+		http.Error(w, "effective_date is required", http.StatusBadRequest)
+		return
+	}
+	effectiveDateStr := effectiveDate.UTC().Format("2006-01-02")
+
+	reasonCode := strings.TrimSpace(r.FormValue("reason_code"))
+	reasonNoteRaw := strings.TrimSpace(r.FormValue("reason_note"))
+	var reasonNote *string
+	if reasonNoteRaw != "" {
+		reasonNote = &reasonNoteRaw
+	}
+
+	initiatorID := authzutil.NormalizedUserUUID(tenantID, currentUser)
+	requestID := ensureRequestID(r)
+	_, err = c.org.DeleteEdgeSliceAndStitch(r.Context(), tenantID, requestID, initiatorID, services.DeleteEdgeSliceAndStitchInput{
+		HierarchyType:       "OrgUnit",
+		ChildNodeID:         nodeID,
+		TargetEffectiveDate: effectiveDate,
+		ReasonCode:          reasonCode,
+		ReasonNote:          reasonNote,
+	})
+	if err != nil {
+		formErr, fieldErrs, statusCode := mapServiceErrorToForm(err)
+		w.WriteHeader(statusCode)
+		details, _ := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
+		if details == nil {
+			details = &viewmodels.OrgNodeDetails{ID: nodeID}
+		}
+
+		edgeRows, listErr := c.org.ListEdgesTimelineAsChild(r.Context(), tenantID, "OrgUnit", nodeID)
+		var target *viewmodels.OrgEdgeSliceRecord
+		if listErr == nil {
+			records := edgeSliceRecordsFromRows(edgeRows, effectiveDate)
+			for i := range records {
+				if normalizeValidTimeDayUTC(records[i].EffectiveDate).Equal(normalizeValidTimeDayUTC(effectiveDate)) {
+					target = &records[i]
+					break
+				}
+			}
+		}
+
+		templ.Handler(orgui.EdgeDeleteSliceForm(orgui.EdgeDeleteSliceFormProps{
+			EffectiveDate: effectiveDateStr,
+			Node:          details,
+			EdgeRecord:    target,
+			ReasonCode:    reasonCode,
+			ReasonNote:    reasonNoteRaw,
+			Errors:        fieldErrs,
+			FormError:     formErr,
 		}), templ.WithStreaming()).ServeHTTP(w, r)
 		return
 	}
@@ -4043,6 +4574,8 @@ func (c *OrgUIController) writeNodePanelWithOOBTree(w http.ResponseWriter, r *ht
 	ensureOrgPageCapabilities(r, orgPositionsAuthzObject, "read")
 	ensureOrgPageCapabilities(r, orgNodesAuthzObject, "write")
 	ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "write")
+	ensureOrgPageCapabilities(r, orgNodesAuthzObject, "admin")
+	ensureOrgPageCapabilities(r, orgEdgesAuthzObject, "admin")
 
 	details, err := c.getNodeDetails(r, tenantID, nodeID, effectiveDate)
 	if err != nil {
@@ -4052,6 +4585,19 @@ func (c *OrgUIController) writeNodePanelWithOOBTree(w http.ResponseWriter, r *ht
 	if details != nil {
 		details.LongName = c.orgNodeLongNameFor(r, tenantID, nodeID, effectiveDate)
 	}
+
+	nodeSliceRows, err := c.org.ListNodeSlicesTimeline(r.Context(), tenantID, nodeID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	edgeRows, err := c.org.ListEdgesTimelineAsChild(r.Context(), tenantID, "OrgUnit", nodeID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	nodeRecords := nodeSliceRecordsFromRows(nodeSliceRows, effectiveDate)
+	edgeRecords := edgeSliceRecordsFromRows(edgeRows, effectiveDate)
 	nodes, _, err := c.org.GetHierarchyAsOf(r.Context(), tenantID, "OrgUnit", effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -4083,7 +4629,12 @@ func (c *OrgUIController) writeNodePanelWithOOBTree(w http.ResponseWriter, r *ht
 		}).Render(ctx, ww); err != nil {
 			return err
 		}
-		if err := orgui.NodeDetails(orgui.NodeDetailsProps{EffectiveDate: effectiveDateStr, Node: details}).Render(ctx, ww); err != nil {
+		if err := orgui.NodeDetails(orgui.NodeDetailsProps{
+			EffectiveDate: effectiveDateStr,
+			Node:          details,
+			NodeRecords:   nodeRecords,
+			EdgeRecords:   edgeRecords,
+		}).Render(ctx, ww); err != nil {
 			return err
 		}
 		return orgui.Tree(orgui.TreeProps{Tree: tree, EffectiveDate: effectiveDateStr, SwapOOB: true}).Render(ctx, ww)
@@ -4152,6 +4703,52 @@ func hierarchyParentIDMap(nodes []services.HierarchyNode) map[uuid.UUID]uuid.UUI
 		out[n.ID] = *n.ParentID
 	}
 	return out
+}
+
+func nodeSliceRecordsFromRows(rows []services.NodeSliceRow, asOf time.Time) []viewmodels.OrgNodeSliceRecord {
+	asOfDay := normalizeValidTimeDayUTC(asOf)
+	out := make([]viewmodels.OrgNodeSliceRecord, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, viewmodels.OrgNodeSliceRecord{
+			SliceID:       r.ID,
+			EffectiveDate: r.EffectiveDate,
+			EndDate:       r.EndDate,
+			Name:          strings.TrimSpace(r.Name),
+			Status:        strings.TrimSpace(r.Status),
+			ActiveAtAsOf:  validTimeIncludesDayUTC(asOfDay, r.EffectiveDate, r.EndDate),
+		})
+	}
+	return out
+}
+
+func edgeSliceRecordsFromRows(rows []services.EdgeTimelineRow, asOf time.Time) []viewmodels.OrgEdgeSliceRecord {
+	asOfDay := normalizeValidTimeDayUTC(asOf)
+	out := make([]viewmodels.OrgEdgeSliceRecord, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, viewmodels.OrgEdgeSliceRecord{
+			EdgeID:            r.EdgeID,
+			ParentNodeID:      r.ParentNodeID,
+			ParentNameAtStart: r.ParentNameAtStart,
+			ParentCode:        r.ParentCode,
+			EffectiveDate:     r.EffectiveDate,
+			EndDate:           r.EndDate,
+			ActiveAtAsOf:      validTimeIncludesDayUTC(asOfDay, r.EffectiveDate, r.EndDate),
+		})
+	}
+	if len(out) > 0 {
+		out[len(out)-1].IsEarliest = true
+	}
+	return out
+}
+
+func validTimeIncludesDayUTC(asOf, startDate, endDate time.Time) bool {
+	asOf = normalizeValidTimeDayUTC(asOf)
+	startDate = normalizeValidTimeDayUTC(startDate)
+	endDate = normalizeValidTimeDayUTC(endDate)
+	if asOf.IsZero() || startDate.IsZero() || endDate.IsZero() {
+		return false
+	}
+	return !asOf.Before(startDate) && !asOf.After(endDate)
 }
 
 func (c *OrgUIController) positionLabelFor(r *http.Request, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time, fallbackCode string) string {

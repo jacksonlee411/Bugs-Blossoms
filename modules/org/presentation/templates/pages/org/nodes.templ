@@ -13,6 +13,8 @@ import (
 type NodesPageProps struct {
 	EffectiveDate string
 	SelectedNode  *viewmodels.OrgNodeDetails
+	NodeRecords   []viewmodels.OrgNodeSliceRecord
+	EdgeRecords   []viewmodels.OrgEdgeSliceRecord
 	Tree          *viewmodels.OrgTree
 	Errors        []string
 }
@@ -140,6 +142,8 @@ templ NodesPage(props NodesPageProps) {
 								@orgui.NodeDetails(orgui.NodeDetailsProps{
 									EffectiveDate: props.EffectiveDate,
 									Node:          props.SelectedNode,
+									NodeRecords:   props.NodeRecords,
+									EdgeRecords:   props.EdgeRecords,
 								})
 							}
 						</div>

@@ -216,19 +216,22 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		expect((await createITResp).status()).toBe(200);
 		await expect(tree.getByRole('button', { name: /IT Team/ })).toBeVisible();
 
-		const nodesEditDate = addUTCDays(nodesBaseEffectiveDate, 1);
-		const nodesEditDateStr = formatUTCDate(nodesEditDate);
-		const nodesEffectiveDateChangeResp = page.waitForResponse((resp) => {
-			return (
-				resp.request().method() === 'GET' &&
-				resp.url().includes('/org/nodes') &&
-				resp.url().includes(`effective_date=${nodesEditDateStr}`)
+			const nodesEditDate = addUTCDays(nodesBaseEffectiveDate, 1);
+			const nodesEditDateStr = formatUTCDate(nodesEditDate);
+			const nodesEffectiveDateChangeResp = page.waitForResponse(
+				(resp) => {
+					return (
+						resp.request().method() === 'GET' &&
+						resp.url().includes('/org/nodes') &&
+						resp.url().includes(`effective_date=${nodesEditDateStr}`)
+					);
+				},
+				{ timeout: 30_000 }
 			);
-		});
-		const nodesEffectiveDateInput = page.locator('#effective-date');
-		await nodesEffectiveDateInput.fill(nodesEditDateStr);
-		await nodesEffectiveDateInput.dispatchEvent('change');
-		expect((await nodesEffectiveDateChangeResp).status()).toBe(200);
+			const nodesEffectiveDateInput = page.locator('#effective-date');
+			await nodesEffectiveDateInput.fill(nodesEditDateStr);
+			await nodesEffectiveDateInput.dispatchEvent('change');
+			expect((await nodesEffectiveDateChangeResp).status()).toBe(200);
 
 		const itDetailsResp = page.waitForResponse((resp) => {
 			return resp.request().method() === 'GET' && resp.url().includes('/org/nodes/');
@@ -248,15 +251,15 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		expect((await hrDetailsResp).status()).toBe(200);
 		await expect(page.locator('#org-node-panel')).toContainText('HR Team');
 		await page.waitForURL(/node_id=/);
-		const hrID = new URL(page.url()).searchParams.get('node_id');
-		expect(hrID).toBeTruthy();
-		const hrIDValue = hrID!;
-		await page.getByRole('button', { name: 'Edit' }).click();
-		await expect(page.getByText('Edit node', { exact: true })).toBeVisible();
-		await page.locator('input[name="name"]').fill('HR Team Updated');
-		const updateNodeResp = page.waitForResponse((resp) => {
-			return (
-				resp.request().method() === 'PATCH' &&
+			const hrID = new URL(page.url()).searchParams.get('node_id');
+			expect(hrID).toBeTruthy();
+			const hrIDValue = hrID!;
+			await page.getByRole('button', { name: 'Edit' }).click();
+			await expect(page.getByText('Edit (Insert)', { exact: true })).toBeVisible();
+			await page.locator('input[name="name"]').fill('HR Team Updated');
+			const updateNodeResp = page.waitForResponse((resp) => {
+				return (
+					resp.request().method() === 'PATCH' &&
 				resp.url().includes(`/org/nodes/${hrIDValue}`) &&
 				resp.url().includes(`effective_date=${nodesEditDateStr}`)
 			);
@@ -266,32 +269,35 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		await expect(page.locator('#org-node-panel')).toContainText('HR Team Updated');
 		await expect(tree.getByRole('button', { name: /HR Team Updated/ })).toBeVisible();
 
-		const nodesMoveDate = addUTCDays(nodesBaseEffectiveDate, 2);
-		const nodesMoveDateStr = formatUTCDate(nodesMoveDate);
-		const nodesMoveEffectiveDateChangeResp = page.waitForResponse((resp) => {
-			return (
-				resp.request().method() === 'GET' &&
-				resp.url().includes('/org/nodes') &&
-				resp.url().includes(`effective_date=${nodesMoveDateStr}`)
+			const nodesMoveDate = addUTCDays(nodesBaseEffectiveDate, 2);
+			const nodesMoveDateStr = formatUTCDate(nodesMoveDate);
+			const nodesMoveEffectiveDateChangeResp = page.waitForResponse(
+				(resp) => {
+					return (
+						resp.request().method() === 'GET' &&
+						resp.url().includes('/org/nodes') &&
+						resp.url().includes(`effective_date=${nodesMoveDateStr}`)
+					);
+				},
+				{ timeout: 30_000 }
 			);
-		});
-		await nodesEffectiveDateInput.fill(nodesMoveDateStr);
-		await nodesEffectiveDateInput.dispatchEvent('change');
-		expect((await nodesMoveEffectiveDateChangeResp).status()).toBe(200);
+			await nodesEffectiveDateInput.fill(nodesMoveDateStr);
+			await nodesEffectiveDateInput.dispatchEvent('change');
+			expect((await nodesMoveEffectiveDateChangeResp).status()).toBe(200);
 
 		const hrDetailsAfterMoveDateResp = page.waitForResponse((resp) => {
 			return resp.request().method() === 'GET' && resp.url().includes(`/org/nodes/${hrIDValue}`) && resp.url().includes(`effective_date=${nodesMoveDateStr}`);
 		});
 		await tree.getByRole('button', { name: /HR Team Updated/ }).click();
 		expect((await hrDetailsAfterMoveDateResp).status()).toBe(200);
-		await expect(page.locator('#org-node-panel')).toContainText('HR Team Updated');
+			await expect(page.locator('#org-node-panel')).toContainText('HR Team Updated');
 
-		await page.getByRole('button', { name: 'Change parent' }).click();
-		await expect(page.getByText('Move node', { exact: true })).toBeVisible();
-		const moveParentCombobox = page.locator('[data-testid="org-node-new-parent-combobox"]');
-		const moveParentSelect = moveParentCombobox.locator('select[name="new_parent_id"]');
-		await setComboboxValue({
-			combobox: moveParentCombobox,
+			await page.getByRole('button', { name: 'Change parent' }).click();
+			await expect(page.getByText('Change parent (Insert)', { exact: true })).toBeVisible();
+			const moveParentCombobox = page.locator('[data-testid="org-node-new-parent-combobox"]');
+			const moveParentSelect = moveParentCombobox.locator('select[name="new_parent_id"]');
+			await setComboboxValue({
+				combobox: moveParentCombobox,
 			query: 'IT Team',
 			value: itIDValue,
 		});
