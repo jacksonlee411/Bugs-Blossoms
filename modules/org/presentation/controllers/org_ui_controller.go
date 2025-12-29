@@ -170,6 +170,7 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 	}
 	tree := mappers.HierarchyToTree(nodes, selectedNodeID)
 	parentLabelByID := hierarchyNodeLabelMap(nodes)
+	parentIDByNodeID := hierarchyParentIDMap(nodes)
 
 	var selected *viewmodels.OrgNodeDetails
 	if selectedNodeID != nil {
@@ -180,11 +181,19 @@ func (c *OrgUIController) NodesPage(w http.ResponseWriter, r *http.Request) {
 			if details != nil {
 				details.LongName = c.orgNodeLongNameFor(r, tenantID, *selectedNodeID, effectiveDate)
 			}
-			if details != nil && details.ParentHint != nil && *details.ParentHint != uuid.Nil {
-				if label, ok := parentLabelByID[*details.ParentHint]; ok && strings.TrimSpace(label) != "" {
-					details.ParentLabel = label
-				} else {
-					details.ParentLabel = c.orgNodeLabelFor(r, tenantID, *details.ParentHint, effectiveDate)
+			if details != nil {
+				if parentID, ok := parentIDByNodeID[*selectedNodeID]; ok && parentID != uuid.Nil {
+					if label, ok := parentLabelByID[parentID]; ok && strings.TrimSpace(label) != "" {
+						details.ParentLabel = label
+					} else {
+						details.ParentLabel = c.orgNodeLabelFor(r, tenantID, parentID, effectiveDate)
+					}
+				} else if details.ParentHint != nil && *details.ParentHint != uuid.Nil {
+					if label, ok := parentLabelByID[*details.ParentHint]; ok && strings.TrimSpace(label) != "" {
+						details.ParentLabel = label
+					} else {
+						details.ParentLabel = c.orgNodeLabelFor(r, tenantID, *details.ParentHint, effectiveDate)
+					}
 				}
 			}
 			selected = details
@@ -4049,11 +4058,20 @@ func (c *OrgUIController) writeNodePanelWithOOBTree(w http.ResponseWriter, r *ht
 		return
 	}
 	parentLabelByID := hierarchyNodeLabelMap(nodes)
-	if details != nil && details.ParentHint != nil && *details.ParentHint != uuid.Nil {
-		if label, ok := parentLabelByID[*details.ParentHint]; ok && strings.TrimSpace(label) != "" {
-			details.ParentLabel = label
-		} else {
-			details.ParentLabel = c.orgNodeLabelFor(r, tenantID, *details.ParentHint, effectiveDate)
+	parentIDByNodeID := hierarchyParentIDMap(nodes)
+	if details != nil {
+		if parentID, ok := parentIDByNodeID[nodeID]; ok && parentID != uuid.Nil {
+			if label, ok := parentLabelByID[parentID]; ok && strings.TrimSpace(label) != "" {
+				details.ParentLabel = label
+			} else {
+				details.ParentLabel = c.orgNodeLabelFor(r, tenantID, parentID, effectiveDate)
+			}
+		} else if details.ParentHint != nil && *details.ParentHint != uuid.Nil {
+			if label, ok := parentLabelByID[*details.ParentHint]; ok && strings.TrimSpace(label) != "" {
+				details.ParentLabel = label
+			} else {
+				details.ParentLabel = c.orgNodeLabelFor(r, tenantID, *details.ParentHint, effectiveDate)
+			}
 		}
 	}
 	selected := nodeID
@@ -4121,6 +4139,17 @@ func hierarchyNodeLabelMap(nodes []services.HierarchyNode) map[uuid.UUID]string 
 			label = n.ID.String()
 		}
 		out[n.ID] = label
+	}
+	return out
+}
+
+func hierarchyParentIDMap(nodes []services.HierarchyNode) map[uuid.UUID]uuid.UUID {
+	out := make(map[uuid.UUID]uuid.UUID, len(nodes))
+	for _, n := range nodes {
+		if n.ParentID == nil || *n.ParentID == uuid.Nil {
+			continue
+		}
+		out[n.ID] = *n.ParentID
 	}
 	return out
 }

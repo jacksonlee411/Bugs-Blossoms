@@ -369,6 +369,7 @@ func (s *OrgService) GetHierarchyAsOf(ctx context.Context, tenantID uuid.UUID, h
 	if asOf.IsZero() {
 		asOf = time.Now().UTC()
 	}
+	asOf = normalizeValidDateUTC(asOf)
 
 	cacheKey := repo.CacheKey("org", "hierarchy", tenantID, hierarchyType, asOf.UTC().Format(time.RFC3339Nano))
 	if s != nil && s.cache != nil {
