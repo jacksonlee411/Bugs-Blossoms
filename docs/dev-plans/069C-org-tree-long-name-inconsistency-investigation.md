@@ -28,7 +28,7 @@
 - 不在本文件内直接落地代码修复；实现应由单独 PR 或对应 dev-plan 承载。
 - 不新增数据库表；如后续修复需要 DDL/迁移，必须按仓库规则获得手工确认并另起计划/PR。
 
-## 2.1 工具链与门禁（SSOT 引用）
+### 2.3 工具链与门禁（SSOT 引用）
 
 - 触发器矩阵与本地必跑：`AGENTS.md`
 - 命令入口：`Makefile`
@@ -104,6 +104,18 @@
 
 调查前必须先回答：在 as-of=D 下，页面中以下字段分别来自哪里？
 
+### 6.1 最小映射表（以当前实现为准，避免“对话式漂移”）
+
+| 视角/字段 | 当前入口（UI/代码） | 数据来源（表/字段） | as-of 口径 | 备注（常见误判点） |
+| --- | --- | --- | --- | --- |
+| 树列表（左侧） | `OrgService.GetHierarchyAsOf` → `OrgRepository.ListHierarchyAsOf*` → `mappers.HierarchyToTree` | `org_edges.parent_node_id` + `org_edges.depth` + `org_node_slices.display_order/name` | `effective_date <= D AND end_date >= D`（以 `D::date` 过滤） | **Tree 是“按 depth 缩进的扁平列表”**，`HierarchyToTree` 不使用 `ParentID`，排序不是 pre-order 时会产生“树位置错觉”。 |
+| 节点详情：上级显示（ParentLabel） | `getNodeDetails` → `GetNodeAsOf` → `details.ParentHint` → `details.ParentLabel` | `org_node_slices.parent_hint`（展示提示） | `effective_date <= D AND end_date >= D`（以 `D::date` 过滤） | 与树使用的 `org_edges.parent_node_id` **不是同一字段**，因此可能命中 H3。 |
+| 节点详情：long_name | `orglabels.ResolveOrgNodeLongNamesAsOf` | 依赖 `org_edges.path`（祖先定位/解析）+ `org_node_slices.name`（祖先命名切片） | 应与页面 effective_date 同步 | path 失真会产生“稳定但错误”的缺段/错段（H1）；若后续切换 069A 形状，对 069 Gate 的依赖更强。 |
+
+> 注：树列表的 SQL 当前按 `depth ASC, display_order ASC, name ASC` 排序（非 pre-order），因此“视觉父子关系”不能作为真实 parent 证据；真实结构以 `org_edges.parent_node_id`（同 as-of）为准。
+
+### 6.2 需要明确的“口径分叉点”（先排除，再谈一致性）
+
 - 树/上级显示：
   - 口径 A：来自 `org_edges`（as-of=D 的 `parent_node_id`）
   - 口径 B：来自 `org_node_slices.parent_hint`（展示提示字段，可能滞后）
@@ -171,7 +183,52 @@ ORDER BY ns.effective_date DESC
 LIMIT 5;
 ```
 
-### 8.3 结构不变量：父 path 应为子 path 的前缀（同 as-of）
+### 8.3 审计时间线：定位 Move/CorrectMove/删除/缝补 的因果顺序（`org_audit_logs`）
+
+> 说明：`org_edge` 的审计 `entity_id` 是 **edge_id**，不是 `child_node_id`；因此按 node 追踪时需从 `old_values/new_values` 里筛 `child_node_id`。
+
+```sql
+-- 方式 A：已知 request_id（最推荐，完整还原一次写事务）
+SELECT
+  transaction_time,
+  change_type,
+  meta->>'operation' AS operation,
+  entity_type,
+  entity_id,
+  effective_date,
+  end_date,
+  old_values,
+  new_values,
+  meta
+FROM org_audit_logs
+WHERE tenant_id = :tenant_id
+  AND request_id = :request_id
+ORDER BY transaction_time ASC;
+
+-- 方式 B：按 node_id 追踪 edge 变更（Move/CorrectMove/删除等）
+SELECT
+  transaction_time,
+  change_type,
+  meta->>'operation' AS operation,
+  entity_id AS edge_id,
+  effective_date,
+  end_date,
+  old_values->>'parent_node_id' AS old_parent_node_id,
+  new_values->>'parent_node_id' AS new_parent_node_id,
+  COALESCE(new_values->>'child_node_id', old_values->>'child_node_id') AS child_node_id,
+  request_id
+FROM org_audit_logs
+WHERE tenant_id = :tenant_id
+  AND entity_type = 'org_edge'
+  AND (
+    new_values->>'child_node_id' = :node_id::text
+    OR old_values->>'child_node_id' = :node_id::text
+  )
+ORDER BY transaction_time DESC
+LIMIT 200;
+```
+
+### 8.4 结构不变量：父 path 应为子 path 的前缀（同 as-of）
 
 ```sql
 WITH target AS (
@@ -201,16 +258,17 @@ SELECT
   t.parent_node_id AS parent_id,
   t.path::text AS child_path,
   p.path::text AS parent_path,
-  (p.path <@ t.path) AS parent_is_prefix,
+  CASE WHEN p.path IS NULL THEN NULL ELSE (p.path @> t.path) END AS parent_is_prefix,
+  CASE WHEN p.path IS NULL THEN NULL ELSE (t.depth = p.depth + 1) END AS parent_child_depth_ok,
   (t.depth = nlevel(t.path)-1) AS child_depth_ok,
   (p.depth = nlevel(p.path)-1) AS parent_depth_ok
 FROM target t
 LEFT JOIN parent p ON true;
 ```
 
-### 8.4 子树内潜在不一致扫描（只读调查版）
+### 8.5 子树内潜在不一致扫描（只读调查版）
 
-> 用目标节点 as-of 的 `path` 作为子树根，扫描同一天内满足 `path <@ root_path` 的边切片，查找 `depth != nlevel(path)-1` 或祖先前缀断裂的候选。
+> 用目标节点 as-of 的 `path` 作为子树根，扫描同一天内满足 `path <@ root_path` 的边切片，查找 `depth != nlevel(path)-1` 或 “parent_path 不是 child_path 前缀” 的候选。
 
 ```sql
 WITH root AS (
@@ -234,15 +292,30 @@ subtree AS (
     AND e.path <@ r.path
 )
 SELECT
-  child_node_id,
-  parent_node_id,
-  effective_date,
-  end_date,
-  depth,
-  nlevel(path)-1 AS depth_calc,
-  path::text AS path_text
-FROM subtree
-WHERE depth <> nlevel(path)-1
+  c.child_node_id,
+  c.parent_node_id,
+  c.effective_date,
+  c.end_date,
+  c.depth,
+  nlevel(c.path)-1 AS depth_calc,
+  c.path::text AS path_text,
+  p.path::text AS parent_path_text,
+  CASE WHEN p.path IS NULL THEN NULL ELSE (p.path @> c.path) END AS parent_is_prefix,
+  CASE WHEN p.path IS NULL THEN NULL ELSE (c.depth = p.depth + 1) END AS parent_child_depth_ok
+FROM subtree c
+LEFT JOIN org_edges p
+  ON p.tenant_id = c.tenant_id
+  AND p.hierarchy_type = c.hierarchy_type
+  AND p.child_node_id = c.parent_node_id
+  AND p.effective_date <= :as_of::date
+  AND p.end_date >= :as_of::date
+WHERE c.parent_node_id IS NOT NULL
+  AND (
+    c.depth <> nlevel(c.path)-1
+    OR p.path IS NULL
+    OR NOT (p.path @> c.path)
+    OR c.depth <> p.depth + 1
+  )
 ORDER BY effective_date DESC
 LIMIT 200;
 ```
@@ -253,11 +326,14 @@ LIMIT 200;
 
 - 根因归类：命中 §7 的哪条假设（可多选），以及证据点。
 - 最小反例：一个能复现的不一致样本（tenant_id/node_id/as_of）。
+- 口径对齐结论：补齐 §6.1 的“字段→来源”映射，并注明树查询当前使用的 `OrgReadStrategy`。
+- 关键证据快照：至少包含 §8.1/8.2/8.4 的输出摘要；若涉及写入顺序/回溯生效日，补齐 §8.3 的审计时间线摘要。
 - 修复建议：对应 069 的 A/C（或补充计划），并明确是否需要读时兜底（仅临时）。
 - 风险评估：影响面（哪些页面/报表受 long_name 错误影响）与回滚策略。
 
 ## 10. 关闭条件（Exit Criteria）
 
 - [ ] 至少 1 个复现样本被记录，并能在本地以 SQL/页面稳定复现。
-- [ ] 已明确“不一致”是口径差异还是数据不变量破坏（或两者兼有），并能用证据支撑。
-- [ ] 已产出后续落地路径：对应 dev-plan/PR 列表（例如补充 069 的治理脚本、补齐 068/069A 的容错策略等）。
+- [ ] 已明确“不一致”是口径差异还是数据不变量破坏（或两者兼有），并能用 §6 + §8 的证据支撑。
+- [ ] 若树侧存在“位置错觉”（非 pre-order + depth 缩进扁平列表），已给出明确的后续落地项：要么调整树输出顺序/结构，要么提供 UI 层防误判手段（文案/交互/对齐策略）。
+- [ ] 已产出可执行的后续落地路径：对应 dev-plan/PR 列表与最小验收口径（例如：对最小反例，§8.4/§8.5 扫描结果收敛为 0 且页面一致）。
