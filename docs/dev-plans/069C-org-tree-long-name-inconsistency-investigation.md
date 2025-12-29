@@ -108,11 +108,11 @@
 
 | 视角/字段 | 当前入口（UI/代码） | 数据来源（表/字段） | as-of 口径 | 备注（常见误判点） |
 | --- | --- | --- | --- | --- |
-| 树列表（左侧） | `OrgService.GetHierarchyAsOf` → `OrgRepository.ListHierarchyAsOf*` → `mappers.HierarchyToTree` | `org_edges.parent_node_id` + `org_edges.depth` + `org_node_slices.display_order/name` | `effective_date <= D AND end_date >= D`（以 `D::date` 过滤） | **Tree 是“按 depth 缩进的扁平列表”**，`HierarchyToTree` 不使用 `ParentID`，排序不是 pre-order 时会产生“树位置错觉”。 |
-| 节点详情：上级显示（ParentLabel） | `getNodeDetails` → `GetNodeAsOf` → `details.ParentHint` → `details.ParentLabel` | `org_node_slices.parent_hint`（展示提示） | `effective_date <= D AND end_date >= D`（以 `D::date` 过滤） | 与树使用的 `org_edges.parent_node_id` **不是同一字段**，因此可能命中 H3。 |
+| 树列表（左侧） | `OrgService.GetHierarchyAsOf` → `OrgRepository.ListHierarchyAsOf*` → `mappers.HierarchyToTree` | `org_edges.parent_node_id` + `org_edges.depth` + `org_node_slices.display_order/name` | `effective_date <= D AND end_date >= D`（以 `D::date` 过滤） | Tree 仍是“按 depth 缩进的扁平列表”，但 **`HierarchyToTree` 已按 `ParentID` 做 pre-order 输出**（同一 parent 下按 `display_order/name` 排序），避免“树位置错觉”。 |
+| 节点详情：上级显示（ParentLabel） | `getNodeDetails` → `GetNodeAsOf`（node slice） + `GetHierarchyAsOf`（edges parent）→ `details.ParentLabel` | 优先使用 `org_edges.parent_node_id`（同 as-of），仅在缺失时 fallback `org_node_slices.parent_hint` | `effective_date <= D AND end_date >= D`（以 `D::date` 过滤） | 与树对齐：上级展示默认以 edges 的真实 parent 为准，降低 H3 噪声。 |
 | 节点详情：long_name | `orglabels.ResolveOrgNodeLongNamesAsOf` | 依赖 `org_edges.path`（祖先定位/解析）+ `org_node_slices.name`（祖先命名切片） | 应与页面 effective_date 同步 | path 失真会产生“稳定但错误”的缺段/错段（H1）；若后续切换 069A 形状，对 069 Gate 的依赖更强。 |
 
-> 注：树列表的 SQL 当前按 `depth ASC, display_order ASC, name ASC` 排序（非 pre-order），因此“视觉父子关系”不能作为真实 parent 证据；真实结构以 `org_edges.parent_node_id`（同 as-of）为准。
+> 注：树列表底层 SQL 仍可能按 `depth ASC, display_order ASC, name ASC` 返回（非 pre-order），但 UI 侧已按 `ParentID` 重新排序；真实结构仍以 `org_edges.parent_node_id`（同 as-of）为准。
 
 ### 6.2 需要明确的“口径分叉点”（先排除，再谈一致性）
 
