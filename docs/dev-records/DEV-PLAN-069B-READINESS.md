@@ -19,3 +19,6 @@
 
 - 实现：`modules/org/services/org_service_066.go`
 - 测试：`modules/org/services/org_069B_edges_path_consistency_delete_integration_test.go`
+- 存量巡检基线（本地）：对 `tenant_id=00000000-0000-0000-0000-000000000001` / `hierarchy_type=OrgUnit`，执行
+  - `scripts/org/069_org_edges_path_inconsistency_count.sql`：从 `1` 修复到 `0`
+  - 修复使用：`scripts/org/069_fix_org_edges_path_one_batch.sql`（示例 `child_edge_id=32207122-ea2e-4614-ab24-4936e5491ae6`）
