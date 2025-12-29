@@ -1,6 +1,6 @@
 # DEV-PLAN-070：Org 组织架构页增加“修改记录 / 删除记录”（Correct / DeleteSliceAndStitch）详细设计
 
-**状态**: 已批准（2025-12-29 13:10 UTC）
+**状态**: 已完成（PR #169 已合并至 `main`，merge commit `bc88cb60`，2025-12-29 21:08 UTC）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**:
@@ -15,12 +15,12 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] 在 `/org/nodes`（组织架构页）为“记录（时间片）”补齐 v1 四个 UI 操作入口：
+- [x] 在 `/org/nodes`（组织架构页）为“记录（时间片）”补齐 v1 四个 UI 操作入口：
   - Node slices：**修改记录（Correct）**、**删除记录（DeleteSliceAndStitch）**
   - Edge slices（child 视角）：**修正移动（CorrectMoveNode）**、**撤销移动（DeleteEdgeSliceAndStitch）**
-- [ ] UI 语义清晰且独立：Insert / Correct / DeleteSliceAndStitch / Move / CorrectMove 分工明确，避免“同一按钮多语义”。
-- [ ] 权限拆分：Correct / DeleteSliceAndStitch / CorrectMove / DeleteEdgeSliceAndStitch 需要独立且更高权限（与 Insert 分离）。
-- [ ] 写入一致性与审计对齐：冻结窗口（freeze）、并发串行化（timeline lock）、审计日志（`org_audit_logs`）与事件发布（`*.v1`）全部由 Service 作为权威保障（UI 只做契约承载）。
+- [x] UI 语义清晰且独立：Insert / Correct / DeleteSliceAndStitch / Move / CorrectMove 分工明确，避免“同一按钮多语义”。
+- [x] 权限拆分：Correct / DeleteSliceAndStitch / CorrectMove / DeleteEdgeSliceAndStitch 需要独立且更高权限（与 Insert 分离）。
+- [x] 写入一致性与审计对齐：冻结窗口（freeze）、并发串行化（timeline lock）、审计日志（`org_audit_logs`）与事件发布（`*.v1`）全部由 Service 作为权威保障（UI 只做契约承载）。
 
 ### 2.2 非目标 (Out of Scope)
 - 不实现“删除实体”（例如删除 `org_nodes` 本体）；本文的“删除记录”仅指删除某条时间片记录（对齐 DEV-PLAN-066 的定义）。
@@ -33,10 +33,10 @@
 > 本节只声明“本计划命中哪些触发器/工具链”，不复制脚本细节；以 `AGENTS.md`/`Makefile`/CI 为准。
 
 - 触发器清单（预计命中）：
-  - [ ] Go 代码（触发器矩阵：`AGENTS.md`）
-  - [ ] `.templ` / Tailwind（触发器矩阵：`AGENTS.md`）
-  - [ ] 多语言 JSON（`modules/org/presentation/locales/*.json`，触发器矩阵：`AGENTS.md`）
-  - [ ] Authz（`make authz-pack && make authz-test && make authz-lint`，触发器矩阵：`AGENTS.md`）
+  - [x] Go 代码（触发器矩阵：`AGENTS.md`）
+  - [x] `.templ` / Tailwind（触发器矩阵：`AGENTS.md`）
+  - [x] 多语言 JSON（`modules/org/presentation/locales/*.json`，触发器矩阵：`AGENTS.md`）
+  - [x] Authz（`make authz-pack && make authz-test && make authz-lint`，触发器矩阵：`AGENTS.md`）
 - SSOT：
   - 触发器矩阵与本地必跑：`AGENTS.md`
   - 删除并缝补：`docs/dev-plans/066-auto-stitch-time-slices-on-delete.md`
@@ -325,25 +325,25 @@ graph TD
 - `org_edges.path` 一致性写入门禁与 preflight：`docs/dev-plans/069B-org-edges-path-consistency-for-delete-and-boundary-changes.md`
 
 ### 8.2 里程碑（实现顺序）
-1. [ ] records 读模型：repo/service 读方法 + viewmodels + templ 渲染（含 active_at_as_of 高亮）。
-2. [ ] 修复 Node `status` 枚举漂移：UI 表单选项收敛为 `active/retired`（禁止提交 `inactive`），并补齐对应 i18n 文案。
-3. [ ] Node Correct：新增 `view=correct` 表单与 `POST :correct` 写入。
-4. [ ] Node DeleteSliceAndStitch：新增 `view=delete-slice` 表单与 `POST :delete-slice` 写入（reason_code/note）。
-5. [ ] Edge CorrectMove：新增 `view=correct-move` 表单与 `POST :correct-move` 写入，并落地互斥引导（6.3）。
-6. [ ] Edge DeleteEdgeSliceAndStitch：新增 `view=delete-edge-slice` 表单与 `POST :delete-edge-slice` 写入（reason_code/note + 069B 错误展示）。
-7. [ ] Authz/UI：确保页面 capabilities 覆盖 `admin`，并对齐按钮可见性与服务端鉴权点。
-8. [ ] i18n：补齐 `modules/org/presentation/locales/{en,zh}.json` 文案（标题/按钮/错误提示/确认文案）。
-9. [ ] 测试与 Readiness：按 `AGENTS.md` 触发器执行与记录。
+1. [x] records 读模型：repo/service 读方法 + viewmodels + templ 渲染（含 active_at_as_of 高亮）。
+2. [x] 修复 Node `status` 枚举漂移：UI 表单选项收敛为 `active/retired`（禁止提交 `inactive`），并补齐对应 i18n 文案。
+3. [x] Node Correct：新增 `view=correct` 表单与 `POST :correct` 写入。
+4. [x] Node DeleteSliceAndStitch：新增 `view=delete-slice` 表单与 `POST :delete-slice` 写入（reason_code/note）。
+5. [x] Edge CorrectMove：新增 `view=correct-move` 表单与 `POST :correct-move` 写入，并落地互斥引导（6.3）。
+6. [x] Edge DeleteEdgeSliceAndStitch：新增 `view=delete-edge-slice` 表单与 `POST :delete-edge-slice` 写入（reason_code/note + 069B 错误展示）。
+7. [x] Authz/UI：确保页面 capabilities 覆盖 `admin`，并对齐按钮可见性与服务端鉴权点。
+8. [x] i18n：补齐 `modules/org/presentation/locales/{en,zh}.json` 文案（标题/按钮/错误提示/确认文案）。
+9. [x] 测试与 Readiness：按 `AGENTS.md` 触发器执行与记录。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
-- [ ] records 列表满足 5.2 的读契约：倒序、可定位 active_at_as_of、Edge 行能显示 `parent_label_at_start`（或 Root）。
-- [ ] Node `status` 值与 DB 约束一致：UI 不再提交 `inactive`；选择“退役/停用”时写入值为 `retired`，并可在 records/详情中正确展示。
-- [ ] Node Correct：不创建新切片；Correct 后 records 列表仍存在同一条 `effective_date` 记录且字段变更可见。
-- [ ] Node DeleteSliceAndStitch：删除后时间轴仍满足 gap-free 门禁（066），records 列表能反映相邻切片 `end_date` 的变化。
-- [ ] Edge CorrectMove：修正移动后树结构与长路径名称在 as-of 上一致；互斥错误能按 6.3 给出可执行引导。
-- [ ] Edge DeleteEdgeSliceAndStitch：撤销移动后满足 066/069B 门禁；`ORG_CANNOT_DELETE_FIRST_EDGE_SLICE`/`ORG_PREFLIGHT_TOO_LARGE` 有清晰错误展示。
-- [ ] 无对应权限时：按钮不可见 + 服务端拒绝（403/422 表现与现有一致）。
-- [ ] 本计划命中的门禁均通过（入口见 `AGENTS.md`），生成物提交齐全。
+- [x] records 列表满足 5.2 的读契约：倒序、可定位 active_at_as_of、Edge 行能显示 `parent_label_at_start`（或 Root）。
+- [x] Node `status` 值与 DB 约束一致：UI 不再提交 `inactive`；选择“退役/停用”时写入值为 `retired`，并可在 records/详情中正确展示。
+- [x] Node Correct：不创建新切片；Correct 后 records 列表仍存在同一条 `effective_date` 记录且字段变更可见。
+- [x] Node DeleteSliceAndStitch：删除后时间轴仍满足 gap-free 门禁（066），records 列表能反映相邻切片 `end_date` 的变化。
+- [x] Edge CorrectMove：修正移动后树结构与长路径名称在 as-of 上一致；互斥错误能按 6.3 给出可执行引导。
+- [x] Edge DeleteEdgeSliceAndStitch：撤销移动后满足 066/069B 门禁；`ORG_CANNOT_DELETE_FIRST_EDGE_SLICE`/`ORG_PREFLIGHT_TOO_LARGE` 有清晰错误展示。
+- [x] 无对应权限时：按钮不可见 + 服务端拒绝（403/422 表现与现有一致）。
+- [x] 本计划命中的门禁均通过（入口见 `AGENTS.md`），生成物提交齐全。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - 不新增 Feature Flag：沿用现有 `OrgRolloutEnabledForTenant` 的租户级开启策略。
@@ -351,3 +351,10 @@ graph TD
 - 回滚：
   - 代码回滚：按常规 PR revert。
   - 数据回滚：Correct/DeleteSliceAndStitch 属业务写入，需依赖审计日志做人工回溯（本计划不提供自动回滚脚本）。
+
+## 11. 实施与合并记录 (Implementation & Merge Record)
+- PR：https://github.com/jacksonlee411/Bugs-Blossoms/pull/169
+- Merge commit：`bc88cb606662a6602807002aa60d1fe4dad80b7b`（`main`）
+- 合并时间：2025-12-29 21:08 UTC
+- 本地验证（触发器矩阵）：`make authz-pack && make generate && make css && go fmt ./... && go vet ./... && make check lint && make check tr && make test && make authz-test && make authz-lint`
+- CI：Quality Gates 全绿（Code Quality & Formatting / Unit & Integration Tests / Routing Gates / E2E Tests）
