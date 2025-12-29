@@ -217,5 +217,6 @@ modules/{module}/
 - DEV-PLAN-069A Readiness：`docs/dev-records/DEV-PLAN-069A-READINESS.md`
 - 调查：组织架构树与组织长名称不一致（DEV-PLAN-069C）：`docs/dev-plans/069C-org-tree-long-name-inconsistency-investigation.md`
 - 在 066 删除/边界变更场景保持 `org_edges.path` 一致性（DEV-PLAN-069B）：`docs/dev-plans/069B-org-edges-path-consistency-for-delete-and-boundary-changes.md`
+- DEV-PLAN-069B Readiness：`docs/dev-records/DEV-PLAN-069B-READINESS.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`

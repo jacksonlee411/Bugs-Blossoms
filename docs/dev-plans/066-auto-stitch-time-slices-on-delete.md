@@ -134,6 +134,9 @@ Valid Time 的业务语义为 day 闭区间 `[effective_date, end_date]`（均�
 - 目标/上一片定位：需要补齐 Repository 锁定能力（以 `effective_date/end_date` 边界相等为准，`FOR UPDATE`）
 - 缝补更新：可复用现有 `TruncateEdge`（本质是 `UPDATE ... SET end_date=?`，同时适用于“截断/延长”）
 - 删除：可复用现有 `DeleteEdgeByID`（按 `id` 删除）
+- 一致性约束（v1 固化）：对 `org_edges` 的 Delete+Stitch，必须接入 DEV-PLAN-069 的 “preflight + prefix rewrite” 原语（见 DEV-PLAN-069B），以避免后代 future slice 的 `org_edges.path/depth` 跨切片失真（H1 复发）。
+  - `422 ORG_PREFLIGHT_TOO_LARGE`：影响行数超限，拒绝在线写入（必须零副作用回滚）。
+  - `422 ORG_CANNOT_DELETE_FIRST_EDGE_SLICE`：禁止删除最早 edge slice（无上一片可 stitch）；避免制造“结构缺口”。
 - 副作用：边关系变化可能影响 closure/build/snapshot；实现阶段需明确复用既有“写入后失效/重建触发”路径，并用集成测试验证读路径一致性。对齐 R401 的建议：避免在命令写事务内同步触发大规模级联重算，优先采用 Outbox 驱动的异步刷新（最终一致性）。
 
 #### 4.4.4 `org_assignments`（primary 时间线）
@@ -202,6 +205,9 @@ Auto-Stitch 可能因“延长相邻切片窗口”触发其他约束失败（�
 ### 4.8 错误码与排障（v1 固化）
 - DB 门禁失败：constraint trigger 函数使用 `ERRCODE = 'integrity_constraint_violation'`（`SQLSTATE 23000`）并设置 `CONSTRAINT = 'org_*_gap_free'`；错误信息必须包含 `tenant_id` 与时间线 key，便于定位。
 - Service 映射：`modules/org/services/pg_errors.go` 增加分支，把 `Code==23000 && ConstraintName ~ '_gap_free$'` 映射为 `409 ORG_TIME_GAP`（message：`time slices must be gap-free`）。
+- `org_edges` 删除/缝补（DEV-PLAN-069B）：写路径额外可能返回
+  - `422 ORG_PREFLIGHT_TOO_LARGE`（复用 069）：子树 future slices prefix rewrite 影响行数超限。
+  - `422 ORG_CANNOT_DELETE_FIRST_EDGE_SLICE`：禁止删除最早 edge slice（无上一片可 stitch）。
 - 排障 SQL（示例：按任意时间片表的时间线 key 定位断层）：
   - `SELECT effective_date, end_date, lag(end_date) OVER (ORDER BY effective_date) AS prev_end_date FROM ... WHERE ... ORDER BY effective_date;`
   - 任意一行满足 `prev_end_date IS NOT NULL AND prev_end_date + 1 <> effective_date` 即为 gap。
@@ -232,7 +238,7 @@ Auto-Stitch 可能因“延长相邻切片窗口”触发其他约束失败（�
 - [ ] 覆盖关键场景的集成测试：
   - 3 段切片 A/B/C，删除 B 后 A 与 C 连续
   - 删除最后一段（`T.end_date=end_of_time`）后，上一段延长至 `end_of_time`
-  - 删除第一段（无 `P`）时不做缝补，但不产生“中间 gap”
+  - `org_edges`：删除第一段（无 `P`）返回 `422 ORG_CANNOT_DELETE_FIRST_EDGE_SLICE`（不允许制造结构缺口）
   - 约束冲突时回滚并返回可解释错误
 - [ ] DB 侧 gap-free 校验门禁生效：绕过 Service 的写入（例如仅 `DELETE T`）无法提交产生 gap 的状态。
 - [ ] 审计日志与事件发布行为符合现有约定（topic 仍为 `*.v1`）。

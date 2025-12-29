@@ -441,9 +441,39 @@ func (s *OrgService) DeleteEdgeSliceAndStitch(ctx context.Context, tenantID uuid
 			return nil, err
 		}
 
+		if !hasPrev {
+			return nil, newServiceError(
+				http.StatusUnprocessableEntity,
+				"ORG_CANNOT_DELETE_FIRST_EDGE_SLICE",
+				"cannot delete the first edge slice (no previous slice to stitch)",
+				nil,
+			)
+		}
+
+		oldPrefix := target.Path
+		affectedEdges, err := s.repo.CountDescendantEdgesNeedingPathRewriteFrom(txCtx, tenantID, in.HierarchyType, target.EffectiveDate, oldPrefix)
+		if err != nil {
+			return nil, err
+		}
+		if affectedEdges > maxEdgesPathRewrite {
+			return nil, newServiceError(
+				http.StatusUnprocessableEntity,
+				"ORG_PREFLIGHT_TOO_LARGE",
+				fmt.Sprintf(
+					"subtree path rewrite impact is too large (affected_edges=%d, limit=%d, effective_date=%s, node_id=%s)",
+					affectedEdges,
+					maxEdgesPathRewrite,
+					target.EffectiveDate.UTC().Format(time.DateOnly),
+					in.ChildNodeID.String(),
+				),
+				nil,
+			)
+		}
+
 		opDetail := map[string]any{
 			"target_effective_date": normalizeValidDateUTC(in.TargetEffectiveDate).Format(time.RFC3339),
 			"deleted_edge_id":       target.ID.String(),
+			"path_rewrite_affected": affectedEdges,
 		}
 
 		targetOld := map[string]any{
@@ -466,48 +496,58 @@ func (s *OrgService) DeleteEdgeSliceAndStitch(ctx context.Context, tenantID uuid
 		if err := s.repo.DeleteEdgeByID(txCtx, tenantID, target.ID); err != nil {
 			return nil, mapPgError(err)
 		}
-		if hasPrev {
-			if err := s.repo.TruncateEdge(txCtx, tenantID, prev.ID, target.EndDate); err != nil {
-				return nil, mapPgError(err)
+		if err := s.repo.TruncateEdge(txCtx, tenantID, prev.ID, target.EndDate); err != nil {
+			return nil, mapPgError(err)
+		}
+
+		newEdgeAt, err := s.repo.LockEdgeAt(txCtx, tenantID, in.HierarchyType, in.ChildNodeID, target.EffectiveDate)
+		if err != nil {
+			return nil, mapPgError(err)
+		}
+		newPrefix := newEdgeAt.Path
+		opDetail["path_rewrite_old_prefix"] = oldPrefix
+		opDetail["path_rewrite_new_prefix"] = newPrefix
+
+		if affectedEdges > 0 && oldPrefix != newPrefix {
+			if _, err := s.repo.RewriteDescendantEdgesPathPrefixFrom(txCtx, tenantID, in.HierarchyType, target.EffectiveDate, oldPrefix, newPrefix); err != nil {
+				return nil, err
 			}
 		}
 
 		var stitchedTo *uuid.UUID
-		if hasPrev {
-			prevOld := map[string]any{
-				"edge_id":        prev.ID.String(),
-				"effective_date": prev.EffectiveDate.UTC().Format(time.RFC3339),
-				"end_date":       prev.EndDate.UTC().Format(time.RFC3339),
-			}
-			prevNew := map[string]any{
-				"edge_id":        prev.ID.String(),
-				"effective_date": prev.EffectiveDate.UTC().Format(time.RFC3339),
-				"end_date":       target.EndDate.UTC().Format(time.RFC3339),
-			}
-			_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
-				RequestID:        requestID,
-				TransactionTime:  txTime,
-				InitiatorID:      initiatorID,
-				ChangeType:       "edge.corrected",
-				EntityType:       "org_edge",
-				EntityID:         prev.ID,
-				EffectiveDate:    prev.EffectiveDate,
-				EndDate:          target.EndDate,
-				OldValues:        prevOld,
-				NewValues:        prevNew,
-				Meta:             buildReasonMeta(reasonCode, in.ReasonNote, reasonInfo),
-				Operation:        "DeleteSliceAndStitch",
-				OperationDetails: opDetail,
-				FreezeMode:       freeze.Mode,
-				FreezeViolation:  freeze.Violation,
-				FreezeCutoffUTC:  freeze.CutoffUTC,
-				AffectedAtUTC:    target.EffectiveDate,
-			})
-			if err != nil {
-				return nil, err
-			}
-			stitchedTo = &prev.ID
+		prevOld := map[string]any{
+			"edge_id":        prev.ID.String(),
+			"effective_date": prev.EffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":       prev.EndDate.UTC().Format(time.RFC3339),
 		}
+		prevNew := map[string]any{
+			"edge_id":        prev.ID.String(),
+			"effective_date": prev.EffectiveDate.UTC().Format(time.RFC3339),
+			"end_date":       target.EndDate.UTC().Format(time.RFC3339),
+		}
+		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
+			RequestID:        requestID,
+			TransactionTime:  txTime,
+			InitiatorID:      initiatorID,
+			ChangeType:       "edge.corrected",
+			EntityType:       "org_edge",
+			EntityID:         prev.ID,
+			EffectiveDate:    prev.EffectiveDate,
+			EndDate:          target.EndDate,
+			OldValues:        prevOld,
+			NewValues:        prevNew,
+			Meta:             buildReasonMeta(reasonCode, in.ReasonNote, reasonInfo),
+			Operation:        "DeleteSliceAndStitch",
+			OperationDetails: opDetail,
+			FreezeMode:       freeze.Mode,
+			FreezeViolation:  freeze.Violation,
+			FreezeCutoffUTC:  freeze.CutoffUTC,
+			AffectedAtUTC:    target.EffectiveDate,
+		})
+		if err != nil {
+			return nil, err
+		}
+		stitchedTo = &prev.ID
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
 			RequestID:        requestID,
@@ -532,10 +572,7 @@ func (s *OrgService) DeleteEdgeSliceAndStitch(ctx context.Context, tenantID uuid
 			return nil, err
 		}
 
-		evID := target.ID
-		if hasPrev {
-			evID = prev.ID
-		}
+		evID := prev.ID
 		ev := buildEventV1(requestID, tenantID, initiatorID, txTime, "edge.corrected", "org_edge", evID, target.EffectiveDate, endOfTime)
 		res := &DeleteEdgeSliceAndStitchResult{
 			DeletedEdgeID:  target.ID,
