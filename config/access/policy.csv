@@ -23,6 +23,15 @@ p, role:core.superadmin, org.roles, *, global, allow
 p, role:core.superadmin, org.security_group_mappings, *, global, allow
 p, role:core.superadmin, org.snapshot, *, global, allow
 p, role:core.superadmin, person.persons, *, global, allow
+p, role:org.orgchart.admin, org.edges, admin, *, allow
+p, role:org.orgchart.admin, org.edges, write, *, allow
+p, role:org.orgchart.admin, org.hierarchies, read, *, allow
+p, role:org.orgchart.admin, org.nodes, admin, *, allow
+p, role:org.orgchart.admin, org.nodes, write, *, allow
+p, role:org.orgchart.editor, org.edges, write, *, allow
+p, role:org.orgchart.editor, org.hierarchies, read, *, allow
+p, role:org.orgchart.editor, org.nodes, write, *, allow
+p, role:org.orgchart.viewer, org.hierarchies, read, *, allow
 p, role:org.staffing.admin, org.assignments, admin, *, allow
 p, role:org.staffing.admin, org.assignments, assign, *, allow
 p, role:org.staffing.admin, org.assignments, read, *, allow
