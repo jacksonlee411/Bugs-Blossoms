@@ -1,6 +1,6 @@
 # DEV-PLAN-069B：在 066 删除/边界变更场景保持 `org_edges.path` 一致性（详细设计）
 
-**状态**: 规划中（2025-12-29 03:27 UTC）— 066 删除/缝补入口已落地，但尚未接入 069 的 preflight/prefix rewrite（`modules/org/services/org_service_066.go` 未调用 COUNT/UPDATE 原语）
+**状态**: 已完成（2025-12-29 04:30 UTC）— 待 PR 合并；Readiness：`docs/dev-records/DEV-PLAN-069B-READINESS.md`
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
@@ -11,9 +11,9 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
-- [ ] 让 DEV-PLAN-069 的一致性修复在 DEV-PLAN-066 的 `org_edges` 写入口下同样成立：任何“从某天起改变 child 祖先链”的写操作，都必须维护后代 future slices 的 `org_edges.path/depth` 前缀一致性。
-- [ ] 固化 066 的 `org_edges` 删除入口接入 069 prefix rewrite 的契约（触发条件、`E/old_prefix/new_prefix` 取值、preflight 预算与失败策略、事务顺序）。
-- [ ] 补齐集成测试：覆盖“先制造 future slice，再通过 066 删除改变祖先链”的回归场景；验收 long_name 不缺段且巡检为 0。
+- [X] 让 DEV-PLAN-069 的一致性修复在 DEV-PLAN-066 的 `org_edges` 写入口下同样成立：任何“从某天起改变 child 祖先链”的写操作，都必须维护后代 future slices 的 `org_edges.path/depth` 前缀一致性。
+- [X] 固化 066 的 `org_edges` 删除入口接入 069 prefix rewrite 的契约（触发条件、`E/old_prefix/new_prefix` 取值、preflight 预算与失败策略、事务顺序）。
+- [X] 补齐集成测试：覆盖“先制造 future slice，再通过 066 删除改变祖先链”的回归场景；验收 long_name 不缺段且巡检为 0。
 
 ### 2.2 非目标 (Out of Scope)
 - 不新增数据库表/大规模 schema 改造（如需新增表/迁移必须另开计划并获得手工确认）。
@@ -110,18 +110,18 @@
   - 依赖 066 的 `DeleteEdgeSliceAndStitch` 写入口落地（本计划只定义其必须履行的 069 一致性契约）。
   - 依赖 069 已存在的 repo 原语（COUNT + prefix rewrite）作为复用点。
 - **里程碑**：
-  1. [ ] 066 的 edge 删除入口接入 069 prefix rewrite（含 preflight 事务顺序）。
-  2. [ ] 错误码 `ORG_CANNOT_DELETE_FIRST_EDGE_SLICE` 在 066 中落地，并同步写入 066 文档契约。
-  3. [ ] 新增集成测试覆盖回归与失败路径（见验收标准）。
-  4. [ ] Readiness：补齐 `docs/dev-records/DEV-PLAN-069B-READINESS.md` 并通过门禁（Go + doc gate）。
+  1. [X] 066 的 edge 删除入口接入 069 prefix rewrite（含 preflight 事务顺序）。
+  2. [X] 错误码 `ORG_CANNOT_DELETE_FIRST_EDGE_SLICE` 在 066 中落地，并同步写入 066 文档契约。
+  3. [X] 新增集成测试覆盖回归与失败路径（见验收标准）。
+  4. [X] Readiness：补齐 `docs/dev-records/DEV-PLAN-069B-READINESS.md` 并通过门禁（Go + doc gate）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
-- [ ] 回归测试：构造 `root -> X -> Y -> Z`，先对 `Z` 生成 future slice，再对 `Y` 执行 066 删除/缝补，使祖先链从 `E` 起变化；验证：
+- [X] 回归测试：构造 `root -> X -> Y -> Z`，先对 `Z` 生成 future slice，再对 `Y` 执行 066 删除/缝补，使祖先链从 `E` 起变化；验证：
   - `pkg/orglabels.ResolveOrgNodeLongNamesAsOf` 的结果不缺段（长名称包含完整祖先链）。
   - 069 巡检（父边 path 为子边 path 前缀）为 0。
-- [ ] 失败路径：当 preflight 超限触发 `ORG_PREFLIGHT_TOO_LARGE` 时：
+- [X] 失败路径：当 preflight 超限触发 `ORG_PREFLIGHT_TOO_LARGE` 时：
   - `org_edges` 时间线（child 的切片）与子树 future slices 的 `path/depth` 均无任何改动（零副作用）。
-- [ ] 失败路径：删除最早切片返回 `ORG_CANNOT_DELETE_FIRST_EDGE_SLICE`，且不会产生“结构缺口”。
+- [X] 失败路径：删除最早切片返回 `ORG_CANNOT_DELETE_FIRST_EDGE_SLICE`，且不会产生“结构缺口”。
 
 ## 10. 运维与监控 (Ops & Monitoring)
 - 本项目仍处于早期阶段，不引入额外监控/开关。
