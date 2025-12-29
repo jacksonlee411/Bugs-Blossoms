@@ -214,6 +214,7 @@ modules/{module}/
 - Org 结构索引（`org_edges.path`）一致性修复（DEV-PLAN-069）：`docs/dev-plans/069-org-long-name-parent-display-mismatch-investigation.md`
 - DEV-PLAN-069 Readiness：`docs/dev-records/DEV-PLAN-069-READINESS.md`
 - 基于 `org_edges.path` 生成组织长路径名称（DEV-PLAN-069A）：`docs/dev-plans/069A-org-long-name-generate-from-org-edges-path.md`
+- 调查：组织架构树与组织长名称不一致（DEV-PLAN-069C）：`docs/dev-plans/069C-org-tree-long-name-inconsistency-investigation.md`
 - 在 066 删除/边界变更场景保持 `org_edges.path` 一致性（DEV-PLAN-069B）：`docs/dev-plans/069B-org-edges-path-consistency-for-delete-and-boundary-changes.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
