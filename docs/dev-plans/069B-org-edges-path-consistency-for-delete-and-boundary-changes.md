@@ -1,6 +1,6 @@
 # DEV-PLAN-069B：在 066 删除/边界变更场景保持 `org_edges.path` 一致性（详细设计）
 
-**状态**: 规划中（2025-12-29 00:15 UTC）
+**状态**: 规划中（2025-12-29 03:27 UTC）— 066 删除/缝补入口已落地，但尚未接入 069 的 preflight/prefix rewrite（`modules/org/services/org_service_066.go` 未调用 COUNT/UPDATE 原语）
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：
