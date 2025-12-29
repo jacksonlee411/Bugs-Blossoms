@@ -138,16 +138,16 @@ templ NodesPage(props NodesPageProps) {
 								<div class="text-sm text-300">
 									{ pageCtx.T("Org.UI.NodePanel.Empty") }
 								</div>
-								} else {
-									@orgui.NodeDetails(orgui.NodeDetailsProps{
-										EffectiveDate: props.EffectiveDate,
-										Node:          props.SelectedNode,
-										NodeRecords:   props.NodeRecords,
-										EdgeRecords:   props.EdgeRecords,
-									})
-								}
-							</div>
+							} else {
+								@orgui.NodeDetails(orgui.NodeDetailsProps{
+									EffectiveDate: props.EffectiveDate,
+									Node:          props.SelectedNode,
+									NodeRecords:   props.NodeRecords,
+									EdgeRecords:   props.EdgeRecords,
+								})
+							}
 						</div>
+					</div>
 				</div>
 			</div>
 		</div>
