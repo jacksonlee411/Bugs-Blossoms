@@ -1,6 +1,10 @@
 # DEV-PLAN-069A：基于 `org_edges.path` 生成组织长路径名称（更轻量的读时派生）
 
-**状态**: 草拟中（2025-12-28 23:55 UTC）
+**状态**: 已实现（2025-12-29 03:27 UTC）— 已合并至 main（PR #159）；Readiness：`docs/dev-records/DEV-PLAN-069A-READINESS.md`
+
+> 完成情况登记（以 main 为准）：
+> - 默认查询已为 path-driven（拆 `target.path` 再 join slices）：`pkg/orglabels/org_node_long_name.go`
+> - 对照一致性测试：`modules/org/services/org_069A_long_name_path_driven_equivalence_test.go`
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**:
@@ -14,10 +18,10 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 - **核心目标**:
-  - [ ] 在 **不改变对外契约**（调用方式/返回语义）的前提下，优化 long_name 生成 SQL 形状：用 `target.path` 提供祖先序列，避免 `org_edges` 自连接扫描祖先集合。
-  - [ ] 将改动边界收敛到 `pkg/orglabels.ResolveOrgNodeLongNames`：不扩散到 Controller/Service/UI。
-  - [ ] 提供“新旧实现结果一致”的对照验证（自动化测试），并给出可回滚路径。
-  - [ ] 明确本计划命中的工具链/门禁触发器，并按 SSOT 执行与引用（见“工具链与门禁（SSOT 引用）”）。
+  - [X] 在 **不改变对外契约**（调用方式/返回语义）的前提下，优化 long_name 生成 SQL 形状：用 `target.path` 提供祖先序列，避免 `org_edges` 自连接扫描祖先集合。
+  - [X] 将改动边界收敛到 `pkg/orglabels.ResolveOrgNodeLongNames`：不扩散到 Controller/Service/UI。
+  - [X] 提供“新旧实现结果一致”的对照验证（自动化测试），并给出可回滚路径。
+  - [X] 明确本计划命中的工具链/门禁触发器，并按 SSOT 执行与引用（见“工具链与门禁（SSOT 引用）”）。
 - **非目标 (Out of Scope)**:
   - 不把 long_name 写时物化到写模型（不新增 long_name 字段/表）。
   - 不引入 schema 变更（DDL/迁移/新增索引/新增 SQL 函数）。若后续确需 DDL（例如引入 `uuid_from_ltree_label(text)`），必须另起 dev-plan，并按仓库规则获得确认后再实施。
@@ -191,10 +195,10 @@ GROUP BY org_node_id, as_of_day;
   - DEV-PLAN-069 的 A/C：`org_edges.path/depth` 作为结构索引 SSOT 的不变量成立（含存量治理）。
   - Postgres `ltree` 已启用（现状已在 org schema 中声明）。
 - **里程碑**（进入编码后）：
-  1. [ ] 在 `pkg/orglabels` 增加 path-driven 查询实现，但先不替换默认；保留现有实现作为基线。
-  2. [ ] 增加对照测试：同一组输入 pairs 同时跑新旧两套查询，断言输出字面一致（覆盖：正常链路、无 edge slice 为空串、无 name 时 `code/id` 兜底）。
+  1. [X] 在 `pkg/orglabels` 增加 path-driven 查询实现，并替换默认实现；旧查询作为基线仅保留在对照测试中。
+  2. [X] 增加对照测试：同一组输入 pairs 同时跑新旧两套查询，断言输出字面一致（覆盖：正常链路、无 edge slice 为空串、无 name 时 `code/id` 兜底）。
   3. [ ] 做一次最小化性能对比：对同一批输入记录 `EXPLAIN (ANALYZE, BUFFERS)`，确认收益在典型数据集上成立。
-  4. [ ] 决策切换方式：替换默认查询或保留双实现；PR 描述必须声明偏离/风险与回滚路径。
+  4. [X] 决策切换方式：已替换为默认查询（PR #159）；回滚路径为 revert 对应提交。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - **正确性（对照一致）**：对相同输入（tenant、pairs），本方案生成的 `long_name` 与 068 现有实现字面一致。
