@@ -219,5 +219,6 @@ modules/{module}/
 - DEV-PLAN-069C Readiness：`docs/dev-records/DEV-PLAN-069C-READINESS.md`
 - 在 066 删除/边界变更场景保持 `org_edges.path` 一致性（DEV-PLAN-069B）：`docs/dev-plans/069B-org-edges-path-consistency-for-delete-and-boundary-changes.md`
 - DEV-PLAN-069B Readiness：`docs/dev-records/DEV-PLAN-069B-READINESS.md`
+- Docker 中 PostgreSQL CPU 偏高调查与建议（DEV-PLAN-071）：`docs/dev-plans/071-postgres-docker-high-cpu-investigation.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
