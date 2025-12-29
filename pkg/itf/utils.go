@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -105,6 +106,11 @@ func (dm *DatabaseManager) Close() {
 		dm.pool.Close()
 		dm.pool = nil
 	}
+	if shouldAutoDropDB(dm.dbName) {
+		if err := DropDB(dm.dbName); err != nil {
+			log.Printf("[WARNING] Failed to drop test database %q: %v", sanitizeDBName(dm.dbName), err)
+		}
+	}
 }
 
 func DefaultParams() *composables.Params {
@@ -148,6 +154,8 @@ const (
 	hashSuffixLength = 9
 )
 
+const keepTestDatabasesEnv = "ITF_KEEP_DATABASES"
+
 // sanitizeDBName replaces special characters in database names with underscores
 // and ensures the name doesn't exceed PostgreSQL's 63-character limit
 func sanitizeDBName(name string) string {
@@ -184,6 +192,20 @@ func sanitizeDBName(name string) string {
 
 	// Name is too long, need to truncate and add hash for uniqueness
 	return truncateWithHash(sanitized, name)
+}
+
+func shouldAutoDropDB(name string) bool {
+	if strings.TrimSpace(os.Getenv(keepTestDatabasesEnv)) != "" {
+		return false
+	}
+
+	sanitized := sanitizeDBName(name)
+	switch sanitized {
+	case "postgres", "template0", "template1":
+		return false
+	}
+
+	return strings.HasPrefix(sanitized, "test") || strings.HasPrefix(sanitized, "t_")
 }
 
 // truncateWithHash truncates a database name and adds a hash suffix for uniqueness
@@ -322,6 +344,69 @@ func CreateDB(name string) {
 	}
 
 	panic(lastErr)
+}
+
+func DropDB(name string) error {
+	sanitizedName := sanitizeDBName(name)
+
+	c := configuration.Use()
+	adminConnStr := fmt.Sprintf(
+		"host=%s port=%s user=%s dbname=postgres password=%s sslmode=disable",
+		c.Database.Host, c.Database.Port, c.Database.User, c.Database.Password,
+	)
+
+	var lastErr error
+	const maxAttempts = 60
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		db, err := sql.Open("postgres", adminConnStr)
+		if err != nil {
+			lastErr = err
+		} else {
+			func() {
+				defer func() {
+					if err := db.Close(); err != nil {
+						log.Printf("[WARNING] Error closing DropDB connection: %v", err)
+					}
+				}()
+
+				pingCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := db.PingContext(pingCtx); err != nil {
+					lastErr = err
+					return
+				}
+
+				dropCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+				defer cancel()
+
+				_, err = db.ExecContext(dropCtx, fmt.Sprintf("DROP DATABASE IF EXISTS %s WITH (FORCE)", sanitizedName))
+				if err != nil {
+					_, err = db.ExecContext(dropCtx, fmt.Sprintf("DROP DATABASE IF EXISTS %s", sanitizedName))
+				}
+				if err != nil {
+					lastErr = err
+					return
+				}
+
+				lastErr = nil
+			}()
+		}
+
+		if lastErr == nil {
+			return nil
+		}
+		if !isTransientPostgresError(lastErr) {
+			return lastErr
+		}
+
+		delay := time.Duration(attempt+1) * 100 * time.Millisecond
+		if delay > time.Second {
+			delay = time.Second
+		}
+		time.Sleep(delay)
+	}
+
+	return lastErr
 }
 
 func DbOpts(name string) string {

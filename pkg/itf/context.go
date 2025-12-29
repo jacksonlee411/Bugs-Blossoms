@@ -99,6 +99,11 @@ func (tc *TestContext) Build(tb testing.TB) *TestEnvironment {
 			tb.Logf("Warning: failed to rollback transaction: %v", err)
 		}
 		tc.pool.Close()
+		if shouldAutoDropDB(tc.dbName) {
+			if err := DropDB(tc.dbName); err != nil {
+				tb.Logf("Warning: failed to drop test database %q: %v", sanitizeDBName(tc.dbName), err)
+			}
+		}
 	})
 
 	return &TestEnvironment{
