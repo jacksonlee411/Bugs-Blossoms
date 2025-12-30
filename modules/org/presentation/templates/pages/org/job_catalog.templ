@@ -128,40 +128,40 @@ func jobProfileJobFamilyID(row *viewmodels.JobProfileJobFamilyRow) string {
 	return row.JobFamilyID.String()
 }
 
-	func jobProfileJobFamilyPercent(row *viewmodels.JobProfileJobFamilyRow) string {
-		if row == nil {
-			return ""
-		}
-		return fmt.Sprintf("%d", row.AllocationPercent)
+func jobProfileJobFamilyPercent(row *viewmodels.JobProfileJobFamilyRow) string {
+	if row == nil {
+		return ""
 	}
+	return fmt.Sprintf("%d", row.AllocationPercent)
+}
 
-	func jobFamilyGroupCode(row *viewmodels.JobFamilyGroupRow) string {
-		if row == nil {
-			return ""
-		}
-		return row.Code
+func jobFamilyGroupCode(row *viewmodels.JobFamilyGroupRow) string {
+	if row == nil {
+		return ""
 	}
+	return row.Code
+}
 
-	func jobFamilyGroupName(row *viewmodels.JobFamilyGroupRow) string {
-		if row == nil {
-			return ""
-		}
-		return row.Name
+func jobFamilyGroupName(row *viewmodels.JobFamilyGroupRow) string {
+	if row == nil {
+		return ""
 	}
+	return row.Name
+}
 
-	func jobFamilyCode(row *viewmodels.JobFamilyRow) string {
-		if row == nil {
-			return ""
-		}
-		return row.Code
+func jobFamilyCode(row *viewmodels.JobFamilyRow) string {
+	if row == nil {
+		return ""
 	}
+	return row.Code
+}
 
-	func jobFamilyName(row *viewmodels.JobFamilyRow) string {
-		if row == nil {
-			return ""
-		}
-		return row.Name
+func jobFamilyName(row *viewmodels.JobFamilyRow) string {
+	if row == nil {
+		return ""
 	}
+	return row.Name
+}
 
 templ JobCatalogHeader(props JobCatalogHeaderProps) {
 	{{ pageCtx := composables.UsePageCtx(ctx) }}
@@ -311,21 +311,21 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 								if isEdit {
 									<input type="hidden" name="edit_id" value={ props.EditID }/>
 								}
-									@input.Text(&input.Props{
-										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
-										Attrs: templ.Attributes{
-											"name":     "code",
-											"value":    jobFamilyGroupCode(props.EditFamilyGroup),
-											"readonly": isEdit,
-										},
-									})
-									@input.Text(&input.Props{
-										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
-										Attrs: templ.Attributes{
-											"name":  "name",
-											"value": jobFamilyGroupName(props.EditFamilyGroup),
-										},
-									})
+								@input.Text(&input.Props{
+									Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
+									Attrs: templ.Attributes{
+										"name":     "code",
+										"value":    jobFamilyGroupCode(props.EditFamilyGroup),
+										"readonly": isEdit,
+									},
+								})
+								@input.Text(&input.Props{
+									Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
+									Attrs: templ.Attributes{
+										"name":  "name",
+										"value": jobFamilyGroupName(props.EditFamilyGroup),
+									},
+								})
 								@base.Select(&base.SelectProps{
 									Label: pageCtx.T("Org.UI.JobCatalog.Fields.IsActive"),
 									Attrs: templ.Attributes{
@@ -419,21 +419,21 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									if isEdit {
 										<input type="hidden" name="edit_id" value={ props.EditID }/>
 									}
-										@input.Text(&input.Props{
-											Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
-											Attrs: templ.Attributes{
-												"name":     "code",
-												"value":    jobFamilyCode(props.EditFamily),
-												"readonly": isEdit,
-											},
-										})
-										@input.Text(&input.Props{
-											Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
-											Attrs: templ.Attributes{
-												"name":  "name",
-												"value": jobFamilyName(props.EditFamily),
-											},
-										})
+									@input.Text(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Code"),
+										Attrs: templ.Attributes{
+											"name":     "code",
+											"value":    jobFamilyCode(props.EditFamily),
+											"readonly": isEdit,
+										},
+									})
+									@input.Text(&input.Props{
+										Label: pageCtx.T("Org.UI.JobCatalog.Fields.Name"),
+										Attrs: templ.Attributes{
+											"name":  "name",
+											"value": jobFamilyName(props.EditFamily),
+										},
+									})
 									@base.Select(&base.SelectProps{
 										Label: pageCtx.T("Org.UI.JobCatalog.Fields.IsActive"),
 										Attrs: templ.Attributes{
