@@ -180,7 +180,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 					</ul>
 				</div>
 			}
-
 			<div class="flex flex-wrap gap-2">
 				<a
 					href={ templ.SafeURL(jobCatalogURL("family-groups", props.EffectiveDate, props.JobFamilyGroupCode, "")) }
@@ -227,7 +226,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 					{ pageCtx.T("Org.UI.JobCatalog.Tabs.Levels") }
 				</a>
 			</div>
-
 			<form id="org-job-catalog-filters" class="space-y-3">
 				<input type="hidden" name="tab" value={ props.Tab }/>
 				switch props.Tab {
@@ -255,7 +253,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 						}
 				}
 			</form>
-
 			switch props.Tab {
 				case "family-groups":
 					<div class="rounded-lg border border-surface-400 bg-surface-300 p-4 space-y-3">
@@ -432,7 +429,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									</div>
 								</form>
 							}
-
 							<div class="overflow-x-auto">
 								<table class="w-full text-sm">
 									<thead class="text-300">
@@ -531,11 +527,9 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									<option value="1" selected?={ !isEdit || props.EditProfile.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
 									<option value="0" selected?={ isEdit && !props.EditProfile.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
 								}
-
 								<div class="rounded-md border border-surface-400 bg-surface-200 p-3 space-y-2">
 									<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.JobCatalog.Fields.JobFamilies") }</div>
 									<div class="text-xs text-300">{ pageCtx.T("Org.UI.JobCatalog.Hints.JobFamiliesSum100") }</div>
-
 									<div class="grid grid-cols-1 gap-2">
 										for i := 0; i < 4; i++ {
 											{{ var fam *viewmodels.JobProfileJobFamilyRow }}
@@ -576,7 +570,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										}
 									</div>
 								</div>
-
 								<div class="flex items-center justify-end gap-2 pt-2">
 									@button.Primary(button.Props{
 										Size: button.SizeSM,
@@ -591,7 +584,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 								</div>
 							</form>
 						}
-
 						<div class="overflow-x-auto">
 							<table class="w-full text-sm">
 								<thead class="text-300">
@@ -703,7 +695,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 								</div>
 							</form>
 						}
-
 						<div class="overflow-x-auto">
 							<table class="w-full text-sm">
 								<thead class="text-300">

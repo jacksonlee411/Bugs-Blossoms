@@ -384,14 +384,14 @@ templ PositionDetails(props PositionDetailsProps) {
 					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.JobFamilyGroupCode") }</div>
 					<div class="text-200">{ codeLabel(props.Position.Row.JobFamilyGroupCode, props.Position.JobFamilyGroupLabel) }</div>
 				</div>
-					<div>
-						<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.JobFamilyCode") }</div>
-						<div class="text-200">{ codeLabel(props.Position.Row.JobFamilyCode, props.Position.JobFamilyLabel) }</div>
-					</div>
-					<div>
-						<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.JobLevelCode") }</div>
-						<div class="text-200">{ codeLabel(props.Position.Row.JobLevelCode, props.Position.JobLevelLabel) }</div>
-					</div>
+				<div>
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.JobFamilyCode") }</div>
+					<div class="text-200">{ codeLabel(props.Position.Row.JobFamilyCode, props.Position.JobFamilyLabel) }</div>
+				</div>
+				<div>
+					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.JobLevelCode") }</div>
+					<div class="text-200">{ codeLabel(props.Position.Row.JobLevelCode, props.Position.JobLevelLabel) }</div>
+				</div>
 				<div class="col-span-2">
 					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.ReportsTo") }</div>
 					<div class="text-200">
@@ -485,10 +485,10 @@ type PositionFormProps struct {
 
 	JobProfileID    string
 	JobProfileLabel string
-	JobLevelCode        string
-	JobLevelLabel       string
-	ReasonCode          string
-	ReasonNote          string
+	JobLevelCode    string
+	JobLevelLabel   string
+	ReasonCode      string
+	ReasonNote      string
 
 	Errors    map[string]string
 	FormError string
@@ -618,66 +618,66 @@ templ PositionForm(props PositionFormProps) {
 				<option value="active" selected?={ props.LifecycleStatus == "" || props.LifecycleStatus == "active" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Active") }</option>
 				<option value="inactive" selected?={ props.LifecycleStatus == "inactive" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Inactive") }</option>
 				<option value="rescinded" selected?={ props.LifecycleStatus == "rescinded" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Rescinded") }</option>
-				}
-				<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-					<div data-testid="org-position-job-profile-id-combobox">
-						@base.Combobox(base.ComboboxProps{
-							Searchable:   true,
-							Label:        pageCtx.T("Org.UI.Positions.Fields.JobProfileID"),
-							Name:         "job_profile_id",
-							Endpoint:     fmt.Sprintf("/org/job-catalog/profiles/options?effective_date=%s", props.EffectiveDate),
-							Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
-							NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
-						}) {
-							if strings.TrimSpace(props.JobProfileID) != "" {
-								<option value={ props.JobProfileID } selected>{ props.JobProfileLabel }</option>
-							}
-							<!-- options loaded via HTMX -->
+			}
+			<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+				<div data-testid="org-position-job-profile-id-combobox">
+					@base.Combobox(base.ComboboxProps{
+						Searchable:   true,
+						Label:        pageCtx.T("Org.UI.Positions.Fields.JobProfileID"),
+						Name:         "job_profile_id",
+						Endpoint:     fmt.Sprintf("/org/job-catalog/profiles/options?effective_date=%s", props.EffectiveDate),
+						Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
+						NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+					}) {
+						if strings.TrimSpace(props.JobProfileID) != "" {
+							<option value={ props.JobProfileID } selected>{ props.JobProfileLabel }</option>
 						}
-						if props.Errors["job_profile_id"] != "" {
-							<div class="text-xs text-red-200">{ props.Errors["job_profile_id"] }</div>
-						}
-					</div>
-					<div data-testid="org-position-job-level-code-combobox">
-						@base.Combobox(base.ComboboxProps{
-							Searchable:   true,
-							Label:        pageCtx.T("Org.UI.Positions.Fields.JobLevelCode"),
-							Name:         "job_level_code",
-							Endpoint:     fmt.Sprintf("/org/job-catalog/levels/options?effective_date=%s", props.EffectiveDate),
-							Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
-							NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
-							Trigger: &base.Trigger{
-								Render: func(trigger *base.TriggerProps) templ.Component {
-									return input.Text(&input.Props{
-										Placeholder: trigger.Placeholder,
-										WrapperProps: templ.Attributes{
-											"x-ref":  "trigger",
-											"@click": "if ($el.querySelector('input')?.disabled) return; open = true",
-										},
-										AddonLeft: &input.Addon{
-											Component: base.SelectedValues(),
-											Attrs: templ.Attributes{
-												"x-show": "selectedValues.size > 0",
-											},
-										},
-										Attrs: trigger.InputAttrs,
-										AddonRight: &input.Addon{
-											Component: base.DropdownIndicator(),
-										},
-									})
-								},
-							},
-						}) {
-							if strings.TrimSpace(props.JobLevelCode) != "" {
-								<option value={ props.JobLevelCode } selected>{ codeLabel(props.JobLevelCode, props.JobLevelLabel) }</option>
-							}
-							<!-- options loaded via HTMX -->
-						}
-						if props.Errors["job_level_code"] != "" {
-							<div class="text-xs text-red-200">{ props.Errors["job_level_code"] }</div>
-						}
-					</div>
+						<!-- options loaded via HTMX -->
+					}
+					if props.Errors["job_profile_id"] != "" {
+						<div class="text-xs text-red-200">{ props.Errors["job_profile_id"] }</div>
+					}
 				</div>
+				<div data-testid="org-position-job-level-code-combobox">
+					@base.Combobox(base.ComboboxProps{
+						Searchable:   true,
+						Label:        pageCtx.T("Org.UI.Positions.Fields.JobLevelCode"),
+						Name:         "job_level_code",
+						Endpoint:     fmt.Sprintf("/org/job-catalog/levels/options?effective_date=%s", props.EffectiveDate),
+						Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
+						NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+						Trigger: &base.Trigger{
+							Render: func(trigger *base.TriggerProps) templ.Component {
+								return input.Text(&input.Props{
+									Placeholder: trigger.Placeholder,
+									WrapperProps: templ.Attributes{
+										"x-ref":  "trigger",
+										"@click": "if ($el.querySelector('input')?.disabled) return; open = true",
+									},
+									AddonLeft: &input.Addon{
+										Component: base.SelectedValues(),
+										Attrs: templ.Attributes{
+											"x-show": "selectedValues.size > 0",
+										},
+									},
+									Attrs: trigger.InputAttrs,
+									AddonRight: &input.Addon{
+										Component: base.DropdownIndicator(),
+									},
+								})
+							},
+						},
+					}) {
+						if strings.TrimSpace(props.JobLevelCode) != "" {
+							<option value={ props.JobLevelCode } selected>{ codeLabel(props.JobLevelCode, props.JobLevelLabel) }</option>
+						}
+						<!-- options loaded via HTMX -->
+					}
+					if props.Errors["job_level_code"] != "" {
+						<div class="text-xs text-red-200">{ props.Errors["job_level_code"] }</div>
+					}
+				</div>
+			</div>
 			@input.Text(&input.Props{
 				Label: pageCtx.T("Org.UI.Positions.Fields.CapacityFTE"),
 				Error: props.Errors["capacity_fte"],
