@@ -63,6 +63,13 @@
 - 工作地点
 - 职位默认薪酬计划（可选）：用于为职位提供默认值；薪酬计划（Pay Plan）定义归属 **"6. 薪酬管理"**，员工实际归属见 **"3.6 薪酬基线与发薪设置"**。
 
+##### 2.1.1 术语对齐（PeopleSoft / Workday / 本项目）
+> 说明：本文以 PeopleSoft 菜单口径为主；本项目“对标 Workday 的职位体系（Job Architecture）”实现契约以 `DEV-PLAN-072` 为 SSOT。
+
+- PeopleSoft **职务（Job Code）** ≈ Workday **Job Profile** ≈ 本项目 **职位模板**（Workday 风格下的岗位定义/编码入口）
+- PeopleSoft **职级（Job Grade）** ≈ Workday **Job Level / Grade** ≈ 本项目 **职级**
+- Workday **Job Family Group / Job Family** ≈ 本项目 **职类 / 职种**（PeopleSoft 常见做法是对 Job Code 做分组/序列化治理，但并非所有实现都有标准等价对象）
+
 ---
 
 ## 3. 人员管理 (Workforce Administration)

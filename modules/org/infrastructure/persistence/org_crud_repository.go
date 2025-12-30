@@ -549,9 +549,6 @@ func (r *OrgRepository) LockPositionSliceAt(ctx context.Context, tenantID uuid.U
 		employment_type,
 		capacity_fte,
 		reports_to_position_id,
-		job_family_group_code,
-		job_family_code,
-		job_role_code,
 		job_level_code,
 		job_profile_id,
 		cost_center_code,
@@ -570,11 +567,7 @@ func (r *OrgRepository) LockPositionSliceAt(ctx context.Context, tenantID uuid.U
 	var reportsTo pgtype.UUID
 	var positionType pgtype.Text
 	var employmentType pgtype.Text
-	var jobFamilyGroupCode pgtype.Text
-	var jobFamilyCode pgtype.Text
-	var jobRoleCode pgtype.Text
 	var jobLevelCode pgtype.Text
-	var jobProfileID pgtype.UUID
 	var costCenterCode pgtype.Text
 	var profile []byte
 	if err := row.Scan(
@@ -587,11 +580,8 @@ func (r *OrgRepository) LockPositionSliceAt(ctx context.Context, tenantID uuid.U
 		&employmentType,
 		&out.CapacityFTE,
 		&reportsTo,
-		&jobFamilyGroupCode,
-		&jobFamilyCode,
-		&jobRoleCode,
 		&jobLevelCode,
-		&jobProfileID,
+		&out.JobProfileID,
 		&costCenterCode,
 		&profile,
 		&out.EffectiveDate,
@@ -603,11 +593,7 @@ func (r *OrgRepository) LockPositionSliceAt(ctx context.Context, tenantID uuid.U
 	out.ReportsToPositionID = nullableUUID(reportsTo)
 	out.PositionType = nullableText(positionType)
 	out.EmploymentType = nullableText(employmentType)
-	out.JobFamilyGroupCode = nullableText(jobFamilyGroupCode)
-	out.JobFamilyCode = nullableText(jobFamilyCode)
-	out.JobRoleCode = nullableText(jobRoleCode)
 	out.JobLevelCode = nullableText(jobLevelCode)
-	out.JobProfileID = nullableUUID(jobProfileID)
 	out.CostCenterCode = nullableText(costCenterCode)
 	out.Profile = profile
 	return out, nil

@@ -3,7 +3,7 @@
 		"Org": "组织与职位",
 		"OrgStructure": "组织架构",
 		"OrgPositions": "职位管理",
-		"JobCatalog": "Job Catalog"
+		"JobCatalog": "职位模板"
 	},
 	"Org": {
 		"UI": {
@@ -149,10 +149,11 @@
 					"Title": "名称",
 					"PositionType": "职位类型",
 					"EmploymentType": "雇佣类型",
-					"JobFamilyGroupCode": "Job Family Group",
-					"JobFamilyCode": "Job Family",
-					"JobRoleCode": "Job Role",
-					"JobLevelCode": "Job Level",
+					"JobFamilyGroupCode": "职类",
+					"JobFamilyCode": "职种",
+					"JobRoleCode": "职务",
+					"JobProfileID": "职位模板",
+					"JobLevelCode": "职级",
 					"Lifecycle": "生命周期",
 					"Staffing": "占编",
 					"FTE": "FTE",
@@ -183,19 +184,27 @@
 				}
 			},
 			"JobCatalog": {
-				"MetaTitle": "Job Catalog",
-				"Title": "Job Catalog",
+				"MetaTitle": "职位模板",
+				"Title": "职位模板",
 				"Tabs": {
-					"FamilyGroups": "Family Groups",
-					"Families": "Families",
-					"Roles": "Roles",
-					"Levels": "Levels"
+					"FamilyGroups": "职类",
+					"Families": "职种",
+					"Profiles": "职位模板",
+					"Levels": "职级"
 				},
 				"Fields": {
 					"Code": "编码",
 					"Name": "名称",
+					"Desc": "描述",
 					"IsActive": "状态",
-					"DisplayOrder": "排序"
+					"DisplayOrder": "排序",
+					"JobFamilies": "归属职种（分摊）",
+					"JobFamily": "职种",
+					"AllocationPercent": "比例（%）",
+					"IsPrimary": "主归属"
+				},
+				"Hints": {
+					"JobFamiliesSum100": "归属职种比例合计必须为 100%，且必须且仅必须 1 个主归属。"
 				}
 			},
 					"Node": {

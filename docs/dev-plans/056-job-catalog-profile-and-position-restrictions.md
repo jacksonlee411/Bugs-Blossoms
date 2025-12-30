@@ -1,6 +1,8 @@
 # DEV-PLAN-056：Job Catalog / Job Profile 与 Position Restrictions（对齐 051 阶段 D）
 
 **状态**: 已完成（2025-12-20 17:31 UTC）
+**对齐更新**：
+- 2025-12-29：职位体系已由 `DEV-PLAN-072` 对标 Workday 重新收口（移除 `Job Role`/allowed-levels，`Job Level` 改为 tenant-global，Position 写入口仅 `job_profile_id` + 可选 `job_level_code`；UI 入口中文名建议为“职位模板”）。本文保留为历史记录，不再作为实现 SSOT。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：

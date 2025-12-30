@@ -197,102 +197,6 @@ func (c *OrgAPIController) UpdateJobFamily(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, row)
 }
 
-func (c *OrgAPIController) ListJobRoles(w http.ResponseWriter, r *http.Request) {
-	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
-	if !ok {
-		return
-	}
-	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "read") {
-		return
-	}
-
-	familyIDRaw := strings.TrimSpace(r.URL.Query().Get("job_family_id"))
-	familyID, err := uuid.Parse(familyIDRaw)
-	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "job_family_id is invalid")
-		return
-	}
-	rows, err := c.org.ListJobRoles(r.Context(), tenantID, familyID)
-	if err != nil {
-		writeServiceError(w, requestID, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": rows})
-}
-
-type createJobRoleRequest struct {
-	JobFamilyID uuid.UUID `json:"job_family_id"`
-	Code        string    `json:"code"`
-	Name        string    `json:"name"`
-	IsActive    *bool     `json:"is_active"`
-}
-
-func (c *OrgAPIController) CreateJobRole(w http.ResponseWriter, r *http.Request) {
-	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
-	if !ok {
-		return
-	}
-	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
-		return
-	}
-
-	var req createJobRoleRequest
-	if err := decodeJSON(r.Body, &req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
-		return
-	}
-	isActive := true
-	if req.IsActive != nil {
-		isActive = *req.IsActive
-	}
-	row, err := c.org.CreateJobRole(r.Context(), tenantID, services.JobRoleCreate{
-		JobFamilyID: req.JobFamilyID,
-		Code:        req.Code,
-		Name:        req.Name,
-		IsActive:    isActive,
-	})
-	if err != nil {
-		writeServiceError(w, requestID, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, row)
-}
-
-type updateJobRoleRequest struct {
-	Name     *string `json:"name"`
-	IsActive *bool   `json:"is_active"`
-}
-
-func (c *OrgAPIController) UpdateJobRole(w http.ResponseWriter, r *http.Request) {
-	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
-	if !ok {
-		return
-	}
-	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgJobCatalogAuthzObject, "admin") {
-		return
-	}
-
-	id, err := uuid.Parse(mux.Vars(r)["id"])
-	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
-		return
-	}
-	var req updateJobRoleRequest
-	if err := decodeJSON(r.Body, &req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
-		return
-	}
-	row, err := c.org.UpdateJobRole(r.Context(), tenantID, id, services.JobRoleUpdate{
-		Name:     req.Name,
-		IsActive: req.IsActive,
-	})
-	if err != nil {
-		writeServiceError(w, requestID, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, row)
-}
-
 func (c *OrgAPIController) ListJobLevels(w http.ResponseWriter, r *http.Request) {
 	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
 	if !ok {
@@ -302,13 +206,7 @@ func (c *OrgAPIController) ListJobLevels(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	roleIDRaw := strings.TrimSpace(r.URL.Query().Get("job_role_id"))
-	roleID, err := uuid.Parse(roleIDRaw)
-	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "job_role_id is invalid")
-		return
-	}
-	rows, err := c.org.ListJobLevels(r.Context(), tenantID, roleID)
+	rows, err := c.org.ListJobLevels(r.Context(), tenantID)
 	if err != nil {
 		writeServiceError(w, requestID, err)
 		return
@@ -317,11 +215,10 @@ func (c *OrgAPIController) ListJobLevels(w http.ResponseWriter, r *http.Request)
 }
 
 type createJobLevelRequest struct {
-	JobRoleID    uuid.UUID `json:"job_role_id"`
-	Code         string    `json:"code"`
-	Name         string    `json:"name"`
-	DisplayOrder int       `json:"display_order"`
-	IsActive     *bool     `json:"is_active"`
+	Code         string `json:"code"`
+	Name         string `json:"name"`
+	DisplayOrder int    `json:"display_order"`
+	IsActive     *bool  `json:"is_active"`
 }
 
 func (c *OrgAPIController) CreateJobLevel(w http.ResponseWriter, r *http.Request) {
@@ -343,7 +240,6 @@ func (c *OrgAPIController) CreateJobLevel(w http.ResponseWriter, r *http.Request
 		isActive = *req.IsActive
 	}
 	row, err := c.org.CreateJobLevel(r.Context(), tenantID, services.JobLevelCreate{
-		JobRoleID:    req.JobRoleID,
 		Code:         req.Code,
 		Name:         req.Name,
 		DisplayOrder: req.DisplayOrder,
@@ -402,30 +298,44 @@ func (c *OrgAPIController) ListJobProfiles(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	raw := strings.TrimSpace(r.URL.Query().Get("job_role_id"))
-	var roleID *uuid.UUID
-	if raw != "" {
-		id, err := uuid.Parse(raw)
-		if err != nil {
-			writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "job_role_id is invalid")
-			return
-		}
-		roleID = &id
-	}
-	rows, err := c.org.ListJobProfiles(r.Context(), tenantID, roleID)
+	rows, err := c.org.ListJobProfiles(r.Context(), tenantID)
 	if err != nil {
 		writeServiceError(w, requestID, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": rows})
+
+	type jobProfileResponse struct {
+		services.JobProfileRow
+		JobFamilies []services.JobProfileJobFamilyRow `json:"job_families"`
+	}
+	out := make([]jobProfileResponse, 0, len(rows))
+	for _, row := range rows {
+		families, err := c.org.ListJobProfileJobFamilies(r.Context(), tenantID, row.ID)
+		if err != nil {
+			writeServiceError(w, requestID, err)
+			return
+		}
+		out = append(out, jobProfileResponse{
+			JobProfileRow: row,
+			JobFamilies:   families,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"items": out})
+}
+
+type jobProfileJobFamilySetItemRequest struct {
+	JobFamilyID       uuid.UUID `json:"job_family_id"`
+	AllocationPercent int       `json:"allocation_percent"`
+	IsPrimary         bool      `json:"is_primary"`
 }
 
 type createJobProfileRequest struct {
-	Code        string    `json:"code"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description"`
-	JobRoleID   uuid.UUID `json:"job_role_id"`
-	IsActive    *bool     `json:"is_active"`
+	Code        string                              `json:"code"`
+	Name        string                              `json:"name"`
+	Description *string                             `json:"description"`
+	IsActive    *bool                               `json:"is_active"`
+	JobFamilies []jobProfileJobFamilySetItemRequest `json:"job_families"`
 }
 
 func (c *OrgAPIController) CreateJobProfile(w http.ResponseWriter, r *http.Request) {
@@ -446,12 +356,20 @@ func (c *OrgAPIController) CreateJobProfile(w http.ResponseWriter, r *http.Reque
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
+	items := make([]services.JobProfileJobFamilySetItem, 0, len(req.JobFamilies))
+	for _, it := range req.JobFamilies {
+		items = append(items, services.JobProfileJobFamilySetItem{
+			JobFamilyID:       it.JobFamilyID,
+			AllocationPercent: it.AllocationPercent,
+			IsPrimary:         it.IsPrimary,
+		})
+	}
 	row, err := c.org.CreateJobProfile(r.Context(), tenantID, services.JobProfileCreate{
 		Code:        req.Code,
 		Name:        req.Name,
 		Description: req.Description,
-		JobRoleID:   req.JobRoleID,
 		IsActive:    isActive,
+		JobFamilies: services.JobProfileJobFamiliesSet{Items: items},
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -461,9 +379,10 @@ func (c *OrgAPIController) CreateJobProfile(w http.ResponseWriter, r *http.Reque
 }
 
 type updateJobProfileRequest struct {
-	Name        *string        `json:"name"`
-	Description optionalString `json:"description"`
-	IsActive    *bool          `json:"is_active"`
+	Name        *string                             `json:"name"`
+	Description optionalString                      `json:"description"`
+	IsActive    *bool                               `json:"is_active"`
+	JobFamilies []jobProfileJobFamilySetItemRequest `json:"job_families"`
 }
 
 func (c *OrgAPIController) UpdateJobProfile(w http.ResponseWriter, r *http.Request) {
@@ -486,48 +405,30 @@ func (c *OrgAPIController) UpdateJobProfile(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	var jobFamilies *services.JobProfileJobFamiliesSet
+	if req.JobFamilies != nil {
+		items := make([]services.JobProfileJobFamilySetItem, 0, len(req.JobFamilies))
+		for _, it := range req.JobFamilies {
+			items = append(items, services.JobProfileJobFamilySetItem{
+				JobFamilyID:       it.JobFamilyID,
+				AllocationPercent: it.AllocationPercent,
+				IsPrimary:         it.IsPrimary,
+			})
+		}
+		jobFamilies = &services.JobProfileJobFamiliesSet{Items: items}
+	}
+
 	row, err := c.org.UpdateJobProfile(r.Context(), tenantID, id, services.JobProfileUpdate{
 		Name:        req.Name,
 		Description: fieldIfSetString(req.Description),
 		IsActive:    req.IsActive,
+		JobFamilies: jobFamilies,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, row)
-}
-
-type setJobProfileAllowedLevelsRequest struct {
-	JobLevelIDs []uuid.UUID `json:"job_level_ids"`
-}
-
-func (c *OrgAPIController) SetJobProfileAllowedLevels(w http.ResponseWriter, r *http.Request) {
-	tenantID, currentUser, requestID, ok := requireSessionTenantUser(w, r)
-	if !ok {
-		return
-	}
-	if !ensureOrgAuthz(w, r, tenantID, currentUser, orgJobProfilesAuthzObject, "admin") {
-		return
-	}
-
-	id, err := uuid.Parse(mux.Vars(r)["id"])
-	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "invalid id")
-		return
-	}
-	var req setJobProfileAllowedLevelsRequest
-	if err := decodeJSON(r.Body, &req); err != nil {
-		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
-		return
-	}
-	if err := c.org.SetJobProfileAllowedLevels(r.Context(), tenantID, id, services.JobProfileAllowedLevelsSet{
-		JobLevelIDs: req.JobLevelIDs,
-	}); err != nil {
-		writeServiceError(w, requestID, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"job_profile_id": id.String()})
 }
 
 func (c *OrgAPIController) GetPositionRestrictions(w http.ResponseWriter, r *http.Request) {

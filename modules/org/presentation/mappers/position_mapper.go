@@ -33,17 +33,9 @@ func PositionsToViewModels(rows []services.PositionViewRow) []viewmodels.OrgPosi
 		if r.JobFamilyCode != nil {
 			jobFamilyCode = strings.TrimSpace(*r.JobFamilyCode)
 		}
-		jobRoleCode := ""
-		if r.JobRoleCode != nil {
-			jobRoleCode = strings.TrimSpace(*r.JobRoleCode)
-		}
 		jobLevelCode := ""
 		if r.JobLevelCode != nil {
 			jobLevelCode = strings.TrimSpace(*r.JobLevelCode)
-		}
-		jobProfileID := r.JobProfileID
-		if jobProfileID != nil && *jobProfileID == uuid.Nil {
-			jobProfileID = nil
 		}
 		costCenterCode := ""
 		if r.CostCenterCode != nil {
@@ -64,9 +56,8 @@ func PositionsToViewModels(rows []services.PositionViewRow) []viewmodels.OrgPosi
 			EmploymentType:     employmentType,
 			JobFamilyGroupCode: jobFamilyGroupCode,
 			JobFamilyCode:      jobFamilyCode,
-			JobRoleCode:        jobRoleCode,
 			JobLevelCode:       jobLevelCode,
-			JobProfileID:       jobProfileID,
+			JobProfileID:       r.JobProfileID,
 			CostCenterCode:     costCenterCode,
 			EffectiveDate:      r.EffectiveDate,
 			EndDate:            r.EndDate,
@@ -86,7 +77,6 @@ func PositionDetailsFrom(row services.PositionViewRow, reportsToID *uuid.UUID) *
 		ReportsToLabel:      "",
 		JobFamilyGroupLabel: "",
 		JobFamilyLabel:      "",
-		JobRoleLabel:        "",
 		JobLevelLabel:       "",
 	}
 }

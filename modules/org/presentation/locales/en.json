@@ -152,6 +152,7 @@
           "JobFamilyGroupCode": "Job family group",
           "JobFamilyCode": "Job family",
           "JobRoleCode": "Job role",
+          "JobProfileID": "Job profile",
           "JobLevelCode": "Job level",
           "Lifecycle": "Lifecycle",
           "Staffing": "Staffing",
@@ -188,14 +189,22 @@
         "Tabs": {
           "FamilyGroups": "Family Groups",
           "Families": "Families",
-          "Roles": "Roles",
+          "Profiles": "Job profiles",
           "Levels": "Levels"
         },
         "Fields": {
           "Code": "Code",
           "Name": "Name",
+          "Desc": "Description",
           "IsActive": "Status",
-          "DisplayOrder": "Display order"
+          "DisplayOrder": "Display order",
+          "JobFamilies": "Job family allocations",
+          "JobFamily": "Job family",
+          "AllocationPercent": "Allocation (%)",
+          "IsPrimary": "Primary"
+        },
+        "Hints": {
+          "JobFamiliesSum100": "Allocations must sum to 100%, and exactly one primary is required."
         }
       },
       "Node": {

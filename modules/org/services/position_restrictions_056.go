@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -132,9 +131,6 @@ func (s *OrgService) SetPositionRestrictions(ctx context.Context, tenantID uuid.
 			EmploymentType:      current.EmploymentType,
 			CapacityFTE:         current.CapacityFTE,
 			ReportsToPositionID: current.ReportsToPositionID,
-			JobFamilyGroupCode:  current.JobFamilyGroupCode,
-			JobFamilyCode:       current.JobFamilyCode,
-			JobRoleCode:         current.JobRoleCode,
 			JobLevelCode:        current.JobLevelCode,
 			JobProfileID:        current.JobProfileID,
 			CostCenterCode:      current.CostCenterCode,
@@ -143,6 +139,9 @@ func (s *OrgService) SetPositionRestrictions(ctx context.Context, tenantID uuid.
 			EndDate:             newEnd,
 		})
 		if err != nil {
+			return nil, mapPgError(err)
+		}
+		if err := s.repo.CopyPositionSliceJobFamilies(txCtx, tenantID, current.ID, sliceID); err != nil {
 			return nil, mapPgError(err)
 		}
 
@@ -344,10 +343,10 @@ func (s *OrgService) validatePositionRestrictionsAgainstSlice(ctx context.Contex
 	}
 
 	if len(r.AllowedJobProfileIDs) != 0 {
-		if slice.JobProfileID == nil || *slice.JobProfileID == uuid.Nil {
+		if slice.JobProfileID == uuid.Nil {
 			return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_PROFILE_MISMATCH", "job_profile_id is required", nil)
 		}
-		if !containsUUID(r.AllowedJobProfileIDs, *slice.JobProfileID) {
+		if !containsUUID(r.AllowedJobProfileIDs, slice.JobProfileID) {
 			return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_PROFILE_MISMATCH", "job_profile_id is not allowed", nil)
 		}
 	}
@@ -356,26 +355,19 @@ func (s *OrgService) validatePositionRestrictionsAgainstSlice(ctx context.Contex
 		return nil
 	}
 
-	if slice.JobFamilyGroupCode == nil || slice.JobFamilyCode == nil || slice.JobRoleCode == nil || slice.JobLevelCode == nil {
-		return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_CATALOG_MISMATCH", "job catalog codes are required", nil)
-	}
-	path, err := s.repo.ResolveJobCatalogPathByCodes(ctx, tenantID, JobCatalogCodes{
-		JobFamilyGroupCode: *slice.JobFamilyGroupCode,
-		JobFamilyCode:      *slice.JobFamilyCode,
-		JobRoleCode:        *slice.JobRoleCode,
-		JobLevelCode:       *slice.JobLevelCode,
-	})
-	if err != nil {
-		if errors.Is(err, ErrJobCatalogInactiveOrMissing) || errors.Is(err, ErrJobCatalogInvalidHierarchy) {
-			return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_CATALOG_MISMATCH", "job catalog mismatch", nil)
-		}
-		return mapPgError(err)
+	if len(r.AllowedJobRoleIDs) != 0 {
+		return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_PAYLOAD_INVALID", "allowed_job_role_ids is not supported", nil)
 	}
 
-	if len(r.AllowedJobRoleIDs) != 0 && !containsUUID(r.AllowedJobRoleIDs, path.JobRoleID) {
-		return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_CATALOG_MISMATCH", "job role is not allowed", nil)
+	if slice.JobLevelCode == nil || strings.TrimSpace(*slice.JobLevelCode) == "" {
+		return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_CATALOG_MISMATCH", "job_level_code is required", nil)
 	}
-	if len(r.AllowedJobLevelIDs) != 0 && !containsUUID(r.AllowedJobLevelIDs, path.JobLevelID) {
+
+	level, err := s.repo.GetJobLevelByCode(ctx, tenantID, strings.TrimSpace(*slice.JobLevelCode))
+	if err != nil {
+		return mapPgError(err)
+	}
+	if len(r.AllowedJobLevelIDs) != 0 && !containsUUID(r.AllowedJobLevelIDs, level.ID) {
 		return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_CATALOG_MISMATCH", "job level is not allowed", nil)
 	}
 	return nil

@@ -53,6 +53,7 @@ func TestOrg033NodePathAndExport(t *testing.T) {
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -142,26 +143,27 @@ func TestOrg033PersonPath(t *testing.T) {
 	targetNodeID := nodes[len(nodes)-1].ID
 
 	// Minimal position + primary assignment as-of.
+	jobProfileID, _ := ensureTestJobProfileWith100PercentFamily(t, ctx, pool, tenantID)
 	positionID := uuid.New()
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 	_, err = pool.Exec(ctx, `
-			INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
-			VALUES (
+				INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
+				VALUES (
 				$1,$2,$3,'P-1','active',false,
 				($4 AT TIME ZONE 'UTC')::date,
 				($5 AT TIME ZONE 'UTC')::date
 			)
-			`, tenantID, positionID, targetNodeID, asOf, endDate)
+				`, tenantID, positionID, targetNodeID, asOf, endDate)
 	require.NoError(t, err)
 
 	_, err = pool.Exec(ctx, `
-			INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date)
-			VALUES (
-				$1,$2,$3,'active',1.0::numeric(9,2),
-				($4 AT TIME ZONE 'UTC')::date,
-				($5 AT TIME ZONE 'UTC')::date
-			)
-			`, tenantID, positionID, targetNodeID, asOf, endDate)
+				INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, job_profile_id, effective_date, end_date)
+				VALUES (
+					$1,$2,$3,'active',1.0::numeric(9,2),$4,
+					($5 AT TIME ZONE 'UTC')::date,
+					($6 AT TIME ZONE 'UTC')::date
+				)
+				`, tenantID, positionID, targetNodeID, jobProfileID, asOf, endDate)
 	require.NoError(t, err)
 
 	personUUID := uuid.New()
@@ -272,6 +274,7 @@ func applyAllOrgMigrationsFor033(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

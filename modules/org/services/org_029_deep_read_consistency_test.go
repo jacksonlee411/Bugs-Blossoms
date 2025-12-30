@@ -53,6 +53,7 @@ func TestOrg029DeepReadConsistency(t *testing.T) {
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -132,6 +133,7 @@ func TestOrg029RoleAssignmentsConsistency(t *testing.T) {
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -224,6 +226,7 @@ func TestOrg029DeepReadQueryBudget(t *testing.T) {
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

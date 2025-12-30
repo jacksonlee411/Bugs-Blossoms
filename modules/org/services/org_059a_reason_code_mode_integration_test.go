@@ -72,22 +72,21 @@ WHERE tenant_id=$1
 
 func TestOrg059AShadow_Position_MissingReasonCodeFillsLegacyAndMetaFlags(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg059ADB(t, "shadow")
+	jobProfileID := seedOrg059AJobProfile(t, ctx, tenantID, svc)
 
 	initiatorID := uuid.New()
 	reqID := "req-059a-shadow-pos"
 	_, err := svc.CreatePosition(ctx, tenantID, reqID, initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-059A-SHADOW",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		Profile:            json.RawMessage(`{}`),
-		ReasonCode:         "",
+		Code:           "POS-059A-SHADOW",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		Profile:        json.RawMessage(`{}`),
+		ReasonCode:     "",
 	})
 	require.NoError(t, err)
 
@@ -110,23 +109,22 @@ WHERE tenant_id=$1 AND request_id=$2
 
 func TestOrg059AEnforce_MissingReasonCodeBlocksPositionAndAssignment_NoAuditNoOutbox(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg059ADB(t, "enforce")
+	jobProfileID := seedOrg059AJobProfile(t, ctx, tenantID, svc)
 
 	initiatorID := uuid.New()
 
 	reqMissingPos := "req-059a-enforce-pos-missing"
 	_, err := svc.CreatePosition(ctx, tenantID, reqMissingPos, initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-059A-ENFORCE-1",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		Profile:            json.RawMessage(`{}`),
-		ReasonCode:         "",
+		Code:           "POS-059A-ENFORCE-1",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		Profile:        json.RawMessage(`{}`),
+		ReasonCode:     "",
 	})
 	require.Error(t, err)
 	var svcErr *orgsvc.ServiceError
@@ -144,18 +142,16 @@ func TestOrg059AEnforce_MissingReasonCodeBlocksPositionAndAssignment_NoAuditNoOu
 	require.Zero(t, outboxCount)
 
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-059a-enforce-pos-ok", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-059A-ENFORCE-OK",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		Profile:            json.RawMessage(`{}`),
-		ReasonCode:         "create",
+		Code:           "POS-059A-ENFORCE-OK",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		Profile:        json.RawMessage(`{}`),
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 
@@ -182,23 +178,22 @@ func TestOrg059AEnforce_MissingReasonCodeBlocksPositionAndAssignment_NoAuditNoOu
 
 func TestOrg059ADisabled_Assignment_MissingReasonCodeKeepsEmptyAndMetaFlags(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg059ADB(t, "disabled")
+	jobProfileID := seedOrg059AJobProfile(t, ctx, tenantID, svc)
 
 	initiatorID := uuid.New()
 
 	posReqID := "req-059a-disabled-pos"
 	pos, err := svc.CreatePosition(ctx, tenantID, posReqID, initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-059A-DISABLED",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		Profile:            json.RawMessage(`{}`),
-		ReasonCode:         "",
+		Code:           "POS-059A-DISABLED",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		Profile:        json.RawMessage(`{}`),
+		ReasonCode:     "",
 	})
 	require.NoError(t, err)
 
@@ -278,4 +273,36 @@ func TestOrg059A_MigrationsIncludeReasonCodeModeColumn(t *testing.T) {
 	ensureTenant(t, ctx, pool, tenantID)
 	_, err := pool.Exec(ctx, `INSERT INTO org_settings (tenant_id, freeze_mode, freeze_grace_days, reason_code_mode) VALUES ($1,'disabled',0,'shadow')`, tenantID)
 	require.NoError(t, err)
+}
+
+func seedOrg059AJobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID, svc *orgsvc.OrgService) uuid.UUID {
+	t.Helper()
+
+	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{
+		Code:     "TST",
+		Name:     "Test Group",
+		IsActive: true,
+	})
+	require.NoError(t, err)
+
+	family, err := svc.CreateJobFamily(ctx, tenantID, orgsvc.JobFamilyCreate{
+		JobFamilyGroupID: group.ID,
+		Code:             "TST-FAMILY",
+		Name:             "Test Family",
+		IsActive:         true,
+	})
+	require.NoError(t, err)
+
+	profile, err := svc.CreateJobProfile(ctx, tenantID, orgsvc.JobProfileCreate{
+		Code:     "TST-PROFILE",
+		Name:     "Test Profile",
+		IsActive: true,
+		JobFamilies: orgsvc.JobProfileJobFamiliesSet{
+			Items: []orgsvc.JobProfileJobFamilySetItem{
+				{JobFamilyID: family.ID, AllocationPercent: 100, IsPrimary: true},
+			},
+		},
+	})
+	require.NoError(t, err)
+	return profile.ID
 }

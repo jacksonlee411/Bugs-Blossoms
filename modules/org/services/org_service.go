@@ -111,6 +111,9 @@ type OrgRepository interface {
 	InsertPosition(ctx context.Context, tenantID uuid.UUID, in PositionInsert) (uuid.UUID, error)
 	GetPositionIsAutoCreated(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID) (bool, error)
 	InsertPositionSlice(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, in PositionSliceInsert) (uuid.UUID, error)
+	CopyJobProfileJobFamiliesToPositionSlice(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, positionSliceID uuid.UUID) error
+	CopyPositionSliceJobFamilies(ctx context.Context, tenantID uuid.UUID, fromSliceID uuid.UUID, toSliceID uuid.UUID) error
+	ResetPositionSliceJobFamiliesFromProfile(ctx context.Context, tenantID uuid.UUID, positionSliceID uuid.UUID, jobProfileID uuid.UUID) error
 	GetPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionSliceRow, error)
 	LockPositionSliceStartingAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, effectiveDate time.Time) (PositionSliceRow, error)
 	LockPositionSliceEndingAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, endDate time.Time) (PositionSliceRow, error)
@@ -134,23 +137,17 @@ type OrgRepository interface {
 	CreateJobFamily(ctx context.Context, tenantID uuid.UUID, in JobFamilyCreate) (JobFamilyRow, error)
 	UpdateJobFamily(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobFamilyUpdate) (JobFamilyRow, error)
 
-	ListJobRoles(ctx context.Context, tenantID uuid.UUID, jobFamilyID uuid.UUID) ([]JobRoleRow, error)
-	CreateJobRole(ctx context.Context, tenantID uuid.UUID, in JobRoleCreate) (JobRoleRow, error)
-	UpdateJobRole(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobRoleUpdate) (JobRoleRow, error)
-
-	ListJobLevels(ctx context.Context, tenantID uuid.UUID, jobRoleID uuid.UUID) ([]JobLevelRow, error)
+	ListJobLevels(ctx context.Context, tenantID uuid.UUID) ([]JobLevelRow, error)
 	CreateJobLevel(ctx context.Context, tenantID uuid.UUID, in JobLevelCreate) (JobLevelRow, error)
 	UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobLevelUpdate) (JobLevelRow, error)
+	GetJobLevelByCode(ctx context.Context, tenantID uuid.UUID, code string) (JobLevelRow, error)
 
-	ListJobProfiles(ctx context.Context, tenantID uuid.UUID, jobRoleID *uuid.UUID) ([]JobProfileRow, error)
+	ListJobProfiles(ctx context.Context, tenantID uuid.UUID) ([]JobProfileRow, error)
 	CreateJobProfile(ctx context.Context, tenantID uuid.UUID, in JobProfileCreate) (JobProfileRow, error)
 	UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobProfileUpdate) (JobProfileRow, error)
-	SetJobProfileAllowedLevels(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileAllowedLevelsSet) error
 	GetJobProfileRef(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) (JobProfileRef, error)
-	ResolveJobCatalogPathByCodes(ctx context.Context, tenantID uuid.UUID, codes JobCatalogCodes) (JobCatalogResolvedPath, error)
-	JobProfileAllowsLevel(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, jobLevelID uuid.UUID) (bool, bool, error)
-	JobLevelExistsUnderRole(ctx context.Context, tenantID uuid.UUID, jobRoleID uuid.UUID, jobLevelID uuid.UUID) (bool, error)
-	ListJobProfileAllowedLevels(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]uuid.UUID, error)
+	ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]JobProfileJobFamilyRow, error)
+	SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileJobFamiliesSet) error
 
 	LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (AssignmentRow, error)
 	LockAssignmentForTimelineAt(ctx context.Context, tenantID uuid.UUID, subjectType string, subjectID uuid.UUID, assignmentType string, asOf time.Time) (AssignmentRow, error)

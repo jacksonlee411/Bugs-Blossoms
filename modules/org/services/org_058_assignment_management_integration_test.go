@@ -39,6 +39,7 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -50,10 +51,13 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 func seedOrgPosition(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantID, orgNodeID, positionID uuid.UUID, code string, capacityFTE float64, effectiveDate, endDate time.Time) {
 	tb.Helper()
 
+	jobProfileID, jobFamilyID := ensureTestJobProfileWith100PercentFamily(tb, ctx, pool, tenantID)
+	sliceID := uuid.New()
+
 	_, err := pool.Exec(ctx, `
-	INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
-	VALUES (
-		$1,$2,$3,$4,'active',false,
+		INSERT INTO org_positions (tenant_id, id, org_node_id, code, status, is_auto_created, effective_date, end_date)
+		VALUES (
+			$1,$2,$3,$4,'active',false,
 		($5 AT TIME ZONE 'UTC')::date,
 		($6 AT TIME ZONE 'UTC')::date
 	)
@@ -61,14 +65,66 @@ func seedOrgPosition(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, ten
 	require.NoError(tb, err)
 
 	_, err = pool.Exec(ctx, `
-	INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date)
-	VALUES (
-		$1,$2,$3,'active',$4::numeric(9,2),
-		($5 AT TIME ZONE 'UTC')::date,
-		($6 AT TIME ZONE 'UTC')::date
-	)
-	`, tenantID, positionID, orgNodeID, capacityFTE, effectiveDate, endDate)
+		INSERT INTO org_position_slices (tenant_id, id, position_id, org_node_id, lifecycle_status, capacity_fte, job_profile_id, effective_date, end_date)
+		VALUES (
+			$1,$2,$3,$4,'active',$5::numeric(9,2),$6,
+			($7 AT TIME ZONE 'UTC')::date,
+			($8 AT TIME ZONE 'UTC')::date
+		)
+		`, tenantID, sliceID, positionID, orgNodeID, capacityFTE, jobProfileID, effectiveDate, endDate)
 	require.NoError(tb, err)
+
+	_, err = pool.Exec(ctx, `
+		INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, allocation_percent, is_primary)
+		VALUES ($1,$2,$3,100,true)
+		ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO UPDATE
+		SET allocation_percent=excluded.allocation_percent, is_primary=excluded.is_primary
+	`, tenantID, sliceID, jobFamilyID)
+	require.NoError(tb, err)
+}
+
+func ensureTestJobProfileWith100PercentFamily(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID) (uuid.UUID, uuid.UUID) {
+	tb.Helper()
+
+	var groupID uuid.UUID
+	err := pool.QueryRow(ctx, `
+		INSERT INTO org_job_family_groups (tenant_id, code, name, is_active)
+		VALUES ($1,'SEED-GROUP','Seed Group',true)
+		ON CONFLICT (tenant_id, code) DO UPDATE
+		SET name=excluded.name, is_active=excluded.is_active
+		RETURNING id
+	`, tenantID).Scan(&groupID)
+	require.NoError(tb, err)
+
+	var familyID uuid.UUID
+	err = pool.QueryRow(ctx, `
+		INSERT INTO org_job_families (tenant_id, job_family_group_id, code, name, is_active)
+		VALUES ($1,$2,'SEED-FAMILY','Seed Family',true)
+		ON CONFLICT (tenant_id, job_family_group_id, code) DO UPDATE
+		SET name=excluded.name, is_active=excluded.is_active
+		RETURNING id
+	`, tenantID, groupID).Scan(&familyID)
+	require.NoError(tb, err)
+
+	var profileID uuid.UUID
+	err = pool.QueryRow(ctx, `
+		INSERT INTO org_job_profiles (tenant_id, code, name, description, is_active)
+		VALUES ($1,'SEED-PROFILE','Seed Profile',NULL,true)
+		ON CONFLICT (tenant_id, code) DO UPDATE
+		SET name=excluded.name, description=excluded.description, is_active=excluded.is_active
+		RETURNING id
+	`, tenantID).Scan(&profileID)
+	require.NoError(tb, err)
+
+	_, err = pool.Exec(ctx, `
+		INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, allocation_percent, is_primary)
+		VALUES ($1,$2,$3,100,true)
+		ON CONFLICT (tenant_id, job_profile_id, job_family_id) DO UPDATE
+		SET allocation_percent=excluded.allocation_percent, is_primary=excluded.is_primary
+	`, tenantID, profileID, familyID)
+	require.NoError(tb, err)
+
+	return profileID, familyID
 }
 
 func TestOrg058_ExtendedAssignmentTypes_NonPrimaryDoesNotAffectCapacity(t *testing.T) {

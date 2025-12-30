@@ -22,9 +22,8 @@ type OrgPositionRow struct {
 
 	JobFamilyGroupCode string
 	JobFamilyCode      string
-	JobRoleCode        string
 	JobLevelCode       string
-	JobProfileID       *uuid.UUID
+	JobProfileID       uuid.UUID
 	CostCenterCode     string
 	EffectiveDate      time.Time
 	EndDate            time.Time
@@ -37,7 +36,6 @@ type OrgPositionDetails struct {
 
 	JobFamilyGroupLabel string
 	JobFamilyLabel      string
-	JobRoleLabel        string
 	JobLevelLabel       string
 }
 

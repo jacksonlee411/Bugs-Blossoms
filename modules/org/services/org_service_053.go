@@ -19,24 +19,21 @@ import (
 const maxReportsToDepth = 128
 
 type CreatePositionInput struct {
-	Code               string
-	OrgNodeID          uuid.UUID
-	EffectiveDate      time.Time
-	Title              *string
-	LifecycleStatus    string
-	PositionType       string
-	EmploymentType     string
-	CapacityFTE        float64
-	ReportsToID        *uuid.UUID
-	JobFamilyGroupCode string
-	JobFamilyCode      string
-	JobRoleCode        string
-	JobLevelCode       string
-	JobProfileID       *uuid.UUID
-	CostCenterCode     *string
-	Profile            json.RawMessage
-	ReasonCode         string
-	ReasonNote         *string
+	Code            string
+	OrgNodeID       uuid.UUID
+	EffectiveDate   time.Time
+	Title           *string
+	LifecycleStatus string
+	PositionType    string
+	EmploymentType  string
+	CapacityFTE     float64
+	ReportsToID     *uuid.UUID
+	JobProfileID    uuid.UUID
+	JobLevelCode    *string
+	CostCenterCode  *string
+	Profile         json.RawMessage
+	ReasonCode      string
+	ReasonNote      *string
 }
 
 type CreatePositionResult struct {
@@ -66,18 +63,15 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 
 	positionType := strings.TrimSpace(in.PositionType)
 	employmentType := strings.TrimSpace(in.EmploymentType)
-	jobFamilyGroupCode := strings.TrimSpace(in.JobFamilyGroupCode)
-	jobFamilyCode := strings.TrimSpace(in.JobFamilyCode)
-	jobRoleCode := strings.TrimSpace(in.JobRoleCode)
-	jobLevelCode := strings.TrimSpace(in.JobLevelCode)
-	if positionType == "" || employmentType == "" || jobFamilyGroupCode == "" || jobFamilyCode == "" || jobRoleCode == "" || jobLevelCode == "" {
-		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_type/employment_type/job_*_code are required for managed positions", nil)
+	if positionType == "" || employmentType == "" {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_type/employment_type are required for managed positions", nil)
 	}
 
 	jobProfileID := in.JobProfileID
-	if jobProfileID != nil && *jobProfileID == uuid.Nil {
-		jobProfileID = nil
+	if jobProfileID == uuid.Nil {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_profile_id is required", nil)
 	}
+	jobLevelCode := trimOptionalText(in.JobLevelCode)
 
 	costCenterCode := trimOptionalText(in.CostCenterCode)
 
@@ -114,7 +108,6 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			})
 			return nil, err
 		}
-		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
 
 		hierarchyType := "OrgUnit"
 		exists, err := s.repo.NodeExistsAt(txCtx, tenantID, in.OrgNodeID, hierarchyType, in.EffectiveDate)
@@ -125,29 +118,22 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			return nil, newServiceError(http.StatusUnprocessableEntity, "ORG_NODE_NOT_FOUND_AT_DATE", "org_node_id not found at effective_date", nil)
 		}
 
+		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
 		var catalogShadowErr *ServiceError
 		if catalogMode != "disabled" {
-			_, err := s.validatePositionCatalogAndProfile(txCtx, tenantID, JobCatalogCodes{
-				JobFamilyGroupCode: jobFamilyGroupCode,
-				JobFamilyCode:      jobFamilyCode,
-				JobRoleCode:        jobRoleCode,
-				JobLevelCode:       jobLevelCode,
-			}, jobProfileID)
-			if err != nil {
+			if err := s.validateJobProfileAndLevel(txCtx, tenantID, jobProfileID, jobLevelCode); err != nil {
 				if catalogMode == "enforce" {
 					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.created", "org_position", uuid.Nil, in.EffectiveDate, catalogMode, err, logrus.Fields{
-						"org_node_id":           in.OrgNodeID.String(),
-						"job_family_group_code": jobFamilyGroupCode,
-						"job_family_code":       jobFamilyCode,
-						"job_role_code":         jobRoleCode,
-						"job_level_code":        jobLevelCode,
-						"job_profile_id":        jobProfileID,
-						"operation":             "Create",
+						"org_node_id": in.OrgNodeID.String(),
+						"operation":   "Create",
 					})
 					return nil, err
 				}
 				var svcErr *ServiceError
 				if !errors.As(err, &svcErr) {
+					return nil, err
+				}
+				if !isPositionCatalogShadowableError(svcErr) {
 					return nil, err
 				}
 				catalogShadowErr = svcErr
@@ -163,11 +149,8 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			return nil, err
 		}
 		if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, false, PositionSliceRow{
-			JobFamilyGroupCode: &jobFamilyGroupCode,
-			JobFamilyCode:      &jobFamilyCode,
-			JobRoleCode:        &jobRoleCode,
-			JobLevelCode:       &jobLevelCode,
-			JobProfileID:       jobProfileID,
+			JobLevelCode: jobLevelCode,
+			JobProfileID: jobProfileID,
 		}, parsedRestrictions); err != nil {
 			return nil, err
 		}
@@ -206,10 +189,7 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			EmploymentType:      &employmentType,
 			CapacityFTE:         in.CapacityFTE,
 			ReportsToPositionID: in.ReportsToID,
-			JobFamilyGroupCode:  &jobFamilyGroupCode,
-			JobFamilyCode:       &jobFamilyCode,
-			JobRoleCode:         &jobRoleCode,
-			JobLevelCode:        &jobLevelCode,
+			JobLevelCode:        jobLevelCode,
 			JobProfileID:        jobProfileID,
 			CostCenterCode:      costCenterCode,
 			Profile:             profile,
@@ -217,6 +197,9 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			EndDate:             endOfTime,
 		})
 		if err != nil {
+			return nil, mapPgError(err)
+		}
+		if err := s.repo.CopyJobProfileJobFamiliesToPositionSlice(txCtx, tenantID, jobProfileID, sliceID); err != nil {
 			return nil, mapPgError(err)
 		}
 
@@ -227,6 +210,8 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			"lifecycle_status":  lifecycle,
 			"is_auto_created":   false,
 			"capacity_fte":      in.CapacityFTE,
+			"job_profile_id":    jobProfileID.String(),
+			"job_level_code":    derefString(jobLevelCode),
 			"effective_date":    in.EffectiveDate.UTC().Format(time.RFC3339),
 			"end_date":          endOfTime.UTC().Format(time.RFC3339),
 			"reports_to_id":     in.ReportsToID,
@@ -237,11 +222,11 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			"reason_code": reasonCode,
 			"reason_note": in.ReasonNote,
 		}
-		addReasonCodeMeta(meta, reasonInfo)
 		if catalogShadowErr != nil {
 			meta["position_catalog_validation_mode"] = catalogMode
 			meta["position_catalog_validation_error_code"] = catalogShadowErr.Code
 		}
+		addReasonCodeMeta(meta, reasonInfo)
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
 			RequestID:       requestID,
@@ -627,20 +612,17 @@ type UpdatePositionInput struct {
 	ReasonCode    string
 	ReasonNote    *string
 
-	OrgNodeID          *uuid.UUID
-	Title              *string
-	LifecycleStatus    *string
-	PositionType       *string
-	EmploymentType     *string
-	CapacityFTE        *float64
-	ReportsToID        *uuid.UUID
-	JobFamilyGroupCode *string
-	JobFamilyCode      *string
-	JobRoleCode        *string
-	JobLevelCode       *string
-	JobProfileID       *uuid.UUID
-	CostCenterCode     *string
-	Profile            *json.RawMessage
+	OrgNodeID       *uuid.UUID
+	Title           *string
+	LifecycleStatus *string
+	PositionType    *string
+	EmploymentType  *string
+	CapacityFTE     *float64
+	ReportsToID     *uuid.UUID
+	JobLevelCode    *string
+	JobProfileID    *uuid.UUID
+	CostCenterCode  *string
+	Profile         *json.RawMessage
 }
 
 type UpdatePositionResult struct {
@@ -681,7 +663,6 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 			})
 			return nil, err
 		}
-		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
 
 		current, err := s.repo.LockPositionSliceAt(txCtx, tenantID, in.PositionID, in.EffectiveDate)
 		if err != nil {
@@ -749,45 +730,21 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 			}
 			employmentType = &v
 		}
-		jobFamilyGroupCode := current.JobFamilyGroupCode
-		if in.JobFamilyGroupCode != nil {
-			v := strings.TrimSpace(*in.JobFamilyGroupCode)
-			if v == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_family_group_code is invalid", nil)
-			}
-			jobFamilyGroupCode = &v
-		}
-		jobFamilyCode := current.JobFamilyCode
-		if in.JobFamilyCode != nil {
-			v := strings.TrimSpace(*in.JobFamilyCode)
-			if v == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_family_code is invalid", nil)
-			}
-			jobFamilyCode = &v
-		}
-		jobRoleCode := current.JobRoleCode
-		if in.JobRoleCode != nil {
-			v := strings.TrimSpace(*in.JobRoleCode)
-			if v == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_role_code is invalid", nil)
-			}
-			jobRoleCode = &v
-		}
 		jobLevelCode := current.JobLevelCode
 		if in.JobLevelCode != nil {
 			v := strings.TrimSpace(*in.JobLevelCode)
 			if v == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_level_code is invalid", nil)
+				jobLevelCode = nil
+			} else {
+				jobLevelCode = &v
 			}
-			jobLevelCode = &v
 		}
 		jobProfileID := current.JobProfileID
 		if in.JobProfileID != nil {
 			if *in.JobProfileID == uuid.Nil {
-				jobProfileID = nil
-			} else {
-				jobProfileID = in.JobProfileID
+				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_profile_id is invalid", nil)
 			}
+			jobProfileID = *in.JobProfileID
 		}
 		costCenterCode := current.CostCenterCode
 		if in.CostCenterCode != nil {
@@ -804,39 +761,27 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 
 		if !isAutoCreated {
 			if positionType == nil || strings.TrimSpace(*positionType) == "" ||
-				employmentType == nil || strings.TrimSpace(*employmentType) == "" ||
-				jobFamilyGroupCode == nil || strings.TrimSpace(*jobFamilyGroupCode) == "" ||
-				jobFamilyCode == nil || strings.TrimSpace(*jobFamilyCode) == "" ||
-				jobRoleCode == nil || strings.TrimSpace(*jobRoleCode) == "" ||
-				jobLevelCode == nil || strings.TrimSpace(*jobLevelCode) == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_type/employment_type/job_*_code are required for managed positions", nil)
+				employmentType == nil || strings.TrimSpace(*employmentType) == "" {
+				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_type/employment_type are required for managed positions", nil)
 			}
 		}
 
+		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
 		var catalogShadowErr *ServiceError
-		if !isAutoCreated && catalogMode != "disabled" {
-			_, err := s.validatePositionCatalogAndProfile(txCtx, tenantID, JobCatalogCodes{
-				JobFamilyGroupCode: derefString(jobFamilyGroupCode),
-				JobFamilyCode:      derefString(jobFamilyCode),
-				JobRoleCode:        derefString(jobRoleCode),
-				JobLevelCode:       derefString(jobLevelCode),
-			}, jobProfileID)
-			if err != nil {
+		if catalogMode != "disabled" {
+			if err := s.validateJobProfileAndLevel(txCtx, tenantID, jobProfileID, jobLevelCode); err != nil {
 				if catalogMode == "enforce" {
-					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.updated", "org_position", current.ID, in.EffectiveDate, catalogMode, err, logrus.Fields{
-						"position_id":           current.ID.String(),
-						"is_auto_created":       isAutoCreated,
-						"job_family_group_code": derefString(jobFamilyGroupCode),
-						"job_family_code":       derefString(jobFamilyCode),
-						"job_role_code":         derefString(jobRoleCode),
-						"job_level_code":        derefString(jobLevelCode),
-						"job_profile_id":        jobProfileID,
-						"operation":             "Update",
+					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.updated", "org_position", in.PositionID, in.EffectiveDate, catalogMode, err, logrus.Fields{
+						"position_id": in.PositionID.String(),
+						"operation":   "Update",
 					})
 					return nil, err
 				}
 				var svcErr *ServiceError
 				if !errors.As(err, &svcErr) {
+					return nil, err
+				}
+				if !isPositionCatalogShadowableError(svcErr) {
 					return nil, err
 				}
 				catalogShadowErr = svcErr
@@ -852,11 +797,8 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 			return nil, err
 		}
 		if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, isAutoCreated, PositionSliceRow{
-			JobFamilyGroupCode: jobFamilyGroupCode,
-			JobFamilyCode:      jobFamilyCode,
-			JobRoleCode:        jobRoleCode,
-			JobLevelCode:       jobLevelCode,
-			JobProfileID:       jobProfileID,
+			JobLevelCode: jobLevelCode,
+			JobProfileID: jobProfileID,
 		}, parsedRestrictions); err != nil {
 			return nil, err
 		}
@@ -894,9 +836,6 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 			EmploymentType:      employmentType,
 			CapacityFTE:         capacity,
 			ReportsToPositionID: reportsTo,
-			JobFamilyGroupCode:  jobFamilyGroupCode,
-			JobFamilyCode:       jobFamilyCode,
-			JobRoleCode:         jobRoleCode,
 			JobLevelCode:        jobLevelCode,
 			JobProfileID:        jobProfileID,
 			CostCenterCode:      costCenterCode,
@@ -906,6 +845,15 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 		})
 		if err != nil {
 			return nil, mapPgError(err)
+		}
+		if current.JobProfileID != jobProfileID {
+			if err := s.repo.CopyJobProfileJobFamiliesToPositionSlice(txCtx, tenantID, jobProfileID, sliceID); err != nil {
+				return nil, mapPgError(err)
+			}
+		} else {
+			if err := s.repo.CopyPositionSliceJobFamilies(txCtx, tenantID, current.ID, sliceID); err != nil {
+				return nil, mapPgError(err)
+			}
 		}
 
 		_, err = s.repo.InsertAuditLog(txCtx, tenantID, AuditLogInsert{
@@ -922,6 +870,8 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 				"org_node_id":      current.OrgNodeID.String(),
 				"lifecycle_status": current.LifecycleStatus,
 				"capacity_fte":     current.CapacityFTE,
+				"job_profile_id":   current.JobProfileID.String(),
+				"job_level_code":   derefString(current.JobLevelCode),
 				"effective_date":   current.EffectiveDate.UTC().Format(time.RFC3339),
 				"end_date":         current.EndDate.UTC().Format(time.RFC3339),
 			},
@@ -930,6 +880,8 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 				"org_node_id":      orgNodeID.String(),
 				"lifecycle_status": lifecycle,
 				"capacity_fte":     capacity,
+				"job_profile_id":   jobProfileID.String(),
+				"job_level_code":   derefString(jobLevelCode),
 				"effective_date":   in.EffectiveDate.UTC().Format(time.RFC3339),
 				"end_date":         newEnd.UTC().Format(time.RFC3339),
 			},
@@ -938,11 +890,11 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 					"reason_code": reasonCode,
 					"reason_note": in.ReasonNote,
 				}
-				addReasonCodeMeta(meta, reasonInfo)
 				if catalogShadowErr != nil {
 					meta["position_catalog_validation_mode"] = catalogMode
 					meta["position_catalog_validation_error_code"] = catalogShadowErr.Code
 				}
+				addReasonCodeMeta(meta, reasonInfo)
 				return meta
 			}(),
 			Operation:       "Update",
@@ -998,24 +950,21 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 }
 
 type CorrectPositionInput struct {
-	PositionID         uuid.UUID
-	AsOf               time.Time
-	ReasonCode         string
-	ReasonNote         *string
-	OrgNodeID          *uuid.UUID
-	Title              *string
-	Lifecycle          *string
-	PositionType       *string
-	EmploymentType     *string
-	CapacityFTE        *float64
-	ReportsToID        *uuid.UUID
-	JobFamilyGroupCode *string
-	JobFamilyCode      *string
-	JobRoleCode        *string
-	JobLevelCode       *string
-	JobProfileID       *uuid.UUID
-	CostCenterCode     *string
-	Profile            *json.RawMessage
+	PositionID     uuid.UUID
+	AsOf           time.Time
+	ReasonCode     string
+	ReasonNote     *string
+	OrgNodeID      *uuid.UUID
+	Title          *string
+	Lifecycle      *string
+	PositionType   *string
+	EmploymentType *string
+	CapacityFTE    *float64
+	ReportsToID    *uuid.UUID
+	JobLevelCode   *string
+	JobProfileID   *uuid.UUID
+	CostCenterCode *string
+	Profile        *json.RawMessage
 }
 
 type CorrectPositionResult struct {
@@ -1047,7 +996,6 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			logReasonCodeRejected(txCtx, tenantID, requestID, "position.corrected", reasonInfo, svcErr)
 			return nil, svcErr
 		}
-		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
 
 		target, err := s.repo.LockPositionSliceAt(txCtx, tenantID, in.PositionID, in.AsOf)
 		if err != nil {
@@ -1113,36 +1061,6 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			employmentType = &v
 			employmentTypePatch = &v
 		}
-		jobFamilyGroupCode := target.JobFamilyGroupCode
-		var jobFamilyGroupCodePatch *string
-		if in.JobFamilyGroupCode != nil {
-			v := strings.TrimSpace(*in.JobFamilyGroupCode)
-			if v == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_family_group_code is invalid", nil)
-			}
-			jobFamilyGroupCode = &v
-			jobFamilyGroupCodePatch = &v
-		}
-		jobFamilyCode := target.JobFamilyCode
-		var jobFamilyCodePatch *string
-		if in.JobFamilyCode != nil {
-			v := strings.TrimSpace(*in.JobFamilyCode)
-			if v == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_family_code is invalid", nil)
-			}
-			jobFamilyCode = &v
-			jobFamilyCodePatch = &v
-		}
-		jobRoleCode := target.JobRoleCode
-		var jobRoleCodePatch *string
-		if in.JobRoleCode != nil {
-			v := strings.TrimSpace(*in.JobRoleCode)
-			if v == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_role_code is invalid", nil)
-			}
-			jobRoleCode = &v
-			jobRoleCodePatch = &v
-		}
 		jobLevelCode := target.JobLevelCode
 		var jobLevelCodePatch *string
 		if in.JobLevelCode != nil {
@@ -1153,13 +1071,14 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			jobLevelCode = &v
 			jobLevelCodePatch = &v
 		}
+		jobProfileID := target.JobProfileID
 		var jobProfileIDPatch *uuid.UUID
 		if in.JobProfileID != nil {
 			if *in.JobProfileID == uuid.Nil {
-				jobProfileIDPatch = &uuid.Nil
-			} else {
-				jobProfileIDPatch = in.JobProfileID
+				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_profile_id is invalid", nil)
 			}
+			jobProfileID = *in.JobProfileID
+			jobProfileIDPatch = in.JobProfileID
 		}
 		var costCenterCodePatch *string
 		if in.CostCenterCode != nil {
@@ -1179,52 +1098,13 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 
 		if !isAutoCreated {
 			if positionType == nil || strings.TrimSpace(*positionType) == "" ||
-				employmentType == nil || strings.TrimSpace(*employmentType) == "" ||
-				jobFamilyGroupCode == nil || strings.TrimSpace(*jobFamilyGroupCode) == "" ||
-				jobFamilyCode == nil || strings.TrimSpace(*jobFamilyCode) == "" ||
-				jobRoleCode == nil || strings.TrimSpace(*jobRoleCode) == "" ||
-				jobLevelCode == nil || strings.TrimSpace(*jobLevelCode) == "" {
-				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_type/employment_type/job_*_code are required for managed positions", nil)
+				employmentType == nil || strings.TrimSpace(*employmentType) == "" {
+				return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "position_type/employment_type are required for managed positions", nil)
 			}
 		}
 
-		jobProfileID := target.JobProfileID
-		if in.JobProfileID != nil {
-			if *in.JobProfileID == uuid.Nil {
-				jobProfileID = nil
-			} else {
-				jobProfileID = in.JobProfileID
-			}
-		}
-
-		var catalogShadowErr *ServiceError
-		if !isAutoCreated && catalogMode != "disabled" {
-			_, err := s.validatePositionCatalogAndProfile(txCtx, tenantID, JobCatalogCodes{
-				JobFamilyGroupCode: derefString(jobFamilyGroupCode),
-				JobFamilyCode:      derefString(jobFamilyCode),
-				JobRoleCode:        derefString(jobRoleCode),
-				JobLevelCode:       derefString(jobLevelCode),
-			}, jobProfileID)
-			if err != nil {
-				if catalogMode == "enforce" {
-					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.corrected", "org_position", in.PositionID, target.EffectiveDate, catalogMode, err, logrus.Fields{
-						"position_id":           in.PositionID.String(),
-						"is_auto_created":       isAutoCreated,
-						"job_family_group_code": derefString(jobFamilyGroupCode),
-						"job_family_code":       derefString(jobFamilyCode),
-						"job_role_code":         derefString(jobRoleCode),
-						"job_level_code":        derefString(jobLevelCode),
-						"job_profile_id":        jobProfileID,
-						"operation":             "Correct",
-					})
-					return nil, err
-				}
-				var svcErr *ServiceError
-				if !errors.As(err, &svcErr) {
-					return nil, err
-				}
-				catalogShadowErr = svcErr
-			}
+		if err := s.validateJobProfileAndLevel(txCtx, tenantID, jobProfileID, jobLevelCode); err != nil {
+			return nil, err
 		}
 
 		restrictionsJSON, err := extractRestrictionsFromProfile(profile)
@@ -1236,11 +1116,8 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			return nil, err
 		}
 		if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, isAutoCreated, PositionSliceRow{
-			JobFamilyGroupCode: jobFamilyGroupCode,
-			JobFamilyCode:      jobFamilyCode,
-			JobRoleCode:        jobRoleCode,
-			JobLevelCode:       jobLevelCode,
-			JobProfileID:       jobProfileID,
+			JobLevelCode: jobLevelCode,
+			JobProfileID: jobProfileID,
 		}, parsedRestrictions); err != nil {
 			return nil, err
 		}
@@ -1284,9 +1161,6 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			EmploymentType:      employmentTypePatch,
 			CapacityFTE:         in.CapacityFTE,
 			ReportsToPositionID: in.ReportsToID,
-			JobFamilyGroupCode:  jobFamilyGroupCodePatch,
-			JobFamilyCode:       jobFamilyCodePatch,
-			JobRoleCode:         jobRoleCodePatch,
 			JobLevelCode:        jobLevelCodePatch,
 			JobProfileID:        jobProfileIDPatch,
 			CostCenterCode:      costCenterCodePatch,
@@ -1329,10 +1203,6 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 					"reason_note": in.ReasonNote,
 				}
 				addReasonCodeMeta(meta, reasonInfo)
-				if catalogShadowErr != nil {
-					meta["position_catalog_validation_mode"] = catalogMode
-					meta["position_catalog_validation_error_code"] = catalogShadowErr.Code
-				}
 				return meta
 			}(),
 			Operation:       "Correct",
@@ -1462,35 +1332,51 @@ func (s *OrgService) RescindPosition(ctx context.Context, tenantID uuid.UUID, re
 			"end_date":         target.EndDate.UTC().Format(time.RFC3339),
 		}
 
-		if err := s.repo.DeletePositionSlicesFrom(txCtx, tenantID, in.PositionID, in.EffectiveDate); err != nil {
-			return nil, err
-		}
-		if target.EffectiveDate.Before(in.EffectiveDate) {
+		var sliceID uuid.UUID
+		if target.EffectiveDate.Equal(in.EffectiveDate) {
+			if err := s.repo.DeletePositionSlicesFrom(txCtx, tenantID, in.PositionID, in.EffectiveDate.AddDate(0, 0, 1)); err != nil {
+				return nil, err
+			}
+			rescinded := "rescinded"
+			if err := s.repo.UpdatePositionSliceInPlace(txCtx, tenantID, target.ID, PositionSliceInPlacePatch{
+				LifecycleStatus: &rescinded,
+			}); err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.UpdatePositionSliceEndDate(txCtx, tenantID, target.ID, endOfTime); err != nil {
+				return nil, mapPgError(err)
+			}
+			sliceID = target.ID
+		} else {
+			if err := s.repo.DeletePositionSlicesFrom(txCtx, tenantID, in.PositionID, in.EffectiveDate); err != nil {
+				return nil, err
+			}
 			if err := s.repo.TruncatePositionSlice(txCtx, tenantID, target.ID, truncateEndDateFromNewEffectiveDate(in.EffectiveDate)); err != nil {
 				return nil, mapPgError(err)
 			}
-		}
 
-		sliceID, err := s.repo.InsertPositionSlice(txCtx, tenantID, in.PositionID, PositionSliceInsert{
-			OrgNodeID:           target.OrgNodeID,
-			Title:               target.Title,
-			LifecycleStatus:     "rescinded",
-			PositionType:        target.PositionType,
-			EmploymentType:      target.EmploymentType,
-			CapacityFTE:         target.CapacityFTE,
-			ReportsToPositionID: target.ReportsToPositionID,
-			JobFamilyGroupCode:  target.JobFamilyGroupCode,
-			JobFamilyCode:       target.JobFamilyCode,
-			JobRoleCode:         target.JobRoleCode,
-			JobLevelCode:        target.JobLevelCode,
-			JobProfileID:        target.JobProfileID,
-			CostCenterCode:      target.CostCenterCode,
-			Profile:             target.Profile,
-			EffectiveDate:       in.EffectiveDate,
-			EndDate:             endOfTime,
-		})
-		if err != nil {
-			return nil, mapPgError(err)
+			var err error
+			sliceID, err = s.repo.InsertPositionSlice(txCtx, tenantID, in.PositionID, PositionSliceInsert{
+				OrgNodeID:           target.OrgNodeID,
+				Title:               target.Title,
+				LifecycleStatus:     "rescinded",
+				PositionType:        target.PositionType,
+				EmploymentType:      target.EmploymentType,
+				CapacityFTE:         target.CapacityFTE,
+				ReportsToPositionID: target.ReportsToPositionID,
+				JobLevelCode:        target.JobLevelCode,
+				JobProfileID:        target.JobProfileID,
+				CostCenterCode:      target.CostCenterCode,
+				Profile:             target.Profile,
+				EffectiveDate:       in.EffectiveDate,
+				EndDate:             endOfTime,
+			})
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.CopyPositionSliceJobFamilies(txCtx, tenantID, target.ID, sliceID); err != nil {
+				return nil, mapPgError(err)
+			}
 		}
 
 		newValues := map[string]any{

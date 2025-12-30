@@ -1,6 +1,8 @@
 # DEV-PLAN-067：Position 分类字段 UI 贯通 + Job Catalog 维护入口（页内分组导航）
 
 **状态**: 已完成（2025-12-28 11:45 UTC）
+**对齐更新**：
+- 2025-12-29：职位体系与 UI 已由 `DEV-PLAN-072` 对标 Workday 重新收口：Position 不再写入 `job_family_group_code/job_family_code/job_role_code`，改为仅选 `job_profile_id`（职位模板）+ 可选 `job_level_code`；`Job Role` 页签与相关写入口退场。本文保留为历史记录，不再作为实现 SSOT。
 
 ## 1. 背景与上下文 (Context)
 - **需求来源**：

@@ -26,11 +26,8 @@ type PositionSliceInsert struct {
 	EmploymentType      *string
 	CapacityFTE         float64
 	ReportsToPositionID *uuid.UUID
-	JobFamilyGroupCode  *string
-	JobFamilyCode       *string
-	JobRoleCode         *string
 	JobLevelCode        *string
-	JobProfileID        *uuid.UUID
+	JobProfileID        uuid.UUID
 	CostCenterCode      *string
 	Profile             json.RawMessage
 	EffectiveDate       time.Time
@@ -45,9 +42,6 @@ type PositionSliceInPlacePatch struct {
 	EmploymentType      *string
 	CapacityFTE         *float64
 	ReportsToPositionID *uuid.UUID
-	JobFamilyGroupCode  *string
-	JobFamilyCode       *string
-	JobRoleCode         *string
 	JobLevelCode        *string
 	JobProfileID        *uuid.UUID
 	CostCenterCode      *string
@@ -80,9 +74,8 @@ type PositionViewRow struct {
 	ReportsToPositionID *uuid.UUID      `json:"reports_to_position_id,omitempty"`
 	JobFamilyGroupCode  *string         `json:"job_family_group_code,omitempty"`
 	JobFamilyCode       *string         `json:"job_family_code,omitempty"`
-	JobRoleCode         *string         `json:"job_role_code,omitempty"`
 	JobLevelCode        *string         `json:"job_level_code,omitempty"`
-	JobProfileID        *uuid.UUID      `json:"job_profile_id,omitempty"`
+	JobProfileID        uuid.UUID       `json:"job_profile_id"`
 	CostCenterCode      *string         `json:"cost_center_code,omitempty"`
 	Profile             json.RawMessage `json:"profile,omitempty"`
 	EffectiveDate       time.Time       `json:"effective_date"`
@@ -99,11 +92,8 @@ type PositionSliceRow struct {
 	EmploymentType      *string
 	CapacityFTE         float64
 	ReportsToPositionID *uuid.UUID
-	JobFamilyGroupCode  *string
-	JobFamilyCode       *string
-	JobRoleCode         *string
 	JobLevelCode        *string
-	JobProfileID        *uuid.UUID
+	JobProfileID        uuid.UUID
 	CostCenterCode      *string
 	Profile             json.RawMessage
 	EffectiveDate       time.Time

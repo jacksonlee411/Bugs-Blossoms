@@ -52,29 +52,8 @@ type JobFamilyUpdate struct {
 	IsActive *bool
 }
 
-type JobRoleRow struct {
-	ID          uuid.UUID `json:"id"`
-	JobFamilyID uuid.UUID `json:"job_family_id"`
-	Code        string    `json:"code"`
-	Name        string    `json:"name"`
-	IsActive    bool      `json:"is_active"`
-}
-
-type JobRoleCreate struct {
-	JobFamilyID uuid.UUID
-	Code        string
-	Name        string
-	IsActive    bool
-}
-
-type JobRoleUpdate struct {
-	Name     *string
-	IsActive *bool
-}
-
 type JobLevelRow struct {
 	ID           uuid.UUID `json:"id"`
-	JobRoleID    uuid.UUID `json:"job_role_id"`
 	Code         string    `json:"code"`
 	Name         string    `json:"name"`
 	DisplayOrder int       `json:"display_order"`
@@ -82,7 +61,6 @@ type JobLevelRow struct {
 }
 
 type JobLevelCreate struct {
-	JobRoleID    uuid.UUID
 	Code         string
 	Name         string
 	DisplayOrder int
@@ -100,7 +78,6 @@ type JobProfileRow struct {
 	Code        string    `json:"code"`
 	Name        string    `json:"name"`
 	Description *string   `json:"description,omitempty"`
-	JobRoleID   uuid.UUID `json:"job_role_id"`
 	IsActive    bool      `json:"is_active"`
 }
 
@@ -108,38 +85,41 @@ type JobProfileCreate struct {
 	Code        string
 	Name        string
 	Description *string
-	JobRoleID   uuid.UUID
 	IsActive    bool
+	JobFamilies JobProfileJobFamiliesSet
 }
 
 type JobProfileUpdate struct {
 	Name        *string
 	Description **string
 	IsActive    *bool
-}
-
-type JobProfileAllowedLevelsSet struct {
-	JobLevelIDs []uuid.UUID
+	JobFamilies *JobProfileJobFamiliesSet
 }
 
 type JobProfileRef struct {
-	ID        uuid.UUID
-	JobRoleID uuid.UUID
-	IsActive  bool
+	ID       uuid.UUID
+	IsActive bool
 }
 
-type JobCatalogCodes struct {
-	JobFamilyGroupCode string
-	JobFamilyCode      string
-	JobRoleCode        string
-	JobLevelCode       string
+type JobProfileJobFamilyRow struct {
+	JobFamilyID        uuid.UUID `json:"job_family_id"`
+	JobFamilyCode      string    `json:"job_family_code"`
+	JobFamilyName      string    `json:"job_family_name"`
+	AllocationPercent  int       `json:"allocation_percent"`
+	IsPrimary          bool      `json:"is_primary"`
+	JobFamilyGroupID   uuid.UUID `json:"job_family_group_id"`
+	JobFamilyGroupCode string    `json:"job_family_group_code"`
+	JobFamilyGroupName string    `json:"job_family_group_name"`
 }
 
-type JobCatalogResolvedPath struct {
-	JobFamilyGroupID uuid.UUID
-	JobFamilyID      uuid.UUID
-	JobRoleID        uuid.UUID
-	JobLevelID       uuid.UUID
+type JobProfileJobFamiliesSet struct {
+	Items []JobProfileJobFamilySetItem
+}
+
+type JobProfileJobFamilySetItem struct {
+	JobFamilyID       uuid.UUID
+	AllocationPercent int
+	IsPrimary         bool
 }
 
 func (s *OrgService) ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID) ([]JobFamilyGroupRow, error) {
@@ -243,68 +223,12 @@ func (s *OrgService) UpdateJobFamily(ctx context.Context, tenantID uuid.UUID, id
 	})
 }
 
-func (s *OrgService) ListJobRoles(ctx context.Context, tenantID uuid.UUID, jobFamilyID uuid.UUID) ([]JobRoleRow, error) {
+func (s *OrgService) ListJobLevels(ctx context.Context, tenantID uuid.UUID) ([]JobLevelRow, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
-	}
-	if jobFamilyID == uuid.Nil {
-		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "job_family_id is required", nil)
-	}
-	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobRoleRow, error) {
-		rows, err := s.repo.ListJobRoles(txCtx, tenantID, jobFamilyID)
-		return rows, mapPgError(err)
-	})
-}
-
-func (s *OrgService) CreateJobRole(ctx context.Context, tenantID uuid.UUID, in JobRoleCreate) (JobRoleRow, error) {
-	if tenantID == uuid.Nil {
-		return JobRoleRow{}, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
-	}
-	if in.JobFamilyID == uuid.Nil {
-		return JobRoleRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_family_id is required", nil)
-	}
-	code := strings.TrimSpace(in.Code)
-	name := strings.TrimSpace(in.Name)
-	if code == "" || name == "" {
-		return JobRoleRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "code/name are required", nil)
-	}
-	in.Code = code
-	in.Name = name
-	return inTx(ctx, tenantID, func(txCtx context.Context) (JobRoleRow, error) {
-		row, err := s.repo.CreateJobRole(txCtx, tenantID, in)
-		return row, mapPgError(err)
-	})
-}
-
-func (s *OrgService) UpdateJobRole(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobRoleUpdate) (JobRoleRow, error) {
-	if tenantID == uuid.Nil {
-		return JobRoleRow{}, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
-	}
-	if id == uuid.Nil {
-		return JobRoleRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "id is required", nil)
-	}
-	if in.Name == nil && in.IsActive == nil {
-		return JobRoleRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "no fields to update", nil)
-	}
-	if in.Name != nil {
-		n := strings.TrimSpace(*in.Name)
-		in.Name = &n
-	}
-	return inTx(ctx, tenantID, func(txCtx context.Context) (JobRoleRow, error) {
-		row, err := s.repo.UpdateJobRole(txCtx, tenantID, id, in)
-		return row, mapPgError(err)
-	})
-}
-
-func (s *OrgService) ListJobLevels(ctx context.Context, tenantID uuid.UUID, jobRoleID uuid.UUID) ([]JobLevelRow, error) {
-	if tenantID == uuid.Nil {
-		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
-	}
-	if jobRoleID == uuid.Nil {
-		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "job_role_id is required", nil)
 	}
 	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobLevelRow, error) {
-		rows, err := s.repo.ListJobLevels(txCtx, tenantID, jobRoleID)
+		rows, err := s.repo.ListJobLevels(txCtx, tenantID)
 		return rows, mapPgError(err)
 	})
 }
@@ -312,9 +236,6 @@ func (s *OrgService) ListJobLevels(ctx context.Context, tenantID uuid.UUID, jobR
 func (s *OrgService) CreateJobLevel(ctx context.Context, tenantID uuid.UUID, in JobLevelCreate) (JobLevelRow, error) {
 	if tenantID == uuid.Nil {
 		return JobLevelRow{}, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
-	}
-	if in.JobRoleID == uuid.Nil {
-		return JobLevelRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_role_id is required", nil)
 	}
 	code := strings.TrimSpace(in.Code)
 	name := strings.TrimSpace(in.Name)
@@ -355,12 +276,12 @@ func (s *OrgService) UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, id 
 	})
 }
 
-func (s *OrgService) ListJobProfiles(ctx context.Context, tenantID uuid.UUID, jobRoleID *uuid.UUID) ([]JobProfileRow, error) {
+func (s *OrgService) ListJobProfiles(ctx context.Context, tenantID uuid.UUID) ([]JobProfileRow, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
 	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobProfileRow, error) {
-		rows, err := s.repo.ListJobProfiles(txCtx, tenantID, jobRoleID)
+		rows, err := s.repo.ListJobProfiles(txCtx, tenantID)
 		return rows, mapPgError(err)
 	})
 }
@@ -369,20 +290,26 @@ func (s *OrgService) CreateJobProfile(ctx context.Context, tenantID uuid.UUID, i
 	if tenantID == uuid.Nil {
 		return JobProfileRow{}, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
-	if in.JobRoleID == uuid.Nil {
-		return JobProfileRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_role_id is required", nil)
-	}
 	code := strings.TrimSpace(in.Code)
 	name := strings.TrimSpace(in.Name)
 	if code == "" || name == "" {
 		return JobProfileRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "code/name are required", nil)
+	}
+	if err := validateJobProfileJobFamiliesSet(in.JobFamilies); err != nil {
+		return JobProfileRow{}, err
 	}
 	in.Code = code
 	in.Name = name
 	in.Description = trimOptionalText(in.Description)
 	return inTx(ctx, tenantID, func(txCtx context.Context) (JobProfileRow, error) {
 		row, err := s.repo.CreateJobProfile(txCtx, tenantID, in)
-		return row, mapPgError(err)
+		if err != nil {
+			return JobProfileRow{}, mapPgError(err)
+		}
+		if err := s.repo.SetJobProfileJobFamilies(txCtx, tenantID, row.ID, in.JobFamilies); err != nil {
+			return JobProfileRow{}, mapPgError(err)
+		}
+		return row, nil
 	})
 }
 
@@ -393,7 +320,7 @@ func (s *OrgService) UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, i
 	if id == uuid.Nil {
 		return JobProfileRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "id is required", nil)
 	}
-	if in.Name == nil && in.Description == nil && in.IsActive == nil {
+	if in.Name == nil && in.Description == nil && in.IsActive == nil && in.JobFamilies == nil {
 		return JobProfileRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "no fields to update", nil)
 	}
 	if in.Name != nil {
@@ -409,50 +336,89 @@ func (s *OrgService) UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, i
 			*in.Description = &v
 		}
 	}
+	if in.JobFamilies != nil {
+		if err := validateJobProfileJobFamiliesSet(*in.JobFamilies); err != nil {
+			return JobProfileRow{}, err
+		}
+	}
 	return inTx(ctx, tenantID, func(txCtx context.Context) (JobProfileRow, error) {
 		row, err := s.repo.UpdateJobProfile(txCtx, tenantID, id, in)
-		return row, mapPgError(err)
+		if err != nil {
+			return JobProfileRow{}, mapPgError(err)
+		}
+		if in.JobFamilies != nil {
+			if err := s.repo.SetJobProfileJobFamilies(txCtx, tenantID, id, *in.JobFamilies); err != nil {
+				return JobProfileRow{}, mapPgError(err)
+			}
+		}
+		return row, nil
 	})
 }
 
-func (s *OrgService) SetJobProfileAllowedLevels(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileAllowedLevelsSet) error {
+func (s *OrgService) ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]JobProfileJobFamilyRow, error) {
+	if tenantID == uuid.Nil {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
+	}
+	if jobProfileID == uuid.Nil {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "job_profile_id is required", nil)
+	}
+	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobProfileJobFamilyRow, error) {
+		rows, err := s.repo.ListJobProfileJobFamilies(txCtx, tenantID, jobProfileID)
+		return rows, mapPgError(err)
+	})
+}
+
+func (s *OrgService) SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileJobFamiliesSet) error {
 	if tenantID == uuid.Nil {
 		return newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
 	if jobProfileID == uuid.Nil {
 		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_profile_id is required", nil)
 	}
-	unique := make([]uuid.UUID, 0, len(in.JobLevelIDs))
-	seen := make(map[uuid.UUID]struct{}, len(in.JobLevelIDs))
-	for _, id := range in.JobLevelIDs {
-		if id == uuid.Nil {
-			return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_level_ids contains invalid uuid", nil)
-		}
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		unique = append(unique, id)
+	if err := validateJobProfileJobFamiliesSet(in); err != nil {
+		return err
 	}
 
 	_, err := inTx(ctx, tenantID, func(txCtx context.Context) (struct{}, error) {
-		profile, err := s.repo.GetJobProfileRef(txCtx, tenantID, jobProfileID)
-		if err != nil {
-			return struct{}{}, mapPgError(err)
-		}
-		for _, levelID := range unique {
-			ok, err := s.repo.JobLevelExistsUnderRole(txCtx, tenantID, profile.JobRoleID, levelID)
-			if err != nil {
-				return struct{}{}, mapPgError(err)
-			}
-			if !ok {
-				return struct{}{}, newServiceError(http.StatusUnprocessableEntity, "ORG_JOB_PROFILE_LEVEL_NOT_UNDER_ROLE", "job_level_id is not under job role", nil)
-			}
-		}
-		if err := s.repo.SetJobProfileAllowedLevels(txCtx, tenantID, jobProfileID, JobProfileAllowedLevelsSet{JobLevelIDs: unique}); err != nil {
+		if err := s.repo.SetJobProfileJobFamilies(txCtx, tenantID, jobProfileID, in); err != nil {
 			return struct{}{}, mapPgError(err)
 		}
 		return struct{}{}, nil
 	})
 	return err
+}
+
+func validateJobProfileJobFamiliesSet(in JobProfileJobFamiliesSet) error {
+	if len(in.Items) == 0 {
+		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_families are required", nil)
+	}
+
+	sum := 0
+	primaryCount := 0
+	seen := make(map[uuid.UUID]struct{}, len(in.Items))
+	for i := range in.Items {
+		it := in.Items[i]
+		if it.JobFamilyID == uuid.Nil {
+			return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_family_id is required", nil)
+		}
+		if _, ok := seen[it.JobFamilyID]; ok {
+			return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_family_id duplicated", nil)
+		}
+		seen[it.JobFamilyID] = struct{}{}
+
+		if it.AllocationPercent < 1 || it.AllocationPercent > 100 {
+			return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "allocation_percent must be between 1 and 100", nil)
+		}
+		sum += it.AllocationPercent
+		if it.IsPrimary {
+			primaryCount++
+		}
+	}
+	if sum != 100 {
+		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "allocation_percent must sum to 100", nil)
+	}
+	if primaryCount != 1 {
+		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "exactly one primary is required", nil)
+	}
+	return nil
 }
