@@ -1178,6 +1178,7 @@ func (c *OrgUIController) JobCatalogPage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	ensureOrgPageCapabilities(r, orgJobCatalogAuthzObject, "admin")
+	ensureOrgPageCapabilities(r, orgJobProfilesAuthzObject, "admin")
 
 	statusCode := http.StatusOK
 	var pageErrs []string

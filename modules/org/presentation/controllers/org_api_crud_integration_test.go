@@ -246,6 +246,7 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
@@ -257,6 +258,13 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 
 	personID := uuid.New()
 	_, err = pool.Exec(context.Background(), `INSERT INTO persons (tenant_id, person_uuid, pernr, display_name) VALUES ($1,$2,$3,$4)`, tenantID, personID, "0001", "Test Person")
+	require.NoError(t, err)
+
+	_, err = pool.Exec(context.Background(), `
+	INSERT INTO org_job_profiles (tenant_id, code, name, is_active)
+	VALUES ($1,'JP-AUTO','Auto Job Profile', TRUE)
+	ON CONFLICT (tenant_id, code) DO NOTHING
+	`, tenantID)
 	require.NoError(t, err)
 
 	withOrgRolloutEnabled(t, tenantID)

@@ -243,6 +243,7 @@ JOIN org_job_profile_job_families jpf
 ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO NOTHING;
 
 -- 6) Remove "allowed job levels" (no longer maintained).
+-- atlas:nolint DS102
 DROP TABLE IF EXISTS org_job_profile_allowed_job_levels;
 
 -- 7) Deduplicate job levels by (tenant_id, code) before making them tenant-global.
@@ -263,9 +264,11 @@ WHERE l.id = r.id
   AND r.rn > 1;
 
 -- 8) Job profiles: remove job_role_id
+-- atlas:nolint CD101
 ALTER TABLE org_job_profiles
     DROP CONSTRAINT IF EXISTS org_job_profiles_role_fk;
 
+-- atlas:nolint DS103
 ALTER TABLE org_job_profiles
     DROP COLUMN IF EXISTS job_role_id;
 
@@ -275,6 +278,7 @@ CREATE INDEX IF NOT EXISTS org_job_profiles_tenant_active_code_idx
     ON org_job_profiles (tenant_id, is_active, code);
 
 -- 9) Job levels: remove job_role_id and enforce tenant-global uniqueness on code
+-- atlas:nolint CD101
 ALTER TABLE org_job_levels
     DROP CONSTRAINT IF EXISTS org_job_levels_role_fk;
 
@@ -283,9 +287,11 @@ ALTER TABLE org_job_levels
 
 DROP INDEX IF EXISTS org_job_levels_tenant_role_active_order_code_idx;
 
+-- atlas:nolint DS103
 ALTER TABLE org_job_levels
     DROP COLUMN IF EXISTS job_role_id;
 
+-- atlas:nolint MF101
 ALTER TABLE org_job_levels
     ADD CONSTRAINT org_job_levels_tenant_id_code_key UNIQUE (tenant_id, code);
 
@@ -293,12 +299,15 @@ CREATE INDEX IF NOT EXISTS org_job_levels_tenant_active_order_code_idx
     ON org_job_levels (tenant_id, is_active, display_order, code);
 
 -- 10) Drop Job Roles (after all dependencies removed).
+-- atlas:nolint DS102
 DROP TABLE IF EXISTS org_job_roles;
 
 -- 11) Position slices: require job_profile_id and remove legacy job_*_code columns.
+-- atlas:nolint MF104
 ALTER TABLE org_position_slices
     ALTER COLUMN job_profile_id SET NOT NULL;
 
+-- atlas:nolint DS103
 ALTER TABLE org_position_slices
     DROP COLUMN IF EXISTS job_family_group_code,
     DROP COLUMN IF EXISTS job_family_code,

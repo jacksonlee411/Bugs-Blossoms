@@ -23,7 +23,7 @@ async function ensureSeeded({ request }: { request: any }) {
 async function ensureJobCatalogPath(args: { page: Page }) {
 	const groupCode = 'FG-001';
 	const familyCode = 'F-001';
-	const roleCode = 'R-001';
+	const profileCode = 'JP-001';
 	const levelCode = 'L-001';
 
 	const createGroup = await args.page.request.post('/org/api/job-catalog/family-groups', {
@@ -49,21 +49,26 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 	expect(createFamily.status()).toBe(201);
 	const family = await createFamily.json();
 
-	const createRole = await args.page.request.post('/org/api/job-catalog/roles', {
+	const createProfile = await args.page.request.post('/org/api/job-profiles', {
 		data: {
-			job_family_id: family.id,
-			code: roleCode,
-			name: 'E2E Job role',
+			code: profileCode,
+			name: 'E2E Job profile',
+			job_families: [
+				{
+					job_family_id: family.id,
+					allocation_percent: 100,
+					is_primary: true,
+				},
+			],
 			is_active: true,
 		},
 		failOnStatusCode: false,
 	});
-	expect(createRole.status()).toBe(201);
-	const role = await createRole.json();
+	expect(createProfile.status()).toBe(201);
+	const profile = await createProfile.json();
 
 	const createLevel = await args.page.request.post('/org/api/job-catalog/levels', {
 		data: {
-			job_role_id: role.id,
 			code: levelCode,
 			name: 'E2E Job level',
 			display_order: 1,
@@ -73,7 +78,7 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 	});
 	expect(createLevel.status()).toBe(201);
 
-	return { groupCode, familyCode, roleCode, levelCode };
+	return { groupCode, familyCode, profileCode, profileID: profile.id, levelCode };
 }
 
 async function setComboboxValue(args: { combobox: ReturnType<Page['locator']>; query: string; value: string }) {
@@ -114,7 +119,7 @@ async function saveScreenshot(args: { page: Page; name: string; fullPage?: boole
 async function createJobCatalogRowsViaUI(args: { page: Page; viewportName: string }) {
 	const groupCode = 'FG-UI-001';
 	const familyCode = 'F-UI-001';
-	const roleCode = 'R-UI-001';
+	const profileCode = 'JP-UI-001';
 	const levelCode = 'L-UI-001';
 
 	const effectiveDate = await args.page.locator('#effective-date').inputValue();
@@ -179,29 +184,49 @@ async function createJobCatalogRowsViaUI(args: { page: Page; viewportName: strin
 	await expect(args.page.locator('table tbody tr', { hasText: familyCode }).first()).toBeVisible();
 	await saveScreenshot({ page: args.page, name: `org-job-catalog-families-created--${args.viewportName}` });
 
-	await args.page.goto(
-		`/org/job-catalog?tab=roles&effective_date=${encodeURIComponent(effectiveDate)}&job_family_group_code=${encodeURIComponent(groupCode)}&job_family_code=${encodeURIComponent(familyCode)}`,
-		{ waitUntil: 'domcontentloaded' }
+	const groupListResp = await args.page.request.get('/org/api/job-catalog/family-groups', { failOnStatusCode: false });
+	expect(groupListResp.status()).toBe(200);
+	const groupList = await groupListResp.json();
+	const group = (groupList.items ?? []).find((it: any) => it.code === groupCode);
+	expect(group).toBeTruthy();
+
+	const familyListResp = await args.page.request.get(
+		`/org/api/job-catalog/families?job_family_group_id=${encodeURIComponent(group.id)}`,
+		{ failOnStatusCode: false }
 	);
+	expect(familyListResp.status()).toBe(200);
+	const familyList = await familyListResp.json();
+	const family = (familyList.items ?? []).find((it: any) => it.code === familyCode);
+	expect(family).toBeTruthy();
+
+	await args.page.goto(`/org/job-catalog?tab=profiles&effective_date=${encodeURIComponent(effectiveDate)}`, {
+		waitUntil: 'domcontentloaded',
+	});
 	await expect(args.page.locator('#org-job-catalog-page')).toBeVisible();
-	const roleForm = args.page
+	const profileForm = args.page
 		.locator('form')
-		.filter({ has: args.page.locator('input[name="tab"][value="roles"]') })
+		.filter({ has: args.page.locator('input[name="tab"][value="profiles"]') })
 		.filter({ has: args.page.locator('input[name="code"]') })
 		.first();
-	await roleForm.locator('input[name="code"]').fill(roleCode);
-	await roleForm.locator('input[name="name"]').fill('UI Job role');
-	const createRoleResp = args.page.waitForResponse((resp) => {
-		return resp.request().method() === 'POST' && resp.url().includes('/org/job-catalog/roles');
+	await profileForm.locator('input[name="code"]').fill(profileCode);
+	await profileForm.locator('input[name="name"]').fill('UI Job profile');
+
+	const family0Combobox = profileForm.locator('div[x-data^="combobox("]').first();
+	await setComboboxValue({ combobox: family0Combobox, query: familyCode, value: family.id });
+	await profileForm.locator('input[name="allocation_percent_0"]').fill('100');
+	await profileForm.locator('input[type="radio"][name="primary_index"][value="0"]').check();
+
+	const createProfileResp = args.page.waitForResponse((resp) => {
+		return resp.request().method() === 'POST' && resp.url().includes('/org/job-catalog/profiles');
 	});
-	await roleForm.getByRole('button', { name: 'Save', exact: true }).click();
-	expect((await createRoleResp).status()).toBe(200);
+	await profileForm.getByRole('button', { name: 'Save', exact: true }).click();
+	expect((await createProfileResp).status()).toBe(200);
 	await args.page.waitForLoadState('domcontentloaded');
-	await expect(args.page.locator('table tbody tr', { hasText: roleCode }).first()).toBeVisible();
-	await saveScreenshot({ page: args.page, name: `org-job-catalog-roles-created--${args.viewportName}` });
+	await expect(args.page.locator('table tbody tr', { hasText: profileCode }).first()).toBeVisible();
+	await saveScreenshot({ page: args.page, name: `org-job-catalog-profiles-created--${args.viewportName}` });
 
 	await args.page.goto(
-		`/org/job-catalog?tab=levels&effective_date=${encodeURIComponent(effectiveDate)}&job_family_group_code=${encodeURIComponent(groupCode)}&job_family_code=${encodeURIComponent(familyCode)}&job_role_code=${encodeURIComponent(roleCode)}`,
+		`/org/job-catalog?tab=levels&effective_date=${encodeURIComponent(effectiveDate)}&job_family_group_code=${encodeURIComponent(groupCode)}`,
 		{ waitUntil: 'domcontentloaded' }
 	);
 	await expect(args.page.locator('#org-job-catalog-page')).toBeVisible();
@@ -280,28 +305,18 @@ for (const viewport of VIEWPORTS) {
 			).toHaveCount(1);
 
 			await positionForm.locator('input[name="code"]').fill('POS-001');
-			await positionForm.locator('input[name="title"]').fill('HR Specialist');
-			await positionForm.locator('input[name="position_type"]').fill('regular');
-			await positionForm.locator('input[name="employment_type"]').fill('full_time');
+				await positionForm.locator('input[name="title"]').fill('HR Specialist');
+				await positionForm.locator('input[name="position_type"]').fill('regular');
+				await positionForm.locator('input[name="employment_type"]').fill('full_time');
 
-			await setComboboxValue({
-				combobox: positionForm.locator('[data-testid="org-position-job-family-group-code-combobox"]'),
-				query: jobCatalog.groupCode,
-				value: jobCatalog.groupCode,
-			});
-			await setComboboxValue({
-				combobox: positionForm.locator('[data-testid="org-position-job-family-code-combobox"]'),
-				query: jobCatalog.familyCode,
-				value: jobCatalog.familyCode,
-			});
-			await setComboboxValue({
-				combobox: positionForm.locator('[data-testid="org-position-job-role-code-combobox"]'),
-				query: jobCatalog.roleCode,
-				value: jobCatalog.roleCode,
-			});
-			await setComboboxValue({
-				combobox: positionForm.locator('[data-testid="org-position-job-level-code-combobox"]'),
-				query: jobCatalog.levelCode,
+				await setComboboxValue({
+					combobox: positionForm.locator('[data-testid="org-position-job-profile-id-combobox"]'),
+					query: jobCatalog.profileCode,
+					value: jobCatalog.profileID,
+				});
+				await setComboboxValue({
+					combobox: positionForm.locator('[data-testid="org-position-job-level-code-combobox"]'),
+					query: jobCatalog.levelCode,
 				value: jobCatalog.levelCode,
 			});
 
@@ -323,19 +338,19 @@ for (const viewport of VIEWPORTS) {
 			await expect(page.locator('#org-job-catalog-page')).toBeVisible();
 			await saveScreenshot({ page, name: `org-job-catalog-families--${viewport.name}` });
 
-			await page.goto(
-				`/org/job-catalog?tab=roles&job_family_group_code=${encodeURIComponent(jobCatalog.groupCode)}&job_family_code=${encodeURIComponent(jobCatalog.familyCode)}`,
-				{ waitUntil: 'domcontentloaded' }
-			);
-			await expect(page.locator('#org-job-catalog-page')).toBeVisible();
-			await saveScreenshot({ page, name: `org-job-catalog-roles--${viewport.name}` });
+				await page.goto(
+					`/org/job-catalog?tab=profiles&job_family_group_code=${encodeURIComponent(jobCatalog.groupCode)}`,
+					{ waitUntil: 'domcontentloaded' }
+				);
+				await expect(page.locator('#org-job-catalog-page')).toBeVisible();
+				await saveScreenshot({ page, name: `org-job-catalog-profiles--${viewport.name}` });
 
-			await page.goto(
-				`/org/job-catalog?tab=levels&job_family_group_code=${encodeURIComponent(jobCatalog.groupCode)}&job_family_code=${encodeURIComponent(jobCatalog.familyCode)}&job_role_code=${encodeURIComponent(jobCatalog.roleCode)}`,
-				{ waitUntil: 'domcontentloaded' }
-			);
-			await expect(page.locator('#org-job-catalog-page')).toBeVisible();
-			await saveScreenshot({ page, name: `org-job-catalog-levels--${viewport.name}` });
+				await page.goto(
+					`/org/job-catalog?tab=levels&job_family_group_code=${encodeURIComponent(jobCatalog.groupCode)}`,
+					{ waitUntil: 'domcontentloaded' }
+				);
+				await expect(page.locator('#org-job-catalog-page')).toBeVisible();
+				await saveScreenshot({ page, name: `org-job-catalog-levels--${viewport.name}` });
 
 			// Authz gate evidence (no org access)
 			await logout(page);

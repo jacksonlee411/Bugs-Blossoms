@@ -457,61 +457,75 @@ func (r *OrgRepository) PositionExistsAt(ctx context.Context, tenantID uuid.UUID
 	return exists, nil
 }
 
-func (r *OrgRepository) InsertAutoPosition(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, orgNodeID uuid.UUID, code string, effectiveDate time.Time) error {
+func (r *OrgRepository) InsertAutoPosition(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, orgNodeID uuid.UUID, code string, jobProfileID uuid.UUID, effectiveDate time.Time) (uuid.UUID, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
+	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 	_, err = tx.Exec(ctx, `
-		INSERT INTO org_positions (
-			tenant_id,
-			id,
+			INSERT INTO org_positions (
+				tenant_id,
+				id,
 			org_node_id,
 		code,
 			status,
 			is_auto_created,
 			effective_date,
-			end_date
-		)
-		VALUES ($1,$2,$3,$4,'active',true,$5,$6)
-		ON CONFLICT (id) DO NOTHING
-		`,
+				end_date
+			)
+			VALUES ($1,$2,$3,$4,'active',true,$5,$6)
+			ON CONFLICT (id) DO NOTHING
+			`,
 		pgUUID(tenantID),
 		pgUUID(positionID),
 		pgUUID(orgNodeID),
 		code,
 		pgValidDate(effectiveDate),
-		pgValidDate(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)),
+		pgValidDate(endDate),
 	)
 	if err != nil {
-		return err
+		return uuid.Nil, err
 	}
 
-	_, err = tx.Exec(ctx, `
+	var sliceID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+	WITH existing AS (
+		SELECT id
+		FROM org_position_slices
+		WHERE tenant_id=$1 AND position_id=$2 AND effective_date=$4 AND end_date=$5
+	),
+	ins AS (
 		INSERT INTO org_position_slices (
-		tenant_id,
-		position_id,
-		org_node_id,
+			tenant_id,
+			position_id,
+			org_node_id,
 			lifecycle_status,
 			capacity_fte,
+			job_profile_id,
 			effective_date,
 			end_date
 		)
-		SELECT $1,$2,$3,'active',1.0,$4,$5
-		WHERE NOT EXISTS (
-			SELECT 1
-			FROM org_position_slices s
-			WHERE s.tenant_id=$1 AND s.position_id=$2 AND s.effective_date=$4 AND s.end_date=$5
-		)
-		`,
+		SELECT $1,$2,$3,'active',1.0,$6,$4,$5
+		WHERE NOT EXISTS (SELECT 1 FROM existing)
+		RETURNING id
+	)
+	SELECT id FROM ins
+	UNION ALL
+	SELECT id FROM existing
+	LIMIT 1
+	`,
 		pgUUID(tenantID),
 		pgUUID(positionID),
 		pgUUID(orgNodeID),
 		pgValidDate(effectiveDate),
-		pgValidDate(time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)),
-	)
-	return err
+		pgValidDate(endDate),
+		pgUUID(jobProfileID),
+	).Scan(&sliceID); err != nil {
+		return uuid.Nil, err
+	}
+	return sliceID, nil
 }
 
 func (r *OrgRepository) GetPositionOrgNodeAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (uuid.UUID, error) {

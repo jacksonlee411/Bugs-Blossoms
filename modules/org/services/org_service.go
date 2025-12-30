@@ -104,7 +104,7 @@ type OrgRepository interface {
 	ListEdgesTimelineAsChild(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childNodeID uuid.UUID) ([]EdgeTimelineRow, error)
 
 	PositionExistsAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (bool, error)
-	InsertAutoPosition(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, orgNodeID uuid.UUID, code string, effectiveDate time.Time) error
+	InsertAutoPosition(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, orgNodeID uuid.UUID, code string, jobProfileID uuid.UUID, effectiveDate time.Time) (uuid.UUID, error)
 	GetPositionOrgNodeAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (uuid.UUID, error)
 	LockPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionSliceRow, error)
 	SumAllocatedFTEAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (float64, error)
@@ -1061,6 +1061,22 @@ type CreateAssignmentResult struct {
 	GeneratedEvents []events.OrgEventV1
 }
 
+func (s *OrgService) pickAutoPositionJobProfileID(ctx context.Context, tenantID uuid.UUID) (uuid.UUID, error) {
+	profiles, err := s.repo.ListJobProfiles(ctx, tenantID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	for _, p := range profiles {
+		if p.IsActive {
+			return p.ID, nil
+		}
+	}
+	if len(profiles) != 0 {
+		return profiles[0].ID, nil
+	}
+	return uuid.Nil, newServiceError(422, "ORG_JOB_PROFILE_REQUIRED", "at least one job profile is required to auto-create positions", nil)
+}
+
 func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, requestID string, initiatorID uuid.UUID, in CreateAssignmentInput) (*CreateAssignmentResult, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(400, "ORG_NO_TENANT", "tenant_id is required", nil)
@@ -1229,7 +1245,15 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				return nil, err
 			}
 			code := autoPositionCode(positionID)
-			if err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, in.EffectiveDate); err != nil {
+			jobProfileID, err := s.pickAutoPositionJobProfileID(txCtx, tenantID)
+			if err != nil {
+				return nil, err
+			}
+			sliceID, err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, jobProfileID, in.EffectiveDate)
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.CopyJobProfileJobFamiliesToPositionSlice(txCtx, tenantID, jobProfileID, sliceID); err != nil {
 				return nil, mapPgError(err)
 			}
 		}
@@ -1505,7 +1529,15 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				return nil, err
 			}
 			code := autoPositionCode(positionID)
-			if err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, in.EffectiveDate); err != nil {
+			jobProfileID, err := s.pickAutoPositionJobProfileID(txCtx, tenantID)
+			if err != nil {
+				return nil, err
+			}
+			sliceID, err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, jobProfileID, in.EffectiveDate)
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.CopyJobProfileJobFamiliesToPositionSlice(txCtx, tenantID, jobProfileID, sliceID); err != nil {
 				return nil, mapPgError(err)
 			}
 		}
