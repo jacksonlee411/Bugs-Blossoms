@@ -150,7 +150,6 @@ type OrgJobFamilyGroup struct {
 type OrgJobLevel struct {
 	TenantID     pgtype.UUID        `json:"tenant_id"`
 	ID           pgtype.UUID        `json:"id"`
-	JobRoleID    pgtype.UUID        `json:"job_role_id"`
 	Code         string             `json:"code"`
 	Name         string             `json:"name"`
 	DisplayOrder int32              `json:"display_order"`
@@ -165,29 +164,20 @@ type OrgJobProfile struct {
 	Code         string             `json:"code"`
 	Name         string             `json:"name"`
 	Description  *string            `json:"description"`
-	JobRoleID    pgtype.UUID        `json:"job_role_id"`
 	IsActive     bool               `json:"is_active"`
 	ExternalRefs []byte             `json:"external_refs"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
-type OrgJobProfileAllowedJobLevel struct {
-	TenantID     pgtype.UUID        `json:"tenant_id"`
-	JobProfileID pgtype.UUID        `json:"job_profile_id"`
-	JobLevelID   pgtype.UUID        `json:"job_level_id"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-}
-
-type OrgJobRole struct {
-	TenantID    pgtype.UUID        `json:"tenant_id"`
-	ID          pgtype.UUID        `json:"id"`
-	JobFamilyID pgtype.UUID        `json:"job_family_id"`
-	Code        string             `json:"code"`
-	Name        string             `json:"name"`
-	IsActive    bool               `json:"is_active"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+type OrgJobProfileJobFamily struct {
+	TenantID          pgtype.UUID        `json:"tenant_id"`
+	JobProfileID      pgtype.UUID        `json:"job_profile_id"`
+	JobFamilyID       pgtype.UUID        `json:"job_family_id"`
+	AllocationPercent int32              `json:"allocation_percent"`
+	IsPrimary         bool               `json:"is_primary"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrgLink struct {
@@ -289,9 +279,6 @@ type OrgPositionSlice struct {
 	CapacityFte         pgtype.Numeric     `json:"capacity_fte"`
 	CapacityHeadcount   *int32             `json:"capacity_headcount"`
 	ReportsToPositionID pgtype.UUID        `json:"reports_to_position_id"`
-	JobFamilyGroupCode  *string            `json:"job_family_group_code"`
-	JobFamilyCode       *string            `json:"job_family_code"`
-	JobRoleCode         *string            `json:"job_role_code"`
 	JobLevelCode        *string            `json:"job_level_code"`
 	JobProfileID        pgtype.UUID        `json:"job_profile_id"`
 	CostCenterCode      *string            `json:"cost_center_code"`
@@ -300,6 +287,16 @@ type OrgPositionSlice struct {
 	EndDate             pgtype.Date        `json:"end_date"`
 	CreatedAt           pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgPositionSliceJobFamily struct {
+	TenantID          pgtype.UUID        `json:"tenant_id"`
+	PositionSliceID   pgtype.UUID        `json:"position_slice_id"`
+	JobFamilyID       pgtype.UUID        `json:"job_family_id"`
+	AllocationPercent int32              `json:"allocation_percent"`
+	IsPrimary         bool               `json:"is_primary"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrgReporting struct {

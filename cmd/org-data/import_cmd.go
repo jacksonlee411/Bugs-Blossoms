@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -1190,6 +1191,90 @@ type importManifestV1 struct {
 	Summary map[string]any `json:"summary"`
 }
 
+func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID) (uuid.UUID, error) {
+	var jobProfileID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+	SELECT id
+	FROM org_job_profiles
+	WHERE tenant_id=$1
+	ORDER BY is_active DESC, created_at ASC, code ASC, id ASC
+	LIMIT 1
+	`, tenantID).Scan(&jobProfileID); err == nil {
+		return jobProfileID, nil
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, err
+	}
+
+	groupCode := "IMPORT"
+	groupName := "导入默认职类"
+	if _, err := tx.Exec(ctx, `
+	INSERT INTO org_job_family_groups (tenant_id, code, name, is_active)
+	VALUES ($1,$2,$3,TRUE)
+	ON CONFLICT (tenant_id, code) DO NOTHING
+	`, tenantID, groupCode, groupName); err != nil {
+		return uuid.Nil, err
+	}
+
+	var groupID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+	SELECT id
+	FROM org_job_family_groups
+	WHERE tenant_id=$1 AND code=$2
+	LIMIT 1
+	`, tenantID, groupCode).Scan(&groupID); err != nil {
+		return uuid.Nil, err
+	}
+
+	familyCode := "IMPORT"
+	familyName := "导入默认职种"
+	if _, err := tx.Exec(ctx, `
+	INSERT INTO org_job_families (tenant_id, job_family_group_id, code, name, is_active)
+	VALUES ($1,$2,$3,$4,TRUE)
+	ON CONFLICT (tenant_id, job_family_group_id, code) DO NOTHING
+	`, tenantID, groupID, familyCode, familyName); err != nil {
+		return uuid.Nil, err
+	}
+
+	var familyID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+	SELECT id
+	FROM org_job_families
+	WHERE tenant_id=$1 AND job_family_group_id=$2 AND code=$3
+	LIMIT 1
+	`, tenantID, groupID, familyCode).Scan(&familyID); err != nil {
+		return uuid.Nil, err
+	}
+
+	profileCode := "IMPORT-DEFAULT"
+	profileName := "导入默认职位模板"
+	if _, err := tx.Exec(ctx, `
+	INSERT INTO org_job_profiles (tenant_id, code, name, is_active)
+	VALUES ($1,$2,$3,TRUE)
+	ON CONFLICT (tenant_id, code) DO NOTHING
+	`, tenantID, profileCode, profileName); err != nil {
+		return uuid.Nil, err
+	}
+
+	if err := tx.QueryRow(ctx, `
+	SELECT id
+	FROM org_job_profiles
+	WHERE tenant_id=$1 AND code=$2
+	LIMIT 1
+	`, tenantID, profileCode).Scan(&jobProfileID); err != nil {
+		return uuid.Nil, err
+	}
+
+	if _, err := tx.Exec(ctx, `
+	INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, allocation_percent, is_primary)
+	VALUES ($1,$2,$3,100,TRUE)
+	ON CONFLICT (tenant_id, job_profile_id, job_family_id) DO NOTHING
+	`, tenantID, jobProfileID, familyID); err != nil {
+		return uuid.Nil, err
+	}
+
+	return jobProfileID, nil
+}
+
 func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedData, opts importOptions) (*importManifestV1, error) {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
@@ -1300,6 +1385,11 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 	}
 	manifest.Inserted.OrgEdges = edgeIDs
 
+	jobProfileID, err := ensurePositionsImportJobProfileID(txCtx, tx, data.tenantID)
+	if err != nil {
+		return nil, withCode(exitDBWrite, fmt.Errorf("ensure import job profile: %w", err))
+	}
+
 	for _, p := range data.positions {
 		sliceID := uuid.New()
 		if _, err := tx.Exec(
@@ -1314,11 +1404,20 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 		if _, err := tx.Exec(
 			txCtx,
 			`INSERT INTO org_position_slices (
-							tenant_id, id, position_id, org_node_id, title, lifecycle_status, capacity_fte, effective_date, end_date
-						) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-			data.tenantID, sliceID, p.id, p.orgNodeID, p.title, p.status, 1.0, pgDateOnlyUTC(p.effectiveDate), pgDateOnlyUTC(p.endDate),
+								tenant_id, id, position_id, org_node_id, title, lifecycle_status, capacity_fte, job_profile_id, effective_date, end_date
+							) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+			data.tenantID, sliceID, p.id, p.orgNodeID, p.title, p.status, 1.0, jobProfileID, pgDateOnlyUTC(p.effectiveDate), pgDateOnlyUTC(p.endDate),
 		); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slices(%s): %w", p.line, p.code, err))
+		}
+		if _, err := tx.Exec(txCtx, `
+			INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, allocation_percent, is_primary)
+			SELECT $1, $3, job_family_id, allocation_percent, is_primary
+			FROM org_job_profile_job_families
+			WHERE tenant_id=$1 AND job_profile_id=$2
+			ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO NOTHING
+			`, data.tenantID, jobProfileID, sliceID); err != nil {
+			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slice_job_families(%s): %w", p.line, p.code, err))
 		}
 		manifest.Inserted.OrgPositions = append(manifest.Inserted.OrgPositions, p.id)
 	}

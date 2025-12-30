@@ -54,6 +54,7 @@ func setupOrg053DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -82,20 +83,19 @@ ON CONFLICT (tenant_id) DO UPDATE SET freeze_mode=excluded.freeze_mode, freeze_g
 
 func TestOrg053ShiftBoundaryPosition_MovesAdjacentBoundary(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg053DB(t)
+	jobProfileID := seedOrg053JobProfile(t, ctx, tenantID, svc)
 
 	initiatorID := uuid.New()
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-053-create", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-A",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		ReasonCode:         "create",
+		Code:           "POS-A",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 
@@ -145,50 +145,45 @@ ORDER BY effective_date ASC
 
 func TestOrg053ReportsToCycle_IsRejected(t *testing.T) {
 	ctx, _, tenantID, rootNodeID, asOf, svc := setupOrg053DB(t)
+	jobProfileID := seedOrg053JobProfile(t, ctx, tenantID, svc)
 
 	initiatorID := uuid.New()
 	a, err := svc.CreatePosition(ctx, tenantID, "req-053-a", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-A",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		ReasonCode:         "create",
+		Code:           "POS-A",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 	b, err := svc.CreatePosition(ctx, tenantID, "req-053-b", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-B",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		ReportsToID:        &a.PositionID,
-		ReasonCode:         "create",
+		Code:           "POS-B",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		ReportsToID:    &a.PositionID,
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 	c, err := svc.CreatePosition(ctx, tenantID, "req-053-c", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-C",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		ReportsToID:        &b.PositionID,
-		ReasonCode:         "create",
+		Code:           "POS-C",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		ReportsToID:    &b.PositionID,
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 
@@ -206,36 +201,35 @@ func TestOrg053ReportsToCycle_IsRejected(t *testing.T) {
 
 func TestOrg053Position_ContractFieldsArePersistedAndReadable(t *testing.T) {
 	ctx, _, tenantID, rootNodeID, asOf, svc := setupOrg053DB(t)
+	jobProfileID := seedOrg053JobProfile(t, ctx, tenantID, svc)
 
 	initiatorID := uuid.New()
 	profile := json.RawMessage(`{"k":"v"}`)
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-053-fields-create", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-FIELDS",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		Title:              ptr("Fields"),
-		LifecycleStatus:    "planned",
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		CapacityFTE:        1.0,
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CostCenterCode:     ptr("CC-001"),
-		Profile:            profile,
-		ReasonCode:         "create",
+		Code:            "POS-FIELDS",
+		OrgNodeID:       rootNodeID,
+		EffectiveDate:   asOf,
+		Title:           ptr("Fields"),
+		LifecycleStatus: "planned",
+		PositionType:    "regular",
+		EmploymentType:  "full_time",
+		CapacityFTE:     1.0,
+		JobProfileID:    jobProfileID,
+		JobLevelCode:    ptr("L1"),
+		CostCenterCode:  ptr("CC-001"),
+		Profile:         profile,
+		ReasonCode:      "create",
 	})
 	require.NoError(t, err)
 
 	got, gotAsOf, err := svc.GetPosition(ctx, tenantID, pos.PositionID, &asOf)
 	require.NoError(t, err)
 	require.True(t, gotAsOf.Equal(asOf))
+	require.Equal(t, jobProfileID, got.JobProfileID)
 	require.Equal(t, "regular", derefStringPtr(got.PositionType))
 	require.Equal(t, "full_time", derefStringPtr(got.EmploymentType))
 	require.Equal(t, "TST", derefStringPtr(got.JobFamilyGroupCode))
 	require.Equal(t, "TST-FAMILY", derefStringPtr(got.JobFamilyCode))
-	require.Equal(t, "TST-ROLE", derefStringPtr(got.JobRoleCode))
 	require.Equal(t, "L1", derefStringPtr(got.JobLevelCode))
 	require.Equal(t, "CC-001", derefStringPtr(got.CostCenterCode))
 
@@ -257,6 +251,7 @@ func TestOrg053Position_ContractFieldsArePersistedAndReadable(t *testing.T) {
 	got2, got2AsOf, err := svc.GetPosition(ctx, tenantID, pos.PositionID, &secondStart)
 	require.NoError(t, err)
 	require.True(t, got2AsOf.Equal(secondStart))
+	require.Equal(t, jobProfileID, got2.JobProfileID)
 	require.Equal(t, "L2", derefStringPtr(got2.JobLevelCode))
 	require.NoError(t, json.Unmarshal(got2.Profile, &profileObj))
 	require.Equal(t, "v2", profileObj["k"])
@@ -269,4 +264,55 @@ func derefStringPtr(v *string) string {
 		return ""
 	}
 	return *v
+}
+
+func seedOrg053JobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID, svc *orgsvc.OrgService) uuid.UUID {
+	t.Helper()
+
+	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{
+		Code:     "TST",
+		Name:     "Test Group",
+		IsActive: true,
+	})
+	require.NoError(t, err)
+	family, err := svc.CreateJobFamily(ctx, tenantID, orgsvc.JobFamilyCreate{
+		JobFamilyGroupID: group.ID,
+		Code:             "TST-FAMILY",
+		Name:             "Test Family",
+		IsActive:         true,
+	})
+	require.NoError(t, err)
+
+	_, err = svc.CreateJobLevel(ctx, tenantID, orgsvc.JobLevelCreate{
+		Code:         "L1",
+		Name:         "Level 1",
+		DisplayOrder: 1,
+		IsActive:     true,
+	})
+	require.NoError(t, err)
+	_, err = svc.CreateJobLevel(ctx, tenantID, orgsvc.JobLevelCreate{
+		Code:         "L2",
+		Name:         "Level 2",
+		DisplayOrder: 2,
+		IsActive:     true,
+	})
+	require.NoError(t, err)
+
+	jobProfile, err := svc.CreateJobProfile(ctx, tenantID, orgsvc.JobProfileCreate{
+		Code:        "JP-1",
+		Name:        "Job Profile 1",
+		Description: nil,
+		IsActive:    true,
+		JobFamilies: orgsvc.JobProfileJobFamiliesSet{
+			Items: []orgsvc.JobProfileJobFamilySetItem{
+				{
+					JobFamilyID:       family.ID,
+					AllocationPercent: 100,
+					IsPrimary:         true,
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+	return jobProfile.ID
 }

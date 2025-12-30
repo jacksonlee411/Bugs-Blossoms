@@ -54,6 +54,7 @@ func setupOrg059DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -82,22 +83,21 @@ ON CONFLICT (tenant_id) DO UPDATE SET freeze_mode=excluded.freeze_mode, freeze_g
 
 func TestOrg059PositionRescind_WritesAuditAndOutbox(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg059DB(t)
+	jobProfileID := seedOrg053JobProfile(t, ctx, tenantID, svc)
 
 	initiatorID := uuid.New()
 
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-059-pos-create", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-059-SMOKE",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "TST",
-		JobFamilyCode:      "TST-FAMILY",
-		JobRoleCode:        "TST-ROLE",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		Profile:            json.RawMessage(`{}`),
-		ReasonCode:         "create",
+		Code:           "POS-059-SMOKE",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		Profile:        json.RawMessage(`{}`),
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 

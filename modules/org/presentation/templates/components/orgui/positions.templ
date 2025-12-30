@@ -389,10 +389,6 @@ templ PositionDetails(props PositionDetailsProps) {
 					<div class="text-200">{ codeLabel(props.Position.Row.JobFamilyCode, props.Position.JobFamilyLabel) }</div>
 				</div>
 				<div>
-					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.JobRoleCode") }</div>
-					<div class="text-200">{ codeLabel(props.Position.Row.JobRoleCode, props.Position.JobRoleLabel) }</div>
-				</div>
-				<div>
 					<div class="text-xs text-400">{ pageCtx.T("Org.UI.Positions.Fields.JobLevelCode") }</div>
 					<div class="text-200">{ codeLabel(props.Position.Row.JobLevelCode, props.Position.JobLevelLabel) }</div>
 				</div>
@@ -487,16 +483,12 @@ type PositionFormProps struct {
 	ReportsToID     string
 	ReportsToLabel  string
 
-	JobFamilyGroupCode  string
-	JobFamilyGroupLabel string
-	JobFamilyCode       string
-	JobFamilyLabel      string
-	JobRoleCode         string
-	JobRoleLabel        string
-	JobLevelCode        string
-	JobLevelLabel       string
-	ReasonCode          string
-	ReasonNote          string
+	JobProfileID    string
+	JobProfileLabel string
+	JobLevelCode    string
+	JobLevelLabel   string
+	ReasonCode      string
+	ReasonNote      string
 
 	Errors    map[string]string
 	FormError string
@@ -628,106 +620,22 @@ templ PositionForm(props PositionFormProps) {
 				<option value="rescinded" selected?={ props.LifecycleStatus == "rescinded" }>{ pageCtx.T("Org.UI.Positions.Lifecycle.Rescinded") }</option>
 			}
 			<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-				<div data-testid="org-position-job-family-group-code-combobox">
+				<div data-testid="org-position-job-profile-id-combobox">
 					@base.Combobox(base.ComboboxProps{
 						Searchable:   true,
-						Label:        pageCtx.T("Org.UI.Positions.Fields.JobFamilyGroupCode"),
-						Name:         "job_family_group_code",
-						Endpoint:     fmt.Sprintf("/org/job-catalog/family-groups/options?effective_date=%s", props.EffectiveDate),
+						Label:        pageCtx.T("Org.UI.Positions.Fields.JobProfileID"),
+						Name:         "job_profile_id",
+						Endpoint:     fmt.Sprintf("/org/job-catalog/profiles/options?effective_date=%s", props.EffectiveDate),
 						Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
 						NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
 					}) {
-						if strings.TrimSpace(props.JobFamilyGroupCode) != "" {
-							<option value={ props.JobFamilyGroupCode } selected>{ codeLabel(props.JobFamilyGroupCode, props.JobFamilyGroupLabel) }</option>
+						if strings.TrimSpace(props.JobProfileID) != "" {
+							<option value={ props.JobProfileID } selected>{ props.JobProfileLabel }</option>
 						}
 						<!-- options loaded via HTMX -->
 					}
-					if props.Errors["job_family_group_code"] != "" {
-						<div class="text-xs text-red-200">{ props.Errors["job_family_group_code"] }</div>
-					}
-				</div>
-				<div data-testid="org-position-job-family-code-combobox">
-					@base.Combobox(base.ComboboxProps{
-						Searchable:   true,
-						Label:        pageCtx.T("Org.UI.Positions.Fields.JobFamilyCode"),
-						Name:         "job_family_code",
-						Endpoint:     fmt.Sprintf("/org/job-catalog/families/options?effective_date=%s", props.EffectiveDate),
-						Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
-						NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
-						Trigger: &base.Trigger{
-							Render: func(trigger *base.TriggerProps) templ.Component {
-								trigger.InputAttrs["hx-include"] = "#org-position-form select[name='job_family_group_code']"
-								trigger.InputAttrs["x-init"] = "(() => { const input = $el; const groupSelect = document.querySelector(\"#org-position-form select[name='job_family_group_code']\"); let prevGroup = groupSelect?.value || \"\"; const reset = () => { selectedValues.clear(); const select = $refs?.select; if (select) { for (const opt of select.options) { opt.selected = false; } select.value = \"\"; select.dispatchEvent(new Event(\"change\")); } }; const updateDisabled = () => { const hasGroup = (groupSelect?.value || \"\") !== \"\"; input.disabled = !hasGroup; if (!hasGroup) { reset(); } }; updateDisabled(); if (!groupSelect) return; groupSelect.addEventListener(\"change\", (e) => { const nextGroup = e.target?.value || \"\"; if (nextGroup === prevGroup) return; prevGroup = nextGroup; reset(); updateDisabled(); }); })()"
-								return input.Text(&input.Props{
-									Placeholder: trigger.Placeholder,
-									WrapperProps: templ.Attributes{
-										"x-ref":  "trigger",
-										"@click": "if ($el.querySelector('input')?.disabled) return; open = true",
-									},
-									AddonLeft: &input.Addon{
-										Component: base.SelectedValues(),
-										Attrs: templ.Attributes{
-											"x-show": "selectedValues.size > 0",
-										},
-									},
-									Attrs: trigger.InputAttrs,
-									AddonRight: &input.Addon{
-										Component: base.DropdownIndicator(),
-									},
-								})
-							},
-						},
-					}) {
-						if strings.TrimSpace(props.JobFamilyCode) != "" {
-							<option value={ props.JobFamilyCode } selected>{ codeLabel(props.JobFamilyCode, props.JobFamilyLabel) }</option>
-						}
-						<!-- options loaded via HTMX -->
-					}
-					if props.Errors["job_family_code"] != "" {
-						<div class="text-xs text-red-200">{ props.Errors["job_family_code"] }</div>
-					}
-				</div>
-			</div>
-			<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-				<div data-testid="org-position-job-role-code-combobox">
-					@base.Combobox(base.ComboboxProps{
-						Searchable:   true,
-						Label:        pageCtx.T("Org.UI.Positions.Fields.JobRoleCode"),
-						Name:         "job_role_code",
-						Endpoint:     fmt.Sprintf("/org/job-catalog/roles/options?effective_date=%s", props.EffectiveDate),
-						Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
-						NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
-						Trigger: &base.Trigger{
-							Render: func(trigger *base.TriggerProps) templ.Component {
-								trigger.InputAttrs["hx-include"] = "#org-position-form select[name='job_family_group_code'], #org-position-form select[name='job_family_code']"
-								trigger.InputAttrs["x-init"] = "(() => { const input = $el; const groupSelect = document.querySelector(\"#org-position-form select[name='job_family_group_code']\"); const familySelect = document.querySelector(\"#org-position-form select[name='job_family_code']\"); let prevFamily = familySelect?.value || \"\"; const reset = () => { selectedValues.clear(); const select = $refs?.select; if (select) { for (const opt of select.options) { opt.selected = false; } select.value = \"\"; select.dispatchEvent(new Event(\"change\")); } }; const updateDisabled = () => { const has = (groupSelect?.value || \"\") !== \"\" && (familySelect?.value || \"\") !== \"\"; input.disabled = !has; if (!has) { reset(); } }; updateDisabled(); if (!familySelect) return; familySelect.addEventListener(\"change\", (e) => { const nextFamily = e.target?.value || \"\"; if (nextFamily === prevFamily) return; prevFamily = nextFamily; reset(); updateDisabled(); }); })()"
-								return input.Text(&input.Props{
-									Placeholder: trigger.Placeholder,
-									WrapperProps: templ.Attributes{
-										"x-ref":  "trigger",
-										"@click": "if ($el.querySelector('input')?.disabled) return; open = true",
-									},
-									AddonLeft: &input.Addon{
-										Component: base.SelectedValues(),
-										Attrs: templ.Attributes{
-											"x-show": "selectedValues.size > 0",
-										},
-									},
-									Attrs: trigger.InputAttrs,
-									AddonRight: &input.Addon{
-										Component: base.DropdownIndicator(),
-									},
-								})
-							},
-						},
-					}) {
-						if strings.TrimSpace(props.JobRoleCode) != "" {
-							<option value={ props.JobRoleCode } selected>{ codeLabel(props.JobRoleCode, props.JobRoleLabel) }</option>
-						}
-						<!-- options loaded via HTMX -->
-					}
-					if props.Errors["job_role_code"] != "" {
-						<div class="text-xs text-red-200">{ props.Errors["job_role_code"] }</div>
+					if props.Errors["job_profile_id"] != "" {
+						<div class="text-xs text-red-200">{ props.Errors["job_profile_id"] }</div>
 					}
 				</div>
 				<div data-testid="org-position-job-level-code-combobox">
@@ -740,8 +648,6 @@ templ PositionForm(props PositionFormProps) {
 						NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
 						Trigger: &base.Trigger{
 							Render: func(trigger *base.TriggerProps) templ.Component {
-								trigger.InputAttrs["hx-include"] = "#org-position-form select[name='job_family_group_code'], #org-position-form select[name='job_family_code'], #org-position-form select[name='job_role_code']"
-								trigger.InputAttrs["x-init"] = "(() => { const input = $el; const groupSelect = document.querySelector(\"#org-position-form select[name='job_family_group_code']\"); const familySelect = document.querySelector(\"#org-position-form select[name='job_family_code']\"); const roleSelect = document.querySelector(\"#org-position-form select[name='job_role_code']\"); let prevRole = roleSelect?.value || \"\"; const reset = () => { selectedValues.clear(); const select = $refs?.select; if (select) { for (const opt of select.options) { opt.selected = false; } select.value = \"\"; select.dispatchEvent(new Event(\"change\")); } }; const updateDisabled = () => { const has = (groupSelect?.value || \"\") !== \"\" && (familySelect?.value || \"\") !== \"\" && (roleSelect?.value || \"\") !== \"\"; input.disabled = !has; if (!has) { reset(); } }; updateDisabled(); if (!roleSelect) return; roleSelect.addEventListener(\"change\", (e) => { const nextRole = e.target?.value || \"\"; if (nextRole === prevRole) return; prevRole = nextRole; reset(); updateDisabled(); }); })()"
 								return input.Text(&input.Props{
 									Placeholder: trigger.Placeholder,
 									WrapperProps: templ.Attributes{

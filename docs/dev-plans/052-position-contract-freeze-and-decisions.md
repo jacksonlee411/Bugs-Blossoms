@@ -3,6 +3,7 @@
 **状态**: 已冻结（2025-12-20）
 **对齐更新**：
 - 2025-12-27：对齐 DEV-PLAN-064：Valid Time（`effective_date/end_date`）按天（`YYYY-MM-DD`）闭区间语义；`tstzrange('[)')` 约束口径统一迁移为 `daterange(effective_date, end_date + 1, '[)')`。
+- 2025-12-29：对齐 DEV-PLAN-072：对标 Workday 职位体系，Position 分类写入口收口为 `job_profile_id`（必填）+ `job_level_code`（可选），移除 `job_*_code`（`job_family_group_code/job_family_code/job_role_code`）与 `Job Role` 相关契约；详见 §12。
 
 > 本计划是 051 的“阶段 A（Contract First）”可执行化版本；内容结构参考 [DEV-PLAN-001](001-technical-design-template.md) 的技术设计模板，但仅冻结**契约与决策**，不展开到具体代码实现细节（实现由 053+ 承接）。
 
@@ -152,17 +153,8 @@ flowchart LR
 - 建议同时支持 `reason_note`（可选自由文本）并落点 `org_audit_logs.meta.reason_note`，用于补充上下文但不参与校验（UI 055 承接）。
 - 枚举治理：最小集合以 050 的示例为起点；是否允许“全局字典 + 租户扩展/自定义”在 056 冻结（本计划先要求“必填且可审计追溯”）。
 
-### 4.5 Job Profile 与 Job Catalog 冲突校验（对齐 050 §3.1，冻结口径）
-> 目的：澄清“岗位定义（Job Profile）”与“职务（Job Role）”不重复，并通过绑定/允许集合避免形成两套并行主数据。
-
-- 结论（沿用 050 的建议并冻结为 v1 口径）：
-  - Job Catalog（四级）用于分类/统计/报表维度；Job Profile 用于职责模板/能力要求/外部对接。
-  - **每个 Job Profile 必须绑定一个 Job Role**（可选绑定 Job Level，或配置允许的 Job Level 集合）。
-  - Position 选择 `job_profile_id` 时，必须满足：
-    - `job_role_code` 与 Job Profile 绑定的 Job Role 一致；
-    - 若 Job Profile 配置了允许的 Job Level 集合，则 `job_level_code` 必须在允许集合内；
-    - 不满足则拒绝（建议错误码：`ORG_JOB_PROFILE_CONFLICT`）。
-- SSOT：Profile↔Catalog 的映射与维护入口由 [DEV-PLAN-056](056-job-catalog-profile-and-position-restrictions.md) 定义与落地；Core（053）只做“按映射校验”的调用与错误码稳定性。
+### 4.5 Job Profile 与 Job Catalog 冲突校验（已被 DEV-PLAN-072 替换）
+> 2025-12-29 起，职位体系已由 `DEV-PLAN-072` 对标 Workday 收口：不再维护 `Job Role`，且 Position 写入口不再写入 `job_*_code`，因此不再存在“Profile↔Catalog 冲突校验”这一类不变量。本节保留为历史记录（实现与契约以 `DEV-PLAN-072` 为准）。
 
 ### 4.6 字段可变性矩阵（对齐 050 §7.8，v1 冻结）
 | 字段/能力 | Update（新增切片） | Correct（原位更正） | 占编（`occupied_fte>0`）时的额外约束 |
@@ -171,7 +163,7 @@ flowchart LR
 | `capacity_fte` | 允许 | 允许（强审计） | 下调不得低于 `occupied_fte`；不得导致超编 |
 | `org_node_id`（组织转移） | 允许 | 不建议 | 转移后占编随 Position 归属变化；必须可追溯 |
 | `reports_to_position_id` | 允许 | 允许（强审计） | 必须防环；禁止自指；必要时要求先调整下属 |
-| `job_*_code` / `job_profile_id` | 允许 | 限制（高权限） | v1 默认：占编>0 时禁止变更；如需放开需业务签字并补前置检查 |
+| `job_profile_id` / `job_level_code` | 允许 | 限制（高权限） | v1 默认：占编>0 时禁止变更；如需放开需业务签字并补前置检查 |
 | `lifecycle_status`（停用/撤销） | 允许 | N/A | 停用策略见 4.2.3；撤销需前置检查（4.7） |
 
 ### 4.7 组织转移与撤销前置检查（对齐 050 §7.4/§7.6，冻结口径）
@@ -216,11 +208,8 @@ flowchart LR
 | `capacity_fte` | `numeric(9,2)` | not null, check `>0` | `1.0` | v1 主口径（System 回填默认值；Managed 必填） |
 | `capacity_headcount` | `int` | null, check `>=0` |  | 可选并行口径（050 §11 决策点） |
 | `reports_to_position_id` | `uuid` | null, FK (`tenant_id`,`id`)->`org_positions`, check `!= position_id` |  | 汇报关系（防环在 service 层；自指由 DB+service 兜底） |
-| `job_family_group_code` | `varchar(64)` | null |  | 050 §4.1（Managed 必填；System 可空；强校验在 056 收口） |
-| `job_family_code` | `varchar(64)` | null |  | 050 §4.1（Managed 必填；System 可空） |
-| `job_role_code` | `varchar(64)` | null |  | 050 §4.1（Managed 必填；System 可空） |
-| `job_level_code` | `varchar(64)` | null |  | 050 §4.1（Managed 必填；System 可空） |
-| `job_profile_id` | `uuid` | null |  | Job Profile（由 056 定义 SSOT） |
+| `job_profile_id` | `uuid` | not null |  | 职位模板（Job Profile，SSOT：`DEV-PLAN-072`） |
+| `job_level_code` | `varchar(64)` | null |  | 职级（可选；SSOT：`DEV-PLAN-072`） |
 | `cost_center_code` | `varchar(64)` | null |  | 可选 |
 | `profile` | `jsonb` | not null, check object | `'{}'::jsonb` | 扩展字段（避免跨域强耦合） |
 | `effective_date` | `date` | not null, check `<= end_date` |  | 生效日（day） |
@@ -267,9 +256,7 @@ flowchart LR
   "position_type": "regular",
   "employment_type": "full_time",
   "capacity_fte": 1.0,
-  "job_family_group_code": "FIN",
-  "job_family_code": "FIN-ACCOUNTING",
-  "job_role_code": "FIN-MGR",
+  "job_profile_id": "00000000-0000-0000-0000-000000000000",
   "job_level_code": "L5",
   "reason_code": "create"
 }
@@ -299,7 +286,10 @@ flowchart LR
 | 422 | `ORG_POSITION_NOT_FOUND_AT_DATE` | Position 在 as-of 不存在 |
 | 422 | `ORG_USE_CORRECT` | `effective_date` 等于目标切片生效日时，提示用 `:correct` |
 | 409 | `ORG_POSITION_CODE_CONFLICT` | `code` 冲突（同租户唯一） |
-| 422 | `ORG_JOB_PROFILE_CONFLICT` | Job Profile 与 Job Catalog（Role/Level）不匹配 |
+| 422 | `ORG_JOB_PROFILE_NOT_FOUND` | `job_profile_id` 不存在（对齐 DEV-PLAN-072） |
+| 422 | `ORG_JOB_PROFILE_INACTIVE` | 职位模板已停用（对齐 DEV-PLAN-072） |
+| 422 | `ORG_JOB_LEVEL_NOT_FOUND` | `job_level_code` 不存在（对齐 DEV-PLAN-072） |
+| 422 | `ORG_JOB_LEVEL_INACTIVE` | 职级已停用（对齐 DEV-PLAN-072） |
 | 422 | `ORG_POSITION_OVER_CAPACITY` | 占编导致 `occupied_fte > capacity_fte` |
 | 409 | `ORG_POSITION_NOT_EMPTY` | as-of 存在占编（`occupied_fte>0`）或有效任职，阻断停用/撤销/受限字段变更 |
 | 409 | `ORG_POSITION_HAS_SUBORDINATES` | as-of 存在下属职位（其它 Position 的 `reports_to_position_id` 指向本 Position） |
@@ -380,3 +370,19 @@ flowchart LR
 - 冻结决策清单（SSOT、System/Managed、HRM legacy positions 处置、状态/口径、停用策略、reason code 口径）。
 - v1 数据模型合同（字段/类型/约束）与对 022/026 的契约变更清单。
 - v1 API 合同与错误码口径（供 053/054/055 对齐实现）。
+
+## 12. 被 DEV-PLAN-072 覆盖的合同变更（破坏性更正，2025-12-29）
+> 本节是 `DEV-PLAN-072` 要求的“契约收口补丁”：明确 052 中与 Job Architecture/分类写入口相关的冻结口径已被替换，避免多 SSOT 漂移。
+
+- **术语统一**（以 `DEV-PLAN-072` / `DEV-PLAN-060` 为准）：
+  - `Job Family Group=职类`、`Job Family=职种`、`Job Profile=职位模板`、`Job Level=职级`；不再设置/维护 `Job Role`。
+- **Position 写入口收口**：
+  - 仅接受 `job_profile_id`（必填）+ `job_level_code`（可选）。
+  - 移除写入：`job_family_group_code/job_family_code/job_role_code`（不再作为请求字段；也不在 `org_position_slices` 持久化）。
+- **不变量与校验点变化**：
+  - 由“Profile 绑定 Role + allowed-levels + 冲突校验”改为：
+    - `job_profile_id` 必须存在且启用；
+    - `job_level_code`（若传）必须存在且启用（tenant-global）。
+  - 职类/职种从职位（Position slice）的“主归属职种”派生（只读投影）；创建职位时默认从职位模板带出“归属与比例”，但允许在职位上覆盖；不再作为 `job_*_code` 写入口字段。
+- **破坏性更正策略**：
+  - 不保留 v1/v2 并行写入口；旧客户端若仍写入 `job_*_code` 需同步更新（迁移细节见 `DEV-PLAN-072`）。

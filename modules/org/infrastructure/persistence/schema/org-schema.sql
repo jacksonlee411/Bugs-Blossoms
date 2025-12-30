@@ -344,11 +344,8 @@ CREATE TABLE org_position_slices (
     capacity_fte numeric(9, 2) NOT NULL DEFAULT 1.0,
     capacity_headcount int NULL,
     reports_to_position_id uuid NULL,
-    job_family_group_code varchar(64) NULL,
-    job_family_code varchar(64) NULL,
-    job_role_code varchar(64) NULL,
     job_level_code varchar(64) NULL,
-    job_profile_id uuid NULL,
+    job_profile_id uuid NOT NULL,
     cost_center_code varchar(64) NULL,
     profile jsonb NOT NULL DEFAULT '{}' ::jsonb,
     effective_date date NOT NULL,
@@ -377,7 +374,9 @@ CREATE INDEX org_position_slices_tenant_node_effective_idx ON org_position_slice
 
 CREATE INDEX org_position_slices_tenant_reports_to_effective_idx ON org_position_slices (tenant_id, reports_to_position_id, effective_date);
 
--- DEV-PLAN-056: Job Catalog / Job Profile (master data).
+CREATE INDEX org_position_slices_tenant_profile_effective_idx ON org_position_slices (tenant_id, job_profile_id, effective_date);
+
+-- DEV-PLAN-072: Workday-style Job Architecture (Job Role removed).
 CREATE TABLE org_job_family_groups (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -408,26 +407,9 @@ CREATE TABLE org_job_families (
 
 CREATE INDEX org_job_families_tenant_group_active_code_idx ON org_job_families (tenant_id, job_family_group_id, is_active, code);
 
-CREATE TABLE org_job_roles (
-    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    job_family_id uuid NOT NULL,
-    code varchar(64) NOT NULL,
-    name text NOT NULL,
-    is_active boolean NOT NULL DEFAULT TRUE,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT org_job_roles_tenant_id_id_key UNIQUE (tenant_id, id),
-    CONSTRAINT org_job_roles_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
-    CONSTRAINT org_job_roles_tenant_id_family_code_key UNIQUE (tenant_id, job_family_id, code)
-);
-
-CREATE INDEX org_job_roles_tenant_family_active_code_idx ON org_job_roles (tenant_id, job_family_id, is_active, code);
-
 CREATE TABLE org_job_levels (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
-    job_role_id uuid NOT NULL,
     code varchar(64) NOT NULL,
     name text NOT NULL,
     display_order int NOT NULL DEFAULT 0,
@@ -436,11 +418,10 @@ CREATE TABLE org_job_levels (
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_job_levels_tenant_id_id_key UNIQUE (tenant_id, id),
     CONSTRAINT org_job_levels_display_order_check CHECK (display_order >= 0),
-    CONSTRAINT org_job_levels_role_fk FOREIGN KEY (tenant_id, job_role_id) REFERENCES org_job_roles (tenant_id, id) ON DELETE RESTRICT,
-    CONSTRAINT org_job_levels_tenant_id_role_code_key UNIQUE (tenant_id, job_role_id, code)
+    CONSTRAINT org_job_levels_tenant_id_code_key UNIQUE (tenant_id, code)
 );
 
-CREATE INDEX org_job_levels_tenant_role_active_order_code_idx ON org_job_levels (tenant_id, job_role_id, is_active, display_order, code);
+CREATE INDEX org_job_levels_tenant_active_order_code_idx ON org_job_levels (tenant_id, is_active, display_order, code);
 
 CREATE TABLE org_job_profiles (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
@@ -448,28 +429,175 @@ CREATE TABLE org_job_profiles (
     code varchar(64) NOT NULL,
     name text NOT NULL,
     description text NULL,
-    job_role_id uuid NOT NULL,
     is_active boolean NOT NULL DEFAULT TRUE,
     external_refs jsonb NOT NULL DEFAULT '{}' ::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_job_profiles_tenant_id_id_key UNIQUE (tenant_id, id),
     CONSTRAINT org_job_profiles_external_refs_is_object_check CHECK (jsonb_typeof(external_refs) = 'object'),
-    CONSTRAINT org_job_profiles_role_fk FOREIGN KEY (tenant_id, job_role_id) REFERENCES org_job_roles (tenant_id, id) ON DELETE RESTRICT,
     CONSTRAINT org_job_profiles_tenant_id_code_key UNIQUE (tenant_id, code)
 );
 
-CREATE INDEX org_job_profiles_tenant_role_active_code_idx ON org_job_profiles (tenant_id, job_role_id, is_active, code);
+CREATE INDEX org_job_profiles_tenant_active_code_idx ON org_job_profiles (tenant_id, is_active, code);
 
-CREATE TABLE org_job_profile_allowed_job_levels (
+ALTER TABLE org_position_slices
+    ADD CONSTRAINT org_position_slices_job_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE RESTRICT;
+
+CREATE TABLE org_job_profile_job_families (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     job_profile_id uuid NOT NULL,
-    job_level_id uuid NOT NULL,
+    job_family_id uuid NOT NULL,
+    allocation_percent int NOT NULL,
+    is_primary boolean NOT NULL DEFAULT FALSE,
     created_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT org_job_profile_allowed_job_levels_pkey PRIMARY KEY (tenant_id, job_profile_id, job_level_id),
-    CONSTRAINT org_job_profile_allowed_job_levels_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE CASCADE,
-    CONSTRAINT org_job_profile_allowed_job_levels_level_fk FOREIGN KEY (tenant_id, job_level_id) REFERENCES org_job_levels (tenant_id, id) ON DELETE RESTRICT
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_profile_job_families_pkey PRIMARY KEY (tenant_id, job_profile_id, job_family_id),
+    CONSTRAINT org_job_profile_job_families_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE CASCADE,
+    CONSTRAINT org_job_profile_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_job_profile_job_families_allocation_check CHECK (allocation_percent >= 1 AND allocation_percent <= 100)
 );
+
+CREATE UNIQUE INDEX org_job_profile_job_families_primary_unique ON org_job_profile_job_families (tenant_id, job_profile_id)
+WHERE
+    is_primary = TRUE;
+
+CREATE INDEX org_job_profile_job_families_tenant_family_profile_idx ON org_job_profile_job_families (tenant_id, job_family_id, job_profile_id);
+
+CREATE OR REPLACE FUNCTION org_job_profile_job_families_validate ()
+    RETURNS TRIGGER
+    AS $$
+DECLARE
+    t_id uuid;
+    p_id uuid;
+    sum_pct int;
+    primary_count int;
+    parent_exists boolean;
+BEGIN
+    t_id := COALESCE(NEW.tenant_id, OLD.tenant_id);
+    p_id := COALESCE(NEW.job_profile_id, OLD.job_profile_id);
+    SELECT
+        EXISTS (
+            SELECT
+                1
+            FROM
+                org_job_profiles p
+            WHERE
+                p.tenant_id = t_id
+                AND p.id = p_id) INTO parent_exists;
+    IF NOT parent_exists THEN
+        RETURN NULL;
+    END IF;
+    SELECT
+        COALESCE(SUM(allocation_percent), 0),
+        COALESCE(SUM(
+                CASE WHEN is_primary THEN
+                    1
+                ELSE
+                    0
+                END), 0) INTO sum_pct,
+        primary_count
+    FROM
+        org_job_profile_job_families
+    WHERE
+        tenant_id = t_id
+        AND job_profile_id = p_id;
+    IF sum_pct <> 100 THEN
+        RAISE EXCEPTION
+            USING ERRCODE = '23514', MESSAGE = format('job profile job families allocation must sum to 100 (tenant_id=%s job_profile_id=%s sum=%s)', t_id, p_id, sum_pct);
+        END IF;
+        IF primary_count <> 1 THEN
+            RAISE EXCEPTION
+                USING ERRCODE = '23514', MESSAGE = format('job profile job families must have exactly one primary (tenant_id=%s job_profile_id=%s count=%s)', t_id, p_id, primary_count);
+            END IF;
+            RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS org_job_profile_job_families_validate_trigger ON org_job_profile_job_families;
+
+CREATE CONSTRAINT TRIGGER org_job_profile_job_families_validate_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON org_job_profile_job_families DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION org_job_profile_job_families_validate ();
+
+CREATE TABLE org_position_slice_job_families (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    position_slice_id uuid NOT NULL,
+    job_family_id uuid NOT NULL,
+    allocation_percent int NOT NULL,
+    is_primary boolean NOT NULL DEFAULT FALSE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_position_slice_job_families_pkey PRIMARY KEY (tenant_id, position_slice_id, job_family_id),
+    CONSTRAINT org_position_slice_job_families_slice_fk FOREIGN KEY (tenant_id, position_slice_id) REFERENCES org_position_slices (tenant_id, id) ON DELETE CASCADE,
+    CONSTRAINT org_position_slice_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
+    CONSTRAINT org_position_slice_job_families_allocation_check CHECK (allocation_percent >= 1 AND allocation_percent <= 100)
+);
+
+CREATE UNIQUE INDEX org_position_slice_job_families_primary_unique ON org_position_slice_job_families (tenant_id, position_slice_id)
+WHERE
+    is_primary = TRUE;
+
+CREATE INDEX org_position_slice_job_families_tenant_family_slice_idx ON org_position_slice_job_families (tenant_id, job_family_id, position_slice_id);
+
+CREATE OR REPLACE FUNCTION org_position_slice_job_families_validate ()
+    RETURNS TRIGGER
+    AS $$
+DECLARE
+    t_id uuid;
+    s_id uuid;
+    sum_pct int;
+    primary_count int;
+    parent_exists boolean;
+BEGIN
+    t_id := COALESCE(NEW.tenant_id, OLD.tenant_id);
+    s_id := COALESCE(NEW.position_slice_id, OLD.position_slice_id);
+    SELECT
+        EXISTS (
+            SELECT
+                1
+            FROM
+                org_position_slices s
+            WHERE
+                s.tenant_id = t_id
+                AND s.id = s_id) INTO parent_exists;
+    IF NOT parent_exists THEN
+        RETURN NULL;
+    END IF;
+    SELECT
+        COALESCE(SUM(allocation_percent), 0),
+        COALESCE(SUM(
+                CASE WHEN is_primary THEN
+                    1
+                ELSE
+                    0
+                END), 0) INTO sum_pct,
+        primary_count
+    FROM
+        org_position_slice_job_families
+    WHERE
+        tenant_id = t_id
+        AND position_slice_id = s_id;
+    IF sum_pct <> 100 THEN
+        RAISE EXCEPTION
+            USING ERRCODE = '23514', MESSAGE = format('position slice job families allocation must sum to 100 (tenant_id=%s position_slice_id=%s sum=%s)', t_id, s_id, sum_pct);
+        END IF;
+        IF primary_count <> 1 THEN
+            RAISE EXCEPTION
+                USING ERRCODE = '23514', MESSAGE = format('position slice job families must have exactly one primary (tenant_id=%s position_slice_id=%s count=%s)', t_id, s_id, primary_count);
+            END IF;
+            RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS org_position_slice_job_families_validate_trigger ON org_position_slice_job_families;
+
+CREATE CONSTRAINT TRIGGER org_position_slice_job_families_validate_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON org_position_slice_job_families DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION org_position_slice_job_families_validate ();
 
 CREATE TABLE org_assignments (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,

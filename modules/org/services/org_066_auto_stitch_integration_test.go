@@ -250,11 +250,13 @@ SET freeze_mode=excluded.freeze_mode, freeze_grace_days=excluded.freeze_grace_da
 	asOf := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 
+	jobProfileID, _ := ensureTestJobProfileWith100PercentFamily(t, ctx, pool, tenantID)
+
 	orgNodeID := uuid.New()
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_nodes (tenant_id, id, type, code, is_root)
-VALUES ($1,$2,'OrgUnit','ROOT',true)
-`, tenantID, orgNodeID)
+	INSERT INTO org_nodes (tenant_id, id, type, code, is_root)
+	VALUES ($1,$2,'OrgUnit','ROOT',true)
+	`, tenantID, orgNodeID)
 	require.NoError(t, err)
 
 	positionID := uuid.New()
@@ -265,12 +267,12 @@ VALUES ($1,$2,$3,'POS-066','active',false,$4::date,$5::date)
 	require.NoError(t, err)
 
 	_, err = pool.Exec(ctx, `
-INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, effective_date, end_date)
-VALUES
-  ($1,$2,$3,'active',1.0,$4::date,$5::date),
-  ($1,$2,$3,'active',1.0,$6::date,$7::date),
-  ($1,$2,$3,'active',1.0,$8::date,$9::date)
-`, tenantID, positionID, orgNodeID,
+	INSERT INTO org_position_slices (tenant_id, position_id, org_node_id, lifecycle_status, capacity_fte, job_profile_id, effective_date, end_date)
+	VALUES
+	  ($1,$2,$3,'active',1.0,$4,$5::date,$6::date),
+	  ($1,$2,$3,'active',1.0,$4,$7::date,$8::date),
+	  ($1,$2,$3,'active',1.0,$4,$9::date,$10::date)
+	`, tenantID, positionID, orgNodeID, jobProfileID,
 		asOf, time.Date(2025, 1, 10, 0, 0, 0, 0, time.UTC),
 		time.Date(2025, 1, 11, 0, 0, 0, 0, time.UTC), time.Date(2025, 1, 20, 0, 0, 0, 0, time.UTC),
 		time.Date(2025, 1, 21, 0, 0, 0, 0, time.UTC), end,

@@ -56,6 +56,7 @@ func setupOrg056DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
+		"20251230090000_org_job_architecture_workday_profiles.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -85,135 +86,96 @@ func setupOrg056DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 
 func TestOrg056CatalogValidation_ShadowWritesButAudits(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, true)
 
 	initiatorID := uuid.New()
 	res, err := svc.CreatePosition(ctx, tenantID, "req-056-shadow", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-SHADOW",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "FIN",
-		JobFamilyCode:      "FIN-ACC",
-		JobRoleCode:        "FIN-MGR",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		ReasonCode:         "create",
+		Code:           "POS-SHADOW",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 
 	var code string
 	err = pool.QueryRow(ctx, `
 	SELECT meta->>'position_catalog_validation_error_code'
-	FROM org_audit_logs
-	WHERE tenant_id=$1 AND request_id=$2 AND entity_id=$3
-	`, tenantID, "req-056-shadow", res.PositionID).Scan(&code)
+		FROM org_audit_logs
+		WHERE tenant_id=$1 AND request_id=$2 AND entity_id=$3
+		`, tenantID, "req-056-shadow", res.PositionID).Scan(&code)
 	require.NoError(t, err)
-	require.Equal(t, "ORG_JOB_CATALOG_INACTIVE_OR_MISSING", code)
+	require.Equal(t, "ORG_JOB_LEVEL_NOT_FOUND", code)
 }
 
 func TestOrg056CatalogValidation_EnforceBlocksInvalidCodes(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, true)
 
 	_, err := pool.Exec(ctx, `UPDATE org_settings SET position_catalog_validation_mode='enforce' WHERE tenant_id=$1`, tenantID)
 	require.NoError(t, err)
 
 	initiatorID := uuid.New()
 	_, err = svc.CreatePosition(ctx, tenantID, "req-056-enforce", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-ENFORCE",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "FIN",
-		JobFamilyCode:      "FIN-ACC",
-		JobRoleCode:        "FIN-MGR",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		ReasonCode:         "create",
+		Code:           "POS-ENFORCE",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		JobLevelCode:   ptr("L1"),
+		CapacityFTE:    1.0,
+		ReasonCode:     "create",
 	})
 	var svcErr *orgsvc.ServiceError
 	require.ErrorAs(t, err, &svcErr)
 	require.Equal(t, 422, svcErr.Status)
-	require.Equal(t, "ORG_JOB_CATALOG_INACTIVE_OR_MISSING", svcErr.Code)
+	require.Equal(t, "ORG_JOB_LEVEL_NOT_FOUND", svcErr.Code)
 }
 
-func TestOrg056JobProfileConflict_EnforceBlocks(t *testing.T) {
+func TestOrg056JobProfileInactive_EnforceBlocks(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
 
 	_, err := pool.Exec(ctx, `UPDATE org_settings SET position_catalog_validation_mode='enforce' WHERE tenant_id=$1`, tenantID)
 	require.NoError(t, err)
 
-	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{Code: "FIN", Name: "Finance", IsActive: true})
-	require.NoError(t, err)
-	fam1, err := svc.CreateJobFamily(ctx, tenantID, orgsvc.JobFamilyCreate{JobFamilyGroupID: group.ID, Code: "FIN-ACC", Name: "Accounting", IsActive: true})
-	require.NoError(t, err)
-	role1, err := svc.CreateJobRole(ctx, tenantID, orgsvc.JobRoleCreate{JobFamilyID: fam1.ID, Code: "FIN-MGR", Name: "Manager", IsActive: true})
-	require.NoError(t, err)
-	level1, err := svc.CreateJobLevel(ctx, tenantID, orgsvc.JobLevelCreate{JobRoleID: role1.ID, Code: "L1", Name: "L1", DisplayOrder: 0, IsActive: true})
-	require.NoError(t, err)
-	profile1, err := svc.CreateJobProfile(ctx, tenantID, orgsvc.JobProfileCreate{Code: "FIN-MGR-P1", Name: "P1", JobRoleID: role1.ID, IsActive: true})
-	require.NoError(t, err)
-	require.NoError(t, svc.SetJobProfileAllowedLevels(ctx, tenantID, profile1.ID, orgsvc.JobProfileAllowedLevelsSet{JobLevelIDs: []uuid.UUID{level1.ID}}))
-
-	fam2, err := svc.CreateJobFamily(ctx, tenantID, orgsvc.JobFamilyCreate{JobFamilyGroupID: group.ID, Code: "FIN-OPS", Name: "Ops", IsActive: true})
-	require.NoError(t, err)
-	role2, err := svc.CreateJobRole(ctx, tenantID, orgsvc.JobRoleCreate{JobFamilyID: fam2.ID, Code: "OPS-ROLE", Name: "OpsRole", IsActive: true})
-	require.NoError(t, err)
-	_, err = svc.CreateJobLevel(ctx, tenantID, orgsvc.JobLevelCreate{JobRoleID: role2.ID, Code: "L1", Name: "L1", DisplayOrder: 0, IsActive: true})
-	require.NoError(t, err)
-	profile2, err := svc.CreateJobProfile(ctx, tenantID, orgsvc.JobProfileCreate{Code: "OPS-P2", Name: "P2", JobRoleID: role2.ID, IsActive: true})
-	require.NoError(t, err)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, false)
 
 	initiatorID := uuid.New()
-	_, err = svc.CreatePosition(ctx, tenantID, "req-056-profile-conflict", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-PROFILE-CONFLICT",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "FIN",
-		JobFamilyCode:      "FIN-ACC",
-		JobRoleCode:        "FIN-MGR",
-		JobLevelCode:       "L1",
-		JobProfileID:       &profile2.ID,
-		CapacityFTE:        1.0,
-		ReasonCode:         "create",
+	_, err = svc.CreatePosition(ctx, tenantID, "req-056-profile-inactive", initiatorID, orgsvc.CreatePositionInput{
+		Code:           "POS-PROFILE-INACTIVE",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		CapacityFTE:    1.0,
+		ReasonCode:     "create",
 	})
 	var svcErr *orgsvc.ServiceError
 	require.ErrorAs(t, err, &svcErr)
 	require.Equal(t, 422, svcErr.Status)
-	require.Equal(t, "ORG_JOB_PROFILE_CONFLICT", svcErr.Code)
+	require.Equal(t, "ORG_JOB_PROFILE_INACTIVE", svcErr.Code)
 }
 
 func TestOrg056SetPositionRestrictions_RejectsMismatch(t *testing.T) {
 	ctx, _, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
-
-	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{Code: "FIN", Name: "Finance", IsActive: true})
-	require.NoError(t, err)
-	fam1, err := svc.CreateJobFamily(ctx, tenantID, orgsvc.JobFamilyCreate{JobFamilyGroupID: group.ID, Code: "FIN-ACC", Name: "Accounting", IsActive: true})
-	require.NoError(t, err)
-	role1, err := svc.CreateJobRole(ctx, tenantID, orgsvc.JobRoleCreate{JobFamilyID: fam1.ID, Code: "FIN-MGR", Name: "Manager", IsActive: true})
-	require.NoError(t, err)
-	_, err = svc.CreateJobLevel(ctx, tenantID, orgsvc.JobLevelCreate{JobRoleID: role1.ID, Code: "L1", Name: "L1", DisplayOrder: 0, IsActive: true})
-	require.NoError(t, err)
-	profile1, err := svc.CreateJobProfile(ctx, tenantID, orgsvc.JobProfileCreate{Code: "FIN-MGR-P1", Name: "P1", JobRoleID: role1.ID, IsActive: true})
-	require.NoError(t, err)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, true)
 
 	initiatorID := uuid.New()
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-056-pos", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-R",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "FIN",
-		JobFamilyCode:      "FIN-ACC",
-		JobRoleCode:        "FIN-MGR",
-		JobLevelCode:       "L1",
-		JobProfileID:       &profile1.ID,
-		CapacityFTE:        1.0,
-		ReasonCode:         "create",
+		Code:           "POS-R",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		CapacityFTE:    1.0,
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 
@@ -233,23 +195,21 @@ func TestOrg056SetPositionRestrictions_RejectsMismatch(t *testing.T) {
 
 func TestOrg056AssignmentRestrictions_EnforceBlocksCorruptRestrictions(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, true)
 
 	_, err := pool.Exec(ctx, `UPDATE org_settings SET position_restrictions_validation_mode='enforce' WHERE tenant_id=$1`, tenantID)
 	require.NoError(t, err)
 
 	initiatorID := uuid.New()
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-056-pos2", initiatorID, orgsvc.CreatePositionInput{
-		Code:               "POS-A",
-		OrgNodeID:          rootNodeID,
-		EffectiveDate:      asOf,
-		PositionType:       "regular",
-		EmploymentType:     "full_time",
-		JobFamilyGroupCode: "FIN",
-		JobFamilyCode:      "FIN-ACC",
-		JobRoleCode:        "FIN-MGR",
-		JobLevelCode:       "L1",
-		CapacityFTE:        1.0,
-		ReasonCode:         "create",
+		Code:           "POS-A",
+		OrgNodeID:      rootNodeID,
+		EffectiveDate:  asOf,
+		PositionType:   "regular",
+		EmploymentType: "full_time",
+		JobProfileID:   jobProfileID,
+		CapacityFTE:    1.0,
+		ReasonCode:     "create",
 	})
 	require.NoError(t, err)
 
@@ -271,4 +231,25 @@ func TestOrg056AssignmentRestrictions_EnforceBlocksCorruptRestrictions(t *testin
 	require.ErrorAs(t, err, &svcErr)
 	require.Equal(t, 422, svcErr.Status)
 	require.Equal(t, "ORG_POSITION_RESTRICTIONS_PROFILE_MISMATCH", svcErr.Code)
+}
+
+func seedOrg056JobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID, svc *orgsvc.OrgService, isActive bool) uuid.UUID {
+	t.Helper()
+
+	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{Code: "FIN", Name: "Finance", IsActive: true})
+	require.NoError(t, err)
+	family, err := svc.CreateJobFamily(ctx, tenantID, orgsvc.JobFamilyCreate{JobFamilyGroupID: group.ID, Code: "FIN-ACC", Name: "Accounting", IsActive: true})
+	require.NoError(t, err)
+	profile, err := svc.CreateJobProfile(ctx, tenantID, orgsvc.JobProfileCreate{
+		Code:     "FIN-P1",
+		Name:     "Finance Profile 1",
+		IsActive: isActive,
+		JobFamilies: orgsvc.JobProfileJobFamiliesSet{
+			Items: []orgsvc.JobProfileJobFamilySetItem{
+				{JobFamilyID: family.ID, AllocationPercent: 100, IsPrimary: true},
+			},
+		},
+	})
+	require.NoError(t, err)
+	return profile.ID
 }

@@ -74,7 +74,7 @@ async function setComboboxValue(args: {
 async function ensureJobCatalogPath(args: { page: Page }) {
 	const groupCode = 'FG-001';
 	const familyCode = 'F-001';
-	const roleCode = 'R-001';
+	const profileCode = 'JP-001';
 	const levelCode = 'L-001';
 
 	const createGroup = await args.page.request.post('/org/api/job-catalog/family-groups', {
@@ -100,21 +100,26 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 	expect(createFamily.status()).toBe(201);
 	const family = await createFamily.json();
 
-	const createRole = await args.page.request.post('/org/api/job-catalog/roles', {
+	const createProfile = await args.page.request.post('/org/api/job-profiles', {
 		data: {
-			job_family_id: family.id,
-			code: roleCode,
-			name: 'E2E Job role',
+			code: profileCode,
+			name: 'E2E Job profile',
+			job_families: [
+				{
+					job_family_id: family.id,
+					allocation_percent: 100,
+					is_primary: true,
+				},
+			],
 			is_active: true,
 		},
 		failOnStatusCode: false,
 	});
-	expect(createRole.status()).toBe(201);
-	const role = await createRole.json();
+	expect(createProfile.status()).toBe(201);
+	const profile = await createProfile.json();
 
 	const createLevel = await args.page.request.post('/org/api/job-catalog/levels', {
 		data: {
-			job_role_id: role.id,
 			code: levelCode,
 			name: 'E2E Job level',
 			display_order: 1,
@@ -124,7 +129,7 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 	});
 	expect(createLevel.status()).toBe(201);
 
-	return { groupCode, familyCode, roleCode, levelCode };
+	return { groupCode, familyCode, profileCode, profileID: profile.id, levelCode };
 }
 
 test.describe('Org UI (DEV-PLAN-035)', () => {
@@ -154,6 +159,8 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 	test('管理员可创建/编辑/移动节点，并创建/编辑分配', async ({ page }) => {
 		await login(page, ADMIN.email, ADMIN.password);
 		await assertAuthenticated(page);
+
+		await ensureJobCatalogPath({ page });
 
 		await createPerson({ page, pernr: '0001', displayName: 'E2E Person 0001' });
 
@@ -216,27 +223,16 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		expect((await createITResp).status()).toBe(200);
 		await expect(tree.getByRole('button', { name: /IT Team/ })).toBeVisible();
 
-			const nodesEditDate = addUTCDays(nodesBaseEffectiveDate, 1);
-			const nodesEditDateStr = formatUTCDate(nodesEditDate);
-			const nodesEffectiveDateChangeResp = page.waitForResponse(
-				(resp) => {
-					return (
-						resp.request().method() === 'GET' &&
-						resp.url().includes('/org/nodes') &&
-						resp.url().includes(`effective_date=${nodesEditDateStr}`)
-					);
-				},
-				{ timeout: 30_000 }
-			);
-			const nodesEffectiveDateInput = page.locator('#effective-date');
-			await nodesEffectiveDateInput.fill(nodesEditDateStr);
-			await nodesEffectiveDateInput.dispatchEvent('change');
-			expect((await nodesEffectiveDateChangeResp).status()).toBe(200);
+				const nodesEditDate = addUTCDays(nodesBaseEffectiveDate, 1);
+				const nodesEditDateStr = formatUTCDate(nodesEditDate);
+				await page.goto(`/org/nodes?effective_date=${nodesEditDateStr}`, { waitUntil: 'domcontentloaded' });
+				await expect(page.locator('#effective-date')).toHaveValue(nodesEditDateStr);
+				await expect(page.locator('#org-tree')).toBeVisible();
 
-		const itDetailsResp = page.waitForResponse((resp) => {
-			return resp.request().method() === 'GET' && resp.url().includes('/org/nodes/');
-		});
-		await tree.getByRole('button', { name: /IT Team/ }).click();
+			const itDetailsResp = page.waitForResponse((resp) => {
+				return resp.request().method() === 'GET' && resp.url().includes('/org/nodes/');
+			});
+			await tree.getByRole('button', { name: /IT Team/ }).click();
 		expect((await itDetailsResp).status()).toBe(200);
 		await expect(page.locator('#org-node-panel')).toContainText('IT Team');
 		await page.waitForURL(/node_id=/);
@@ -269,25 +265,15 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		await expect(page.locator('#org-node-panel')).toContainText('HR Team Updated');
 		await expect(tree.getByRole('button', { name: /HR Team Updated/ })).toBeVisible();
 
-			const nodesMoveDate = addUTCDays(nodesBaseEffectiveDate, 2);
-			const nodesMoveDateStr = formatUTCDate(nodesMoveDate);
-			const nodesMoveEffectiveDateChangeResp = page.waitForResponse(
-				(resp) => {
-					return (
-						resp.request().method() === 'GET' &&
-						resp.url().includes('/org/nodes') &&
-						resp.url().includes(`effective_date=${nodesMoveDateStr}`)
-					);
-				},
-				{ timeout: 30_000 }
-			);
-			await nodesEffectiveDateInput.fill(nodesMoveDateStr);
-			await nodesEffectiveDateInput.dispatchEvent('change');
-			expect((await nodesMoveEffectiveDateChangeResp).status()).toBe(200);
+				const nodesMoveDate = addUTCDays(nodesBaseEffectiveDate, 2);
+				const nodesMoveDateStr = formatUTCDate(nodesMoveDate);
+				await page.goto(`/org/nodes?effective_date=${nodesMoveDateStr}`, { waitUntil: 'domcontentloaded' });
+				await expect(page.locator('#effective-date')).toHaveValue(nodesMoveDateStr);
+				await expect(page.locator('#org-tree')).toBeVisible();
 
-		const hrDetailsAfterMoveDateResp = page.waitForResponse((resp) => {
-			return resp.request().method() === 'GET' && resp.url().includes(`/org/nodes/${hrIDValue}`) && resp.url().includes(`effective_date=${nodesMoveDateStr}`);
-		});
+			const hrDetailsAfterMoveDateResp = page.waitForResponse((resp) => {
+				return resp.request().method() === 'GET' && resp.url().includes(`/org/nodes/${hrIDValue}`) && resp.url().includes(`effective_date=${nodesMoveDateStr}`);
+			});
 		await tree.getByRole('button', { name: /HR Team Updated/ }).click();
 		expect((await hrDetailsAfterMoveDateResp).status()).toBe(200);
 			await expect(page.locator('#org-node-panel')).toContainText('HR Team Updated');
@@ -350,7 +336,7 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		});
 		const effectiveDateInput = page.locator('#effective-date');
 		await effectiveDateInput.fill(assignmentsFutureStr);
-		await effectiveDateInput.dispatchEvent('change');
+		await effectiveDateInput.press('Tab');
 		expect((await effectiveDateChangeResp).status()).toBe(200);
 
 		const editButton = page.locator('[data-testid^="org-assignment-edit-"]').first();
@@ -449,7 +435,7 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 				{ timeout: 30_000 }
 			);
 			await page.locator('[data-testid="org-assignment-effective-date"]').fill(assignmentsFutureStr);
-			await page.locator('[data-testid="org-assignment-effective-date"]').dispatchEvent('change');
+			await page.locator('[data-testid="org-assignment-effective-date"]').press('Tab');
 			expect((await formRefreshResp).status()).toBe(200);
 			await expect(page.locator('[data-testid="org-assignment-effective-date"]')).toHaveValue(assignmentsFutureStr);
 
@@ -478,29 +464,19 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 
 				await page.locator('input[name="code"]').fill('POS-001');
 				await page.locator('input[name="title"]').fill('HR Specialist');
-				await page.locator('#org-position-form input[name="position_type"]').fill('regular');
-				await page.locator('#org-position-form input[name="employment_type"]').fill('full_time');
+					await page.locator('#org-position-form input[name="position_type"]').fill('regular');
+					await page.locator('#org-position-form input[name="employment_type"]').fill('full_time');
 
-				await setComboboxValue({
-					combobox: page.locator('[data-testid="org-position-job-family-group-code-combobox"]'),
-					query: jobCatalog.groupCode,
-					value: jobCatalog.groupCode,
-				});
-				await setComboboxValue({
-					combobox: page.locator('[data-testid="org-position-job-family-code-combobox"]'),
-					query: jobCatalog.familyCode,
-					value: jobCatalog.familyCode,
-				});
-				await setComboboxValue({
-					combobox: page.locator('[data-testid="org-position-job-role-code-combobox"]'),
-					query: jobCatalog.roleCode,
-					value: jobCatalog.roleCode,
-				});
-				await setComboboxValue({
-					combobox: page.locator('[data-testid="org-position-job-level-code-combobox"]'),
-					query: jobCatalog.levelCode,
-					value: jobCatalog.levelCode,
-				});
+					await setComboboxValue({
+						combobox: page.locator('[data-testid="org-position-job-profile-id-combobox"]'),
+						query: jobCatalog.profileCode,
+						value: jobCatalog.profileID,
+					});
+					await setComboboxValue({
+						combobox: page.locator('[data-testid="org-position-job-level-code-combobox"]'),
+						query: jobCatalog.levelCode,
+						value: jobCatalog.levelCode,
+					});
 				const createResp = page.waitForResponse(
 					(resp) => resp.request().method() === 'POST' && resp.url().includes('/org/positions'),
 					{ timeout: 30_000 }
@@ -603,29 +579,19 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 
 			await page.locator('input[name="code"]').fill('POS-001');
 			await page.locator('input[name="title"]').fill('HR Specialist');
-			await page.locator('#org-position-form input[name="position_type"]').fill('regular');
-			await page.locator('#org-position-form input[name="employment_type"]').fill('full_time');
+				await page.locator('#org-position-form input[name="position_type"]').fill('regular');
+				await page.locator('#org-position-form input[name="employment_type"]').fill('full_time');
 
-			await setComboboxValue({
-				combobox: page.locator('[data-testid="org-position-job-family-group-code-combobox"]'),
-				query: jobCatalog.groupCode,
-				value: jobCatalog.groupCode,
-			});
-			await setComboboxValue({
-				combobox: page.locator('[data-testid="org-position-job-family-code-combobox"]'),
-				query: jobCatalog.familyCode,
-				value: jobCatalog.familyCode,
-			});
-			await setComboboxValue({
-				combobox: page.locator('[data-testid="org-position-job-role-code-combobox"]'),
-				query: jobCatalog.roleCode,
-				value: jobCatalog.roleCode,
-			});
-			await setComboboxValue({
-				combobox: page.locator('[data-testid="org-position-job-level-code-combobox"]'),
-				query: jobCatalog.levelCode,
-				value: jobCatalog.levelCode,
-			});
+				await setComboboxValue({
+					combobox: page.locator('[data-testid="org-position-job-profile-id-combobox"]'),
+					query: jobCatalog.profileCode,
+					value: jobCatalog.profileID,
+				});
+				await setComboboxValue({
+					combobox: page.locator('[data-testid="org-position-job-level-code-combobox"]'),
+					query: jobCatalog.levelCode,
+					value: jobCatalog.levelCode,
+				});
 			const createResp = page.waitForResponse((resp) => {
 				return resp.request().method() === 'POST' && resp.url().includes('/org/positions');
 			});

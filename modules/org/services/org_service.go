@@ -104,13 +104,16 @@ type OrgRepository interface {
 	ListEdgesTimelineAsChild(ctx context.Context, tenantID uuid.UUID, hierarchyType string, childNodeID uuid.UUID) ([]EdgeTimelineRow, error)
 
 	PositionExistsAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (bool, error)
-	InsertAutoPosition(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, orgNodeID uuid.UUID, code string, effectiveDate time.Time) error
+	InsertAutoPosition(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, orgNodeID uuid.UUID, code string, jobProfileID uuid.UUID, effectiveDate time.Time) (uuid.UUID, error)
 	GetPositionOrgNodeAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (uuid.UUID, error)
 	LockPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionSliceRow, error)
 	SumAllocatedFTEAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (float64, error)
 	InsertPosition(ctx context.Context, tenantID uuid.UUID, in PositionInsert) (uuid.UUID, error)
 	GetPositionIsAutoCreated(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID) (bool, error)
 	InsertPositionSlice(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, in PositionSliceInsert) (uuid.UUID, error)
+	CopyJobProfileJobFamiliesToPositionSlice(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, positionSliceID uuid.UUID) error
+	CopyPositionSliceJobFamilies(ctx context.Context, tenantID uuid.UUID, fromSliceID uuid.UUID, toSliceID uuid.UUID) error
+	ResetPositionSliceJobFamiliesFromProfile(ctx context.Context, tenantID uuid.UUID, positionSliceID uuid.UUID, jobProfileID uuid.UUID) error
 	GetPositionSliceAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (PositionSliceRow, error)
 	LockPositionSliceStartingAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, effectiveDate time.Time) (PositionSliceRow, error)
 	LockPositionSliceEndingAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, endDate time.Time) (PositionSliceRow, error)
@@ -134,23 +137,17 @@ type OrgRepository interface {
 	CreateJobFamily(ctx context.Context, tenantID uuid.UUID, in JobFamilyCreate) (JobFamilyRow, error)
 	UpdateJobFamily(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobFamilyUpdate) (JobFamilyRow, error)
 
-	ListJobRoles(ctx context.Context, tenantID uuid.UUID, jobFamilyID uuid.UUID) ([]JobRoleRow, error)
-	CreateJobRole(ctx context.Context, tenantID uuid.UUID, in JobRoleCreate) (JobRoleRow, error)
-	UpdateJobRole(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobRoleUpdate) (JobRoleRow, error)
-
-	ListJobLevels(ctx context.Context, tenantID uuid.UUID, jobRoleID uuid.UUID) ([]JobLevelRow, error)
+	ListJobLevels(ctx context.Context, tenantID uuid.UUID) ([]JobLevelRow, error)
 	CreateJobLevel(ctx context.Context, tenantID uuid.UUID, in JobLevelCreate) (JobLevelRow, error)
 	UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobLevelUpdate) (JobLevelRow, error)
+	GetJobLevelByCode(ctx context.Context, tenantID uuid.UUID, code string) (JobLevelRow, error)
 
-	ListJobProfiles(ctx context.Context, tenantID uuid.UUID, jobRoleID *uuid.UUID) ([]JobProfileRow, error)
+	ListJobProfiles(ctx context.Context, tenantID uuid.UUID) ([]JobProfileRow, error)
 	CreateJobProfile(ctx context.Context, tenantID uuid.UUID, in JobProfileCreate) (JobProfileRow, error)
 	UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobProfileUpdate) (JobProfileRow, error)
-	SetJobProfileAllowedLevels(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileAllowedLevelsSet) error
 	GetJobProfileRef(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) (JobProfileRef, error)
-	ResolveJobCatalogPathByCodes(ctx context.Context, tenantID uuid.UUID, codes JobCatalogCodes) (JobCatalogResolvedPath, error)
-	JobProfileAllowsLevel(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, jobLevelID uuid.UUID) (bool, bool, error)
-	JobLevelExistsUnderRole(ctx context.Context, tenantID uuid.UUID, jobRoleID uuid.UUID, jobLevelID uuid.UUID) (bool, error)
-	ListJobProfileAllowedLevels(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]uuid.UUID, error)
+	ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]JobProfileJobFamilyRow, error)
+	SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileJobFamiliesSet) error
 
 	LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (AssignmentRow, error)
 	LockAssignmentForTimelineAt(ctx context.Context, tenantID uuid.UUID, subjectType string, subjectID uuid.UUID, assignmentType string, asOf time.Time) (AssignmentRow, error)
@@ -1064,6 +1061,22 @@ type CreateAssignmentResult struct {
 	GeneratedEvents []events.OrgEventV1
 }
 
+func (s *OrgService) pickAutoPositionJobProfileID(ctx context.Context, tenantID uuid.UUID) (uuid.UUID, error) {
+	profiles, err := s.repo.ListJobProfiles(ctx, tenantID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	for _, p := range profiles {
+		if p.IsActive {
+			return p.ID, nil
+		}
+	}
+	if len(profiles) != 0 {
+		return profiles[0].ID, nil
+	}
+	return uuid.Nil, newServiceError(422, "ORG_JOB_PROFILE_REQUIRED", "at least one job profile is required to auto-create positions", nil)
+}
+
 func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, requestID string, initiatorID uuid.UUID, in CreateAssignmentInput) (*CreateAssignmentResult, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(400, "ORG_NO_TENANT", "tenant_id is required", nil)
@@ -1232,7 +1245,15 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				return nil, err
 			}
 			code := autoPositionCode(positionID)
-			if err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, in.EffectiveDate); err != nil {
+			jobProfileID, err := s.pickAutoPositionJobProfileID(txCtx, tenantID)
+			if err != nil {
+				return nil, err
+			}
+			sliceID, err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, jobProfileID, in.EffectiveDate)
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.CopyJobProfileJobFamiliesToPositionSlice(txCtx, tenantID, jobProfileID, sliceID); err != nil {
 				return nil, mapPgError(err)
 			}
 		}
@@ -1508,7 +1529,15 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				return nil, err
 			}
 			code := autoPositionCode(positionID)
-			if err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, in.EffectiveDate); err != nil {
+			jobProfileID, err := s.pickAutoPositionJobProfileID(txCtx, tenantID)
+			if err != nil {
+				return nil, err
+			}
+			sliceID, err := s.repo.InsertAutoPosition(txCtx, tenantID, positionID, *in.OrgNodeID, code, jobProfileID, in.EffectiveDate)
+			if err != nil {
+				return nil, mapPgError(err)
+			}
+			if err := s.repo.CopyJobProfileJobFamiliesToPositionSlice(txCtx, tenantID, jobProfileID, sliceID); err != nil {
 				return nil, mapPgError(err)
 			}
 		}
