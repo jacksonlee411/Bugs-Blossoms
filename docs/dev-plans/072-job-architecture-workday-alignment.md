@@ -482,7 +482,7 @@ DROP TABLE IF EXISTS org_job_profile_allowed_job_levels;
 > 用户确认“不需要指定职务与职级关系”，本计划不再维护“职位模板↔职级”的允许集合；实现阶段应删除该接口与对应表 `org_job_profile_allowed_job_levels`。
 
 ### 5.2 JSON API：职类/职种/职级（Job Catalog 子资源）
-> `Job Role` 退场后：以下资源应收敛为三类主数据（职类/职种/职级），并在 UI 中以“职位模板”页聚合维护入口。
+> `Job Role` 退场后：以下资源应收敛为三类主数据（职类/职种/职级），并在 UI 中以“职位分类”页聚合维护入口（其中 `Profiles` 页签为“职位模板”，作为主维护入口；见 `DEV-PLAN-072A`）。
 
 #### 5.2.1 职类（Job Family Group）
 - `GET /org/api/job-catalog/family-groups`
@@ -527,8 +527,8 @@ DROP TABLE IF EXISTS org_job_profile_allowed_job_levels;
 - 必须从路由与控制器移除：
   - `GET/POST/PATCH /org/api/job-catalog/roles`
 
-### 5.3 HTMX UI：职位模板（原 `Job Catalog`）页面
-> UI 入口：组织与职位 → `Job Catalog`，中文展示名建议统一为“职位模板”。
+### 5.3 HTMX UI：职位分类（`Job Catalog`）页面
+> UI 入口：组织与职位 → `Job Catalog`，中文展示名统一为“职位分类”；其中 `Profiles` 页签中文名为“职位模板”（见 `DEV-PLAN-072A`）。
 
 #### 5.3.1 路由（最终状态）
 - 页面：`GET /org/job-catalog`

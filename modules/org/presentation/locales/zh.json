@@ -1,10 +1,10 @@
 {
-	"NavigationLinks": {
-		"Org": "组织与职位",
-		"OrgStructure": "组织架构",
-		"OrgPositions": "职位管理",
-		"JobCatalog": "职位模板"
-	},
+		"NavigationLinks": {
+			"Org": "组织与职位",
+			"OrgStructure": "组织架构",
+			"OrgPositions": "职位管理",
+			"JobCatalog": "职位分类"
+		},
 	"Org": {
 		"UI": {
 			"Tabs": {
@@ -183,13 +183,13 @@
 					"Next": "下一页"
 				}
 			},
-			"JobCatalog": {
-				"MetaTitle": "职位模板",
-				"Title": "职位模板",
-				"Tabs": {
-					"FamilyGroups": "职类",
-					"Families": "职种",
-					"Profiles": "职位模板",
+				"JobCatalog": {
+					"MetaTitle": "职位分类",
+					"Title": "职位分类",
+					"Tabs": {
+						"FamilyGroups": "职类",
+						"Families": "职种",
+						"Profiles": "职位模板",
 					"Levels": "职级"
 				},
 				"Fields": {
