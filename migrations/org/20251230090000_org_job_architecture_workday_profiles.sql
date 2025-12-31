@@ -292,17 +292,36 @@ ALTER TABLE org_job_levels
     DROP COLUMN IF EXISTS job_role_id;
 
 -- atlas:nolint MF101
-ALTER TABLE org_job_levels
-    ADD CONSTRAINT org_job_levels_tenant_id_code_key UNIQUE (tenant_id, code);
+-- Some legacy/dev DBs may already have this tenant-global uniqueness in place.
+-- +goose StatementBegin
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'org_job_levels_tenant_id_code_key'
+    ) THEN
+        ALTER TABLE org_job_levels
+            ADD CONSTRAINT org_job_levels_tenant_id_code_key UNIQUE (tenant_id, code);
+    END IF;
+END $$;
+-- +goose StatementEnd
 
 CREATE INDEX IF NOT EXISTS org_job_levels_tenant_active_order_code_idx
     ON org_job_levels (tenant_id, is_active, display_order, code);
 
 -- 10) Drop Job Roles (after all dependencies removed).
 -- atlas:nolint DS102
+-- Legacy table (not part of DEV-PLAN-072 model). It can block dropping org_job_roles.
+DROP TABLE IF EXISTS org_job_role_family_allocations;
+
 DROP TABLE IF EXISTS org_job_roles;
 
 -- 11) Position slices: require job_profile_id and remove legacy job_*_code columns.
+-- org_position_slices has deferrable constraint triggers (e.g. gap-free). Ensure they are fired
+-- before attempting ALTER TABLE in the same transaction.
+SET CONSTRAINTS ALL IMMEDIATE;
+
 -- atlas:nolint MF104
 ALTER TABLE org_position_slices
     ALTER COLUMN job_profile_id SET NOT NULL;
@@ -313,10 +332,21 @@ ALTER TABLE org_position_slices
     DROP COLUMN IF EXISTS job_family_code,
     DROP COLUMN IF EXISTS job_role_code;
 
-ALTER TABLE org_position_slices
-    ADD CONSTRAINT org_position_slices_job_profile_fk
-    FOREIGN KEY (tenant_id, job_profile_id)
-    REFERENCES org_job_profiles (tenant_id, id) ON DELETE RESTRICT;
+-- +goose StatementBegin
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'org_position_slices_job_profile_fk'
+    ) THEN
+        ALTER TABLE org_position_slices
+            ADD CONSTRAINT org_position_slices_job_profile_fk
+            FOREIGN KEY (tenant_id, job_profile_id)
+            REFERENCES org_job_profiles (tenant_id, id) ON DELETE RESTRICT;
+    END IF;
+END $$;
+-- +goose StatementEnd
 
 CREATE INDEX IF NOT EXISTS org_position_slices_tenant_profile_effective_idx
     ON org_position_slices (tenant_id, job_profile_id, effective_date);
