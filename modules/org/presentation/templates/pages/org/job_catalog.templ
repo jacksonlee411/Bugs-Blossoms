@@ -339,8 +339,12 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									@button.Primary(button.Props{
 										Size: button.SizeSM,
 										Attrs: templ.Attributes{
-											"type":       "submit",
-											"hx-include": "#org-job-catalog-filters, #effective-date",
+											"type":        "submit",
+											"hx-target":   "#org-job-catalog-page",
+											"hx-select":   "#org-job-catalog-page",
+											"hx-swap":     "outerHTML",
+											"hx-push-url": "true",
+											"hx-include":  "#org-job-catalog-filters, #effective-date",
 											ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/family-groups/%s", props.EditID), "/org/job-catalog/family-groups"),
 										},
 									}) {
@@ -447,8 +451,12 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										@button.Primary(button.Props{
 											Size: button.SizeSM,
 											Attrs: templ.Attributes{
-												"type":       "submit",
-												"hx-include": "#org-job-catalog-filters, #effective-date",
+												"type":        "submit",
+												"hx-target":   "#org-job-catalog-page",
+												"hx-select":   "#org-job-catalog-page",
+												"hx-swap":     "outerHTML",
+												"hx-push-url": "true",
+												"hx-include":  "#org-job-catalog-filters, #effective-date",
 												ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/families/%s", props.EditID), "/org/job-catalog/families"),
 											},
 										}) {
@@ -602,8 +610,12 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									@button.Primary(button.Props{
 										Size: button.SizeSM,
 										Attrs: templ.Attributes{
-											"type":       "submit",
-											"hx-include": "#org-job-catalog-filters, #effective-date",
+											"type":        "submit",
+											"hx-target":   "#org-job-catalog-page",
+											"hx-select":   "#org-job-catalog-page",
+											"hx-swap":     "outerHTML",
+											"hx-push-url": "true",
+											"hx-include":  "#org-job-catalog-filters, #effective-date",
 											ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/profiles/%s", props.EditID), "/org/job-catalog/profiles"),
 										},
 									}) {
@@ -713,8 +725,12 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									@button.Primary(button.Props{
 										Size: button.SizeSM,
 										Attrs: templ.Attributes{
-											"type":       "submit",
-											"hx-include": "#org-job-catalog-filters, #effective-date",
+											"type":        "submit",
+											"hx-target":   "#org-job-catalog-page",
+											"hx-select":   "#org-job-catalog-page",
+											"hx-swap":     "outerHTML",
+											"hx-push-url": "true",
+											"hx-include":  "#org-job-catalog-filters, #effective-date",
 											ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/levels/%s", props.EditID), "/org/job-catalog/levels"),
 										},
 									}) {

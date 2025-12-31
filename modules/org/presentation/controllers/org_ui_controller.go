@@ -2753,9 +2753,18 @@ func jobProfileJobFamiliesSetFromForm(r *http.Request) (services.JobProfileJobFa
 		if percentRaw == "" {
 			return services.JobProfileJobFamiliesSet{}, fmt.Errorf("allocation_percent_%d is required", i)
 		}
+		percentRaw = strings.TrimSuffix(percentRaw, "%")
+
 		percent, err := strconv.Atoi(percentRaw)
 		if err != nil {
-			return services.JobProfileJobFamiliesSet{}, fmt.Errorf("invalid allocation_percent_%d", i)
+			percentFloat, floatErr := strconv.ParseFloat(percentRaw, 64)
+			if floatErr != nil {
+				return services.JobProfileJobFamiliesSet{}, fmt.Errorf("invalid allocation_percent_%d", i)
+			}
+			if percentFloat != float64(int(percentFloat)) {
+				return services.JobProfileJobFamiliesSet{}, fmt.Errorf("invalid allocation_percent_%d", i)
+			}
+			percent = int(percentFloat)
 		}
 
 		items = append(items, indexed{
@@ -2777,9 +2786,22 @@ func jobProfileJobFamiliesSetFromForm(r *http.Request) (services.JobProfileJobFa
 		}
 		primaryIndex = v
 	}
-	for i := range items {
-		if items[i].index == primaryIndex {
-			items[i].item.IsPrimary = true
+
+	if primaryIndexRaw == "" && len(items) == 1 {
+		items[0].item.IsPrimary = true
+	} else {
+		foundPrimary := false
+		for i := range items {
+			if items[i].index == primaryIndex {
+				items[i].item.IsPrimary = true
+				foundPrimary = true
+			}
+		}
+		if primaryIndexRaw != "" && !foundPrimary {
+			return services.JobProfileJobFamiliesSet{}, errors.New("invalid primary_index")
+		}
+		if primaryIndexRaw == "" && len(items) > 1 {
+			return services.JobProfileJobFamiliesSet{}, errors.New("primary_index is required")
 		}
 	}
 
