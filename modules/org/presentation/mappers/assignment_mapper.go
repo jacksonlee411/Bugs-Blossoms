@@ -35,6 +35,12 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 		}
 		return formatCodeName(c, n)
 	}
+	jobLevelLabel := func(code, name *string) string {
+		if name == nil || strings.TrimSpace(*name) == "" {
+			return ""
+		}
+		return labelFromPtrs(code, name)
+	}
 	out := make([]viewmodels.OrgAssignmentRow, 0, len(rows))
 	for _, r := range rows {
 		code := ""
@@ -98,7 +104,7 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 			JobFamilyGroup:  strings.TrimSpace(labelFromPtrs(r.JobFamilyGroupCode, r.JobFamilyGroupName)),
 			JobFamily:       strings.TrimSpace(labelFromPtrs(r.JobFamilyCode, r.JobFamilyName)),
 			JobProfile:      strings.TrimSpace(labelFromPtrs(r.JobProfileCode, r.JobProfileName)),
-			JobLevel:        strings.TrimSpace(labelFromPtrs(r.JobLevelCode, r.JobLevelName)),
+			JobLevel:        strings.TrimSpace(jobLevelLabel(r.JobLevelCode, r.JobLevelName)),
 			OperationType:   startEventType,
 			EndEventType:    endEventType,
 			EffectiveDate:   r.EffectiveDate,
