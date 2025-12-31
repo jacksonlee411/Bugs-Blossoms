@@ -1337,7 +1337,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var55 string
 			templ_7745c5c3_Var55, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.Pernr"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 475, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 475, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var55))
 			if templ_7745c5c3_Err != nil {
@@ -1350,7 +1350,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var56 string
 			templ_7745c5c3_Var56, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.Effective"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 476, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 476, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var56))
 			if templ_7745c5c3_Err != nil {
@@ -1363,7 +1363,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var57 string
 			templ_7745c5c3_Var57, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.EventType"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 477, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 477, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var57))
 			if templ_7745c5c3_Err != nil {
@@ -1376,7 +1376,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var58 string
 			templ_7745c5c3_Var58, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.OrgNodeID"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 478, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 478, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var58))
 			if templ_7745c5c3_Err != nil {
@@ -1389,7 +1389,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var59 string
 			templ_7745c5c3_Var59, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.OrgNodeLongName"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 479, Col: 83}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 479, Col: 82}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var59))
 			if templ_7745c5c3_Err != nil {
@@ -1402,7 +1402,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var60 string
 			templ_7745c5c3_Var60, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.Position"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 480, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 480, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var60))
 			if templ_7745c5c3_Err != nil {
@@ -1415,7 +1415,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var61 string
 			templ_7745c5c3_Var61, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.JobFamilyGroup"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 481, Col: 82}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 481, Col: 81}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var61))
 			if templ_7745c5c3_Err != nil {
@@ -1428,7 +1428,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var62 string
 			templ_7745c5c3_Var62, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.JobFamily"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 482, Col: 77}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 482, Col: 76}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var62))
 			if templ_7745c5c3_Err != nil {
@@ -1441,7 +1441,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var63 string
 			templ_7745c5c3_Var63, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.JobProfile"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 483, Col: 78}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 483, Col: 77}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var63))
 			if templ_7745c5c3_Err != nil {
@@ -1454,7 +1454,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 			var templ_7745c5c3_Var64 string
 			templ_7745c5c3_Var64, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.Assignments.Table.JobLevel"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 484, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 484, Col: 75}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var64))
 			if templ_7745c5c3_Err != nil {
@@ -1472,7 +1472,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 				var templ_7745c5c3_Var65 string
 				templ_7745c5c3_Var65, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Actions"))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 486, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 486, Col: 50}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var65))
 				if templ_7745c5c3_Err != nil {
@@ -1669,7 +1669,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 				var templ_7745c5c3_Var76 string
 				templ_7745c5c3_Var76, templ_7745c5c3_Err = templ.JoinStringErrs(posLabel)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 566, Col: 18}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 566, Col: 17}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var76))
 				if templ_7745c5c3_Err != nil {
@@ -1689,7 +1689,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 					var templ_7745c5c3_Var77 string
 					templ_7745c5c3_Var77, templ_7745c5c3_Err = templ.JoinStringErrs(jobFamilyGroup)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 573, Col: 25}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 573, Col: 24}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var77))
 					if templ_7745c5c3_Err != nil {
@@ -1710,7 +1710,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 					var templ_7745c5c3_Var78 string
 					templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(jobFamily)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 581, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 581, Col: 19}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 					if templ_7745c5c3_Err != nil {
@@ -1731,7 +1731,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 					var templ_7745c5c3_Var79 string
 					templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(jobProfile)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 589, Col: 21}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 589, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 					if templ_7745c5c3_Err != nil {
@@ -1752,7 +1752,7 @@ func AssignmentsTimeline(props AssignmentsTimelineProps) templ.Component {
 					var templ_7745c5c3_Var80 string
 					templ_7745c5c3_Var80, templ_7745c5c3_Err = templ.JoinStringErrs(jobLevel)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 597, Col: 19}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/components/orgui/assignments.templ`, Line: 597, Col: 18}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var80))
 					if templ_7745c5c3_Err != nil {
