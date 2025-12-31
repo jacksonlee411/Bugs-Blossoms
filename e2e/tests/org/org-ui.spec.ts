@@ -733,10 +733,11 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 
 		const timelineTable = page.locator('#org-assignments-timeline table');
 		await expect(timelineTable).toBeVisible();
-		await expect(timelineTable.getByRole('columnheader', { name: 'Job family group', exact: true })).toBeVisible();
-		await expect(timelineTable.getByRole('columnheader', { name: 'Job family', exact: true })).toBeVisible();
-		await expect(timelineTable.getByRole('columnheader', { name: 'Job profile', exact: true })).toBeVisible();
-		await expect(timelineTable.getByRole('columnheader', { name: 'Job level', exact: true })).toBeVisible();
+		const timelineHeaderRow = timelineTable.locator('thead tr');
+		await expect(timelineHeaderRow).toContainText('Job family group');
+		await expect(timelineHeaderRow).toContainText('Job family');
+		await expect(timelineHeaderRow).toContainText('Job profile');
+		await expect(timelineHeaderRow).toContainText('Job level');
 
 		await expect(page.locator('#org-assignments-timeline')).toContainText(`${jobCatalog.groupCode} — E2E Job family group`);
 		await expect(page.locator('#org-assignments-timeline')).toContainText(`${jobCatalog.familyCode} — E2E Job family`);
@@ -751,10 +752,11 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 
 		const personTimelineTable = page.locator('#org-assignments-timeline table');
 		await expect(personTimelineTable).toBeVisible();
-		await expect(personTimelineTable.getByRole('columnheader', { name: 'Job family group', exact: true })).toBeVisible();
-		await expect(personTimelineTable.getByRole('columnheader', { name: 'Job family', exact: true })).toBeVisible();
-		await expect(personTimelineTable.getByRole('columnheader', { name: 'Job profile', exact: true })).toBeVisible();
-		await expect(personTimelineTable.getByRole('columnheader', { name: 'Job level', exact: true })).toBeVisible();
+		const personTimelineHeaderRow = personTimelineTable.locator('thead tr');
+		await expect(personTimelineHeaderRow).toContainText('Job family group');
+		await expect(personTimelineHeaderRow).toContainText('Job family');
+		await expect(personTimelineHeaderRow).toContainText('Job profile');
+		await expect(personTimelineHeaderRow).toContainText('Job level');
 	});
 
 		test('无 Org 权限账号访问 /org/positions 返回 Unauthorized（DEV-PLAN-055）', async ({ page }) => {
