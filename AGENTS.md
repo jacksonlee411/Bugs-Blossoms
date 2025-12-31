@@ -222,5 +222,6 @@ modules/{module}/
 - 组织架构页增加“修改记录 / 删除记录”（DEV-PLAN-070）：`docs/dev-plans/070-org-ui-correct-and-delete-records.md`
 - Docker 中 PostgreSQL CPU 偏高调查与建议（DEV-PLAN-071）：`docs/dev-plans/071-postgres-docker-high-cpu-investigation.md`
 - 对标 Workday 的职位体系（Job Architecture）（DEV-PLAN-072）：`docs/dev-plans/072-job-architecture-workday-alignment.md`
+- Job Catalog 二级菜单中文名修正为“职位分类” + 职种创建补齐（DEV-PLAN-072A）：`docs/dev-plans/072A-job-catalog-zh-nav-rename-and-job-family-create.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`

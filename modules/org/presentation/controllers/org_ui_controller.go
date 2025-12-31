@@ -1760,6 +1760,19 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 		}
 	}
 
+	if tab == "families" && groupID == uuid.Nil && groupCode == "" && len(props.FamilyGroups) > 0 {
+		selected := props.FamilyGroups[0]
+		for _, row := range props.FamilyGroups {
+			if row.IsActive {
+				selected = row
+				break
+			}
+		}
+		groupID = selected.ID
+		props.JobFamilyGroupCode = selected.Code
+		props.JobFamilyGroupLabel = selected.Name
+	}
+
 	switch tab {
 	case "family-groups":
 		if editID != "" {
