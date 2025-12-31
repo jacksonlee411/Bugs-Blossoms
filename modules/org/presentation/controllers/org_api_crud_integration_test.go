@@ -247,6 +247,7 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 

@@ -1265,8 +1265,8 @@ func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID 
 	}
 
 	if _, err := tx.Exec(ctx, `
-	INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, allocation_percent, is_primary)
-	VALUES ($1,$2,$3,100,TRUE)
+	INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, is_primary)
+	VALUES ($1,$2,$3,TRUE)
 	ON CONFLICT (tenant_id, job_profile_id, job_family_id) DO NOTHING
 	`, tenantID, jobProfileID, familyID); err != nil {
 		return uuid.Nil, err
@@ -1411,12 +1411,12 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slices(%s): %w", p.line, p.code, err))
 		}
 		if _, err := tx.Exec(txCtx, `
-			INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, allocation_percent, is_primary)
-			SELECT $1, $3, job_family_id, allocation_percent, is_primary
-			FROM org_job_profile_job_families
-			WHERE tenant_id=$1 AND job_profile_id=$2
-			ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO NOTHING
-			`, data.tenantID, jobProfileID, sliceID); err != nil {
+				INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, is_primary)
+				SELECT $1, $3, job_family_id, is_primary
+				FROM org_job_profile_job_families
+				WHERE tenant_id=$1 AND job_profile_id=$2
+				ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO NOTHING
+				`, data.tenantID, jobProfileID, sliceID); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slice_job_families(%s): %w", p.line, p.code, err))
 		}
 		manifest.Inserted.OrgPositions = append(manifest.Inserted.OrgPositions, p.id)

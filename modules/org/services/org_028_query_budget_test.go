@@ -81,6 +81,7 @@ func TestOrg028QueryBudget(t *testing.T) {
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

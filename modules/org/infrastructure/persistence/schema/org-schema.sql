@@ -443,19 +443,17 @@ CREATE INDEX org_job_profiles_tenant_active_code_idx ON org_job_profiles (tenant
 ALTER TABLE org_position_slices
     ADD CONSTRAINT org_position_slices_job_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE RESTRICT;
 
-CREATE TABLE org_job_profile_job_families (
-    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-    job_profile_id uuid NOT NULL,
-    job_family_id uuid NOT NULL,
-    allocation_percent int NOT NULL,
-    is_primary boolean NOT NULL DEFAULT FALSE,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT org_job_profile_job_families_pkey PRIMARY KEY (tenant_id, job_profile_id, job_family_id),
-    CONSTRAINT org_job_profile_job_families_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE CASCADE,
-    CONSTRAINT org_job_profile_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
-    CONSTRAINT org_job_profile_job_families_allocation_check CHECK (allocation_percent >= 1 AND allocation_percent <= 100)
-);
+	CREATE TABLE org_job_profile_job_families (
+	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+	    job_profile_id uuid NOT NULL,
+	    job_family_id uuid NOT NULL,
+	    is_primary boolean NOT NULL DEFAULT FALSE,
+	    created_at timestamptz NOT NULL DEFAULT now(),
+	    updated_at timestamptz NOT NULL DEFAULT now(),
+	    CONSTRAINT org_job_profile_job_families_pkey PRIMARY KEY (tenant_id, job_profile_id, job_family_id),
+	    CONSTRAINT org_job_profile_job_families_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE CASCADE,
+	    CONSTRAINT org_job_profile_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT
+	);
 
 CREATE UNIQUE INDEX org_job_profile_job_families_primary_unique ON org_job_profile_job_families (tenant_id, job_profile_id)
 WHERE
@@ -463,16 +461,15 @@ WHERE
 
 CREATE INDEX org_job_profile_job_families_tenant_family_profile_idx ON org_job_profile_job_families (tenant_id, job_family_id, job_profile_id);
 
-CREATE OR REPLACE FUNCTION org_job_profile_job_families_validate ()
-    RETURNS TRIGGER
-    AS $$
-DECLARE
-    t_id uuid;
-    p_id uuid;
-    sum_pct int;
-    primary_count int;
-    parent_exists boolean;
-BEGIN
+	CREATE OR REPLACE FUNCTION org_job_profile_job_families_validate ()
+	    RETURNS TRIGGER
+	    AS $$
+	DECLARE
+	    t_id uuid;
+	    p_id uuid;
+	    primary_count int;
+	    parent_exists boolean;
+	BEGIN
     t_id := COALESCE(NEW.tenant_id, OLD.tenant_id);
     p_id := COALESCE(NEW.job_profile_id, OLD.job_profile_id);
     SELECT
@@ -486,33 +483,27 @@ BEGIN
                 AND p.id = p_id) INTO parent_exists;
     IF NOT parent_exists THEN
         RETURN NULL;
-    END IF;
-    SELECT
-        COALESCE(SUM(allocation_percent), 0),
-        COALESCE(SUM(
-                CASE WHEN is_primary THEN
-                    1
-                ELSE
-                    0
-                END), 0) INTO sum_pct,
-        primary_count
-    FROM
-        org_job_profile_job_families
-    WHERE
-        tenant_id = t_id
-        AND job_profile_id = p_id;
-    IF sum_pct <> 100 THEN
-        RAISE EXCEPTION
-            USING ERRCODE = '23514', MESSAGE = format('job profile job families allocation must sum to 100 (tenant_id=%s job_profile_id=%s sum=%s)', t_id, p_id, sum_pct);
-        END IF;
-        IF primary_count <> 1 THEN
-            RAISE EXCEPTION
-                USING ERRCODE = '23514', MESSAGE = format('job profile job families must have exactly one primary (tenant_id=%s job_profile_id=%s count=%s)', t_id, p_id, primary_count);
-            END IF;
-            RETURN NULL;
-END;
-$$
-LANGUAGE plpgsql;
+	    END IF;
+	    SELECT
+	        COALESCE(SUM(
+	                CASE WHEN is_primary THEN
+	                    1
+	                ELSE
+	                    0
+	                END), 0) INTO primary_count
+	    FROM
+	        org_job_profile_job_families
+	    WHERE
+	        tenant_id = t_id
+	        AND job_profile_id = p_id;
+	    IF primary_count <> 1 THEN
+	        RAISE EXCEPTION
+	            USING ERRCODE = '23514', MESSAGE = format('job profile job families must have exactly one primary (tenant_id=%s job_profile_id=%s count=%s)', t_id, p_id, primary_count);
+	        END IF;
+	        RETURN NULL;
+	END;
+	$$
+	LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS org_job_profile_job_families_validate_trigger ON org_job_profile_job_families;
 
@@ -521,19 +512,17 @@ CREATE CONSTRAINT TRIGGER org_job_profile_job_families_validate_trigger
     FOR EACH ROW
     EXECUTE FUNCTION org_job_profile_job_families_validate ();
 
-CREATE TABLE org_position_slice_job_families (
-    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-    position_slice_id uuid NOT NULL,
-    job_family_id uuid NOT NULL,
-    allocation_percent int NOT NULL,
-    is_primary boolean NOT NULL DEFAULT FALSE,
-    created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT org_position_slice_job_families_pkey PRIMARY KEY (tenant_id, position_slice_id, job_family_id),
-    CONSTRAINT org_position_slice_job_families_slice_fk FOREIGN KEY (tenant_id, position_slice_id) REFERENCES org_position_slices (tenant_id, id) ON DELETE CASCADE,
-    CONSTRAINT org_position_slice_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
-    CONSTRAINT org_position_slice_job_families_allocation_check CHECK (allocation_percent >= 1 AND allocation_percent <= 100)
-);
+	CREATE TABLE org_position_slice_job_families (
+	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+	    position_slice_id uuid NOT NULL,
+	    job_family_id uuid NOT NULL,
+	    is_primary boolean NOT NULL DEFAULT FALSE,
+	    created_at timestamptz NOT NULL DEFAULT now(),
+	    updated_at timestamptz NOT NULL DEFAULT now(),
+	    CONSTRAINT org_position_slice_job_families_pkey PRIMARY KEY (tenant_id, position_slice_id, job_family_id),
+	    CONSTRAINT org_position_slice_job_families_slice_fk FOREIGN KEY (tenant_id, position_slice_id) REFERENCES org_position_slices (tenant_id, id) ON DELETE CASCADE,
+	    CONSTRAINT org_position_slice_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT
+	);
 
 CREATE UNIQUE INDEX org_position_slice_job_families_primary_unique ON org_position_slice_job_families (tenant_id, position_slice_id)
 WHERE
@@ -541,16 +530,15 @@ WHERE
 
 CREATE INDEX org_position_slice_job_families_tenant_family_slice_idx ON org_position_slice_job_families (tenant_id, job_family_id, position_slice_id);
 
-CREATE OR REPLACE FUNCTION org_position_slice_job_families_validate ()
-    RETURNS TRIGGER
-    AS $$
-DECLARE
-    t_id uuid;
-    s_id uuid;
-    sum_pct int;
-    primary_count int;
-    parent_exists boolean;
-BEGIN
+	CREATE OR REPLACE FUNCTION org_position_slice_job_families_validate ()
+	    RETURNS TRIGGER
+	    AS $$
+	DECLARE
+	    t_id uuid;
+	    s_id uuid;
+	    primary_count int;
+	    parent_exists boolean;
+	BEGIN
     t_id := COALESCE(NEW.tenant_id, OLD.tenant_id);
     s_id := COALESCE(NEW.position_slice_id, OLD.position_slice_id);
     SELECT
@@ -564,33 +552,27 @@ BEGIN
                 AND s.id = s_id) INTO parent_exists;
     IF NOT parent_exists THEN
         RETURN NULL;
-    END IF;
-    SELECT
-        COALESCE(SUM(allocation_percent), 0),
-        COALESCE(SUM(
-                CASE WHEN is_primary THEN
-                    1
-                ELSE
-                    0
-                END), 0) INTO sum_pct,
-        primary_count
-    FROM
-        org_position_slice_job_families
-    WHERE
-        tenant_id = t_id
-        AND position_slice_id = s_id;
-    IF sum_pct <> 100 THEN
-        RAISE EXCEPTION
-            USING ERRCODE = '23514', MESSAGE = format('position slice job families allocation must sum to 100 (tenant_id=%s position_slice_id=%s sum=%s)', t_id, s_id, sum_pct);
-        END IF;
-        IF primary_count <> 1 THEN
-            RAISE EXCEPTION
-                USING ERRCODE = '23514', MESSAGE = format('position slice job families must have exactly one primary (tenant_id=%s position_slice_id=%s count=%s)', t_id, s_id, primary_count);
-            END IF;
-            RETURN NULL;
-END;
-$$
-LANGUAGE plpgsql;
+	    END IF;
+	    SELECT
+	        COALESCE(SUM(
+	                CASE WHEN is_primary THEN
+	                    1
+	                ELSE
+	                    0
+	                END), 0) INTO primary_count
+	    FROM
+	        org_position_slice_job_families
+	    WHERE
+	        tenant_id = t_id
+	        AND position_slice_id = s_id;
+	    IF primary_count <> 1 THEN
+	        RAISE EXCEPTION
+	            USING ERRCODE = '23514', MESSAGE = format('position slice job families must have exactly one primary (tenant_id=%s position_slice_id=%s count=%s)', t_id, s_id, primary_count);
+	        END IF;
+	        RETURN NULL;
+	END;
+	$$
+	LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS org_position_slice_job_families_validate_trigger ON org_position_slice_job_families;
 

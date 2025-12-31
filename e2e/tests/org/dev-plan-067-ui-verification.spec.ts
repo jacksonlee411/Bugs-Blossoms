@@ -49,18 +49,17 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 	expect(createFamily.status()).toBe(201);
 	const family = await createFamily.json();
 
-	const createProfile = await args.page.request.post('/org/api/job-profiles', {
-		data: {
-			code: profileCode,
-			name: 'E2E Job profile',
-			job_families: [
-				{
-					job_family_id: family.id,
-					allocation_percent: 100,
-					is_primary: true,
-				},
-			],
-			is_active: true,
+		const createProfile = await args.page.request.post('/org/api/job-profiles', {
+			data: {
+				code: profileCode,
+				name: 'E2E Job profile',
+				job_families: [
+					{
+						job_family_id: family.id,
+						is_primary: true,
+					},
+				],
+				is_active: true,
 		},
 		failOnStatusCode: false,
 	});
@@ -208,13 +207,12 @@ async function createJobCatalogRowsViaUI(args: { page: Page; viewportName: strin
 		.filter({ has: args.page.locator('input[name="tab"][value="profiles"]') })
 		.filter({ has: args.page.locator('input[name="code"]') })
 		.first();
-	await profileForm.locator('input[name="code"]').fill(profileCode);
-	await profileForm.locator('input[name="name"]').fill('UI Job profile');
+		await profileForm.locator('input[name="code"]').fill(profileCode);
+		await profileForm.locator('input[name="name"]').fill('UI Job profile');
 
-	const family0Combobox = profileForm.locator('div[x-data^="combobox("]').first();
-	await setComboboxValue({ combobox: family0Combobox, query: familyCode, value: family.id });
-	await profileForm.locator('input[name="allocation_percent_0"]').fill('100');
-	await profileForm.locator('input[type="radio"][name="primary_index"][value="0"]').check();
+		const family0Combobox = profileForm.locator('div[x-data^="combobox("]').first();
+		await setComboboxValue({ combobox: family0Combobox, query: familyCode, value: family.id });
+		await profileForm.locator('input[type="radio"][name="primary_index"][value="0"]').check();
 
 	const createProfileResp = args.page.waitForResponse((resp) => {
 		return resp.request().method() === 'POST' && resp.url().includes('/org/job-catalog/profiles');
