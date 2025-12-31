@@ -637,6 +637,126 @@ test.describe('Org UI (DEV-PLAN-035)', () => {
 		await expect(page.locator('#org-position-details')).toContainText('POS-001');
 	});
 
+	test('任职记录页展示职位体系字段（DEV-PLAN-073）', async ({ page }) => {
+		await login(page, ADMIN.email, ADMIN.password);
+		await assertAuthenticated(page);
+
+		const jobCatalog = await ensureJobCatalogPath({ page });
+
+		await createPerson({ page, pernr: '0730', displayName: 'E2E Person 0730' });
+		const personIDValue = new URL(page.url()).pathname.split('/').pop();
+		expect(personIDValue).toBeTruthy();
+
+		await page.goto('/org/nodes', { waitUntil: 'domcontentloaded' });
+		await expect(page).toHaveURL(/\/org\/nodes/);
+		await page.waitForFunction(() => typeof (window as any).htmx !== 'undefined', { timeout: 10_000 });
+
+		await page.locator('[data-testid="org-new-node"]').click();
+		await expect(page.getByText('Create node', { exact: true })).toBeVisible();
+		await page.locator('input[name="code"]').fill('ROOT');
+		await page.locator('input[name="name"]').fill('Company');
+		await page.getByRole('button', { name: 'Create' }).click();
+
+		const nodesTree = page.locator('#org-tree');
+		await expect(nodesTree.getByRole('button', { name: /Company/ })).toBeVisible();
+
+		await nodesTree.getByRole('button', { name: /Company/ }).click();
+		await page.locator('[data-testid="org-new-child"]').click();
+		await expect(page.getByText('Create node', { exact: true })).toBeVisible();
+		await page.locator('input[name="code"]').fill('HR');
+		await page.locator('input[name="name"]').fill('HR Team');
+		await page.getByRole('button', { name: 'Create' }).click();
+
+		await expect(nodesTree.getByRole('button', { name: /HR Team/ })).toBeVisible();
+		const hrHxGet = await nodesTree.getByRole('button', { name: /HR Team/ }).getAttribute('hx-get');
+		expect(hrHxGet).toBeTruthy();
+		const hrIDValue = new URL(hrHxGet!, 'http://local').pathname.split('/').pop();
+		expect(hrIDValue).toBeTruthy();
+
+		await page.goto('/org/positions', { waitUntil: 'domcontentloaded' });
+		await expect(page).toHaveURL(/\/org\/positions/);
+		await page.waitForFunction(() => typeof (window as any).htmx !== 'undefined', { timeout: 10_000 });
+
+		const positionsTree = page.locator('#org-tree');
+		const panelResp = page.waitForResponse((resp) => resp.request().method() === 'GET' && resp.url().includes('/org/positions/panel'));
+		await positionsTree.getByRole('button', { name: /HR Team/ }).click();
+		expect((await panelResp).status()).toBe(200);
+
+		await page.getByRole('button', { name: 'Create position', exact: true }).click();
+		await expect(page.locator('#org-position-details').getByText('Create position', { exact: true })).toBeVisible();
+
+		await page.locator('input[name="code"]').fill('POS-073');
+		await page.locator('input[name="title"]').fill('E2E Position 073');
+		await page.locator('#org-position-form input[name="position_type"]').fill('regular');
+		await page.locator('#org-position-form input[name="employment_type"]').fill('full_time');
+		await setComboboxValue({
+			combobox: page.locator('[data-testid="org-position-job-profile-id-combobox"]'),
+			query: jobCatalog.profileCode,
+			value: jobCatalog.profileID,
+		});
+		await setComboboxValue({
+			combobox: page.locator('[data-testid="org-position-job-level-code-combobox"]'),
+			query: jobCatalog.levelCode,
+			value: jobCatalog.levelCode,
+		});
+
+		const createPosResp = page.waitForResponse((resp) => resp.request().method() === 'POST' && resp.url().includes('/org/positions'));
+		await page.locator('#org-position-details').getByRole('button', { name: 'Create', exact: true }).click();
+		expect((await createPosResp).status()).toBe(200);
+
+		await page.waitForURL(/position_id=/);
+		const positionIDValue = new URL(page.url()).searchParams.get('position_id');
+		expect(positionIDValue).toBeTruthy();
+
+		const assignmentsEffectiveDateStr = await page.locator('#effective-date').inputValue();
+		expect(assignmentsEffectiveDateStr).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+		await page.goto(`/org/assignments?effective_date=${assignmentsEffectiveDateStr}`, { waitUntil: 'domcontentloaded' });
+		await expect(page).toHaveURL(new RegExp(`\\/org\\/assignments\\?effective_date=${assignmentsEffectiveDateStr}`));
+
+		await page.getByLabel('Pernr').fill('0730');
+		await expect(page.locator('#org-pernr')).toHaveValue('0730');
+		await setComboboxValue({
+			combobox: page.locator('[data-testid="org-assignment-orgnode-combobox"]'),
+			query: 'HR Team',
+			value: hrIDValue!,
+		});
+		await setComboboxValue({
+			combobox: page.locator('[data-testid="org-assignment-position-combobox"]'),
+			query: 'POS-073',
+			value: positionIDValue!,
+		});
+
+		const createAssignmentResponse = page.waitForResponse((resp) => resp.request().method() === 'POST' && resp.url().includes('/org/assignments'));
+		await page.getByRole('button', { name: 'Create' }).click();
+		expect((await createAssignmentResponse).status()).toBe(200);
+
+		const timelineTable = page.locator('#org-assignments-timeline table');
+		await expect(timelineTable).toBeVisible();
+		await expect(timelineTable.getByRole('columnheader', { name: 'Job family group', exact: true })).toBeVisible();
+		await expect(timelineTable.getByRole('columnheader', { name: 'Job family', exact: true })).toBeVisible();
+		await expect(timelineTable.getByRole('columnheader', { name: 'Job profile', exact: true })).toBeVisible();
+		await expect(timelineTable.getByRole('columnheader', { name: 'Job level', exact: true })).toBeVisible();
+
+		await expect(page.locator('#org-assignments-timeline')).toContainText(`${jobCatalog.groupCode} — E2E Job family group`);
+		await expect(page.locator('#org-assignments-timeline')).toContainText(`${jobCatalog.familyCode} — E2E Job family`);
+		await expect(page.locator('#org-assignments-timeline')).toContainText(`${jobCatalog.profileCode} — E2E Job profile`);
+		await expect(page.locator('#org-assignments-timeline')).toContainText(`${jobCatalog.levelCode} — E2E Job level`);
+
+		const firstRow = timelineTable.locator('tbody tr').first();
+		await expect(firstRow).not.toContainText(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+
+		await page.goto(`/person/persons/${personIDValue}?effective_date=${assignmentsEffectiveDateStr}`, { waitUntil: 'domcontentloaded' });
+		await expect(page).toHaveURL(new RegExp(`\\/person\\/persons\\/${personIDValue}\\?effective_date=${assignmentsEffectiveDateStr}`));
+
+		const personTimelineTable = page.locator('#org-assignments-timeline table');
+		await expect(personTimelineTable).toBeVisible();
+		await expect(personTimelineTable.getByRole('columnheader', { name: 'Job family group', exact: true })).toBeVisible();
+		await expect(personTimelineTable.getByRole('columnheader', { name: 'Job family', exact: true })).toBeVisible();
+		await expect(personTimelineTable.getByRole('columnheader', { name: 'Job profile', exact: true })).toBeVisible();
+		await expect(personTimelineTable.getByRole('columnheader', { name: 'Job level', exact: true })).toBeVisible();
+	});
+
 		test('无 Org 权限账号访问 /org/positions 返回 Unauthorized（DEV-PLAN-055）', async ({ page }) => {
 			await login(page, READONLY.email, READONLY.password);
 			await assertAuthenticated(page);

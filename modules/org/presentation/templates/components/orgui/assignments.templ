@@ -471,17 +471,21 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 		}
 		<table class="w-full table-auto border-collapse text-sm">
 			<thead class="border-b border-surface-400 text-left text-300">
-				<tr>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Pernr") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Effective") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.EventType") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeLongName") }</th>
-					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
-					if pageCtx.CanAuthz("org.assignments", "assign") {
-						<th class="py-2 pr-2">{ pageCtx.T("Actions") }</th>
-					}
-				</tr>
+					<tr>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Pernr") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Effective") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.EventType") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeLongName") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.JobFamilyGroup") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.JobFamily") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.JobProfile") }</th>
+						<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.JobLevel") }</th>
+						if pageCtx.CanAuthz("org.assignments", "assign") {
+							<th class="py-2 pr-2">{ pageCtx.T("Actions") }</th>
+						}
+					</tr>
 			</thead>
 			<tbody>
 				for _, row := range props.Timeline.Rows {
@@ -549,23 +553,55 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 								{ longName }
 							}
 						</td>
-						<td class="py-2 pr-2 text-200">
-							{{ posLabel := strings.TrimSpace(row.PositionLabel) }}
-							{{if posLabel == "" {
-	posLabel = strings.TrimSpace(row.PositionCode)
-}
-							}}
-							{{if posLabel == "" {
-	posLabel = pageCtx.T("Org.UI.Shared.NotFound")
-}
-							}}
-							{ posLabel }
-						</td>
-						if pageCtx.CanAuthz("org.assignments", "assign") {
-							<td class="py-2 pr-2">
-								if canEdit {
-									@button.Secondary(button.Props{
-										Size:  button.SizeSM,
+							<td class="py-2 pr-2 text-200">
+								{{ posLabel := strings.TrimSpace(row.PositionLabel) }}
+								{{if posLabel == "" {
+		posLabel = strings.TrimSpace(row.PositionCode)
+	}
+								}}
+								{{if posLabel == "" {
+		posLabel = pageCtx.T("Org.UI.Shared.NotFound")
+	}
+								}}
+								{ posLabel }
+							</td>
+							<td class="py-2 pr-2 text-200">
+								{{ jobFamilyGroup := strings.TrimSpace(row.JobFamilyGroup) }}
+								if jobFamilyGroup == "" {
+									<span class="text-xs text-400">—</span>
+								} else {
+									{ jobFamilyGroup }
+								}
+							</td>
+							<td class="py-2 pr-2 text-200">
+								{{ jobFamily := strings.TrimSpace(row.JobFamily) }}
+								if jobFamily == "" {
+									<span class="text-xs text-400">—</span>
+								} else {
+									{ jobFamily }
+								}
+							</td>
+							<td class="py-2 pr-2 text-200">
+								{{ jobProfile := strings.TrimSpace(row.JobProfile) }}
+								if jobProfile == "" {
+									<span class="text-xs text-400">—</span>
+								} else {
+									{ jobProfile }
+								}
+							</td>
+							<td class="py-2 pr-2 text-200">
+								{{ jobLevel := strings.TrimSpace(row.JobLevel) }}
+								if jobLevel == "" {
+									<span class="text-xs text-400">—</span>
+								} else {
+									{ jobLevel }
+								}
+							</td>
+							if pageCtx.CanAuthz("org.assignments", "assign") {
+								<td class="py-2 pr-2">
+									if canEdit {
+										@button.Secondary(button.Props{
+											Size:  button.SizeSM,
 										Class: "px-2 py-1",
 										Attrs: templ.Attributes{
 											"data-testid": fmt.Sprintf("org-assignment-edit-%s", row.ID.String()),

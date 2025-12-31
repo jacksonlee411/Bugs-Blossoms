@@ -70,7 +70,11 @@
           "EventType": "Event type",
           "OrgNodeID": "Department",
           "OrgNodeLongName": "Org long name",
-          "Position": "Position"
+          "Position": "Position",
+          "JobFamilyGroup": "Job family group",
+          "JobFamily": "Job family",
+          "JobProfile": "Job profile",
+          "JobLevel": "Job level"
         }
       },
       "Tree": {

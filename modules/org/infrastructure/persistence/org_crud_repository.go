@@ -790,24 +790,32 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 	}
 
 	rows, err := tx.Query(ctx, `
-	SELECT
-		a.id,
-		a.position_id,
-		ps.org_node_id,
-		a.assignment_type,
-		a.is_primary,
-		a.allocated_fte,
-		a.employment_status,
-		a.effective_date,
-		a.end_date,
-		p.code AS position_code,
-		ps.title AS position_title,
-		n.code AS org_node_code,
-		ns.name AS org_node_name,
-		(
-			SELECT e.event_type
-			FROM org_personnel_events e
-			WHERE e.tenant_id=a.tenant_id
+		SELECT
+			a.id,
+			a.position_id,
+			ps.org_node_id,
+			a.assignment_type,
+			a.is_primary,
+			a.allocated_fte,
+			a.employment_status,
+			a.effective_date,
+			a.end_date,
+			p.code AS position_code,
+			ps.title AS position_title,
+			n.code AS org_node_code,
+			ns.name AS org_node_name,
+			jfg.code AS job_family_group_code,
+			jfg.name AS job_family_group_name,
+			jf.code AS job_family_code,
+			jf.name AS job_family_name,
+			jp.code AS job_profile_code,
+			jp.name AS job_profile_name,
+			ps.job_level_code AS job_level_code,
+			jl.name AS job_level_name,
+			(
+				SELECT e.event_type
+				FROM org_personnel_events e
+				WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type IN ('hire', 'transfer')
 				AND e.effective_date = a.effective_date
@@ -833,17 +841,33 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 		AND ps.position_id=a.position_id
 		AND ps.effective_date <= a.effective_date
 		AND ps.end_date >= a.effective_date
-	JOIN org_nodes n
-		ON n.tenant_id=a.tenant_id
-		AND n.id=ps.org_node_id
-	LEFT JOIN org_node_slices ns
-		ON ns.tenant_id=a.tenant_id
-		AND ns.org_node_id=ps.org_node_id
-		AND ns.effective_date <= a.effective_date
-		AND ns.end_date >= a.effective_date
-	WHERE a.tenant_id=$1 AND a.subject_id=$2
-	ORDER BY a.effective_date ASC
-	`, pgUUID(tenantID), pgUUID(subjectID))
+		JOIN org_nodes n
+			ON n.tenant_id=a.tenant_id
+			AND n.id=ps.org_node_id
+		LEFT JOIN org_node_slices ns
+			ON ns.tenant_id=a.tenant_id
+			AND ns.org_node_id=ps.org_node_id
+			AND ns.effective_date <= a.effective_date
+			AND ns.end_date >= a.effective_date
+		LEFT JOIN org_job_profiles jp
+			ON jp.tenant_id=a.tenant_id
+			AND jp.id=ps.job_profile_id
+		LEFT JOIN org_job_profile_job_families pjf
+			ON pjf.tenant_id=a.tenant_id
+			AND pjf.job_profile_id=ps.job_profile_id
+			AND pjf.is_primary=TRUE
+		LEFT JOIN org_job_families jf
+			ON jf.tenant_id=a.tenant_id
+			AND jf.id=pjf.job_family_id
+		LEFT JOIN org_job_family_groups jfg
+			ON jfg.tenant_id=a.tenant_id
+			AND jfg.id=jf.job_family_group_id
+		LEFT JOIN org_job_levels jl
+			ON jl.tenant_id=a.tenant_id
+			AND jl.code=ps.job_level_code
+		WHERE a.tenant_id=$1 AND a.subject_id=$2
+		ORDER BY a.effective_date ASC
+		`, pgUUID(tenantID), pgUUID(subjectID))
 	if err != nil {
 		return nil, err
 	}
@@ -856,6 +880,14 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 		var positionTitle pgtype.Text
 		var orgNodeCode string
 		var orgNodeName pgtype.Text
+		var jobFamilyGroupCode pgtype.Text
+		var jobFamilyGroupName pgtype.Text
+		var jobFamilyCode pgtype.Text
+		var jobFamilyName pgtype.Text
+		var jobProfileCode pgtype.Text
+		var jobProfileName pgtype.Text
+		var jobLevelCode pgtype.Text
+		var jobLevelName pgtype.Text
 		var startEventType pgtype.Text
 		var endEventType pgtype.Text
 		if err := rows.Scan(
@@ -872,6 +904,14 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			&positionTitle,
 			&orgNodeCode,
 			&orgNodeName,
+			&jobFamilyGroupCode,
+			&jobFamilyGroupName,
+			&jobFamilyCode,
+			&jobFamilyName,
+			&jobProfileCode,
+			&jobProfileName,
+			&jobLevelCode,
+			&jobLevelName,
 			&startEventType,
 			&endEventType,
 		); err != nil {
@@ -887,6 +927,14 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			v.OrgNodeCode = &c
 		}
 		v.OrgNodeName = nullableText(orgNodeName)
+		v.JobFamilyGroupCode = nullableText(jobFamilyGroupCode)
+		v.JobFamilyGroupName = nullableText(jobFamilyGroupName)
+		v.JobFamilyCode = nullableText(jobFamilyCode)
+		v.JobFamilyName = nullableText(jobFamilyName)
+		v.JobProfileCode = nullableText(jobProfileCode)
+		v.JobProfileName = nullableText(jobProfileName)
+		v.JobLevelCode = nullableText(jobLevelCode)
+		v.JobLevelName = nullableText(jobLevelName)
 		v.StartEventType = nullableText(startEventType)
 		v.EndEventType = nullableText(endEventType)
 		out = append(out, v)
@@ -901,20 +949,32 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 	}
 
 	rows, err := tx.Query(ctx, `
-	SELECT
-		a.id,
-		a.position_id,
-		s.org_node_id,
-		a.assignment_type,
-		a.is_primary,
-		a.allocated_fte,
-		a.employment_status,
-		a.effective_date,
-		a.end_date,
-		(
-			SELECT e.event_type
-			FROM org_personnel_events e
-			WHERE e.tenant_id=a.tenant_id
+		SELECT
+			a.id,
+			a.position_id,
+			s.org_node_id,
+			a.assignment_type,
+			a.is_primary,
+			a.allocated_fte,
+			a.employment_status,
+			a.effective_date,
+			a.end_date,
+			p.code AS position_code,
+			s.title AS position_title,
+			n.code AS org_node_code,
+			ns.name AS org_node_name,
+			jfg.code AS job_family_group_code,
+			jfg.name AS job_family_group_name,
+			jf.code AS job_family_code,
+			jf.name AS job_family_name,
+			jp.code AS job_profile_code,
+			jp.name AS job_profile_name,
+			s.job_level_code AS job_level_code,
+			jl.name AS job_level_name,
+			(
+				SELECT e.event_type
+				FROM org_personnel_events e
+				WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type IN ('hire', 'transfer')
 				AND e.effective_date = a.effective_date
@@ -930,16 +990,43 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 				AND e.effective_date = a.end_date
 			ORDER BY e.created_at DESC
 			LIMIT 1
-		) AS end_event_type
-	FROM org_assignments a
-	JOIN org_position_slices s
-		ON s.tenant_id=a.tenant_id
-		AND s.position_id=a.position_id
-		AND s.effective_date <= $3
-		AND s.end_date >= $3
-	WHERE a.tenant_id=$1 AND a.subject_id=$2 AND a.effective_date <= $3 AND a.end_date >= $3
-	ORDER BY a.effective_date DESC
-	`, pgUUID(tenantID), pgUUID(subjectID), pgValidDate(asOf))
+			) AS end_event_type
+		FROM org_assignments a
+		JOIN org_positions p
+			ON p.tenant_id=a.tenant_id
+			AND p.id=a.position_id
+		JOIN org_position_slices s
+			ON s.tenant_id=a.tenant_id
+			AND s.position_id=a.position_id
+			AND s.effective_date <= $3
+			AND s.end_date >= $3
+		JOIN org_nodes n
+			ON n.tenant_id=a.tenant_id
+			AND n.id=s.org_node_id
+		LEFT JOIN org_node_slices ns
+			ON ns.tenant_id=a.tenant_id
+			AND ns.org_node_id=s.org_node_id
+			AND ns.effective_date <= $3
+			AND ns.end_date >= $3
+		LEFT JOIN org_job_profiles jp
+			ON jp.tenant_id=a.tenant_id
+			AND jp.id=s.job_profile_id
+		LEFT JOIN org_job_profile_job_families pjf
+			ON pjf.tenant_id=a.tenant_id
+			AND pjf.job_profile_id=s.job_profile_id
+			AND pjf.is_primary=TRUE
+		LEFT JOIN org_job_families jf
+			ON jf.tenant_id=a.tenant_id
+			AND jf.id=pjf.job_family_id
+		LEFT JOIN org_job_family_groups jfg
+			ON jfg.tenant_id=a.tenant_id
+			AND jfg.id=jf.job_family_group_id
+		LEFT JOIN org_job_levels jl
+			ON jl.tenant_id=a.tenant_id
+			AND jl.code=s.job_level_code
+		WHERE a.tenant_id=$1 AND a.subject_id=$2 AND a.effective_date <= $3 AND a.end_date >= $3
+		ORDER BY a.effective_date DESC
+		`, pgUUID(tenantID), pgUUID(subjectID), pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -948,6 +1035,18 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 	out := make([]services.AssignmentViewRow, 0, 16)
 	for rows.Next() {
 		var v services.AssignmentViewRow
+		var positionCode string
+		var positionTitle pgtype.Text
+		var orgNodeCode string
+		var orgNodeName pgtype.Text
+		var jobFamilyGroupCode pgtype.Text
+		var jobFamilyGroupName pgtype.Text
+		var jobFamilyCode pgtype.Text
+		var jobFamilyName pgtype.Text
+		var jobProfileCode pgtype.Text
+		var jobProfileName pgtype.Text
+		var jobLevelCode pgtype.Text
+		var jobLevelName pgtype.Text
 		var startEventType pgtype.Text
 		var endEventType pgtype.Text
 		if err := rows.Scan(
@@ -960,11 +1059,41 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 			&v.EmploymentStatus,
 			&v.EffectiveDate,
 			&v.EndDate,
+			&positionCode,
+			&positionTitle,
+			&orgNodeCode,
+			&orgNodeName,
+			&jobFamilyGroupCode,
+			&jobFamilyGroupName,
+			&jobFamilyCode,
+			&jobFamilyName,
+			&jobProfileCode,
+			&jobProfileName,
+			&jobLevelCode,
+			&jobLevelName,
 			&startEventType,
 			&endEventType,
 		); err != nil {
 			return nil, err
 		}
+		if positionCode != "" {
+			c := positionCode
+			v.PositionCode = &c
+		}
+		v.PositionTitle = nullableText(positionTitle)
+		if orgNodeCode != "" {
+			c := orgNodeCode
+			v.OrgNodeCode = &c
+		}
+		v.OrgNodeName = nullableText(orgNodeName)
+		v.JobFamilyGroupCode = nullableText(jobFamilyGroupCode)
+		v.JobFamilyGroupName = nullableText(jobFamilyGroupName)
+		v.JobFamilyCode = nullableText(jobFamilyCode)
+		v.JobFamilyName = nullableText(jobFamilyName)
+		v.JobProfileCode = nullableText(jobProfileCode)
+		v.JobProfileName = nullableText(jobProfileName)
+		v.JobLevelCode = nullableText(jobLevelCode)
+		v.JobLevelName = nullableText(jobLevelName)
 		v.StartEventType = nullableText(startEventType)
 		v.EndEventType = nullableText(endEventType)
 		out = append(out, v)
