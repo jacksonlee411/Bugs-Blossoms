@@ -5,6 +5,7 @@
 DROP TRIGGER IF EXISTS org_job_profile_job_families_validate_trigger ON org_job_profile_job_families;
 DROP FUNCTION IF EXISTS org_job_profile_job_families_validate();
 
+-- atlas:nolint DS103
 ALTER TABLE org_job_profile_job_families
     DROP COLUMN IF EXISTS allocation_percent;
 
@@ -57,6 +58,7 @@ EXECUTE FUNCTION org_job_profile_job_families_validate();
 DROP TRIGGER IF EXISTS org_position_slice_job_families_validate_trigger ON org_position_slice_job_families;
 DROP FUNCTION IF EXISTS org_position_slice_job_families_validate();
 
+-- atlas:nolint DS103
 ALTER TABLE org_position_slice_job_families
     DROP COLUMN IF EXISTS allocation_percent;
 
