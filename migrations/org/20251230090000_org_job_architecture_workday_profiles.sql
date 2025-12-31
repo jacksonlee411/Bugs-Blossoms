@@ -315,6 +315,7 @@ CREATE INDEX IF NOT EXISTS org_job_levels_tenant_active_order_code_idx
 -- Legacy table (not part of DEV-PLAN-072 model). It can block dropping org_job_roles.
 DROP TABLE IF EXISTS org_job_role_family_allocations;
 
+-- atlas:nolint DS102
 DROP TABLE IF EXISTS org_job_roles;
 
 -- 11) Position slices: require job_profile_id and remove legacy job_*_code columns.
