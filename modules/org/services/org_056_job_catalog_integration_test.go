@@ -57,6 +57,7 @@ func setupOrg056DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -246,7 +247,7 @@ func seedOrg056JobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID,
 		IsActive: isActive,
 		JobFamilies: orgsvc.JobProfileJobFamiliesSet{
 			Items: []orgsvc.JobProfileJobFamilySetItem{
-				{JobFamilyID: family.ID, AllocationPercent: 100, IsPrimary: true},
+				{JobFamilyID: family.ID, IsPrimary: true},
 			},
 		},
 	})

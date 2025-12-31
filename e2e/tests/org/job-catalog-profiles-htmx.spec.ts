@@ -62,6 +62,13 @@ test.describe('Org Job Catalog profiles (HTMX UX)', () => {
 		expect(createFamily.status()).toBe(201);
 		const family = await createFamily.json();
 
+		const createFamily2 = await page.request.post('/org/api/job-catalog/families', {
+			data: { job_family_group_id: group.id, code: 'F2', name: 'Family 2', is_active: true },
+			failOnStatusCode: false,
+		});
+		expect(createFamily2.status()).toBe(201);
+		const family2 = await createFamily2.json();
+
 		await page.goto(
 			`/org/job-catalog?tab=profiles&effective_date=${encodeURIComponent(effectiveDate)}&job_family_group_code=G1`,
 			{ waitUntil: 'domcontentloaded' },
@@ -80,7 +87,8 @@ test.describe('Org Job Catalog profiles (HTMX UX)', () => {
 		const family0Combobox = profileForm.locator('div[x-data^="combobox("]').first();
 		await setComboboxValue({ combobox: family0Combobox, query: 'F1', value: family.id });
 
-		await profileForm.locator('input[name="allocation_percent_0"]').fill('99');
+		const family1Combobox = profileForm.locator('div[x-data^="combobox("]').nth(1);
+		await setComboboxValue({ combobox: family1Combobox, query: 'F2', value: family2.id });
 
 		const saveResp = page.waitForResponse((resp) => {
 			return resp.request().method() === 'POST' && resp.url().includes('/org/job-catalog/profiles');
@@ -88,7 +96,7 @@ test.describe('Org Job Catalog profiles (HTMX UX)', () => {
 		await profileForm.getByRole('button', { name: 'Save', exact: true }).click();
 		expect((await saveResp).status()).toBe(422);
 
-		await expect(page.locator('#org-job-catalog-page')).toContainText('allocation_percent must sum to 100');
+		await expect(page.locator('#org-job-catalog-page')).toContainText('primary_index is required');
 		await expect(page.locator('#org-job-catalog-page [aria-label="Sidebar navigation"]')).toHaveCount(0);
 	});
 
@@ -131,8 +139,6 @@ test.describe('Org Job Catalog profiles (HTMX UX)', () => {
 		const family0Combobox = profileForm.locator('div[x-data^="combobox("]').first();
 		await setComboboxValue({ combobox: family0Combobox, query: 'F1', value: family.id });
 
-		await profileForm.locator('input[name="allocation_percent_0"]').fill('100');
-
 		const saveResp = page.waitForResponse((resp) => {
 			return resp.request().method() === 'POST' && resp.url().includes('/org/job-catalog/profiles');
 		});
@@ -143,4 +149,3 @@ test.describe('Org Job Catalog profiles (HTMX UX)', () => {
 		await expect(page.locator('table tbody tr', { hasText: profileCode }).first()).toBeVisible();
 	});
 });
-

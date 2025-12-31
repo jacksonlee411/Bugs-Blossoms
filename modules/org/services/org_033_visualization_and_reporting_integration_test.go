@@ -54,6 +54,7 @@ func TestOrg033NodePathAndExport(t *testing.T) {
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -143,7 +144,7 @@ func TestOrg033PersonPath(t *testing.T) {
 	targetNodeID := nodes[len(nodes)-1].ID
 
 	// Minimal position + primary assignment as-of.
-	jobProfileID, _ := ensureTestJobProfileWith100PercentFamily(t, ctx, pool, tenantID)
+	jobProfileID, _ := ensureTestJobProfileWithPrimaryFamily(t, ctx, pool, tenantID)
 	positionID := uuid.New()
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 	_, err = pool.Exec(ctx, `
@@ -275,6 +276,7 @@ func applyAllOrgMigrationsFor033(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

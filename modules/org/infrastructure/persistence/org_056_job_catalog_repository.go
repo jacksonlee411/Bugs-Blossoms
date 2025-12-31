@@ -402,15 +402,14 @@ func (r *OrgRepository) ListJobProfileJobFamilies(ctx context.Context, tenantID 
 		return nil, err
 	}
 	rows, err := tx.Query(ctx, `
-	SELECT
-		jf.id,
-		jf.code,
-		jf.name,
-		jpf.allocation_percent,
-		jpf.is_primary,
-		jfg.id,
-		jfg.code,
-		jfg.name
+		SELECT
+			jf.id,
+			jf.code,
+			jf.name,
+			jpf.is_primary,
+			jfg.id,
+			jfg.code,
+			jfg.name
 	FROM org_job_profile_job_families jpf
 	JOIN org_job_families jf
 		ON jf.tenant_id = jpf.tenant_id
@@ -433,7 +432,6 @@ func (r *OrgRepository) ListJobProfileJobFamilies(ctx context.Context, tenantID 
 			&row.JobFamilyID,
 			&row.JobFamilyCode,
 			&row.JobFamilyName,
-			&row.AllocationPercent,
 			&row.IsPrimary,
 			&row.JobFamilyGroupID,
 			&row.JobFamilyGroupCode,
@@ -463,24 +461,21 @@ func (r *OrgRepository) SetJobProfileJobFamilies(ctx context.Context, tenantID u
 	}
 
 	familyIDs := make([]uuid.UUID, 0, len(in.Items))
-	percents := make([]int32, 0, len(in.Items))
 	primaries := make([]bool, 0, len(in.Items))
 	for _, it := range in.Items {
 		familyIDs = append(familyIDs, it.JobFamilyID)
-		percents = append(percents, int32(it.AllocationPercent))
 		primaries = append(primaries, it.IsPrimary)
 	}
 
 	_, err = tx.Exec(ctx, `
-	INSERT INTO org_job_profile_job_families (
-		tenant_id,
-		job_profile_id,
-		job_family_id,
-		allocation_percent,
-		is_primary
-	)
-	SELECT $1, $2, x.job_family_id, x.allocation_percent, x.is_primary
-	FROM UNNEST($3::uuid[], $4::int[], $5::bool[]) AS x(job_family_id, allocation_percent, is_primary)
-	`, pgUUID(tenantID), pgUUID(jobProfileID), familyIDs, percents, primaries)
+		INSERT INTO org_job_profile_job_families (
+			tenant_id,
+			job_profile_id,
+			job_family_id,
+			is_primary
+		)
+		SELECT $1, $2, x.job_family_id, x.is_primary
+		FROM UNNEST($3::uuid[], $4::bool[]) AS x(job_family_id, is_primary)
+		`, pgUUID(tenantID), pgUUID(jobProfileID), familyIDs, primaries)
 	return err
 }

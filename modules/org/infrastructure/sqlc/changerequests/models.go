@@ -171,13 +171,12 @@ type OrgJobProfile struct {
 }
 
 type OrgJobProfileJobFamily struct {
-	TenantID          pgtype.UUID        `json:"tenant_id"`
-	JobProfileID      pgtype.UUID        `json:"job_profile_id"`
-	JobFamilyID       pgtype.UUID        `json:"job_family_id"`
-	AllocationPercent int32              `json:"allocation_percent"`
-	IsPrimary         bool               `json:"is_primary"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	TenantID     pgtype.UUID        `json:"tenant_id"`
+	JobProfileID pgtype.UUID        `json:"job_profile_id"`
+	JobFamilyID  pgtype.UUID        `json:"job_family_id"`
+	IsPrimary    bool               `json:"is_primary"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrgLink struct {
@@ -290,13 +289,12 @@ type OrgPositionSlice struct {
 }
 
 type OrgPositionSliceJobFamily struct {
-	TenantID          pgtype.UUID        `json:"tenant_id"`
-	PositionSliceID   pgtype.UUID        `json:"position_slice_id"`
-	JobFamilyID       pgtype.UUID        `json:"job_family_id"`
-	AllocationPercent int32              `json:"allocation_percent"`
-	IsPrimary         bool               `json:"is_primary"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	TenantID        pgtype.UUID        `json:"tenant_id"`
+	PositionSliceID pgtype.UUID        `json:"position_slice_id"`
+	JobFamilyID     pgtype.UUID        `json:"job_family_id"`
+	IsPrimary       bool               `json:"is_primary"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrgReporting struct {

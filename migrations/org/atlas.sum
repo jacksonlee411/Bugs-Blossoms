@@ -1,4 +1,4 @@
-h1:N2q4awH8SjCwFBvc5LdaJJuOtm/s+Ka9Us1WTx+ejfk=
+h1:jkTnr8KQHoShSMe1PUpajihJp1Ao2KRCLfxb8AAXXZ4=
 00001_org_baseline.sql h1:HKEUK9io9zwPWO60nEqXEqYxCigSLmO1D/mRcH82dhQ=
 00002_org_migration_smoke.sql h1:D9VgnC2eBDeHyMVqBzEP1/rtMwdtRkcpCGqPwg1L7Gw=
 20251218005114_org_placeholders_and_event_contracts.sql h1:TSQBkvi1nm7SCw+q2BX6ltB/V2naYuznwC923I2PH88=
@@ -18,3 +18,4 @@ h1:N2q4awH8SjCwFBvc5LdaJJuOtm/s+Ka9Us1WTx+ejfk=
 20251229200000_org_job_roles_ensure_job_family_id.sql h1:7Pz85sqlu848sDRQ7TdngMMFpJjWX7DzfTuSuUlgby4=
 20251229201000_org_job_catalog_unspecified_placeholders.sql h1:r5siOG0bU0ud5PvNQMQwyqX5h/F7TzIJ943ItiMVtwQ=
 20251230090000_org_job_architecture_workday_profiles.sql h1:o7m0C1VKVNpYdGyNevlq578nglmpRTfDHDMx2VKclNE=
+20251231120000_org_remove_job_family_allocation_percent.sql h1:r9aLaBj+SlpcnYSNm3qWsqqHAGpJ7wo6a8Jj1Nzetz8=

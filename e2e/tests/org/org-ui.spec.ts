@@ -100,18 +100,17 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 	expect(createFamily.status()).toBe(201);
 	const family = await createFamily.json();
 
-	const createProfile = await args.page.request.post('/org/api/job-profiles', {
-		data: {
-			code: profileCode,
-			name: 'E2E Job profile',
-			job_families: [
-				{
-					job_family_id: family.id,
-					allocation_percent: 100,
-					is_primary: true,
-				},
-			],
-			is_active: true,
+		const createProfile = await args.page.request.post('/org/api/job-profiles', {
+			data: {
+				code: profileCode,
+				name: 'E2E Job profile',
+				job_families: [
+					{
+						job_family_id: family.id,
+						is_primary: true,
+					},
+				],
+				is_active: true,
 		},
 		failOnStatusCode: false,
 	});

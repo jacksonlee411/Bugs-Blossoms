@@ -299,7 +299,7 @@ func seedOrg059AJobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID
 		IsActive: true,
 		JobFamilies: orgsvc.JobProfileJobFamiliesSet{
 			Items: []orgsvc.JobProfileJobFamilySetItem{
-				{JobFamilyID: family.ID, AllocationPercent: 100, IsPrimary: true},
+				{JobFamilyID: family.ID, IsPrimary: true},
 			},
 		},
 	})

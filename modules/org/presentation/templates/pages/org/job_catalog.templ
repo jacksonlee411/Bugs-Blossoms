@@ -128,13 +128,6 @@ func jobProfileJobFamilyID(row *viewmodels.JobProfileJobFamilyRow) string {
 	return row.JobFamilyID.String()
 }
 
-func jobProfileJobFamilyPercent(row *viewmodels.JobProfileJobFamilyRow) string {
-	if row == nil {
-		return ""
-	}
-	return fmt.Sprintf("%d", row.AllocationPercent)
-}
-
 func jobFamilyGroupCode(row *viewmodels.JobFamilyGroupRow) string {
 	if row == nil {
 		return ""
@@ -565,7 +558,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 								}
 								<div class="rounded-md border border-surface-400 bg-surface-200 p-3 space-y-2">
 									<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.JobCatalog.Fields.JobFamilies") }</div>
-									<div class="text-xs text-300">{ pageCtx.T("Org.UI.JobCatalog.Hints.JobFamiliesSum100") }</div>
+									<div class="text-xs text-300">{ pageCtx.T("Org.UI.JobCatalog.Hints.JobFamiliesPrimaryOne") }</div>
 									<div class="grid grid-cols-1 gap-2">
 										for i := 0; i < 4; i++ {
 											{{ var fam *viewmodels.JobProfileJobFamilyRow }}
@@ -573,7 +566,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 												{{ fam = &props.EditProfile.JobFamilies[i] }}
 											}
 											<div class="grid grid-cols-12 gap-2 items-end">
-												<div class="col-span-7">
+												<div class="col-span-10">
 													@base.Combobox(base.ComboboxProps{
 														Searchable:   true,
 														Label:        pageCtx.T("Org.UI.JobCatalog.Fields.JobFamily"),
@@ -586,15 +579,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 															<option value={ jobProfileJobFamilyID(fam) } selected>{ jobProfileJobFamilyLabel(fam) }</option>
 														}
 													}
-												</div>
-												<div class="col-span-3">
-													@input.Number(&input.Props{
-														Label: pageCtx.T("Org.UI.JobCatalog.Fields.AllocationPercent"),
-														Attrs: templ.Attributes{
-															"name":  fmt.Sprintf("allocation_percent_%d", i),
-															"value": jobProfileJobFamilyPercent(fam),
-														},
-													})
 												</div>
 												<div class="col-span-2 pb-2">
 													<label class="inline-flex items-center gap-2 text-sm text-200">

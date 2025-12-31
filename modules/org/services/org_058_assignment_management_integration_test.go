@@ -40,6 +40,7 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -51,7 +52,7 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 func seedOrgPosition(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantID, orgNodeID, positionID uuid.UUID, code string, capacityFTE float64, effectiveDate, endDate time.Time) {
 	tb.Helper()
 
-	jobProfileID, jobFamilyID := ensureTestJobProfileWith100PercentFamily(tb, ctx, pool, tenantID)
+	jobProfileID, jobFamilyID := ensureTestJobProfileWithPrimaryFamily(tb, ctx, pool, tenantID)
 	sliceID := uuid.New()
 
 	_, err := pool.Exec(ctx, `
@@ -75,15 +76,15 @@ func seedOrgPosition(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, ten
 	require.NoError(tb, err)
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, allocation_percent, is_primary)
-		VALUES ($1,$2,$3,100,true)
+		INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, is_primary)
+		VALUES ($1,$2,$3,true)
 		ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO UPDATE
-		SET allocation_percent=excluded.allocation_percent, is_primary=excluded.is_primary
+		SET is_primary=excluded.is_primary
 	`, tenantID, sliceID, jobFamilyID)
 	require.NoError(tb, err)
 }
 
-func ensureTestJobProfileWith100PercentFamily(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID) (uuid.UUID, uuid.UUID) {
+func ensureTestJobProfileWithPrimaryFamily(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID) (uuid.UUID, uuid.UUID) {
 	tb.Helper()
 
 	var groupID uuid.UUID
@@ -117,10 +118,10 @@ func ensureTestJobProfileWith100PercentFamily(tb testing.TB, ctx context.Context
 	require.NoError(tb, err)
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, allocation_percent, is_primary)
-		VALUES ($1,$2,$3,100,true)
+		INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, is_primary)
+		VALUES ($1,$2,$3,true)
 		ON CONFLICT (tenant_id, job_profile_id, job_family_id) DO UPDATE
-		SET allocation_percent=excluded.allocation_percent, is_primary=excluded.is_primary
+		SET is_primary=excluded.is_primary
 	`, tenantID, profileID, familyID)
 	require.NoError(tb, err)
 

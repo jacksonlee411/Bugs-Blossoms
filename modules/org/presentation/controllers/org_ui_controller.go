@@ -1857,7 +1857,6 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 						JobFamilyGroupCode: strings.TrimSpace(fam.JobFamilyGroupCode),
 						JobFamilyCode:      strings.TrimSpace(fam.JobFamilyCode),
 						JobFamilyName:      strings.TrimSpace(fam.JobFamilyName),
-						AllocationPercent:  fam.AllocationPercent,
 						IsPrimary:          fam.IsPrimary,
 					})
 				}
@@ -2749,30 +2748,11 @@ func jobProfileJobFamiliesSetFromForm(r *http.Request) (services.JobProfileJobFa
 			return services.JobProfileJobFamiliesSet{}, fmt.Errorf("invalid job_family_id_%d", i)
 		}
 
-		percentRaw := strings.TrimSpace(param(r, fmt.Sprintf("allocation_percent_%d", i)))
-		if percentRaw == "" {
-			return services.JobProfileJobFamiliesSet{}, fmt.Errorf("allocation_percent_%d is required", i)
-		}
-		percentRaw = strings.TrimSuffix(percentRaw, "%")
-
-		percent, err := strconv.Atoi(percentRaw)
-		if err != nil {
-			percentFloat, floatErr := strconv.ParseFloat(percentRaw, 64)
-			if floatErr != nil {
-				return services.JobProfileJobFamiliesSet{}, fmt.Errorf("invalid allocation_percent_%d", i)
-			}
-			if percentFloat != float64(int(percentFloat)) {
-				return services.JobProfileJobFamiliesSet{}, fmt.Errorf("invalid allocation_percent_%d", i)
-			}
-			percent = int(percentFloat)
-		}
-
 		items = append(items, indexed{
 			index: i,
 			item: services.JobProfileJobFamilySetItem{
-				JobFamilyID:       jobFamilyID,
-				AllocationPercent: percent,
-				IsPrimary:         false,
+				JobFamilyID: jobFamilyID,
+				IsPrimary:   false,
 			},
 		})
 	}

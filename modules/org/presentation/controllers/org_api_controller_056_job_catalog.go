@@ -325,9 +325,8 @@ func (c *OrgAPIController) ListJobProfiles(w http.ResponseWriter, r *http.Reques
 }
 
 type jobProfileJobFamilySetItemRequest struct {
-	JobFamilyID       uuid.UUID `json:"job_family_id"`
-	AllocationPercent int       `json:"allocation_percent"`
-	IsPrimary         bool      `json:"is_primary"`
+	JobFamilyID uuid.UUID `json:"job_family_id"`
+	IsPrimary   bool      `json:"is_primary"`
 }
 
 type createJobProfileRequest struct {
@@ -359,9 +358,8 @@ func (c *OrgAPIController) CreateJobProfile(w http.ResponseWriter, r *http.Reque
 	items := make([]services.JobProfileJobFamilySetItem, 0, len(req.JobFamilies))
 	for _, it := range req.JobFamilies {
 		items = append(items, services.JobProfileJobFamilySetItem{
-			JobFamilyID:       it.JobFamilyID,
-			AllocationPercent: it.AllocationPercent,
-			IsPrimary:         it.IsPrimary,
+			JobFamilyID: it.JobFamilyID,
+			IsPrimary:   it.IsPrimary,
 		})
 	}
 	row, err := c.org.CreateJobProfile(r.Context(), tenantID, services.JobProfileCreate{
@@ -410,9 +408,8 @@ func (c *OrgAPIController) UpdateJobProfile(w http.ResponseWriter, r *http.Reque
 		items := make([]services.JobProfileJobFamilySetItem, 0, len(req.JobFamilies))
 		for _, it := range req.JobFamilies {
 			items = append(items, services.JobProfileJobFamilySetItem{
-				JobFamilyID:       it.JobFamilyID,
-				AllocationPercent: it.AllocationPercent,
-				IsPrimary:         it.IsPrimary,
+				JobFamilyID: it.JobFamilyID,
+				IsPrimary:   it.IsPrimary,
 			})
 		}
 		jobFamilies = &services.JobProfileJobFamiliesSet{Items: items}

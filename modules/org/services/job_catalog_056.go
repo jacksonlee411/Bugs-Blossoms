@@ -105,7 +105,6 @@ type JobProfileJobFamilyRow struct {
 	JobFamilyID        uuid.UUID `json:"job_family_id"`
 	JobFamilyCode      string    `json:"job_family_code"`
 	JobFamilyName      string    `json:"job_family_name"`
-	AllocationPercent  int       `json:"allocation_percent"`
 	IsPrimary          bool      `json:"is_primary"`
 	JobFamilyGroupID   uuid.UUID `json:"job_family_group_id"`
 	JobFamilyGroupCode string    `json:"job_family_group_code"`
@@ -117,9 +116,8 @@ type JobProfileJobFamiliesSet struct {
 }
 
 type JobProfileJobFamilySetItem struct {
-	JobFamilyID       uuid.UUID
-	AllocationPercent int
-	IsPrimary         bool
+	JobFamilyID uuid.UUID
+	IsPrimary   bool
 }
 
 func (s *OrgService) ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID) ([]JobFamilyGroupRow, error) {
@@ -393,7 +391,6 @@ func validateJobProfileJobFamiliesSet(in JobProfileJobFamiliesSet) error {
 		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_families are required", nil)
 	}
 
-	sum := 0
 	primaryCount := 0
 	seen := make(map[uuid.UUID]struct{}, len(in.Items))
 	for i := range in.Items {
@@ -406,16 +403,9 @@ func validateJobProfileJobFamiliesSet(in JobProfileJobFamiliesSet) error {
 		}
 		seen[it.JobFamilyID] = struct{}{}
 
-		if it.AllocationPercent < 1 || it.AllocationPercent > 100 {
-			return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "allocation_percent must be between 1 and 100", nil)
-		}
-		sum += it.AllocationPercent
 		if it.IsPrimary {
 			primaryCount++
 		}
-	}
-	if sum != 100 {
-		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "allocation_percent must sum to 100", nil)
 	}
 	if primaryCount != 1 {
 		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "exactly one primary is required", nil)
