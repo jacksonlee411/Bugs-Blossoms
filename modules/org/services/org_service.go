@@ -289,23 +289,31 @@ type AssignmentInPlacePatch struct {
 }
 
 type AssignmentViewRow struct {
-	ID               uuid.UUID  `json:"id"`
-	PositionID       uuid.UUID  `json:"position_id"`
-	OrgNodeID        uuid.UUID  `json:"org_node_id"`
-	AssignmentType   string     `json:"assignment_type"`
-	IsPrimary        bool       `json:"is_primary"`
-	AllocatedFTE     float64    `json:"allocated_fte"`
-	EmploymentStatus string     `json:"-"`
-	EffectiveDate    time.Time  `json:"effective_date"`
-	EndDate          time.Time  `json:"end_date"`
-	PositionCode     *string    `json:"position_code,omitempty"`
-	PositionTitle    *string    `json:"position_title,omitempty"`
-	OrgNodeCode      *string    `json:"org_node_code,omitempty"`
-	OrgNodeName      *string    `json:"org_node_name,omitempty"`
-	Pernr            *string    `json:"pernr,omitempty"`
-	SubjectID        *uuid.UUID `json:"subject_id,omitempty"`
-	StartEventType   *string    `json:"start_event_type,omitempty"`
-	EndEventType     *string    `json:"end_event_type,omitempty"`
+	ID                 uuid.UUID  `json:"id"`
+	PositionID         uuid.UUID  `json:"position_id"`
+	OrgNodeID          uuid.UUID  `json:"org_node_id"`
+	AssignmentType     string     `json:"assignment_type"`
+	IsPrimary          bool       `json:"is_primary"`
+	AllocatedFTE       float64    `json:"allocated_fte"`
+	EmploymentStatus   string     `json:"-"`
+	EffectiveDate      time.Time  `json:"effective_date"`
+	EndDate            time.Time  `json:"end_date"`
+	PositionCode       *string    `json:"position_code,omitempty"`
+	PositionTitle      *string    `json:"position_title,omitempty"`
+	OrgNodeCode        *string    `json:"org_node_code,omitempty"`
+	OrgNodeName        *string    `json:"org_node_name,omitempty"`
+	JobFamilyGroupCode *string    `json:"job_family_group_code,omitempty"`
+	JobFamilyGroupName *string    `json:"job_family_group_name,omitempty"`
+	JobFamilyCode      *string    `json:"job_family_code,omitempty"`
+	JobFamilyName      *string    `json:"job_family_name,omitempty"`
+	JobProfileCode     *string    `json:"job_profile_code,omitempty"`
+	JobProfileName     *string    `json:"job_profile_name,omitempty"`
+	JobLevelCode       *string    `json:"job_level_code,omitempty"`
+	JobLevelName       *string    `json:"job_level_name,omitempty"`
+	Pernr              *string    `json:"pernr,omitempty"`
+	SubjectID          *uuid.UUID `json:"subject_id,omitempty"`
+	StartEventType     *string    `json:"start_event_type,omitempty"`
+	EndEventType       *string    `json:"end_event_type,omitempty"`
 }
 
 type OrgService struct {
