@@ -1683,7 +1683,7 @@ func JobCatalogPage(props JobCatalogPageProps) templ.Component {
 					var templ_7745c5c3_Var78 string
 					templ_7745c5c3_Var78, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.JobCatalog.Fields.JobFamilies"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 560, Col: 103}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 560, Col: 102}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var78))
 					if templ_7745c5c3_Err != nil {
@@ -1696,7 +1696,7 @@ func JobCatalogPage(props JobCatalogPageProps) templ.Component {
 					var templ_7745c5c3_Var79 string
 					templ_7745c5c3_Var79, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.JobCatalog.Hints.JobFamiliesPrimaryOne"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 561, Col: 100}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 561, Col: 99}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var79))
 					if templ_7745c5c3_Err != nil {
@@ -1735,7 +1735,7 @@ func JobCatalogPage(props JobCatalogPageProps) templ.Component {
 								var templ_7745c5c3_Var81 string
 								templ_7745c5c3_Var81, templ_7745c5c3_Err = templ.JoinStringErrs(jobProfileJobFamilyID(fam))
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 579, Col: 58}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 579, Col: 57}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var81))
 								if templ_7745c5c3_Err != nil {
@@ -1748,7 +1748,7 @@ func JobCatalogPage(props JobCatalogPageProps) templ.Component {
 								var templ_7745c5c3_Var82 string
 								templ_7745c5c3_Var82, templ_7745c5c3_Err = templ.JoinStringErrs(jobProfileJobFamilyLabel(fam))
 								if templ_7745c5c3_Err != nil {
-									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 579, Col: 101}
+									return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 579, Col: 100}
 								}
 								_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var82))
 								if templ_7745c5c3_Err != nil {
@@ -1779,7 +1779,7 @@ func JobCatalogPage(props JobCatalogPageProps) templ.Component {
 						var templ_7745c5c3_Var83 string
 						templ_7745c5c3_Var83, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", i))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 585, Col: 84}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 585, Col: 83}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var83))
 						if templ_7745c5c3_Err != nil {
@@ -1802,7 +1802,7 @@ func JobCatalogPage(props JobCatalogPageProps) templ.Component {
 						var templ_7745c5c3_Var84 string
 						templ_7745c5c3_Var84, templ_7745c5c3_Err = templ.JoinStringErrs(pageCtx.T("Org.UI.JobCatalog.Fields.IsPrimary"))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 586, Col: 70}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `modules/org/presentation/templates/pages/org/job_catalog.templ`, Line: 586, Col: 69}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var84))
 						if templ_7745c5c3_Err != nil {

@@ -555,41 +555,41 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 								}) {
 									<option value="1" selected?={ !isEdit || props.EditProfile.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Active") }</option>
 									<option value="0" selected?={ isEdit && !props.EditProfile.IsActive }>{ pageCtx.T("Org.UI.Node.Status.Inactive") }</option>
-									}
-									<div class="rounded-md border border-surface-400 bg-surface-200 p-3 space-y-2">
-										<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.JobCatalog.Fields.JobFamilies") }</div>
-										<div class="text-xs text-300">{ pageCtx.T("Org.UI.JobCatalog.Hints.JobFamiliesPrimaryOne") }</div>
-										<div class="grid grid-cols-1 gap-2">
-											for i := 0; i < 4; i++ {
-												{{ var fam *viewmodels.JobProfileJobFamilyRow }}
-												if props.EditProfile != nil && i < len(props.EditProfile.JobFamilies) {
-													{{ fam = &props.EditProfile.JobFamilies[i] }}
-												}
-												<div class="grid grid-cols-12 gap-2 items-end">
-													<div class="col-span-10">
-														@base.Combobox(base.ComboboxProps{
-															Searchable:   true,
-															Label:        pageCtx.T("Org.UI.JobCatalog.Fields.JobFamily"),
-															Name:         fmt.Sprintf("job_family_id_%d", i),
-															Endpoint:     fmt.Sprintf("/org/job-catalog/families/id-options?effective_date=%s", props.EffectiveDate),
-															Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
-															NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
-														}) {
-															if fam != nil {
-																<option value={ jobProfileJobFamilyID(fam) } selected>{ jobProfileJobFamilyLabel(fam) }</option>
-															}
-														}
-													</div>
-													<div class="col-span-2 pb-2">
-														<label class="inline-flex items-center gap-2 text-sm text-200">
-															<input type="radio" name="primary_index" value={ fmt.Sprintf("%d", i) } checked?={ fam != nil && fam.IsPrimary }/>
-															<span>{ pageCtx.T("Org.UI.JobCatalog.Fields.IsPrimary") }</span>
-														</label>
-													</div>
-												</div>
+								}
+								<div class="rounded-md border border-surface-400 bg-surface-200 p-3 space-y-2">
+									<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.JobCatalog.Fields.JobFamilies") }</div>
+									<div class="text-xs text-300">{ pageCtx.T("Org.UI.JobCatalog.Hints.JobFamiliesPrimaryOne") }</div>
+									<div class="grid grid-cols-1 gap-2">
+										for i := 0; i < 4; i++ {
+											{{ var fam *viewmodels.JobProfileJobFamilyRow }}
+											if props.EditProfile != nil && i < len(props.EditProfile.JobFamilies) {
+												{{ fam = &props.EditProfile.JobFamilies[i] }}
 											}
-										</div>
+											<div class="grid grid-cols-12 gap-2 items-end">
+												<div class="col-span-10">
+													@base.Combobox(base.ComboboxProps{
+														Searchable:   true,
+														Label:        pageCtx.T("Org.UI.JobCatalog.Fields.JobFamily"),
+														Name:         fmt.Sprintf("job_family_id_%d", i),
+														Endpoint:     fmt.Sprintf("/org/job-catalog/families/id-options?effective_date=%s", props.EffectiveDate),
+														Placeholder:  fmt.Sprintf("%s…", pageCtx.T("Search")),
+														NotFoundText: pageCtx.T("Org.UI.Shared.NotFound"),
+													}) {
+														if fam != nil {
+															<option value={ jobProfileJobFamilyID(fam) } selected>{ jobProfileJobFamilyLabel(fam) }</option>
+														}
+													}
+												</div>
+												<div class="col-span-2 pb-2">
+													<label class="inline-flex items-center gap-2 text-sm text-200">
+														<input type="radio" name="primary_index" value={ fmt.Sprintf("%d", i) } checked?={ fam != nil && fam.IsPrimary }/>
+														<span>{ pageCtx.T("Org.UI.JobCatalog.Fields.IsPrimary") }</span>
+													</label>
+												</div>
+											</div>
+										}
 									</div>
+								</div>
 								<div class="flex items-center justify-end gap-2 pt-2">
 									@button.Primary(button.Props{
 										Size: button.SizeSM,
