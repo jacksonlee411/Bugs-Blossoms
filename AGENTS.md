@@ -223,5 +223,8 @@ modules/{module}/
 - Docker 中 PostgreSQL CPU 偏高调查与建议（DEV-PLAN-071）：`docs/dev-plans/071-postgres-docker-high-cpu-investigation.md`
 - 对标 Workday 的职位体系（Job Architecture）（DEV-PLAN-072）：`docs/dev-plans/072-job-architecture-workday-alignment.md`
 - Job Catalog 二级菜单中文名修正为“职位分类” + 职种创建补齐（DEV-PLAN-072A）：`docs/dev-plans/072A-job-catalog-zh-nav-rename-and-job-family-create.md`
+- DEV-PLAN-073 任职记录页增加字段（职类/职种/职位模板/职级）：`docs/dev-plans/073-job-data-add-job-architecture-fields.md`
+- DEV-PLAN-074 取消职位模板职种“百分比分配”（保留多职种配置）：`docs/dev-plans/074-remove-job-profile-allocation-percent.md`
+- 职位分类（Job Catalog）主数据属性 Effective Dating：切片化 + 同步展示 + 复用抽象（DEV-PLAN-075）：`docs/dev-plans/075-job-catalog-effective-dated-attributes.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
