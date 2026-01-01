@@ -22,6 +22,7 @@ CREATE UNIQUE INDEX "org_job_profile_slice_job_families_primary_unique" ON "publ
 -- create index "org_job_profile_slice_job_families_tenant_family_slice_idx" to table: "org_job_profile_slice_job_families"
 CREATE INDEX "org_job_profile_slice_job_families_tenant_family_slice_idx" ON "public"."org_job_profile_slice_job_families" ("tenant_id", "job_family_id", "job_profile_slice_id");
 -- drop "__org_migration_smoke" table
+-- atlas:nolint DS102
 DROP TABLE "public"."__org_migration_smoke";
 
 -- +goose Down
