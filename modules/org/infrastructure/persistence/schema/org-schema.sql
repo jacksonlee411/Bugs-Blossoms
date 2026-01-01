@@ -513,7 +513,6 @@ CREATE CONSTRAINT TRIGGER org_job_profile_job_families_validate_trigger
     EXECUTE FUNCTION org_job_profile_job_families_validate ();
 
 -- DEV-PLAN-075: Effective-dated Job Catalog attribute slices (Phase A: schema + baseline backfill).
-
 CREATE TABLE org_job_family_group_slices (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
@@ -659,8 +658,8 @@ BEGIN
     IF primary_count <> 1 THEN
         RAISE EXCEPTION
             USING ERRCODE = '23000', CONSTRAINT = 'org_job_profile_slice_job_families_invalid_body', MESSAGE = format('job profile slice job families must have exactly one primary (tenant_id=%s job_profile_slice_id=%s count=%s)', t_id, s_id, primary_count);
-    END IF;
-    RETURN NULL;
+        END IF;
+        RETURN NULL;
 END;
 $$
 LANGUAGE plpgsql;
@@ -1363,7 +1362,6 @@ CREATE CONSTRAINT TRIGGER org_assignments_gap_free
     EXECUTE FUNCTION org_assignments_gap_free_trigger ();
 
 -- DEV-PLAN-075: Job Catalog slices must be gap-free (commit-time gate).
-
 CREATE OR REPLACE FUNCTION org_job_family_group_slices_gap_free_assert (p_tenant_id uuid, p_job_family_group_id uuid)
     RETURNS void
     AS $$
