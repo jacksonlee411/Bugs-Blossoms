@@ -21,6 +21,7 @@ async function ensureSeeded({ request }: { request: any }) {
 }
 
 async function ensureJobCatalogPath(args: { page: Page }) {
+	const effectiveDate = '2025-01-01';
 	const groupCode = 'FG-001';
 	const familyCode = 'F-001';
 	const profileCode = 'JP-001';
@@ -31,6 +32,7 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 			code: groupCode,
 			name: 'E2E Job family group',
 			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});
@@ -43,23 +45,25 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 			code: familyCode,
 			name: 'E2E Job family',
 			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});
 	expect(createFamily.status()).toBe(201);
 	const family = await createFamily.json();
 
-		const createProfile = await args.page.request.post('/org/api/job-profiles', {
-			data: {
-				code: profileCode,
-				name: 'E2E Job profile',
-				job_families: [
-					{
-						job_family_id: family.id,
-						is_primary: true,
-					},
-				],
-				is_active: true,
+	const createProfile = await args.page.request.post('/org/api/job-profiles', {
+		data: {
+			code: profileCode,
+			name: 'E2E Job profile',
+			job_families: [
+				{
+					job_family_id: family.id,
+					is_primary: true,
+				},
+			],
+			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});
@@ -72,6 +76,7 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 			name: 'E2E Job level',
 			display_order: 1,
 			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});
