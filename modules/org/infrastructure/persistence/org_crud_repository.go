@@ -790,32 +790,32 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT
-			a.id,
-			a.position_id,
-			ps.org_node_id,
-			a.assignment_type,
-			a.is_primary,
-			a.allocated_fte,
-			a.employment_status,
-			a.effective_date,
-			a.end_date,
-			p.code AS position_code,
-			ps.title AS position_title,
-			n.code AS org_node_code,
-			ns.name AS org_node_name,
-			jfg.code AS job_family_group_code,
-			jfg.name AS job_family_group_name,
-			jf.code AS job_family_code,
-			jf.name AS job_family_name,
-			jp.code AS job_profile_code,
-			jp.name AS job_profile_name,
-			ps.job_level_code AS job_level_code,
-			jl.name AS job_level_name,
-			(
-				SELECT e.event_type
-				FROM org_personnel_events e
-				WHERE e.tenant_id=a.tenant_id
+			SELECT
+				a.id,
+				a.position_id,
+				ps.org_node_id,
+				a.assignment_type,
+				a.is_primary,
+				a.allocated_fte,
+				a.employment_status,
+				a.effective_date,
+				a.end_date,
+				p.code AS position_code,
+				ps.title AS position_title,
+				n.code AS org_node_code,
+				ns.name AS org_node_name,
+				jfg.code AS job_family_group_code,
+				jfgs.name AS job_family_group_name,
+				jf.code AS job_family_code,
+				jfs.name AS job_family_name,
+				jp.code AS job_profile_code,
+				jps.name AS job_profile_name,
+				ps.job_level_code AS job_level_code,
+				jls.name AS job_level_name,
+				(
+					SELECT e.event_type
+					FROM org_personnel_events e
+					WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type IN ('hire', 'transfer')
 				AND e.effective_date = a.effective_date
@@ -849,25 +849,45 @@ func (r *OrgRepository) ListAssignmentsTimeline(ctx context.Context, tenantID uu
 			AND ns.org_node_id=ps.org_node_id
 			AND ns.effective_date <= a.effective_date
 			AND ns.end_date >= a.effective_date
-		LEFT JOIN org_job_profiles jp
-			ON jp.tenant_id=a.tenant_id
-			AND jp.id=ps.job_profile_id
-		LEFT JOIN org_job_profile_job_families pjf
-			ON pjf.tenant_id=a.tenant_id
-			AND pjf.job_profile_id=ps.job_profile_id
-			AND pjf.is_primary=TRUE
-		LEFT JOIN org_job_families jf
-			ON jf.tenant_id=a.tenant_id
-			AND jf.id=pjf.job_family_id
-		LEFT JOIN org_job_family_groups jfg
-			ON jfg.tenant_id=a.tenant_id
-			AND jfg.id=jf.job_family_group_id
-		LEFT JOIN org_job_levels jl
-			ON jl.tenant_id=a.tenant_id
-			AND jl.code=ps.job_level_code
-		WHERE a.tenant_id=$1 AND a.subject_id=$2
-		ORDER BY a.effective_date ASC
-		`, pgUUID(tenantID), pgUUID(subjectID))
+			LEFT JOIN org_job_profiles jp
+				ON jp.tenant_id=a.tenant_id
+				AND jp.id=ps.job_profile_id
+			LEFT JOIN org_job_profile_slices jps
+				ON jps.tenant_id=a.tenant_id
+				AND jps.job_profile_id=ps.job_profile_id
+				AND jps.effective_date <= a.effective_date
+				AND jps.end_date >= a.effective_date
+			LEFT JOIN org_job_profile_slice_job_families jpsjf
+				ON jpsjf.tenant_id=a.tenant_id
+				AND jpsjf.job_profile_slice_id=jps.id
+				AND jpsjf.is_primary=TRUE
+			LEFT JOIN org_job_families jf
+				ON jf.tenant_id=a.tenant_id
+				AND jf.id=jpsjf.job_family_id
+			LEFT JOIN org_job_family_slices jfs
+				ON jfs.tenant_id=a.tenant_id
+				AND jfs.job_family_id=jf.id
+				AND jfs.effective_date <= a.effective_date
+				AND jfs.end_date >= a.effective_date
+			LEFT JOIN org_job_family_groups jfg
+				ON jfg.tenant_id=a.tenant_id
+				AND jfg.id=jf.job_family_group_id
+			LEFT JOIN org_job_family_group_slices jfgs
+				ON jfgs.tenant_id=a.tenant_id
+				AND jfgs.job_family_group_id=jfg.id
+				AND jfgs.effective_date <= a.effective_date
+				AND jfgs.end_date >= a.effective_date
+			LEFT JOIN org_job_levels jl
+				ON jl.tenant_id=a.tenant_id
+				AND jl.code=ps.job_level_code
+			LEFT JOIN org_job_level_slices jls
+				ON jls.tenant_id=a.tenant_id
+				AND jls.job_level_id=jl.id
+				AND jls.effective_date <= a.effective_date
+				AND jls.end_date >= a.effective_date
+			WHERE a.tenant_id=$1 AND a.subject_id=$2
+			ORDER BY a.effective_date ASC
+			`, pgUUID(tenantID), pgUUID(subjectID))
 	if err != nil {
 		return nil, err
 	}
@@ -949,32 +969,32 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT
-			a.id,
-			a.position_id,
-			s.org_node_id,
-			a.assignment_type,
-			a.is_primary,
-			a.allocated_fte,
-			a.employment_status,
-			a.effective_date,
-			a.end_date,
-			p.code AS position_code,
-			s.title AS position_title,
-			n.code AS org_node_code,
-			ns.name AS org_node_name,
-			jfg.code AS job_family_group_code,
-			jfg.name AS job_family_group_name,
-			jf.code AS job_family_code,
-			jf.name AS job_family_name,
-			jp.code AS job_profile_code,
-			jp.name AS job_profile_name,
-			s.job_level_code AS job_level_code,
-			jl.name AS job_level_name,
-			(
-				SELECT e.event_type
-				FROM org_personnel_events e
-				WHERE e.tenant_id=a.tenant_id
+			SELECT
+				a.id,
+				a.position_id,
+				s.org_node_id,
+				a.assignment_type,
+				a.is_primary,
+				a.allocated_fte,
+				a.employment_status,
+				a.effective_date,
+				a.end_date,
+				p.code AS position_code,
+				s.title AS position_title,
+				n.code AS org_node_code,
+				ns.name AS org_node_name,
+				jfg.code AS job_family_group_code,
+				jfgs.name AS job_family_group_name,
+				jf.code AS job_family_code,
+				jfs.name AS job_family_name,
+				jp.code AS job_profile_code,
+				jps.name AS job_profile_name,
+				s.job_level_code AS job_level_code,
+				jls.name AS job_level_name,
+				(
+					SELECT e.event_type
+					FROM org_personnel_events e
+					WHERE e.tenant_id=a.tenant_id
 				AND e.person_uuid=a.subject_id
 				AND e.event_type IN ('hire', 'transfer')
 				AND e.effective_date = a.effective_date
@@ -1008,25 +1028,45 @@ func (r *OrgRepository) ListAssignmentsAsOf(ctx context.Context, tenantID uuid.U
 			AND ns.org_node_id=s.org_node_id
 			AND ns.effective_date <= $3
 			AND ns.end_date >= $3
-		LEFT JOIN org_job_profiles jp
-			ON jp.tenant_id=a.tenant_id
-			AND jp.id=s.job_profile_id
-		LEFT JOIN org_job_profile_job_families pjf
-			ON pjf.tenant_id=a.tenant_id
-			AND pjf.job_profile_id=s.job_profile_id
-			AND pjf.is_primary=TRUE
-		LEFT JOIN org_job_families jf
-			ON jf.tenant_id=a.tenant_id
-			AND jf.id=pjf.job_family_id
-		LEFT JOIN org_job_family_groups jfg
-			ON jfg.tenant_id=a.tenant_id
-			AND jfg.id=jf.job_family_group_id
-		LEFT JOIN org_job_levels jl
-			ON jl.tenant_id=a.tenant_id
-			AND jl.code=s.job_level_code
-		WHERE a.tenant_id=$1 AND a.subject_id=$2 AND a.effective_date <= $3 AND a.end_date >= $3
-		ORDER BY a.effective_date DESC
-		`, pgUUID(tenantID), pgUUID(subjectID), pgValidDate(asOf))
+			LEFT JOIN org_job_profiles jp
+				ON jp.tenant_id=a.tenant_id
+				AND jp.id=s.job_profile_id
+			LEFT JOIN org_job_profile_slices jps
+				ON jps.tenant_id=a.tenant_id
+				AND jps.job_profile_id=s.job_profile_id
+				AND jps.effective_date <= $3
+				AND jps.end_date >= $3
+			LEFT JOIN org_job_profile_slice_job_families jpsjf
+				ON jpsjf.tenant_id=a.tenant_id
+				AND jpsjf.job_profile_slice_id=jps.id
+				AND jpsjf.is_primary=TRUE
+			LEFT JOIN org_job_families jf
+				ON jf.tenant_id=a.tenant_id
+				AND jf.id=jpsjf.job_family_id
+			LEFT JOIN org_job_family_slices jfs
+				ON jfs.tenant_id=a.tenant_id
+				AND jfs.job_family_id=jf.id
+				AND jfs.effective_date <= $3
+				AND jfs.end_date >= $3
+			LEFT JOIN org_job_family_groups jfg
+				ON jfg.tenant_id=a.tenant_id
+				AND jfg.id=jf.job_family_group_id
+			LEFT JOIN org_job_family_group_slices jfgs
+				ON jfgs.tenant_id=a.tenant_id
+				AND jfgs.job_family_group_id=jfg.id
+				AND jfgs.effective_date <= $3
+				AND jfgs.end_date >= $3
+			LEFT JOIN org_job_levels jl
+				ON jl.tenant_id=a.tenant_id
+				AND jl.code=s.job_level_code
+			LEFT JOIN org_job_level_slices jls
+				ON jls.tenant_id=a.tenant_id
+				AND jls.job_level_id=jl.id
+				AND jls.effective_date <= $3
+				AND jls.end_date >= $3
+			WHERE a.tenant_id=$1 AND a.subject_id=$2 AND a.effective_date <= $3 AND a.end_date >= $3
+			ORDER BY a.effective_date DESC
+			`, pgUUID(tenantID), pgUUID(subjectID), pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}

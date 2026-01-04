@@ -1015,39 +1015,3 @@ func (r *OrgRepository) ListJobProfileJobFamiliesByProfileIDsAsOf(ctx context.Co
 	}
 	return out, nil
 }
-
-func (r *OrgRepository) SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in services.JobProfileJobFamiliesSet) error {
-	tx, err := composables.UseTx(ctx)
-	if err != nil {
-		return err
-	}
-	_, err = tx.Exec(ctx, `
-	DELETE FROM org_job_profile_job_families
-	WHERE tenant_id=$1 AND job_profile_id=$2
-	`, pgUUID(tenantID), pgUUID(jobProfileID))
-	if err != nil {
-		return err
-	}
-	if len(in.Items) == 0 {
-		return nil
-	}
-
-	familyIDs := make([]uuid.UUID, 0, len(in.Items))
-	primaries := make([]bool, 0, len(in.Items))
-	for _, it := range in.Items {
-		familyIDs = append(familyIDs, it.JobFamilyID)
-		primaries = append(primaries, it.IsPrimary)
-	}
-
-	_, err = tx.Exec(ctx, `
-		INSERT INTO org_job_profile_job_families (
-			tenant_id,
-			job_profile_id,
-			job_family_id,
-			is_primary
-		)
-		SELECT $1, $2, x.job_family_id, x.is_primary
-		FROM UNNEST($3::uuid[], $4::bool[]) AS x(job_family_id, is_primary)
-		`, pgUUID(tenantID), pgUUID(jobProfileID), familyIDs, primaries)
-	return err
-}

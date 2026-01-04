@@ -167,7 +167,6 @@ type OrgRepository interface {
 	TruncateJobProfileSlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
 	ListJobProfileSliceJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileSliceID uuid.UUID) ([]JobProfileSliceJobFamilySetItem, error)
 	SetJobProfileSliceJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileSliceID uuid.UUID, in JobProfileJobFamiliesSet) error
-	SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileJobFamiliesSet) error
 
 	LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (AssignmentRow, error)
 	LockAssignmentForTimelineAt(ctx context.Context, tenantID uuid.UUID, subjectType string, subjectID uuid.UUID, assignmentType string, asOf time.Time) (AssignmentRow, error)

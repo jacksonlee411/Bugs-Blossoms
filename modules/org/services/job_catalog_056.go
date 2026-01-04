@@ -692,9 +692,6 @@ func (s *OrgService) CreateJobProfile(ctx context.Context, tenantID uuid.UUID, i
 		if err := s.repo.SetJobProfileSliceJobFamilies(txCtx, tenantID, sliceID, in.JobFamilies); err != nil {
 			return JobProfileRow{}, mapPgError(err)
 		}
-		if err := s.repo.SetJobProfileJobFamilies(txCtx, tenantID, row.ID, in.JobFamilies); err != nil {
-			return JobProfileRow{}, mapPgError(err)
-		}
 		return JobProfileRow{
 			ID:          row.ID,
 			Code:        strings.TrimSpace(row.Code),
@@ -814,11 +811,6 @@ func (s *OrgService) UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, i
 		if err != nil {
 			return JobProfileRow{}, mapPgError(err)
 		}
-		if in.JobFamilies != nil {
-			if err := s.repo.SetJobProfileJobFamilies(txCtx, tenantID, id, *in.JobFamilies); err != nil {
-				return JobProfileRow{}, mapPgError(err)
-			}
-		}
 		return JobProfileRow{
 			ID:          identityRow.ID,
 			Code:        strings.TrimSpace(identityRow.Code),
@@ -844,26 +836,6 @@ func (s *OrgService) ListJobProfileJobFamilies(ctx context.Context, tenantID uui
 		rows, err := s.repo.ListJobProfileJobFamilies(txCtx, tenantID, jobProfileID, asOf)
 		return rows, mapPgError(err)
 	})
-}
-
-func (s *OrgService) SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileJobFamiliesSet) error {
-	if tenantID == uuid.Nil {
-		return newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
-	}
-	if jobProfileID == uuid.Nil {
-		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_profile_id is required", nil)
-	}
-	if err := validateJobProfileJobFamiliesSet(in); err != nil {
-		return err
-	}
-
-	_, err := inTx(ctx, tenantID, func(txCtx context.Context) (struct{}, error) {
-		if err := s.repo.SetJobProfileJobFamilies(txCtx, tenantID, jobProfileID, in); err != nil {
-			return struct{}{}, mapPgError(err)
-		}
-		return struct{}{}, nil
-	})
-	return err
 }
 
 func validateJobProfileJobFamiliesSet(in JobProfileJobFamiliesSet) error {
