@@ -1248,9 +1248,10 @@ func (c *OrgUIController) CreateJobFamilyGroupUI(w http.ResponseWriter, r *http.
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.CreateJobFamilyGroup(r.Context(), tenantID, services.JobFamilyGroupCreate{
-		Code:     code,
-		Name:     name,
-		IsActive: isActive,
+		Code:          code,
+		Name:          name,
+		IsActive:      isActive,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1302,8 +1303,10 @@ func (c *OrgUIController) UpdateJobFamilyGroupUI(w http.ResponseWriter, r *http.
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.UpdateJobFamilyGroup(r.Context(), tenantID, id, services.JobFamilyGroupUpdate{
-		Name:     &name,
-		IsActive: &isActive,
+		Name:          &name,
+		IsActive:      &isActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     strings.TrimSpace(param(r, "write_mode")),
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1378,6 +1381,7 @@ func (c *OrgUIController) CreateJobFamilyUI(w http.ResponseWriter, r *http.Reque
 		Code:             code,
 		Name:             name,
 		IsActive:         isActive,
+		EffectiveDate:    effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1430,8 +1434,10 @@ func (c *OrgUIController) UpdateJobFamilyUI(w http.ResponseWriter, r *http.Reque
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.UpdateJobFamily(r.Context(), tenantID, id, services.JobFamilyUpdate{
-		Name:     &name,
-		IsActive: &isActive,
+		Name:          &name,
+		IsActive:      &isActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     strings.TrimSpace(param(r, "write_mode")),
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1496,11 +1502,12 @@ func (c *OrgUIController) CreateJobProfileUI(w http.ResponseWriter, r *http.Requ
 	}
 
 	_, err = c.org.CreateJobProfile(r.Context(), tenantID, services.JobProfileCreate{
-		Code:        code,
-		Name:        name,
-		Description: description,
-		IsActive:    isActive,
-		JobFamilies: jobFamilies,
+		Code:          code,
+		Name:          name,
+		Description:   description,
+		IsActive:      isActive,
+		JobFamilies:   jobFamilies,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1575,10 +1582,12 @@ func (c *OrgUIController) UpdateJobProfileUI(w http.ResponseWriter, r *http.Requ
 	}
 
 	_, err = c.org.UpdateJobProfile(r.Context(), tenantID, id, services.JobProfileUpdate{
-		Name:        &name,
-		Description: description,
-		IsActive:    &isActive,
-		JobFamilies: &jobFamilies,
+		Name:          &name,
+		Description:   description,
+		IsActive:      &isActive,
+		JobFamilies:   &jobFamilies,
+		EffectiveDate: effectiveDate,
+		WriteMode:     strings.TrimSpace(param(r, "write_mode")),
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1636,10 +1645,11 @@ func (c *OrgUIController) CreateJobLevelUI(w http.ResponseWriter, r *http.Reques
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.CreateJobLevel(r.Context(), tenantID, services.JobLevelCreate{
-		Code:         code,
-		Name:         name,
-		DisplayOrder: displayOrder,
-		IsActive:     isActive,
+		Code:          code,
+		Name:          name,
+		DisplayOrder:  displayOrder,
+		IsActive:      isActive,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1702,9 +1712,11 @@ func (c *OrgUIController) UpdateJobLevelUI(w http.ResponseWriter, r *http.Reques
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.UpdateJobLevel(r.Context(), tenantID, id, services.JobLevelUpdate{
-		Name:         &name,
-		DisplayOrder: &displayOrder,
-		IsActive:     &isActive,
+		Name:          &name,
+		DisplayOrder:  &displayOrder,
+		IsActive:      &isActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     strings.TrimSpace(param(r, "write_mode")),
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)

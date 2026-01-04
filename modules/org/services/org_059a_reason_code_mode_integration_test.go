@@ -278,10 +278,13 @@ func TestOrg059A_MigrationsIncludeReasonCodeModeColumn(t *testing.T) {
 func seedOrg059AJobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID, svc *orgsvc.OrgService) uuid.UUID {
 	t.Helper()
 
+	asOf := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
 	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{
-		Code:     "TST",
-		Name:     "Test Group",
-		IsActive: true,
+		Code:          "TST",
+		Name:          "Test Group",
+		IsActive:      true,
+		EffectiveDate: asOf,
 	})
 	require.NoError(t, err)
 
@@ -290,6 +293,7 @@ func seedOrg059AJobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID
 		Code:             "TST-FAMILY",
 		Name:             "Test Family",
 		IsActive:         true,
+		EffectiveDate:    asOf,
 	})
 	require.NoError(t, err)
 
@@ -302,6 +306,7 @@ func seedOrg059AJobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID
 				{JobFamilyID: family.ID, IsPrimary: true},
 			},
 		},
+		EffectiveDate: asOf,
 	})
 	require.NoError(t, err)
 	return profile.ID

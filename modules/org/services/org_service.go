@@ -132,16 +132,28 @@ type OrgRepository interface {
 	ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobFamilyGroupRow, error)
 	CreateJobFamilyGroup(ctx context.Context, tenantID uuid.UUID, in JobFamilyGroupCreate) (JobFamilyGroupRow, error)
 	UpdateJobFamilyGroup(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobFamilyGroupUpdate) (JobFamilyGroupRow, error)
+	LockJobFamilyGroupSliceAt(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID, asOf time.Time) (JobFamilyGroupSliceRow, error)
+	InsertJobFamilyGroupSlice(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID, name string, isActive bool, effectiveDate time.Time, endDate time.Time) (uuid.UUID, error)
+	UpdateJobFamilyGroupSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch JobFamilyGroupSliceInPlacePatch) error
+	TruncateJobFamilyGroupSlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
 
 	ListJobFamilies(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID, asOf time.Time) ([]JobFamilyRow, error)
 	ListJobFamiliesByGroupIDsAsOf(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupIDs []uuid.UUID, asOf time.Time) ([]JobFamilyRow, error)
 	CreateJobFamily(ctx context.Context, tenantID uuid.UUID, in JobFamilyCreate) (JobFamilyRow, error)
 	UpdateJobFamily(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobFamilyUpdate) (JobFamilyRow, error)
+	LockJobFamilySliceAt(ctx context.Context, tenantID uuid.UUID, jobFamilyID uuid.UUID, asOf time.Time) (JobFamilySliceRow, error)
+	InsertJobFamilySlice(ctx context.Context, tenantID uuid.UUID, jobFamilyID uuid.UUID, name string, isActive bool, effectiveDate time.Time, endDate time.Time) (uuid.UUID, error)
+	UpdateJobFamilySliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch JobFamilySliceInPlacePatch) error
+	TruncateJobFamilySlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
 
 	ListJobLevels(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobLevelRow, error)
 	CreateJobLevel(ctx context.Context, tenantID uuid.UUID, in JobLevelCreate) (JobLevelRow, error)
 	UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobLevelUpdate) (JobLevelRow, error)
 	GetJobLevelByCode(ctx context.Context, tenantID uuid.UUID, code string, asOf time.Time) (JobLevelRow, error)
+	LockJobLevelSliceAt(ctx context.Context, tenantID uuid.UUID, jobLevelID uuid.UUID, asOf time.Time) (JobLevelSliceRow, error)
+	InsertJobLevelSlice(ctx context.Context, tenantID uuid.UUID, jobLevelID uuid.UUID, name string, displayOrder int, isActive bool, effectiveDate time.Time, endDate time.Time) (uuid.UUID, error)
+	UpdateJobLevelSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch JobLevelSliceInPlacePatch) error
+	TruncateJobLevelSlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
 
 	ListJobProfiles(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobProfileRow, error)
 	CreateJobProfile(ctx context.Context, tenantID uuid.UUID, in JobProfileCreate) (JobProfileRow, error)
@@ -149,6 +161,12 @@ type OrgRepository interface {
 	GetJobProfileRef(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, asOf time.Time) (JobProfileRef, error)
 	ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, asOf time.Time) ([]JobProfileJobFamilyRow, error)
 	ListJobProfileJobFamiliesByProfileIDsAsOf(ctx context.Context, tenantID uuid.UUID, jobProfileIDs []uuid.UUID, asOf time.Time) (map[uuid.UUID][]JobProfileJobFamilyRow, error)
+	LockJobProfileSliceAt(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, asOf time.Time) (JobProfileSliceRow, error)
+	InsertJobProfileSlice(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, name string, description *string, isActive bool, externalRefs []byte, effectiveDate time.Time, endDate time.Time) (uuid.UUID, error)
+	UpdateJobProfileSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch JobProfileSliceInPlacePatch) error
+	TruncateJobProfileSlice(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, endDate time.Time) error
+	ListJobProfileSliceJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileSliceID uuid.UUID) ([]JobProfileSliceJobFamilySetItem, error)
+	SetJobProfileSliceJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileSliceID uuid.UUID, in JobProfileJobFamiliesSet) error
 	SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileJobFamiliesSet) error
 
 	LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (AssignmentRow, error)
