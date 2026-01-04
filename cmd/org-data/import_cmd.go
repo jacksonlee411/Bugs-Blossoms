@@ -1215,10 +1215,10 @@ func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID 
 	groupCode := "IMPORT"
 	groupName := "导入默认职类"
 	if _, err := tx.Exec(ctx, `
-	INSERT INTO org_job_family_groups (tenant_id, code, name, is_active)
-	VALUES ($1,$2,$3,TRUE)
+	INSERT INTO org_job_family_groups (tenant_id, code)
+	VALUES ($1,$2)
 	ON CONFLICT (tenant_id, code) DO NOTHING
-	`, tenantID, groupCode, groupName); err != nil {
+	`, tenantID, groupCode); err != nil {
 		return uuid.Nil, err
 	}
 
@@ -1259,10 +1259,10 @@ func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID 
 	familyCode := "IMPORT"
 	familyName := "导入默认职种"
 	if _, err := tx.Exec(ctx, `
-	INSERT INTO org_job_families (tenant_id, job_family_group_id, code, name, is_active)
-	VALUES ($1,$2,$3,$4,TRUE)
+	INSERT INTO org_job_families (tenant_id, job_family_group_id, code)
+	VALUES ($1,$2,$3)
 	ON CONFLICT (tenant_id, job_family_group_id, code) DO NOTHING
-	`, tenantID, groupID, familyCode, familyName); err != nil {
+	`, tenantID, groupID, familyCode); err != nil {
 		return uuid.Nil, err
 	}
 
@@ -1303,10 +1303,10 @@ func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID 
 	profileCode := "IMPORT-DEFAULT"
 	profileName := "导入默认职位模板"
 	if _, err := tx.Exec(ctx, `
-	INSERT INTO org_job_profiles (tenant_id, code, name, is_active)
-	VALUES ($1,$2,$3,TRUE)
+	INSERT INTO org_job_profiles (tenant_id, code)
+	VALUES ($1,$2)
 	ON CONFLICT (tenant_id, code) DO NOTHING
-	`, tenantID, profileCode, profileName); err != nil {
+	`, tenantID, profileCode); err != nil {
 		return uuid.Nil, err
 	}
 

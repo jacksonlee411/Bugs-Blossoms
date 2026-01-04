@@ -50,15 +50,18 @@ func (r *OrgRepository) CreateJobFamilyGroup(ctx context.Context, tenantID uuid.
 	}
 	var row services.JobFamilyGroupRow
 	err = tx.QueryRow(ctx, `
-	INSERT INTO org_job_family_groups (tenant_id, code, name, is_active)
-	VALUES ($1,$2,$3,$4)
-	RETURNING id, code, name, is_active
+	INSERT INTO org_job_family_groups (tenant_id, code)
+	VALUES ($1,$2)
+	RETURNING id, code
 	`,
 		pgUUID(tenantID),
 		strings.TrimSpace(in.Code),
-		strings.TrimSpace(in.Name),
-		in.IsActive,
-	).Scan(&row.ID, &row.Code, &row.Name, &row.IsActive)
+	).Scan(&row.ID, &row.Code)
+	if err != nil {
+		return services.JobFamilyGroupRow{}, err
+	}
+	row.Name = strings.TrimSpace(in.Name)
+	row.IsActive = in.IsActive
 	return row, err
 }
 
@@ -67,33 +70,32 @@ func (r *OrgRepository) UpdateJobFamilyGroup(ctx context.Context, tenantID uuid.
 	if err != nil {
 		return services.JobFamilyGroupRow{}, err
 	}
-	setName := in.Name != nil
-	setActive := in.IsActive != nil
-	name := ""
-	if in.Name != nil {
-		name = strings.TrimSpace(*in.Name)
-	}
-	active := false
-	if in.IsActive != nil {
-		active = *in.IsActive
-	}
 
 	var row services.JobFamilyGroupRow
 	err = tx.QueryRow(ctx, `
-	UPDATE org_job_family_groups
-	SET
-		name = CASE WHEN $3 THEN $4 ELSE name END,
-		is_active = CASE WHEN $5 THEN $6 ELSE is_active END,
-		updated_at = now()
-	WHERE tenant_id=$1 AND id=$2
-	RETURNING id, code, name, is_active
+	WITH updated AS (
+		UPDATE org_job_family_groups
+		SET updated_at = now()
+		WHERE tenant_id=$1 AND id=$2
+		RETURNING id, code
+	)
+	SELECT
+		u.id,
+		u.code,
+		s.name,
+		s.is_active
+	FROM updated u
+	JOIN org_job_family_group_slices s
+		ON s.tenant_id=$1
+		AND s.job_family_group_id=u.id
+		AND s.effective_date <= $3
+		AND s.end_date >= $3
+	ORDER BY s.effective_date DESC
+	LIMIT 1
 	`,
 		pgUUID(tenantID),
 		pgUUID(id),
-		setName,
-		name,
-		setActive,
-		active,
+		pgValidDate(in.EffectiveDate),
 	).Scan(&row.ID, &row.Code, &row.Name, &row.IsActive)
 	return row, err
 }
@@ -324,16 +326,19 @@ func (r *OrgRepository) CreateJobFamily(ctx context.Context, tenantID uuid.UUID,
 	}
 	var row services.JobFamilyRow
 	err = tx.QueryRow(ctx, `
-	INSERT INTO org_job_families (tenant_id, job_family_group_id, code, name, is_active)
-	VALUES ($1,$2,$3,$4,$5)
-	RETURNING id, job_family_group_id, code, name, is_active
+	INSERT INTO org_job_families (tenant_id, job_family_group_id, code)
+	VALUES ($1,$2,$3)
+	RETURNING id, job_family_group_id, code
 	`,
 		pgUUID(tenantID),
 		pgUUID(in.JobFamilyGroupID),
 		strings.TrimSpace(in.Code),
-		strings.TrimSpace(in.Name),
-		in.IsActive,
-	).Scan(&row.ID, &row.JobFamilyGroupID, &row.Code, &row.Name, &row.IsActive)
+	).Scan(&row.ID, &row.JobFamilyGroupID, &row.Code)
+	if err != nil {
+		return services.JobFamilyRow{}, err
+	}
+	row.Name = strings.TrimSpace(in.Name)
+	row.IsActive = in.IsActive
 	return row, err
 }
 
@@ -342,33 +347,33 @@ func (r *OrgRepository) UpdateJobFamily(ctx context.Context, tenantID uuid.UUID,
 	if err != nil {
 		return services.JobFamilyRow{}, err
 	}
-	setName := in.Name != nil
-	setActive := in.IsActive != nil
-	name := ""
-	if in.Name != nil {
-		name = strings.TrimSpace(*in.Name)
-	}
-	active := false
-	if in.IsActive != nil {
-		active = *in.IsActive
-	}
 
 	var row services.JobFamilyRow
 	err = tx.QueryRow(ctx, `
-	UPDATE org_job_families
-	SET
-		name = CASE WHEN $3 THEN $4 ELSE name END,
-		is_active = CASE WHEN $5 THEN $6 ELSE is_active END,
-		updated_at = now()
-	WHERE tenant_id=$1 AND id=$2
-	RETURNING id, job_family_group_id, code, name, is_active
+	WITH updated AS (
+		UPDATE org_job_families
+		SET updated_at = now()
+		WHERE tenant_id=$1 AND id=$2
+		RETURNING id, job_family_group_id, code
+	)
+	SELECT
+		u.id,
+		u.job_family_group_id,
+		u.code,
+		s.name,
+		s.is_active
+	FROM updated u
+	JOIN org_job_family_slices s
+		ON s.tenant_id=$1
+		AND s.job_family_id=u.id
+		AND s.effective_date <= $3
+		AND s.end_date >= $3
+	ORDER BY s.effective_date DESC
+	LIMIT 1
 	`,
 		pgUUID(tenantID),
 		pgUUID(id),
-		setName,
-		name,
-		setActive,
-		active,
+		pgValidDate(in.EffectiveDate),
 	).Scan(&row.ID, &row.JobFamilyGroupID, &row.Code, &row.Name, &row.IsActive)
 	return row, err
 }
@@ -495,16 +500,19 @@ func (r *OrgRepository) CreateJobLevel(ctx context.Context, tenantID uuid.UUID, 
 	}
 	var row services.JobLevelRow
 	err = tx.QueryRow(ctx, `
-	INSERT INTO org_job_levels (tenant_id, code, name, display_order, is_active)
-	VALUES ($1,$2,$3,$4,$5)
-	RETURNING id, code, name, display_order, is_active
+	INSERT INTO org_job_levels (tenant_id, code)
+	VALUES ($1,$2)
+	RETURNING id, code
 	`,
 		pgUUID(tenantID),
 		strings.TrimSpace(in.Code),
-		strings.TrimSpace(in.Name),
-		in.DisplayOrder,
-		in.IsActive,
-	).Scan(&row.ID, &row.Code, &row.Name, &row.DisplayOrder, &row.IsActive)
+	).Scan(&row.ID, &row.Code)
+	if err != nil {
+		return services.JobLevelRow{}, err
+	}
+	row.Name = strings.TrimSpace(in.Name)
+	row.DisplayOrder = in.DisplayOrder
+	row.IsActive = in.IsActive
 	return row, err
 }
 
@@ -513,41 +521,33 @@ func (r *OrgRepository) UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, 
 	if err != nil {
 		return services.JobLevelRow{}, err
 	}
-	setName := in.Name != nil
-	setOrder := in.DisplayOrder != nil
-	setActive := in.IsActive != nil
-	name := ""
-	if in.Name != nil {
-		name = strings.TrimSpace(*in.Name)
-	}
-	order := 0
-	if in.DisplayOrder != nil {
-		order = *in.DisplayOrder
-	}
-	active := false
-	if in.IsActive != nil {
-		active = *in.IsActive
-	}
 
 	var row services.JobLevelRow
 	err = tx.QueryRow(ctx, `
-	UPDATE org_job_levels
-	SET
-		name = CASE WHEN $3 THEN $4 ELSE name END,
-		display_order = CASE WHEN $5 THEN $6 ELSE display_order END,
-		is_active = CASE WHEN $7 THEN $8 ELSE is_active END,
-		updated_at = now()
-	WHERE tenant_id=$1 AND id=$2
-	RETURNING id, code, name, display_order, is_active
+	WITH updated AS (
+		UPDATE org_job_levels
+		SET updated_at = now()
+		WHERE tenant_id=$1 AND id=$2
+		RETURNING id, code
+	)
+	SELECT
+		u.id,
+		u.code,
+		s.name,
+		s.display_order,
+		s.is_active
+	FROM updated u
+	JOIN org_job_level_slices s
+		ON s.tenant_id=$1
+		AND s.job_level_id=u.id
+		AND s.effective_date <= $3
+		AND s.end_date >= $3
+	ORDER BY s.effective_date DESC
+	LIMIT 1
 	`,
 		pgUUID(tenantID),
 		pgUUID(id),
-		setName,
-		name,
-		setOrder,
-		order,
-		setActive,
-		active,
+		pgValidDate(in.EffectiveDate),
 	).Scan(&row.ID, &row.Code, &row.Name, &row.DisplayOrder, &row.IsActive)
 	return row, err
 }
@@ -591,22 +591,26 @@ func (r *OrgRepository) CreateJobProfile(ctx context.Context, tenantID uuid.UUID
 		return services.JobProfileRow{}, err
 	}
 	var row services.JobProfileRow
-	var desc pgtype.Text
-	if in.Description != nil {
-		desc = pgtype.Text{String: *in.Description, Valid: true}
-	}
 	err = tx.QueryRow(ctx, `
-	INSERT INTO org_job_profiles (tenant_id, code, name, description, is_active)
-	VALUES ($1,$2,$3,$4,$5)
-	RETURNING id, code, name, description, is_active
+	INSERT INTO org_job_profiles (tenant_id, code)
+	VALUES ($1,$2)
+	RETURNING id, code
 	`,
 		pgUUID(tenantID),
 		strings.TrimSpace(in.Code),
-		strings.TrimSpace(in.Name),
-		desc,
-		in.IsActive,
-	).Scan(&row.ID, &row.Code, &row.Name, &desc, &row.IsActive)
-	row.Description = nullableText(desc)
+	).Scan(&row.ID, &row.Code)
+	if err != nil {
+		return services.JobProfileRow{}, err
+	}
+	row.Name = strings.TrimSpace(in.Name)
+	row.IsActive = in.IsActive
+	row.Description = nil
+	if in.Description != nil {
+		d := strings.TrimSpace(*in.Description)
+		if d != "" {
+			row.Description = &d
+		}
+	}
 	return row, err
 }
 
@@ -615,42 +619,34 @@ func (r *OrgRepository) UpdateJobProfile(ctx context.Context, tenantID uuid.UUID
 	if err != nil {
 		return services.JobProfileRow{}, err
 	}
-	setName := in.Name != nil
-	setDesc := in.Description != nil
-	setActive := in.IsActive != nil
-	name := ""
-	if in.Name != nil {
-		name = strings.TrimSpace(*in.Name)
-	}
-	desc := pgtype.Text{}
-	if in.Description != nil && *in.Description != nil {
-		desc = pgtype.Text{String: strings.TrimSpace(**in.Description), Valid: true}
-	}
-	active := false
-	if in.IsActive != nil {
-		active = *in.IsActive
-	}
 
 	var row services.JobProfileRow
 	var outDesc pgtype.Text
 	err = tx.QueryRow(ctx, `
-	UPDATE org_job_profiles
-	SET
-		name = CASE WHEN $3 THEN $4 ELSE name END,
-		description = CASE WHEN $5 THEN $6 ELSE description END,
-		is_active = CASE WHEN $7 THEN $8 ELSE is_active END,
-		updated_at = now()
-	WHERE tenant_id=$1 AND id=$2
-	RETURNING id, code, name, description, is_active
+	WITH updated AS (
+		UPDATE org_job_profiles
+		SET updated_at = now()
+		WHERE tenant_id=$1 AND id=$2
+		RETURNING id, code
+	)
+	SELECT
+		u.id,
+		u.code,
+		s.name,
+		s.description,
+		s.is_active
+	FROM updated u
+	JOIN org_job_profile_slices s
+		ON s.tenant_id=$1
+		AND s.job_profile_id=u.id
+		AND s.effective_date <= $3
+		AND s.end_date >= $3
+	ORDER BY s.effective_date DESC
+	LIMIT 1
 	`,
 		pgUUID(tenantID),
 		pgUUID(id),
-		setName,
-		name,
-		setDesc,
-		desc,
-		setActive,
-		active,
+		pgValidDate(in.EffectiveDate),
 	).Scan(&row.ID, &row.Code, &row.Name, &outDesc, &row.IsActive)
 	row.Description = nullableText(outDesc)
 	return row, err

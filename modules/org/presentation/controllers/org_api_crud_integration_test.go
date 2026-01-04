@@ -252,6 +252,7 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 		"20260101020855_org_job_catalog_effective_dated_slices_phase_a.sql",
 		"20260101020930_org_job_catalog_effective_dated_slices_gates_and_backfill.sql",
 		"20260104100000_org_drop_job_profile_job_families_legacy.sql",
+		"20260104120000_org_drop_job_catalog_identity_legacy_columns.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
 
