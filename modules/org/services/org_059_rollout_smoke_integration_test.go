@@ -59,6 +59,7 @@ func setupOrg059DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 		"20251231120000_org_remove_job_family_allocation_percent.sql",
 		"20260101020855_org_job_catalog_effective_dated_slices_phase_a.sql",
 		"20260101020930_org_job_catalog_effective_dated_slices_gates_and_backfill.sql",
+		"20260104100000_org_drop_job_profile_job_families_legacy.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

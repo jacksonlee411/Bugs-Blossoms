@@ -1381,14 +1381,6 @@ func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID 
 		}
 	}
 
-	if _, err := tx.Exec(ctx, `
-	INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, is_primary)
-	VALUES ($1,$2,$3,TRUE)
-	ON CONFLICT (tenant_id, job_profile_id, job_family_id) DO NOTHING
-	`, tenantID, jobProfileID, familyID); err != nil {
-		return uuid.Nil, err
-	}
-
 	return jobProfileID, nil
 }
 
