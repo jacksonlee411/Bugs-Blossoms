@@ -14,11 +14,13 @@ async function ensureSeeded({ request }: { request: any }) {
 }
 
 async function createJobFamilyGroup(args: { page: Page; code: string }) {
+	const effectiveDate = '2025-01-01';
 	const resp = await args.page.request.post('/org/api/job-catalog/family-groups', {
 		data: {
 			code: args.code,
 			name: 'E2E Job family group',
 			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});

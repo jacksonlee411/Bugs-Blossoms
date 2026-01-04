@@ -25,6 +25,7 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 
 	files := []string{
 		"00001_org_baseline.sql",
+		"00002_org_migration_smoke.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
 		"20251221090000_org_reason_code_mode.sql",
@@ -41,6 +42,8 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
 		"20251231120000_org_remove_job_family_allocation_percent.sql",
+		"20260101020855_org_job_catalog_effective_dated_slices_phase_a.sql",
+		"20260101020930_org_job_catalog_effective_dated_slices_gates_and_backfill.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -87,39 +90,89 @@ func seedOrgPosition(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, ten
 func ensureTestJobProfileWithPrimaryFamily(tb testing.TB, ctx context.Context, pool *pgxpool.Pool, tenantID uuid.UUID) (uuid.UUID, uuid.UUID) {
 	tb.Helper()
 
+	asOf := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+
 	var groupID uuid.UUID
 	err := pool.QueryRow(ctx, `
-		INSERT INTO org_job_family_groups (tenant_id, code, name, is_active)
-		VALUES ($1,'SEED-GROUP','Seed Group',true)
+			INSERT INTO org_job_family_groups (tenant_id, code, name, is_active)
+			VALUES ($1,'SEED-GROUP','Seed Group',true)
 		ON CONFLICT (tenant_id, code) DO UPDATE
 		SET name=excluded.name, is_active=excluded.is_active
 		RETURNING id
-	`, tenantID).Scan(&groupID)
+		`, tenantID).Scan(&groupID)
+	require.NoError(tb, err)
+
+	_, err = pool.Exec(ctx, `
+		DELETE FROM org_job_family_group_slices
+		WHERE tenant_id=$1 AND job_family_group_id=$2
+	`, tenantID, groupID)
+	require.NoError(tb, err)
+	_, err = pool.Exec(ctx, `
+		INSERT INTO org_job_family_group_slices (tenant_id, job_family_group_id, name, is_active, effective_date, end_date)
+		VALUES ($1,$2,'Seed Group',true,($3 AT TIME ZONE 'UTC')::date,DATE '9999-12-31')
+	`, tenantID, groupID, asOf)
 	require.NoError(tb, err)
 
 	var familyID uuid.UUID
 	err = pool.QueryRow(ctx, `
-		INSERT INTO org_job_families (tenant_id, job_family_group_id, code, name, is_active)
-		VALUES ($1,$2,'SEED-FAMILY','Seed Family',true)
+			INSERT INTO org_job_families (tenant_id, job_family_group_id, code, name, is_active)
+			VALUES ($1,$2,'SEED-FAMILY','Seed Family',true)
 		ON CONFLICT (tenant_id, job_family_group_id, code) DO UPDATE
 		SET name=excluded.name, is_active=excluded.is_active
 		RETURNING id
-	`, tenantID, groupID).Scan(&familyID)
+		`, tenantID, groupID).Scan(&familyID)
+	require.NoError(tb, err)
+
+	_, err = pool.Exec(ctx, `
+		DELETE FROM org_job_family_slices
+		WHERE tenant_id=$1 AND job_family_id=$2
+	`, tenantID, familyID)
+	require.NoError(tb, err)
+	_, err = pool.Exec(ctx, `
+		INSERT INTO org_job_family_slices (tenant_id, job_family_id, name, is_active, effective_date, end_date)
+		VALUES ($1,$2,'Seed Family',true,($3 AT TIME ZONE 'UTC')::date,DATE '9999-12-31')
+	`, tenantID, familyID, asOf)
 	require.NoError(tb, err)
 
 	var profileID uuid.UUID
 	err = pool.QueryRow(ctx, `
-		INSERT INTO org_job_profiles (tenant_id, code, name, description, is_active)
-		VALUES ($1,'SEED-PROFILE','Seed Profile',NULL,true)
+			INSERT INTO org_job_profiles (tenant_id, code, name, description, is_active)
+			VALUES ($1,'SEED-PROFILE','Seed Profile',NULL,true)
 		ON CONFLICT (tenant_id, code) DO UPDATE
 		SET name=excluded.name, description=excluded.description, is_active=excluded.is_active
 		RETURNING id
-	`, tenantID).Scan(&profileID)
+		`, tenantID).Scan(&profileID)
+	require.NoError(tb, err)
+
+	var profileSliceID uuid.UUID
+	_, err = pool.Exec(ctx, `
+		DELETE FROM org_job_profile_slices
+		WHERE tenant_id=$1 AND job_profile_id=$2
+	`, tenantID, profileID)
+	require.NoError(tb, err)
+	err = pool.QueryRow(ctx, `
+		INSERT INTO org_job_profile_slices (tenant_id, job_profile_id, name, description, is_active, external_refs, effective_date, end_date)
+		VALUES ($1,$2,'Seed Profile',NULL,true,'{}'::jsonb,($3 AT TIME ZONE 'UTC')::date,DATE '9999-12-31')
+		RETURNING id
+	`, tenantID, profileID, asOf).Scan(&profileSliceID)
 	require.NoError(tb, err)
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, is_primary)
+		DELETE FROM org_job_profile_slice_job_families
+		WHERE tenant_id=$1 AND job_profile_slice_id=$2
+	`, tenantID, profileSliceID)
+	require.NoError(tb, err)
+	_, err = pool.Exec(ctx, `
+		INSERT INTO org_job_profile_slice_job_families (tenant_id, job_profile_slice_id, job_family_id, is_primary)
 		VALUES ($1,$2,$3,true)
+		ON CONFLICT (tenant_id, job_profile_slice_id, job_family_id) DO UPDATE
+		SET is_primary=excluded.is_primary
+	`, tenantID, profileSliceID, familyID)
+	require.NoError(tb, err)
+
+	_, err = pool.Exec(ctx, `
+			INSERT INTO org_job_profile_job_families (tenant_id, job_profile_id, job_family_id, is_primary)
+			VALUES ($1,$2,$3,true)
 		ON CONFLICT (tenant_id, job_profile_id, job_family_id) DO UPDATE
 		SET is_primary=excluded.is_primary
 	`, tenantID, profileID, familyID)

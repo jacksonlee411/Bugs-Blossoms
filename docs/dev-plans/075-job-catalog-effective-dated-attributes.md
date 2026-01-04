@@ -1,6 +1,6 @@
 # DEV-PLAN-075：职位分类（Job Catalog）主数据属性 Effective Dating：切片化 + 同步展示 + 复用抽象
 
-**状态**: 规划中（2025-12-31 23:44 UTC）
+**状态**：Phase B/C PR 中（2026-01-04 01:49 UTC，PR #179）；Phase A 已合并（PR #178）
 
 ## 1. 背景与上下文 (Context)
 - **现状**：Job Catalog / Job Profile 主数据（职类/职种/职级/职位模板）当前为 SCD1（直接 `UPDATE` 覆盖），缺少 Valid Time 维度；Org UI 已预留 `effective_date` 参数，但目前不参与读写与校验。

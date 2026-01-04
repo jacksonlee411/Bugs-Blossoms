@@ -48,26 +48,26 @@ test.describe('Org Job Catalog profiles (HTMX UX)', () => {
 		await login(page, ADMIN.email, ADMIN.password);
 		await assertAuthenticated(page);
 
-		const createGroup = await page.request.post('/org/api/job-catalog/family-groups', {
-			data: { code: 'G1', name: 'Group 1', is_active: true },
-			failOnStatusCode: false,
-		});
-		expect(createGroup.status()).toBe(201);
-		const group = await createGroup.json();
+			const createGroup = await page.request.post('/org/api/job-catalog/family-groups', {
+				data: { code: 'G1', name: 'Group 1', is_active: true, effective_date: effectiveDate },
+				failOnStatusCode: false,
+			});
+			expect(createGroup.status()).toBe(201);
+			const group = await createGroup.json();
 
-		const createFamily = await page.request.post('/org/api/job-catalog/families', {
-			data: { job_family_group_id: group.id, code: 'F1', name: 'Family 1', is_active: true },
-			failOnStatusCode: false,
-		});
-		expect(createFamily.status()).toBe(201);
-		const family = await createFamily.json();
+			const createFamily = await page.request.post('/org/api/job-catalog/families', {
+				data: { job_family_group_id: group.id, code: 'F1', name: 'Family 1', is_active: true, effective_date: effectiveDate },
+				failOnStatusCode: false,
+			});
+			expect(createFamily.status()).toBe(201);
+			const family = await createFamily.json();
 
-		const createFamily2 = await page.request.post('/org/api/job-catalog/families', {
-			data: { job_family_group_id: group.id, code: 'F2', name: 'Family 2', is_active: true },
-			failOnStatusCode: false,
-		});
-		expect(createFamily2.status()).toBe(201);
-		const family2 = await createFamily2.json();
+			const createFamily2 = await page.request.post('/org/api/job-catalog/families', {
+				data: { job_family_group_id: group.id, code: 'F2', name: 'Family 2', is_active: true, effective_date: effectiveDate },
+				failOnStatusCode: false,
+			});
+			expect(createFamily2.status()).toBe(201);
+			const family2 = await createFamily2.json();
 
 		await page.goto(
 			`/org/job-catalog?tab=profiles&effective_date=${encodeURIComponent(effectiveDate)}&job_family_group_code=G1`,
@@ -107,19 +107,19 @@ test.describe('Org Job Catalog profiles (HTMX UX)', () => {
 		await login(page, ADMIN.email, ADMIN.password);
 		await assertAuthenticated(page);
 
-		const createGroup = await page.request.post('/org/api/job-catalog/family-groups', {
-			data: { code: 'G1', name: 'Group 1', is_active: true },
-			failOnStatusCode: false,
-		});
-		expect(createGroup.status()).toBe(201);
-		const group = await createGroup.json();
+			const createGroup = await page.request.post('/org/api/job-catalog/family-groups', {
+				data: { code: 'G1', name: 'Group 1', is_active: true, effective_date: effectiveDate },
+				failOnStatusCode: false,
+			});
+			expect(createGroup.status()).toBe(201);
+			const group = await createGroup.json();
 
-		const createFamily = await page.request.post('/org/api/job-catalog/families', {
-			data: { job_family_group_id: group.id, code: 'F1', name: 'Family 1', is_active: true },
-			failOnStatusCode: false,
-		});
-		expect(createFamily.status()).toBe(201);
-		const family = await createFamily.json();
+			const createFamily = await page.request.post('/org/api/job-catalog/families', {
+				data: { job_family_group_id: group.id, code: 'F1', name: 'Family 1', is_active: true, effective_date: effectiveDate },
+				failOnStatusCode: false,
+			});
+			expect(createFamily.status()).toBe(201);
+			const family = await createFamily.json();
 
 		await page.goto(
 			`/org/job-catalog?tab=profiles&effective_date=${encodeURIComponent(effectiveDate)}&job_family_group_code=G1`,

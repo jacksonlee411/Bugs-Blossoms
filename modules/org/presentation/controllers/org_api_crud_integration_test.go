@@ -232,6 +232,7 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 
 	pool, tenantID := setupOrgTestDB(t, []string{
 		"00001_org_baseline.sql",
+		"00002_org_migration_smoke.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
 		"20251218150000_org_outbox.sql",
@@ -248,8 +249,12 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
 		"20251231120000_org_remove_job_family_allocation_percent.sql",
+		"20260101020855_org_job_catalog_effective_dated_slices_phase_a.sql",
+		"20260101020930_org_job_catalog_effective_dated_slices_gates_and_backfill.sql",
 	})
 	ensureOrgSettings(t, pool, tenantID)
+
+	svc := orgsvc.NewOrgService(persistence.NewOrgRepository())
 
 	// persons table is owned by Person migrations; for controller integration tests we only need the minimal schema contract.
 	root := filepath.Clean("../../../../")
@@ -261,18 +266,37 @@ func TestOrgAPIController_Assignments_Create_AutoPositionAndOutbox(t *testing.T)
 	_, err = pool.Exec(context.Background(), `INSERT INTO persons (tenant_id, person_uuid, pernr, display_name) VALUES ($1,$2,$3,$4)`, tenantID, personID, "0001", "Test Person")
 	require.NoError(t, err)
 
-	_, err = pool.Exec(context.Background(), `
-	INSERT INTO org_job_profiles (tenant_id, code, name, is_active)
-	VALUES ($1,'JP-AUTO','Auto Job Profile', TRUE)
-	ON CONFLICT (tenant_id, code) DO NOTHING
-	`, tenantID)
+	asOfDate := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	svcCtx := composables.WithPool(context.Background(), pool)
+	group, err := svc.CreateJobFamilyGroup(svcCtx, tenantID, orgsvc.JobFamilyGroupCreate{
+		Code:          "AUTO-GROUP",
+		Name:          "Auto Group",
+		IsActive:      true,
+		EffectiveDate: asOfDate,
+	})
+	require.NoError(t, err)
+	family, err := svc.CreateJobFamily(svcCtx, tenantID, orgsvc.JobFamilyCreate{
+		JobFamilyGroupID: group.ID,
+		Code:             "AUTO-FAMILY",
+		Name:             "Auto Family",
+		IsActive:         true,
+		EffectiveDate:    asOfDate,
+	})
+	require.NoError(t, err)
+	_, err = svc.CreateJobProfile(svcCtx, tenantID, orgsvc.JobProfileCreate{
+		Code:          "JP-AUTO",
+		Name:          "Auto Job Profile",
+		IsActive:      true,
+		JobFamilies:   orgsvc.JobProfileJobFamiliesSet{Items: []orgsvc.JobProfileJobFamilySetItem{{JobFamilyID: family.ID, IsPrimary: true}}},
+		EffectiveDate: asOfDate,
+	})
 	require.NoError(t, err)
 
 	withOrgRolloutEnabled(t, tenantID)
 	u := newTestOrgUser(tenantID)
 
 	c := &OrgAPIController{
-		org: orgsvc.NewOrgService(persistence.NewOrgRepository()),
+		org: svc,
 	}
 
 	// Create root node (required for auto-position path).
