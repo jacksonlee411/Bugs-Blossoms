@@ -1194,16 +1194,23 @@ type importManifestV1 struct {
 func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID uuid.UUID) (uuid.UUID, error) {
 	var jobProfileID uuid.UUID
 	if err := tx.QueryRow(ctx, `
-	SELECT id
-	FROM org_job_profiles
-	WHERE tenant_id=$1
-	ORDER BY is_active DESC, created_at ASC, code ASC, id ASC
+	SELECT s.job_profile_id
+	FROM org_job_profile_slices s
+	JOIN org_job_profile_slice_job_families sf
+		ON sf.tenant_id=s.tenant_id
+		AND sf.job_profile_slice_id=s.id
+		AND sf.is_primary=TRUE
+	WHERE s.tenant_id=$1
+	ORDER BY s.is_active DESC, s.effective_date ASC, s.job_profile_id ASC
 	LIMIT 1
 	`, tenantID).Scan(&jobProfileID); err == nil {
 		return jobProfileID, nil
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, err
 	}
+
+	baselineDate := time.Date(1900, 1, 1, 0, 0, 0, 0, time.UTC)
+	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 
 	groupCode := "IMPORT"
 	groupName := "导入默认职类"
@@ -1223,6 +1230,30 @@ func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID 
 	LIMIT 1
 	`, tenantID, groupCode).Scan(&groupID); err != nil {
 		return uuid.Nil, err
+	}
+
+	var hasGroupSlice bool
+	if err := tx.QueryRow(ctx, `
+	SELECT EXISTS (
+		SELECT 1
+		FROM org_job_family_group_slices
+		WHERE tenant_id=$1 AND job_family_group_id=$2
+	)
+	`, tenantID, groupID).Scan(&hasGroupSlice); err != nil {
+		return uuid.Nil, err
+	}
+	if !hasGroupSlice {
+		if _, err := tx.Exec(ctx, `
+		INSERT INTO org_job_family_group_slices
+			(tenant_id, job_family_group_id, name, is_active, effective_date, end_date)
+		VALUES (
+			$1,$2,$3,TRUE,
+			($4 AT TIME ZONE 'UTC')::date,
+			($5 AT TIME ZONE 'UTC')::date
+		)
+		`, tenantID, groupID, groupName, baselineDate, endDate); err != nil {
+			return uuid.Nil, err
+		}
 	}
 
 	familyCode := "IMPORT"
@@ -1245,6 +1276,30 @@ func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID 
 		return uuid.Nil, err
 	}
 
+	var hasFamilySlice bool
+	if err := tx.QueryRow(ctx, `
+	SELECT EXISTS (
+		SELECT 1
+		FROM org_job_family_slices
+		WHERE tenant_id=$1 AND job_family_id=$2
+	)
+	`, tenantID, familyID).Scan(&hasFamilySlice); err != nil {
+		return uuid.Nil, err
+	}
+	if !hasFamilySlice {
+		if _, err := tx.Exec(ctx, `
+		INSERT INTO org_job_family_slices
+			(tenant_id, job_family_id, name, is_active, effective_date, end_date)
+		VALUES (
+			$1,$2,$3,TRUE,
+			($4 AT TIME ZONE 'UTC')::date,
+			($5 AT TIME ZONE 'UTC')::date
+		)
+		`, tenantID, familyID, familyName, baselineDate, endDate); err != nil {
+			return uuid.Nil, err
+		}
+	}
+
 	profileCode := "IMPORT-DEFAULT"
 	profileName := "导入默认职位模板"
 	if _, err := tx.Exec(ctx, `
@@ -1262,6 +1317,68 @@ func ensurePositionsImportJobProfileID(ctx context.Context, tx pgx.Tx, tenantID 
 	LIMIT 1
 	`, tenantID, profileCode).Scan(&jobProfileID); err != nil {
 		return uuid.Nil, err
+	}
+
+	var profileSliceID uuid.UUID
+	if err := tx.QueryRow(ctx, `
+	SELECT id
+	FROM org_job_profile_slices
+	WHERE tenant_id=$1
+		AND job_profile_id=$2
+		AND effective_date <= ($3 AT TIME ZONE 'UTC')::date
+		AND end_date >= ($3 AT TIME ZONE 'UTC')::date
+	ORDER BY effective_date DESC
+	LIMIT 1
+	`, tenantID, jobProfileID, baselineDate).Scan(&profileSliceID); err != nil {
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return uuid.Nil, err
+		}
+		if err := tx.QueryRow(ctx, `
+		SELECT id
+		FROM org_job_profile_slices
+		WHERE tenant_id=$1 AND job_profile_id=$2
+		ORDER BY effective_date ASC
+		LIMIT 1
+		`, tenantID, jobProfileID).Scan(&profileSliceID); err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return uuid.Nil, err
+			}
+			if err := tx.QueryRow(ctx, `
+			INSERT INTO org_job_profile_slices
+				(tenant_id, job_profile_id, name, description, is_active, external_refs, effective_date, end_date)
+			VALUES (
+				$1,$2,$3,NULL,TRUE,'{}'::jsonb,
+				($4 AT TIME ZONE 'UTC')::date,
+				($5 AT TIME ZONE 'UTC')::date
+			)
+			RETURNING id
+			`, tenantID, jobProfileID, profileName, baselineDate, endDate).Scan(&profileSliceID); err != nil {
+				return uuid.Nil, err
+			}
+		}
+	}
+
+	var primaryCount int
+	if err := tx.QueryRow(ctx, `
+	SELECT COALESCE(SUM(CASE WHEN is_primary THEN 1 ELSE 0 END), 0)::int
+	FROM org_job_profile_slice_job_families
+	WHERE tenant_id=$1 AND job_profile_slice_id=$2
+	`, tenantID, profileSliceID).Scan(&primaryCount); err != nil {
+		return uuid.Nil, err
+	}
+	if primaryCount != 1 {
+		if _, err := tx.Exec(ctx, `
+		DELETE FROM org_job_profile_slice_job_families
+		WHERE tenant_id=$1 AND job_profile_slice_id=$2
+		`, tenantID, profileSliceID); err != nil {
+			return uuid.Nil, err
+		}
+		if _, err := tx.Exec(ctx, `
+		INSERT INTO org_job_profile_slice_job_families (tenant_id, job_profile_slice_id, job_family_id, is_primary)
+		VALUES ($1,$2,$3,TRUE)
+		`, tenantID, profileSliceID, familyID); err != nil {
+			return uuid.Nil, err
+		}
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -1411,12 +1528,23 @@ func applySeedImport(ctx context.Context, pool *pgxpool.Pool, data normalizedDat
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slices(%s): %w", p.line, p.code, err))
 		}
 		if _, err := tx.Exec(txCtx, `
-				INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, is_primary)
-				SELECT $1, $3, job_family_id, is_primary
-				FROM org_job_profile_job_families
-				WHERE tenant_id=$1 AND job_profile_id=$2
-				ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO NOTHING
-				`, data.tenantID, jobProfileID, sliceID); err != nil {
+					INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, is_primary)
+					SELECT $1, $3, sf.job_family_id, sf.is_primary
+					FROM (
+						SELECT id
+						FROM org_job_profile_slices
+						WHERE tenant_id=$1
+							AND job_profile_id=$2
+							AND effective_date <= $4::date
+							AND end_date >= $4::date
+						ORDER BY effective_date DESC
+						LIMIT 1
+					) s
+					JOIN org_job_profile_slice_job_families sf
+						ON sf.tenant_id=$1
+						AND sf.job_profile_slice_id=s.id
+					ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO NOTHING
+					`, data.tenantID, jobProfileID, sliceID, pgDateOnlyUTC(p.effectiveDate)); err != nil {
 			return nil, withCode(exitDBWrite, fmt.Errorf("line %d: insert org_position_slice_job_families(%s): %w", p.line, p.code, err))
 		}
 		manifest.Inserted.OrgPositions = append(manifest.Inserted.OrgPositions, p.id)
