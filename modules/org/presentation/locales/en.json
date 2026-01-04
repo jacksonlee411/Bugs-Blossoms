@@ -16,7 +16,12 @@
         "AsOf": "As of",
         "EffectiveDate": "Effective date",
         "NotFound": "Not found",
-        "Present": "Present"
+        "Present": "Present",
+        "WriteMode": {
+          "Label": "Write mode",
+          "Correct": "Correct",
+          "UpdateFromDate": "Update from date"
+        }
       },
       "Nodes": {
         "MetaTitle": "Org structure",

@@ -12,12 +12,17 @@
 				"Assignments": "人员分配",
 				"Positions": "职位管理"
 			},
-				"Shared": {
-					"AsOf": "生效视图",
-					"EffectiveDate": "生效日期",
-					"NotFound": "未找到",
-					"Present": "至今"
-				},
+					"Shared": {
+						"AsOf": "生效视图",
+						"EffectiveDate": "生效日期",
+						"NotFound": "未找到",
+						"Present": "至今",
+						"WriteMode": {
+							"Label": "写入方式",
+							"Correct": "更正（就地）",
+							"UpdateFromDate": "从该日起生效"
+						}
+					},
 			"Nodes": {
 				"MetaTitle": "组织架构",
 				"Title": "组织架构"

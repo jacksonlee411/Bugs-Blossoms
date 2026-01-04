@@ -155,6 +155,11 @@ async function createJobCatalogRowsViaUI(args: { page: Page; viewportName: strin
 		.filter({ has: args.page.locator('input[name="edit_id"]') })
 		.first();
 	await expect(editGroupForm.locator('input[name="code"]')).toHaveValue(groupCode);
+
+	const writeModeSelect = args.page.locator('#org-job-catalog-write-mode');
+	await expect(writeModeSelect).toBeVisible();
+	await writeModeSelect.selectOption('correct');
+
 	await editGroupForm.locator('input[name="name"]').fill('UI Job family group (updated)');
 	const updateGroupResp = args.page.waitForResponse((resp) => {
 		return resp.request().method() === 'PATCH' && resp.url().includes('/org/job-catalog/family-groups/');

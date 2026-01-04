@@ -131,8 +131,6 @@ type OrgJobFamily struct {
 	ID               pgtype.UUID        `json:"id"`
 	JobFamilyGroupID pgtype.UUID        `json:"job_family_group_id"`
 	Code             string             `json:"code"`
-	Name             string             `json:"name"`
-	IsActive         bool               `json:"is_active"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
@@ -141,42 +139,84 @@ type OrgJobFamilyGroup struct {
 	TenantID  pgtype.UUID        `json:"tenant_id"`
 	ID        pgtype.UUID        `json:"id"`
 	Code      string             `json:"code"`
-	Name      string             `json:"name"`
-	IsActive  bool               `json:"is_active"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
+type OrgJobFamilyGroupSlice struct {
+	TenantID         pgtype.UUID        `json:"tenant_id"`
+	ID               pgtype.UUID        `json:"id"`
+	JobFamilyGroupID pgtype.UUID        `json:"job_family_group_id"`
+	Name             string             `json:"name"`
+	IsActive         bool               `json:"is_active"`
+	EffectiveDate    pgtype.Date        `json:"effective_date"`
+	EndDate          pgtype.Date        `json:"end_date"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgJobFamilySlice struct {
+	TenantID      pgtype.UUID        `json:"tenant_id"`
+	ID            pgtype.UUID        `json:"id"`
+	JobFamilyID   pgtype.UUID        `json:"job_family_id"`
+	Name          string             `json:"name"`
+	IsActive      bool               `json:"is_active"`
+	EffectiveDate pgtype.Date        `json:"effective_date"`
+	EndDate       pgtype.Date        `json:"end_date"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type OrgJobLevel struct {
-	TenantID     pgtype.UUID        `json:"tenant_id"`
-	ID           pgtype.UUID        `json:"id"`
-	Code         string             `json:"code"`
-	Name         string             `json:"name"`
-	DisplayOrder int32              `json:"display_order"`
-	IsActive     bool               `json:"is_active"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	TenantID  pgtype.UUID        `json:"tenant_id"`
+	ID        pgtype.UUID        `json:"id"`
+	Code      string             `json:"code"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgJobLevelSlice struct {
+	TenantID      pgtype.UUID        `json:"tenant_id"`
+	ID            pgtype.UUID        `json:"id"`
+	JobLevelID    pgtype.UUID        `json:"job_level_id"`
+	Name          string             `json:"name"`
+	DisplayOrder  int32              `json:"display_order"`
+	IsActive      bool               `json:"is_active"`
+	EffectiveDate pgtype.Date        `json:"effective_date"`
+	EndDate       pgtype.Date        `json:"end_date"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrgJobProfile struct {
-	TenantID     pgtype.UUID        `json:"tenant_id"`
-	ID           pgtype.UUID        `json:"id"`
-	Code         string             `json:"code"`
-	Name         string             `json:"name"`
-	Description  *string            `json:"description"`
-	IsActive     bool               `json:"is_active"`
-	ExternalRefs []byte             `json:"external_refs"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	TenantID  pgtype.UUID        `json:"tenant_id"`
+	ID        pgtype.UUID        `json:"id"`
+	Code      string             `json:"code"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
 }
 
-type OrgJobProfileJobFamily struct {
-	TenantID     pgtype.UUID        `json:"tenant_id"`
-	JobProfileID pgtype.UUID        `json:"job_profile_id"`
-	JobFamilyID  pgtype.UUID        `json:"job_family_id"`
-	IsPrimary    bool               `json:"is_primary"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+type OrgJobProfileSlice struct {
+	TenantID      pgtype.UUID        `json:"tenant_id"`
+	ID            pgtype.UUID        `json:"id"`
+	JobProfileID  pgtype.UUID        `json:"job_profile_id"`
+	Name          string             `json:"name"`
+	Description   *string            `json:"description"`
+	IsActive      bool               `json:"is_active"`
+	ExternalRefs  []byte             `json:"external_refs"`
+	EffectiveDate pgtype.Date        `json:"effective_date"`
+	EndDate       pgtype.Date        `json:"end_date"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
+type OrgJobProfileSliceJobFamily struct {
+	TenantID          pgtype.UUID        `json:"tenant_id"`
+	JobProfileSliceID pgtype.UUID        `json:"job_profile_slice_id"`
+	JobFamilyID       pgtype.UUID        `json:"job_family_id"`
+	IsPrimary         bool               `json:"is_primary"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
 }
 
 type OrgLink struct {

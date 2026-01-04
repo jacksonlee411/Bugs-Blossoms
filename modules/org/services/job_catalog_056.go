@@ -20,15 +20,15 @@ const (
 	WriteModeUpdateFromDate = "update_from_date"
 )
 
-func normalizeWriteMode(v string) string {
+func parseWriteMode(v string) (string, error) {
 	v = strings.TrimSpace(strings.ToLower(v))
 	switch v {
-	case "", WriteModeCorrect:
-		return WriteModeCorrect
-	case WriteModeUpdateFromDate:
-		return v
+	case WriteModeCorrect, WriteModeUpdateFromDate:
+		return v, nil
+	case "":
+		return "", newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "write_mode is required", nil)
 	default:
-		return WriteModeCorrect
+		return "", newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "invalid write_mode", nil)
 	}
 }
 
@@ -291,7 +291,10 @@ func (s *OrgService) UpdateJobFamilyGroup(ctx context.Context, tenantID uuid.UUI
 	if effectiveDate.IsZero() {
 		return JobFamilyGroupRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "effective_date is required", nil)
 	}
-	mode := normalizeWriteMode(in.WriteMode)
+	mode, err := parseWriteMode(in.WriteMode)
+	if err != nil {
+		return JobFamilyGroupRow{}, err
+	}
 	if in.Name != nil {
 		n := strings.TrimSpace(*in.Name)
 		in.Name = &n
@@ -428,7 +431,10 @@ func (s *OrgService) UpdateJobFamily(ctx context.Context, tenantID uuid.UUID, id
 	if effectiveDate.IsZero() {
 		return JobFamilyRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "effective_date is required", nil)
 	}
-	mode := normalizeWriteMode(in.WriteMode)
+	mode, err := parseWriteMode(in.WriteMode)
+	if err != nil {
+		return JobFamilyRow{}, err
+	}
 	if in.Name != nil {
 		n := strings.TrimSpace(*in.Name)
 		in.Name = &n
@@ -548,7 +554,10 @@ func (s *OrgService) UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, id 
 	if effectiveDate.IsZero() {
 		return JobLevelRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "effective_date is required", nil)
 	}
-	mode := normalizeWriteMode(in.WriteMode)
+	mode, err := parseWriteMode(in.WriteMode)
+	if err != nil {
+		return JobLevelRow{}, err
+	}
 	if in.Name != nil {
 		n := strings.TrimSpace(*in.Name)
 		in.Name = &n
@@ -716,7 +725,10 @@ func (s *OrgService) UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, i
 	if effectiveDate.IsZero() {
 		return JobProfileRow{}, newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "effective_date is required", nil)
 	}
-	mode := normalizeWriteMode(in.WriteMode)
+	mode, err := parseWriteMode(in.WriteMode)
+	if err != nil {
+		return JobProfileRow{}, err
+	}
 	if in.Name != nil {
 		n := strings.TrimSpace(*in.Name)
 		in.Name = &n
