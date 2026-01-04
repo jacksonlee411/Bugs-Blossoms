@@ -3,6 +3,7 @@
 
 DROP TRIGGER IF EXISTS org_job_profile_job_families_validate_trigger ON org_job_profile_job_families;
 DROP FUNCTION IF EXISTS org_job_profile_job_families_validate();
+-- atlas:nolint DS102
 DROP TABLE IF EXISTS org_job_profile_job_families;
 
 -- +goose Down
