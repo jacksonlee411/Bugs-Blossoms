@@ -239,6 +239,86 @@ func TestOrg056AssignmentRestrictions_EnforceBlocksCorruptRestrictions(t *testin
 	require.Equal(t, "ORG_POSITION_RESTRICTIONS_PROFILE_MISMATCH", svcErr.Code)
 }
 
+func TestOrg056JobCatalog_FamilyGroupUpdateFromDate_CreatesSlices(t *testing.T) {
+	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
+	_ = pool
+	_ = rootNodeID
+
+	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{
+		Code:          "TST",
+		Name:          "Base",
+		IsActive:      true,
+		EffectiveDate: asOf,
+	})
+	require.NoError(t, err)
+
+	d2 := time.Date(2025, 12, 2, 0, 0, 0, 0, time.UTC)
+	name0 := "U0"
+	active0 := true
+	_, err = svc.UpdateJobFamilyGroup(ctx, tenantID, group.ID, orgsvc.JobFamilyGroupUpdate{
+		Name:          &name0,
+		IsActive:      &active0,
+		EffectiveDate: d2,
+		WriteMode:     orgsvc.WriteModeUpdateFromDate,
+	})
+	require.NoError(t, err)
+
+	d3 := time.Date(2025, 12, 3, 0, 0, 0, 0, time.UTC)
+	name1 := "U1"
+	_, err = svc.UpdateJobFamilyGroup(ctx, tenantID, group.ID, orgsvc.JobFamilyGroupUpdate{
+		Name:          &name1,
+		IsActive:      &active0,
+		EffectiveDate: d3,
+		WriteMode:     orgsvc.WriteModeUpdateFromDate,
+	})
+	require.NoError(t, err)
+
+	assertNameAt := func(t *testing.T, d time.Time, want string) {
+		t.Helper()
+		rows, err := svc.ListJobFamilyGroups(ctx, tenantID, d)
+		require.NoError(t, err)
+		for _, r := range rows {
+			if r.ID == group.ID {
+				require.Equal(t, want, r.Name)
+				return
+			}
+		}
+		t.Fatalf("job family group not found: %s", group.ID)
+	}
+
+	assertNameAt(t, time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC), "Base")
+	assertNameAt(t, d2, "U0")
+	assertNameAt(t, d3, "U1")
+}
+
+func TestOrg056JobCatalog_FamilyGroupUpdate_RequiresWriteMode(t *testing.T) {
+	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
+	_ = pool
+	_ = rootNodeID
+
+	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{
+		Code:          "TST",
+		Name:          "Base",
+		IsActive:      true,
+		EffectiveDate: asOf,
+	})
+	require.NoError(t, err)
+
+	d2 := time.Date(2025, 12, 2, 0, 0, 0, 0, time.UTC)
+	name0 := "U0"
+	active0 := true
+	_, err = svc.UpdateJobFamilyGroup(ctx, tenantID, group.ID, orgsvc.JobFamilyGroupUpdate{
+		Name:          &name0,
+		IsActive:      &active0,
+		EffectiveDate: d2,
+		WriteMode:     "",
+	})
+	var svcErr *orgsvc.ServiceError
+	require.ErrorAs(t, err, &svcErr)
+	require.Equal(t, 400, svcErr.Status)
+	require.Equal(t, "ORG_INVALID_BODY", svcErr.Code)
+}
+
 func seedOrg056JobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID, svc *orgsvc.OrgService, asOf time.Time, isActive bool) uuid.UUID {
 	t.Helper()
 

@@ -1751,8 +1751,16 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 	}
 	effectiveDate = normalizeValidTimeDayUTC(effectiveDate)
 
+	writeMode := strings.TrimSpace(strings.ToLower(param(r, "write_mode")))
+	switch writeMode {
+	case services.WriteModeCorrect, services.WriteModeUpdateFromDate:
+	default:
+		writeMode = services.WriteModeUpdateFromDate
+	}
+
 	props := orgtemplates.JobCatalogPageProps{
 		EffectiveDate:       effectiveDateStr,
+		WriteMode:           writeMode,
 		Tab:                 tab,
 		JobFamilyGroupCode:  groupCode,
 		JobFamilyGroupLabel: "",
