@@ -440,12 +440,12 @@ CREATE TABLE org_job_profiles (
 
 CREATE INDEX org_job_profiles_tenant_active_code_idx ON org_job_profiles (tenant_id, is_active, code);
 
-	ALTER TABLE org_position_slices
-	    ADD CONSTRAINT org_position_slices_job_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE RESTRICT;
+ALTER TABLE org_position_slices
+    ADD CONSTRAINT org_position_slices_job_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE RESTRICT;
 
-	-- DEV-PLAN-075: Effective-dated Job Catalog attribute slices (Phase A: schema + baseline backfill).
-	CREATE TABLE org_job_family_group_slices (
-	    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+-- DEV-PLAN-075: Effective-dated Job Catalog attribute slices (Phase A: schema + baseline backfill).
+CREATE TABLE org_job_family_group_slices (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     job_family_group_id uuid NOT NULL,
     name text NOT NULL,
