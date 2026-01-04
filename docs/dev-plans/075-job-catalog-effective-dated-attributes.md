@@ -1,6 +1,6 @@
 # DEV-PLAN-075：职位分类（Job Catalog）主数据属性 Effective Dating：切片化 + 同步展示 + 复用抽象
 
-**状态**：Phase B/C PR 中（2026-01-04 01:49 UTC，PR #179）；Phase A 已合并（PR #178）
+**状态**：已完成（2026-01-04 04:22 UTC）— PR #178/#179/#180/#181；identity legacy 列退场见 `DEV-PLAN-075A`
 
 ## 1. 背景与上下文 (Context)
 - **现状**：Job Catalog / Job Profile 主数据（职类/职种/职级/职位模板）当前为 SCD1（直接 `UPDATE` 覆盖），缺少 Valid Time 维度；Org UI 已预留 `effective_date` 参数，但目前不参与读写与校验。
@@ -15,10 +15,10 @@
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 目标
-- [ ] Job Catalog 各“属性对象”切片化（Valid Time=date）：`Job Family Group / Job Family / Job Level / Job Profile` 均支持 `effective_date/end_date`，并对齐 Org/Position 的切片机制（自然拼接 + no-overlap）。
-- [ ] **无空档（gap-free）**：同一对象的时间线一旦存在切片，必须从首片 `effective_date` 连续覆盖到 `end_of_time`（默认 `9999-12-31`），相邻切片满足 `prev.end_date + 1 = next.effective_date`。
-- [ ] **同步展示**：任一主数据属性在日期 D 发生变化时，所有引用该属性的读路径（职位页、任职时间线、options 下拉、校验）在 `as_of_date=D` 及之后展示/校验自动按切片解析，**无需回写引用方数据**。
-- [ ] **复用抽象**：提供可复用的“Effective-Dated Master Data”读/写模板，使新增一个新的职位分类维度时，只需补齐 schema + adapter，不需要复制粘贴整套算法与 SQL 片段。
+- [X] Job Catalog 各“属性对象”切片化（Valid Time=date）：`Job Family Group / Job Family / Job Level / Job Profile` 均支持 `effective_date/end_date`，并对齐 Org/Position 的切片机制（自然拼接 + no-overlap）。
+- [X] **无空档（gap-free）**：同一对象的时间线一旦存在切片，必须从首片 `effective_date` 连续覆盖到 `end_of_time`（默认 `9999-12-31`），相邻切片满足 `prev.end_date + 1 = next.effective_date`。
+- [X] **同步展示**：任一主数据属性在日期 D 发生变化时，所有引用该属性的读路径（职位页、任职时间线、options 下拉、校验）在 `as_of_date=D` 及之后展示/校验自动按切片解析，**无需回写引用方数据**。
+- [X] **复用抽象**：提供可复用的“Effective-Dated Master Data”读/写模板，使新增一个新的职位分类维度时，只需补齐 schema + adapter，不需要复制粘贴整套算法与 SQL 片段。
 
 ### 2.2 非目标
 - 不引入 PeopleSoft `EFFSEQ`（同一自然日多次生效）的表达能力；仍遵循 `DEV-PLAN-064` 的 date-only 前提。
@@ -29,11 +29,11 @@
 > 本节只声明“本计划命中哪些触发器”；命令细节以 SSOT 为准，避免 drift（`AGENTS.md`/`Makefile`/CI）。
 
 - **触发器清单（本计划命中项）**：
-  - [ ] Go 代码（触发器矩阵：`AGENTS.md`）
-  - [ ] `.templ` / Tailwind（触发器矩阵：`AGENTS.md`）
-  - [ ] 多语言 JSON（触发器矩阵：`AGENTS.md`）
-  - [ ] Org DB 迁移 / Schema（Org Atlas+Goose：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`）
-  - [ ] 文档（`make check doc`）
+  - [X] Go 代码（触发器矩阵：`AGENTS.md`）
+  - [X] `.templ` / Tailwind（触发器矩阵：`AGENTS.md`）
+  - [X] 多语言 JSON（触发器矩阵：`AGENTS.md`）
+  - [X] Org DB 迁移 / Schema（Org Atlas+Goose：`docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`）
+  - [X] 文档（`make check doc`）
 - **SSOT 链接**：
   - 触发器矩阵与本地必跑：`AGENTS.md`
   - 命令入口：`Makefile`
@@ -729,21 +729,21 @@ engine 仅依赖“边界与写入原语”，建议 adapter 收敛为以下能�
 - 测试/seed 插数：必须 `rg \"INSERT INTO org_job_\"` / `rg \"org_job_profile_job_families\"` 全量扫描并迁移到 slices（或改为通过 service/repo helper 写入）。
 
 ### 10.1 Phase A：引入 slices + 基线回填（只增量，不改读写）
-- [ ] Schema：新增 slices 表与必要索引/约束（no-overlap EXCLUDE + gap-free gate + Profile slice families trigger）；同步更新 `modules/org/infrastructure/persistence/schema/org-schema.sql`（避免 drift）。
-- [ ] 基线回填（单次、确定性）：
-  - [ ] 所有 Job Catalog identity 对象回填首条 slice：`effective_date = 1900-01-01`，`end_date = end_of_time`。
-  - [ ] Profile 的首条 slice 同时回填 slice-job-families（从现有 `org_job_profile_job_families` 复制；primary 约束必须满足）。
+- [X] Schema：新增 slices 表与必要索引/约束（no-overlap EXCLUDE + gap-free gate + Profile slice families trigger）；同步更新 `modules/org/infrastructure/persistence/schema/org-schema.sql`（避免 drift）。
+- [X] 基线回填（单次、确定性）：
+  - [X] 所有 Job Catalog identity 对象回填首条 slice：`effective_date = 1900-01-01`，`end_date = end_of_time`。
+  - [X] Profile 的首条 slice 同时回填 slice-job-families（从现有 `org_job_profile_job_families` 复制；primary 约束必须满足）。
 
 ### 10.2 Phase B：读切换（全部走 slices as-of）
 > 重要：Phase B（读切换）与 Phase C（写切换）必须在同一部署内完成；否则 Phase B 期间新增/更新的 Job Catalog 数据会缺失 slices，导致读侧“消失”。
-- [ ] Repo：为 Job Family Group/Family/Level/Profile 提供 `List*AsOf`/`Get*AsOf`/批量 resolver，并替换所有读路径（页面、options、校验、联表展示）。
-- [ ] 验收：grep/代码审查确保不再读取 identity 表的 legacy `name/is_active/description/display_order` 字段。
-- [ ] 性能与 N+1：修复已确认的 N+1 入口（见 10.0），并把“effective_date 参与查询”作为 options/列表的强约束。
+- [X] Repo：为 Job Family Group/Family/Level/Profile 提供 `List*AsOf`/`Get*AsOf`/批量 resolver，并替换所有读路径（页面、options、校验、联表展示）。
+- [X] 验收：grep/代码审查确保不再读取 identity 表的 legacy `name/is_active/description/display_order` 字段。
+- [X] 性能与 N+1：修复已确认的 N+1 入口（见 10.0），并把“effective_date 参与查询”作为 options/列表的强约束。
 
 ### 10.3 Phase C：写切换（Correct/UpdateFromDate）
-- [ ] Service：对 Job Catalog 各对象的 Create/Update 写入口切到 slice engine（并实现 6.2 的 `write_mode` 契约）。
-- [ ] Controller/UI/API：落地 `write_mode` 传参，且对 `ORG_USE_CORRECT` 给出可读提示。
-- [ ] 导入/脚本/seed：改造所有直接写 `org_job_*` identity 的路径为 slices 写入（至少包含 `cmd/org-data/import_cmd.go:1194`）；禁止出现仅写 identity 不写 slices 的分叉。
+- [X] Service：对 Job Catalog 各对象的 Create/Update 写入口切到 slice engine（并实现 6.2 的 `write_mode` 契约）。
+- [X] Controller/UI/API：落地 `write_mode` 传参，且对 `ORG_USE_CORRECT` 给出可读提示。
+- [X] 导入/脚本/seed：改造所有直接写 `org_job_*` identity 的路径为 slices 写入（至少包含 `cmd/org-data/import_cmd.go:1194`）；禁止出现仅写 identity 不写 slices 的分叉。
 
 ### 10.4 Phase D：退场与清理（避免双 SSOT 长期存在）
 > 选项在实施时二选一（必须明确选择并执行，否则视为未完成）。
@@ -751,26 +751,26 @@ engine 仅依赖“边界与写入原语”，建议 adapter 收敛为以下能�
 - 选项 A（推荐，完整退场）：在确认所有读写都已切到 slices 后：
   - 当前选择：**选项 A**
   - [x] 删除/下线旧表 `org_job_profile_job_families`（数据已迁移到 `org_job_profile_slice_job_families`；并已落地 drop 迁移）。
-  - [ ] 评估并删除 identity 表中不再使用的 legacy 列（若存在未知依赖则延期，但必须登记退场计划与搜索证据）。
+  - [X] 评估并删除 identity 表中不再使用的 legacy 列（若存在未知依赖则延期，但必须登记退场计划与搜索证据）— 已拆分到 `DEV-PLAN-075A`。
 - 选项 B（风险更低，分步退场）：本计划只保证“逻辑 SSOT= slices”，legacy 列保留但不再被代码读取；并在后续 `DEV-PLAN-075B`（待立）中完成列/表清理。
 
 ## 11. 测试与验收标准 (Acceptance Criteria)
 ### 11.1 验收覆盖（对应本计划 3 个诉求）
-- [ ] （1）无空档：对任一 Job Family Group/Family/Level/Profile，在不同日期做 2 次 Update，最终 slices 满足 no-overlap 且自然拼接；不存在空档。
-- [ ] （1）DB 兜底：新建的 `*_slices_gap_free` DEFERRABLE CONSTRAINT TRIGGER 生效；若写入导致 gap-free 断言失败，应返回 `409 ORG_TIME_GAP`（而非 silent drift）。
-- [ ] （2）同步展示：对某 Job Family Group 在 D2 改名；在 `/org/assignments` 选 `effective_date=D1` 与 `D2` 时，职类列展示不同名称且符合切片；无需改动任职/职位数据。
-- [ ] （2）同步校验：将某 Job Level 在 D2 设为 inactive；创建 position slice 于 D2 选择该 `job_level_code` 必须拒绝，但历史 D1 不受影响。
-- [ ] （2）冻结窗口：若 OrgSettings 开启 freeze enforce，则对冻结窗口之前的 effective_date 做 Correct/UpdateFromDate 必须拒绝并返回 `409 ORG_FROZEN_WINDOW`。
-- [ ] （2）primary 约束稳定失败：Profile↔Families 的 “至少 1 条 + 恰好 1 个 primary” 若失败必须返回 `400 ORG_INVALID_BODY`；无论由 service 校验触发还是 DB trigger 兜底触发，都不得冒泡 `500 ORG_INTERNAL`。
-- [ ] （2）无 N+1：
+- [X] （1）无空档：对任一 Job Family Group/Family/Level/Profile，在不同日期做 2 次 Update，最终 slices 满足 no-overlap 且自然拼接；不存在空档。
+- [X] （1）DB 兜底：新建的 `*_slices_gap_free` DEFERRABLE CONSTRAINT TRIGGER 生效；若写入导致 gap-free 断言失败，应返回 `409 ORG_TIME_GAP`（而非 silent drift）。
+- [X] （2）同步展示：对某 Job Family Group 在 D2 改名；在 `/org/assignments` 选 `effective_date=D1` 与 `D2` 时，职类列展示不同名称且符合切片；无需改动任职/职位数据。
+- [X] （2）同步校验：将某 Job Level 在 D2 设为 inactive；创建 position slice 于 D2 选择该 `job_level_code` 必须拒绝，但历史 D1 不受影响。
+- [X] （2）冻结窗口：若 OrgSettings 开启 freeze enforce，则对冻结窗口之前的 effective_date 做 Correct/UpdateFromDate 必须拒绝并返回 `409 ORG_FROZEN_WINDOW`。
+- [X] （2）primary 约束稳定失败：Profile↔Families 的 “至少 1 条 + 恰好 1 个 primary” 若失败必须返回 `400 ORG_INVALID_BODY`；无论由 service 校验触发还是 DB trigger 兜底触发，都不得冒泡 `500 ORG_INTERNAL`。
+- [X] （2）无 N+1：
   - `/org/assignments`（以及复用入口）在多行渲染时，Job Catalog 的 as-of 解析必须采用“单条联表 SQL”或“批量 resolver”，不得出现 per-row 查询（以代码审查作为验收基线）。
   - `GET /org/api/job-catalog/profiles` 返回 profiles+families 时不得 per-profile 查询（必须批量/单条联表 SQL）。
   - UI Options（例如 `JobFamilyIDOptions`）不得出现 for group -> `ListJobFamilies` 的 N+1；并且必须按 `effective_date` 做 as-of。
-- [ ] （3）复用抽象：在完成 4 类对象后，新增第 5 类维度时，不新增新的切片边界算法实现文件；变更集应主要由 schema + adapter + as-of repo helper + tests 构成。
+- [X] （3）复用抽象：在完成 4 类对象后，新增第 5 类维度时，不新增新的切片边界算法实现文件；变更集应主要由 schema + adapter + as-of repo helper + tests 构成。
 
 ### 11.2 门禁与回归
-- [ ] 按触发器矩阵执行并通过（SSOT：`AGENTS.md`）；特别是 Org 迁移门禁与文档门禁。
-- [ ] Readiness：创建并填写 `docs/dev-records/DEV-PLAN-075-READINESS.md`（记录关键命令/结果与时间戳；避免把“验证证据”散落在对话里）。
+- [X] 按触发器矩阵执行并通过（SSOT：`AGENTS.md`）；特别是 Org 迁移门禁与文档门禁。
+- [X] Readiness：创建并填写 `docs/dev-records/DEV-PLAN-075-READINESS.md`（记录关键命令/结果与时间戳；避免把“验证证据”散落在对话里）。
 
 ## 12. 依赖与里程碑 (Dependencies & Milestones)
 ### 12.1 依赖
@@ -780,13 +780,13 @@ engine 仅依赖“边界与写入原语”，建议 adapter 收敛为以下能�
 - Job Architecture（背景约束）：`docs/dev-plans/072-job-architecture-workday-alignment.md`
 
 ### 12.2 里程碑
-1. [ ] Schema 评审：确认新增表清单与字段；**获得“新增表”手工确认后**落地迁移（10.1）
-2. [ ] Phase A：落地 slices + 基线回填（10.1）
-3. [ ] Phase B：读切换（10.2）——包括 `/org/job-catalog`、options、Position/Assignment 展示与写入口校验
-4. [ ] Phase C：写切换（10.3）——落地 `write_mode` 契约与 `ORG_USE_CORRECT` 失败路径
-5. [ ] 性能回归：按 11.1 的 “无 N+1” 约束完成代码审查与必要的批量 resolver
-6. [ ] Phase D：完成退场与清理（10.4，必须二选一）
-7. [ ] 验证：按 SSOT 门禁全量通过，并填写 `docs/dev-records/DEV-PLAN-075-READINESS.md`（含时间戳）
+1. [X] Schema 评审：确认新增表清单与字段；**获得“新增表”手工确认后**落地迁移（10.1）
+2. [X] Phase A：落地 slices + 基线回填（10.1）
+3. [X] Phase B：读切换（10.2）——包括 `/org/job-catalog`、options、Position/Assignment 展示与写入口校验
+4. [X] Phase C：写切换（10.3）——落地 `write_mode` 契约与 `ORG_USE_CORRECT` 失败路径
+5. [X] 性能回归：按 11.1 的 “无 N+1” 约束完成代码审查与必要的批量 resolver
+6. [X] Phase D：完成退场与清理（10.4，必须二选一）
+7. [X] 验证：按 SSOT 门禁全量通过，并填写 `docs/dev-records/DEV-PLAN-075-READINESS.md`（含时间戳）
 
 ## 13. 运维与回滚 (Ops & Rollback)
 - Feature Flag：不引入（对齐仓库约束：早期阶段避免过度运维/开关切换；见 `AGENTS.md` 3.6）。
