@@ -12,23 +12,23 @@ ALTER TABLE org_job_levels
 ALTER TABLE org_job_profiles
     DROP CONSTRAINT IF EXISTS org_job_profiles_external_refs_is_object_check;
 
--- atlas:nolint DS102
+-- atlas:nolint DS103
 ALTER TABLE org_job_family_groups
     DROP COLUMN IF EXISTS name,
     DROP COLUMN IF EXISTS is_active;
 
--- atlas:nolint DS102
+-- atlas:nolint DS103
 ALTER TABLE org_job_families
     DROP COLUMN IF EXISTS name,
     DROP COLUMN IF EXISTS is_active;
 
--- atlas:nolint DS102
+-- atlas:nolint DS103
 ALTER TABLE org_job_levels
     DROP COLUMN IF EXISTS name,
     DROP COLUMN IF EXISTS display_order,
     DROP COLUMN IF EXISTS is_active;
 
--- atlas:nolint DS102
+-- atlas:nolint DS103
 ALTER TABLE org_job_profiles
     DROP COLUMN IF EXISTS name,
     DROP COLUMN IF EXISTS description,
