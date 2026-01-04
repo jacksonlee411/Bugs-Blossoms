@@ -750,7 +750,7 @@ engine 仅依赖“边界与写入原语”，建议 adapter 收敛为以下能�
 
 - 选项 A（推荐，完整退场）：在确认所有读写都已切到 slices 后：
   - 当前选择：**选项 A**
-  - [ ] 删除/下线旧表 `org_job_profile_job_families`（已完成数据迁移到 `org_job_profile_slice_job_families`）。
+  - [x] 删除/下线旧表 `org_job_profile_job_families`（数据已迁移到 `org_job_profile_slice_job_families`；并已落地 drop 迁移）。
   - [ ] 评估并删除 identity 表中不再使用的 legacy 列（若存在未知依赖则延期，但必须登记退场计划与搜索证据）。
 - 选项 B（风险更低，分步退场）：本计划只保证“逻辑 SSOT= slices”，legacy 列保留但不再被代码读取；并在后续 `DEV-PLAN-075B`（待立）中完成列/表清理。
 
