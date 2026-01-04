@@ -102,6 +102,16 @@ v4 的关键点（仅提炼差异对照所需信息）：
 2) 但关键范式不同：当前是“状态切片 SoT”，v4 是“事件流 SoT”。因此 v4 的核心能力（确定性重放、投射幂等、以事件为唯一写入口）在现状中不成立。
 3) 若目标是“读性能 + 一致性 + 可纠偏”，现状通过 `org_edges.path` + 029 closure/snapshot + 026 snapshot/batch 已能覆盖大部分需求；若目标是“任意时刻可全量重放重建（包括核心状态）”，则需要引入事件溯源 SSOT 并改变写模型形态。
 
+### 6.1 PostgreSQL 能力利用度评估（daterange / 索引 / 事务）
+> 本节评估“现状是否已充分利用 PG 优势”，以及与 v4 期望能力的对齐程度（以 `modules/org/infrastructure/persistence/schema/org-schema.sql` 为事实源）。
+
+- `daterange`/no-overlap：现状已大量使用 `daterange(effective_date, end_date + 1, '[)')` + `EXCLUDE USING gist (... WITH &&)` 约束（例如 `org_node_slices`、`org_edges`、closure/snapshot、岗位/任职/属性等），能在 DB 层强制“时间片不重叠”的不变量；这一点与 v4 的 `validity daterange + EXCLUDE` 目标一致，甚至覆盖面更广。
+- “能用约束 ≠ 能用索引”：因为 `daterange(...)` 多以**表达式**形态存在（而不是物化列），且不少 as-of 查询写法仍是 `effective_date <= :as_of AND end_date >= :as_of`，实际是否走到 GiST/范围相关索引，取决于查询形状与 planner 选择；这也是 076 在 Option 0 里建议“逐步收敛为 range 运算（`daterange(...) @> :as_of`）”的原因。
+- 路径索引：`org_edges.path ltree` + `gist(tenant_id, path)` 已能高效支持“子树/祖先链”的空间过滤；但现状缺少类似 v4 `GiST(node_path, validity)` 的**时空联合索引**（Path+Time 同时切割），因此“子树 + as-of day”常需要额外时间过滤/多表 join 或依赖 029 closure/snapshot 的派生表来兜底性能。
+- 事务完整性：现状写路径在 Go 层以单事务编排（状态切片 + 审计 + outbox 同事务提交），能利用 PG 的 ACID 保证“写后强一致可读”与“事件投递一致性”（outbox）；但复杂写逻辑主要在应用层执行，意味着锁持有时间与往返次数更难被压缩（这是 v4 将投射引擎下沉到 DB 的主要收益点之一）。
+
+结论：从“PG 能力利用”角度，现状已经在 **RLS 多租户、ltree、btree_gist + EXCLUDE(no-overlap)、派生读模型可重建** 等方面投入较深；相对 v4 的不足更多在“查询形状与索引对齐（range 运算 / 时空联合索引）”以及“将复杂写投射收敛到 DB 单入口”两条主线上。
+
 ## 7. 推荐演进路径（Options）
 > 本节只给出可选路线与前置条件；不在本计划内实施。
 
@@ -127,4 +137,3 @@ v4 的关键点（仅提炼差异对照所需信息）：
 ## 8. 验证与门禁（SSOT 引用）
 - 本计划为文档变更：按 `AGENTS.md` 的文档门禁执行 `make check doc`。
 - 若后续任一选项进入实施：按 `AGENTS.md` 的“变更触发器矩阵”选择必跑项（Go/迁移/templ/authz 等）。
-
