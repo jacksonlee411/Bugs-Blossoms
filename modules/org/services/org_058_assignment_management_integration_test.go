@@ -45,6 +45,7 @@ func applyAllOrgMigrationsFor058(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20260101020855_org_job_catalog_effective_dated_slices_phase_a.sql",
 		"20260101020930_org_job_catalog_effective_dated_slices_gates_and_backfill.sql",
 		"20260104100000_org_drop_job_profile_job_families_legacy.sql",
+		"20260104120000_org_drop_job_catalog_identity_legacy_columns.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -95,10 +96,10 @@ func ensureTestJobProfileWithPrimaryFamily(tb testing.TB, ctx context.Context, p
 
 	var groupID uuid.UUID
 	err := pool.QueryRow(ctx, `
-			INSERT INTO org_job_family_groups (tenant_id, code, name, is_active)
-			VALUES ($1,'SEED-GROUP','Seed Group',true)
+			INSERT INTO org_job_family_groups (tenant_id, code)
+			VALUES ($1,'SEED-GROUP')
 		ON CONFLICT (tenant_id, code) DO UPDATE
-		SET name=excluded.name, is_active=excluded.is_active
+		SET updated_at=now()
 		RETURNING id
 		`, tenantID).Scan(&groupID)
 	require.NoError(tb, err)
@@ -116,10 +117,10 @@ func ensureTestJobProfileWithPrimaryFamily(tb testing.TB, ctx context.Context, p
 
 	var familyID uuid.UUID
 	err = pool.QueryRow(ctx, `
-			INSERT INTO org_job_families (tenant_id, job_family_group_id, code, name, is_active)
-			VALUES ($1,$2,'SEED-FAMILY','Seed Family',true)
+			INSERT INTO org_job_families (tenant_id, job_family_group_id, code)
+			VALUES ($1,$2,'SEED-FAMILY')
 		ON CONFLICT (tenant_id, job_family_group_id, code) DO UPDATE
-		SET name=excluded.name, is_active=excluded.is_active
+		SET updated_at=now()
 		RETURNING id
 		`, tenantID, groupID).Scan(&familyID)
 	require.NoError(tb, err)
@@ -137,10 +138,10 @@ func ensureTestJobProfileWithPrimaryFamily(tb testing.TB, ctx context.Context, p
 
 	var profileID uuid.UUID
 	err = pool.QueryRow(ctx, `
-			INSERT INTO org_job_profiles (tenant_id, code, name, description, is_active)
-			VALUES ($1,'SEED-PROFILE','Seed Profile',NULL,true)
+			INSERT INTO org_job_profiles (tenant_id, code)
+			VALUES ($1,'SEED-PROFILE')
 		ON CONFLICT (tenant_id, code) DO UPDATE
-		SET name=excluded.name, description=excluded.description, is_active=excluded.is_active
+		SET updated_at=now()
 		RETURNING id
 		`, tenantID).Scan(&profileID)
 	require.NoError(tb, err)
