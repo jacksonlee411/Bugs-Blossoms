@@ -226,5 +226,6 @@ modules/{module}/
 - DEV-PLAN-073 任职记录页增加字段（职类/职种/职位模板/职级）：`docs/dev-plans/073-job-data-add-job-architecture-fields.md`
 - DEV-PLAN-074 取消职位模板职种“百分比分配”（保留多职种配置）：`docs/dev-plans/074-remove-job-profile-allocation-percent.md`
 - 职位分类（Job Catalog）主数据属性 Effective Dating：切片化 + 同步展示 + 复用抽象（DEV-PLAN-075）：`docs/dev-plans/075-job-catalog-effective-dated-attributes.md`
+- Org 模块现状研究与 v4（事务性事件溯源 + 同步投射）差异评估（DEV-PLAN-076）：`docs/dev-plans/076-org-v4-transactional-event-sourcing-gap-analysis.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
