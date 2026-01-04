@@ -3,6 +3,7 @@ package persistence
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -11,17 +12,22 @@ import (
 	"github.com/iota-uz/iota-sdk/pkg/composables"
 )
 
-func (r *OrgRepository) ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID) ([]services.JobFamilyGroupRow, error) {
+func (r *OrgRepository) ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]services.JobFamilyGroupRow, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	rows, err := tx.Query(ctx, `
-	SELECT id, code, name, is_active
-	FROM org_job_family_groups
-	WHERE tenant_id=$1
-	ORDER BY code ASC, id ASC
-	`, pgUUID(tenantID))
+	SELECT g.id, g.code, s.name, s.is_active
+	FROM org_job_family_groups g
+	JOIN org_job_family_group_slices s
+		ON s.tenant_id=g.tenant_id
+		AND s.job_family_group_id=g.id
+		AND s.effective_date <= $2
+		AND s.end_date >= $2
+	WHERE g.tenant_id=$1
+	ORDER BY g.code ASC, g.id ASC
+	`, pgUUID(tenantID), pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -92,17 +98,56 @@ func (r *OrgRepository) UpdateJobFamilyGroup(ctx context.Context, tenantID uuid.
 	return row, err
 }
 
-func (r *OrgRepository) ListJobFamilies(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID) ([]services.JobFamilyRow, error) {
+func (r *OrgRepository) ListJobFamilies(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID, asOf time.Time) ([]services.JobFamilyRow, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	rows, err := tx.Query(ctx, `
-	SELECT id, job_family_group_id, code, name, is_active
-	FROM org_job_families
-	WHERE tenant_id=$1 AND job_family_group_id=$2
-	ORDER BY code ASC, id ASC
-	`, pgUUID(tenantID), pgUUID(jobFamilyGroupID))
+	SELECT f.id, f.job_family_group_id, f.code, s.name, s.is_active
+	FROM org_job_families f
+	JOIN org_job_family_slices s
+		ON s.tenant_id=f.tenant_id
+		AND s.job_family_id=f.id
+		AND s.effective_date <= $3
+		AND s.end_date >= $3
+	WHERE f.tenant_id=$1 AND f.job_family_group_id=$2
+	ORDER BY f.code ASC, f.id ASC
+	`, pgUUID(tenantID), pgUUID(jobFamilyGroupID), pgValidDate(asOf))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]services.JobFamilyRow, 0, 64)
+	for rows.Next() {
+		var row services.JobFamilyRow
+		if err := rows.Scan(&row.ID, &row.JobFamilyGroupID, &row.Code, &row.Name, &row.IsActive); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
+func (r *OrgRepository) ListJobFamiliesByGroupIDsAsOf(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupIDs []uuid.UUID, asOf time.Time) ([]services.JobFamilyRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(jobFamilyGroupIDs) == 0 {
+		return []services.JobFamilyRow{}, nil
+	}
+	rows, err := tx.Query(ctx, `
+	SELECT f.id, f.job_family_group_id, f.code, s.name, s.is_active
+	FROM org_job_families f
+	JOIN org_job_family_slices s
+		ON s.tenant_id=f.tenant_id
+		AND s.job_family_id=f.id
+		AND s.effective_date <= $3
+		AND s.end_date >= $3
+	WHERE f.tenant_id=$1 AND f.job_family_group_id = ANY($2::uuid[])
+	ORDER BY f.job_family_group_id ASC, f.code ASC, f.id ASC
+	`, pgUUID(tenantID), jobFamilyGroupIDs, pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -174,17 +219,22 @@ func (r *OrgRepository) UpdateJobFamily(ctx context.Context, tenantID uuid.UUID,
 	return row, err
 }
 
-func (r *OrgRepository) ListJobLevels(ctx context.Context, tenantID uuid.UUID) ([]services.JobLevelRow, error) {
+func (r *OrgRepository) ListJobLevels(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]services.JobLevelRow, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	rows, err := tx.Query(ctx, `
-	SELECT id, code, name, display_order, is_active
-	FROM org_job_levels
-	WHERE tenant_id=$1
-	ORDER BY display_order ASC, code ASC, id ASC
-	`, pgUUID(tenantID))
+	SELECT l.id, l.code, s.name, s.display_order, s.is_active
+	FROM org_job_levels l
+	JOIN org_job_level_slices s
+		ON s.tenant_id=l.tenant_id
+		AND s.job_level_id=l.id
+		AND s.effective_date <= $2
+		AND s.end_date >= $2
+	WHERE l.tenant_id=$1
+	ORDER BY s.display_order ASC, l.code ASC, l.id ASC
+	`, pgUUID(tenantID), pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -264,17 +314,22 @@ func (r *OrgRepository) UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, 
 	return row, err
 }
 
-func (r *OrgRepository) ListJobProfiles(ctx context.Context, tenantID uuid.UUID) ([]services.JobProfileRow, error) {
+func (r *OrgRepository) ListJobProfiles(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]services.JobProfileRow, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	rows, err := tx.Query(ctx, `
-	SELECT id, code, name, description, is_active
-	FROM org_job_profiles
-	WHERE tenant_id=$1
-	ORDER BY code ASC, id ASC
-	`, pgUUID(tenantID))
+	SELECT p.id, p.code, s.name, s.description, s.is_active
+	FROM org_job_profiles p
+	JOIN org_job_profile_slices s
+		ON s.tenant_id=p.tenant_id
+		AND s.job_profile_id=p.id
+		AND s.effective_date <= $2
+		AND s.end_date >= $2
+	WHERE p.tenant_id=$1
+	ORDER BY p.code ASC, p.id ASC
+	`, pgUUID(tenantID), pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -363,63 +418,98 @@ func (r *OrgRepository) UpdateJobProfile(ctx context.Context, tenantID uuid.UUID
 	return row, err
 }
 
-func (r *OrgRepository) GetJobProfileRef(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) (services.JobProfileRef, error) {
+func (r *OrgRepository) GetJobProfileRef(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, asOf time.Time) (services.JobProfileRef, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return services.JobProfileRef{}, err
 	}
 	var ref services.JobProfileRef
 	if err := tx.QueryRow(ctx, `
-	SELECT id, is_active
-	FROM org_job_profiles
-	WHERE tenant_id=$1 AND id=$2
-	`, pgUUID(tenantID), pgUUID(jobProfileID)).Scan(&ref.ID, &ref.IsActive); err != nil {
+	SELECT p.id, s.is_active
+	FROM org_job_profiles p
+	JOIN org_job_profile_slices s
+		ON s.tenant_id=p.tenant_id
+		AND s.job_profile_id=p.id
+		AND s.effective_date <= $3
+		AND s.end_date >= $3
+	WHERE p.tenant_id=$1 AND p.id=$2
+	ORDER BY s.effective_date DESC
+	LIMIT 1
+	`, pgUUID(tenantID), pgUUID(jobProfileID), pgValidDate(asOf)).Scan(&ref.ID, &ref.IsActive); err != nil {
 		return services.JobProfileRef{}, err
 	}
 	return ref, nil
 }
 
-func (r *OrgRepository) GetJobLevelByCode(ctx context.Context, tenantID uuid.UUID, code string) (services.JobLevelRow, error) {
+func (r *OrgRepository) GetJobLevelByCode(ctx context.Context, tenantID uuid.UUID, code string, asOf time.Time) (services.JobLevelRow, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return services.JobLevelRow{}, err
 	}
 	var row services.JobLevelRow
 	if err := tx.QueryRow(ctx, `
-	SELECT id, code, name, display_order, is_active
-	FROM org_job_levels
-	WHERE tenant_id=$1 AND code=$2
+	SELECT l.id, l.code, s.name, s.display_order, s.is_active
+	FROM org_job_levels l
+	JOIN org_job_level_slices s
+		ON s.tenant_id=l.tenant_id
+		AND s.job_level_id=l.id
+		AND s.effective_date <= $3
+		AND s.end_date >= $3
+	WHERE l.tenant_id=$1 AND l.code=$2
+	ORDER BY s.effective_date DESC
 	LIMIT 1
-	`, pgUUID(tenantID), strings.TrimSpace(code)).Scan(&row.ID, &row.Code, &row.Name, &row.DisplayOrder, &row.IsActive); err != nil {
+	`, pgUUID(tenantID), strings.TrimSpace(code), pgValidDate(asOf)).Scan(&row.ID, &row.Code, &row.Name, &row.DisplayOrder, &row.IsActive); err != nil {
 		return services.JobLevelRow{}, err
 	}
 	return row, nil
 }
 
-func (r *OrgRepository) ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]services.JobProfileJobFamilyRow, error) {
+func (r *OrgRepository) ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, asOf time.Time) ([]services.JobProfileJobFamilyRow, error) {
 	tx, err := composables.UseTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	rows, err := tx.Query(ctx, `
+		WITH profile_slice AS (
+			SELECT s.id
+			FROM org_job_profile_slices s
+			WHERE s.tenant_id=$1
+				AND s.job_profile_id=$2
+				AND s.effective_date <= $3
+				AND s.end_date >= $3
+			ORDER BY s.effective_date DESC
+			LIMIT 1
+		)
 		SELECT
 			jf.id,
 			jf.code,
-			jf.name,
-			jpf.is_primary,
+			jfs.name,
+			pjf.is_primary,
 			jfg.id,
 			jfg.code,
-			jfg.name
-	FROM org_job_profile_job_families jpf
-	JOIN org_job_families jf
-		ON jf.tenant_id = jpf.tenant_id
-		AND jf.id = jpf.job_family_id
-	JOIN org_job_family_groups jfg
-		ON jfg.tenant_id = jf.tenant_id
-		AND jfg.id = jf.job_family_group_id
-	WHERE jpf.tenant_id=$1 AND jpf.job_profile_id=$2
-	ORDER BY jpf.is_primary DESC, jf.code ASC, jf.id ASC
-	`, pgUUID(tenantID), pgUUID(jobProfileID))
+			jfgs.name
+		FROM profile_slice ps
+		JOIN org_job_profile_slice_job_families pjf
+			ON pjf.tenant_id=$1
+			AND pjf.job_profile_slice_id=ps.id
+		JOIN org_job_families jf
+			ON jf.tenant_id=pjf.tenant_id
+			AND jf.id=pjf.job_family_id
+		JOIN org_job_family_slices jfs
+			ON jfs.tenant_id=jf.tenant_id
+			AND jfs.job_family_id=jf.id
+			AND jfs.effective_date <= $3
+			AND jfs.end_date >= $3
+		JOIN org_job_family_groups jfg
+			ON jfg.tenant_id=jf.tenant_id
+			AND jfg.id=jf.job_family_group_id
+		JOIN org_job_family_group_slices jfgs
+			ON jfgs.tenant_id=jfg.tenant_id
+			AND jfgs.job_family_group_id=jfg.id
+			AND jfgs.effective_date <= $3
+			AND jfgs.end_date >= $3
+		ORDER BY pjf.is_primary DESC, jf.code ASC, jf.id ASC
+		`, pgUUID(tenantID), pgUUID(jobProfileID), pgValidDate(asOf))
 	if err != nil {
 		return nil, err
 	}
@@ -442,6 +532,88 @@ func (r *OrgRepository) ListJobProfileJobFamilies(ctx context.Context, tenantID 
 		out = append(out, row)
 	}
 	return out, rows.Err()
+}
+
+func (r *OrgRepository) ListJobProfileJobFamiliesByProfileIDsAsOf(ctx context.Context, tenantID uuid.UUID, jobProfileIDs []uuid.UUID, asOf time.Time) (map[uuid.UUID][]services.JobProfileJobFamilyRow, error) {
+	tx, err := composables.UseTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID][]services.JobProfileJobFamilyRow, len(jobProfileIDs))
+	if len(jobProfileIDs) == 0 {
+		return out, nil
+	}
+
+	rows, err := tx.Query(ctx, `
+		WITH prof_ids AS (
+			SELECT unnest($2::uuid[]) AS job_profile_id
+		),
+		profile_slices AS (
+			SELECT i.job_profile_id, s.id AS slice_id
+			FROM prof_ids i
+			JOIN org_job_profile_slices s
+				ON s.tenant_id=$1
+				AND s.job_profile_id=i.job_profile_id
+				AND s.effective_date <= $3
+				AND s.end_date >= $3
+		)
+		SELECT
+			ps.job_profile_id,
+			jf.id,
+			jf.code,
+			jfs.name,
+			pjf.is_primary,
+			jfg.id,
+			jfg.code,
+			jfgs.name
+		FROM profile_slices ps
+		JOIN org_job_profile_slice_job_families pjf
+			ON pjf.tenant_id=$1
+			AND pjf.job_profile_slice_id=ps.slice_id
+		JOIN org_job_families jf
+			ON jf.tenant_id=pjf.tenant_id
+			AND jf.id=pjf.job_family_id
+		JOIN org_job_family_slices jfs
+			ON jfs.tenant_id=jf.tenant_id
+			AND jfs.job_family_id=jf.id
+			AND jfs.effective_date <= $3
+			AND jfs.end_date >= $3
+		JOIN org_job_family_groups jfg
+			ON jfg.tenant_id=jf.tenant_id
+			AND jfg.id=jf.job_family_group_id
+		JOIN org_job_family_group_slices jfgs
+			ON jfgs.tenant_id=jfg.tenant_id
+			AND jfgs.job_family_group_id=jfg.id
+			AND jfgs.effective_date <= $3
+			AND jfgs.end_date >= $3
+		ORDER BY ps.job_profile_id ASC, pjf.is_primary DESC, jf.code ASC, jf.id ASC
+		`, pgUUID(tenantID), jobProfileIDs, pgValidDate(asOf))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var profileID uuid.UUID
+		var row services.JobProfileJobFamilyRow
+		if err := rows.Scan(
+			&profileID,
+			&row.JobFamilyID,
+			&row.JobFamilyCode,
+			&row.JobFamilyName,
+			&row.IsPrimary,
+			&row.JobFamilyGroupID,
+			&row.JobFamilyGroupCode,
+			&row.JobFamilyGroupName,
+		); err != nil {
+			return nil, err
+		}
+		out[profileID] = append(out[profileID], row)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (r *OrgRepository) SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in services.JobProfileJobFamiliesSet) error {

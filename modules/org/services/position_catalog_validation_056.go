@@ -5,17 +5,22 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *OrgService) validateJobProfileAndLevel(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, jobLevelCode *string) error {
+func (s *OrgService) validateJobProfileAndLevel(ctx context.Context, tenantID uuid.UUID, asOf time.Time, jobProfileID uuid.UUID, jobLevelCode *string) error {
 	if jobProfileID == uuid.Nil {
 		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "job_profile_id is required", nil)
 	}
+	if asOf.IsZero() {
+		return newServiceError(http.StatusBadRequest, "ORG_INVALID_BODY", "effective_date is required", nil)
+	}
+	asOf = normalizeValidTimeDayUTC(asOf)
 
-	profile, err := s.repo.GetJobProfileRef(ctx, tenantID, jobProfileID)
+	profile, err := s.repo.GetJobProfileRef(ctx, tenantID, jobProfileID, asOf)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return newServiceError(http.StatusUnprocessableEntity, "ORG_JOB_PROFILE_NOT_FOUND", "job_profile_id not found", nil)
@@ -26,7 +31,7 @@ func (s *OrgService) validateJobProfileAndLevel(ctx context.Context, tenantID uu
 		return newServiceError(http.StatusUnprocessableEntity, "ORG_JOB_PROFILE_INACTIVE", "job profile is inactive", nil)
 	}
 
-	families, err := s.repo.ListJobProfileJobFamilies(ctx, tenantID, jobProfileID)
+	families, err := s.repo.ListJobProfileJobFamilies(ctx, tenantID, jobProfileID, asOf)
 	if err != nil {
 		return mapPgError(err)
 	}
@@ -42,7 +47,7 @@ func (s *OrgService) validateJobProfileAndLevel(ctx context.Context, tenantID uu
 		return nil
 	}
 
-	level, err := s.repo.GetJobLevelByCode(ctx, tenantID, code)
+	level, err := s.repo.GetJobLevelByCode(ctx, tenantID, code, asOf)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return newServiceError(http.StatusUnprocessableEntity, "ORG_JOB_LEVEL_NOT_FOUND", "job_level_code not found", nil)

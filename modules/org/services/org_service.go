@@ -129,24 +129,26 @@ type OrgRepository interface {
 	UpdatePositionSliceInPlace(ctx context.Context, tenantID uuid.UUID, sliceID uuid.UUID, patch PositionSliceInPlacePatch) error
 	HasPositionSubordinatesAt(ctx context.Context, tenantID uuid.UUID, positionID uuid.UUID, asOf time.Time) (bool, error)
 
-	ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID) ([]JobFamilyGroupRow, error)
+	ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobFamilyGroupRow, error)
 	CreateJobFamilyGroup(ctx context.Context, tenantID uuid.UUID, in JobFamilyGroupCreate) (JobFamilyGroupRow, error)
 	UpdateJobFamilyGroup(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobFamilyGroupUpdate) (JobFamilyGroupRow, error)
 
-	ListJobFamilies(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID) ([]JobFamilyRow, error)
+	ListJobFamilies(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID, asOf time.Time) ([]JobFamilyRow, error)
+	ListJobFamiliesByGroupIDsAsOf(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupIDs []uuid.UUID, asOf time.Time) ([]JobFamilyRow, error)
 	CreateJobFamily(ctx context.Context, tenantID uuid.UUID, in JobFamilyCreate) (JobFamilyRow, error)
 	UpdateJobFamily(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobFamilyUpdate) (JobFamilyRow, error)
 
-	ListJobLevels(ctx context.Context, tenantID uuid.UUID) ([]JobLevelRow, error)
+	ListJobLevels(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobLevelRow, error)
 	CreateJobLevel(ctx context.Context, tenantID uuid.UUID, in JobLevelCreate) (JobLevelRow, error)
 	UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobLevelUpdate) (JobLevelRow, error)
-	GetJobLevelByCode(ctx context.Context, tenantID uuid.UUID, code string) (JobLevelRow, error)
+	GetJobLevelByCode(ctx context.Context, tenantID uuid.UUID, code string, asOf time.Time) (JobLevelRow, error)
 
-	ListJobProfiles(ctx context.Context, tenantID uuid.UUID) ([]JobProfileRow, error)
+	ListJobProfiles(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobProfileRow, error)
 	CreateJobProfile(ctx context.Context, tenantID uuid.UUID, in JobProfileCreate) (JobProfileRow, error)
 	UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, id uuid.UUID, in JobProfileUpdate) (JobProfileRow, error)
-	GetJobProfileRef(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) (JobProfileRef, error)
-	ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]JobProfileJobFamilyRow, error)
+	GetJobProfileRef(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, asOf time.Time) (JobProfileRef, error)
+	ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, asOf time.Time) ([]JobProfileJobFamilyRow, error)
+	ListJobProfileJobFamiliesByProfileIDsAsOf(ctx context.Context, tenantID uuid.UUID, jobProfileIDs []uuid.UUID, asOf time.Time) (map[uuid.UUID][]JobProfileJobFamilyRow, error)
 	SetJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, in JobProfileJobFamiliesSet) error
 
 	LockAssignmentAt(ctx context.Context, tenantID uuid.UUID, assignmentID uuid.UUID, asOf time.Time) (AssignmentRow, error)
@@ -1069,8 +1071,9 @@ type CreateAssignmentResult struct {
 	GeneratedEvents []events.OrgEventV1
 }
 
-func (s *OrgService) pickAutoPositionJobProfileID(ctx context.Context, tenantID uuid.UUID) (uuid.UUID, error) {
-	profiles, err := s.repo.ListJobProfiles(ctx, tenantID)
+func (s *OrgService) pickAutoPositionJobProfileID(ctx context.Context, tenantID uuid.UUID, asOf time.Time) (uuid.UUID, error) {
+	asOf = normalizeValidTimeDayUTC(asOf)
+	profiles, err := s.repo.ListJobProfiles(ctx, tenantID, asOf)
 	if err != nil {
 		return uuid.Nil, err
 	}
@@ -1253,7 +1256,7 @@ func (s *OrgService) CreateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				return nil, err
 			}
 			code := autoPositionCode(positionID)
-			jobProfileID, err := s.pickAutoPositionJobProfileID(txCtx, tenantID)
+			jobProfileID, err := s.pickAutoPositionJobProfileID(txCtx, tenantID, in.EffectiveDate)
 			if err != nil {
 				return nil, err
 			}
@@ -1537,7 +1540,7 @@ func (s *OrgService) UpdateAssignment(ctx context.Context, tenantID uuid.UUID, r
 				return nil, err
 			}
 			code := autoPositionCode(positionID)
-			jobProfileID, err := s.pickAutoPositionJobProfileID(txCtx, tenantID)
+			jobProfileID, err := s.pickAutoPositionJobProfileID(txCtx, tenantID, in.EffectiveDate)
 			if err != nil {
 				return nil, err
 			}

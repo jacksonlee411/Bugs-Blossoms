@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -120,12 +121,21 @@ type JobProfileJobFamilySetItem struct {
 	IsPrimary   bool
 }
 
-func (s *OrgService) ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID) ([]JobFamilyGroupRow, error) {
+type JobProfileListItem struct {
+	JobProfileRow
+	JobFamilies []JobProfileJobFamilyRow `json:"job_families"`
+}
+
+func (s *OrgService) ListJobFamilyGroups(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobFamilyGroupRow, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
+	if asOf.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "as_of is required", nil)
+	}
+	asOf = normalizeValidTimeDayUTC(asOf)
 	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobFamilyGroupRow, error) {
-		return s.repo.ListJobFamilyGroups(txCtx, tenantID)
+		return s.repo.ListJobFamilyGroups(txCtx, tenantID, asOf)
 	})
 }
 
@@ -168,15 +178,33 @@ func (s *OrgService) UpdateJobFamilyGroup(ctx context.Context, tenantID uuid.UUI
 	})
 }
 
-func (s *OrgService) ListJobFamilies(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID) ([]JobFamilyRow, error) {
+func (s *OrgService) ListJobFamilies(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupID uuid.UUID, asOf time.Time) ([]JobFamilyRow, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
 	if jobFamilyGroupID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "job_family_group_id is required", nil)
 	}
+	if asOf.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "as_of is required", nil)
+	}
+	asOf = normalizeValidTimeDayUTC(asOf)
 	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobFamilyRow, error) {
-		rows, err := s.repo.ListJobFamilies(txCtx, tenantID, jobFamilyGroupID)
+		rows, err := s.repo.ListJobFamilies(txCtx, tenantID, jobFamilyGroupID, asOf)
+		return rows, mapPgError(err)
+	})
+}
+
+func (s *OrgService) ListJobFamiliesByGroupIDsAsOf(ctx context.Context, tenantID uuid.UUID, jobFamilyGroupIDs []uuid.UUID, asOf time.Time) ([]JobFamilyRow, error) {
+	if tenantID == uuid.Nil {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
+	}
+	if asOf.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "as_of is required", nil)
+	}
+	asOf = normalizeValidTimeDayUTC(asOf)
+	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobFamilyRow, error) {
+		rows, err := s.repo.ListJobFamiliesByGroupIDsAsOf(txCtx, tenantID, jobFamilyGroupIDs, asOf)
 		return rows, mapPgError(err)
 	})
 }
@@ -221,12 +249,16 @@ func (s *OrgService) UpdateJobFamily(ctx context.Context, tenantID uuid.UUID, id
 	})
 }
 
-func (s *OrgService) ListJobLevels(ctx context.Context, tenantID uuid.UUID) ([]JobLevelRow, error) {
+func (s *OrgService) ListJobLevels(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobLevelRow, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
+	if asOf.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "as_of is required", nil)
+	}
+	asOf = normalizeValidTimeDayUTC(asOf)
 	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobLevelRow, error) {
-		rows, err := s.repo.ListJobLevels(txCtx, tenantID)
+		rows, err := s.repo.ListJobLevels(txCtx, tenantID, asOf)
 		return rows, mapPgError(err)
 	})
 }
@@ -274,13 +306,50 @@ func (s *OrgService) UpdateJobLevel(ctx context.Context, tenantID uuid.UUID, id 
 	})
 }
 
-func (s *OrgService) ListJobProfiles(ctx context.Context, tenantID uuid.UUID) ([]JobProfileRow, error) {
+func (s *OrgService) ListJobProfiles(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobProfileRow, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
+	if asOf.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "as_of is required", nil)
+	}
+	asOf = normalizeValidTimeDayUTC(asOf)
 	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobProfileRow, error) {
-		rows, err := s.repo.ListJobProfiles(txCtx, tenantID)
+		rows, err := s.repo.ListJobProfiles(txCtx, tenantID, asOf)
 		return rows, mapPgError(err)
+	})
+}
+
+func (s *OrgService) ListJobProfilesWithFamilies(ctx context.Context, tenantID uuid.UUID, asOf time.Time) ([]JobProfileListItem, error) {
+	if tenantID == uuid.Nil {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
+	}
+	if asOf.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "as_of is required", nil)
+	}
+	asOf = normalizeValidTimeDayUTC(asOf)
+	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobProfileListItem, error) {
+		profiles, err := s.repo.ListJobProfiles(txCtx, tenantID, asOf)
+		if err != nil {
+			return nil, mapPgError(err)
+		}
+		ids := make([]uuid.UUID, 0, len(profiles))
+		for _, p := range profiles {
+			ids = append(ids, p.ID)
+		}
+		familiesByProfileID, err := s.repo.ListJobProfileJobFamiliesByProfileIDsAsOf(txCtx, tenantID, ids, asOf)
+		if err != nil {
+			return nil, mapPgError(err)
+		}
+
+		out := make([]JobProfileListItem, 0, len(profiles))
+		for _, p := range profiles {
+			out = append(out, JobProfileListItem{
+				JobProfileRow: p,
+				JobFamilies:   familiesByProfileID[p.ID],
+			})
+		}
+		return out, nil
 	})
 }
 
@@ -353,15 +422,19 @@ func (s *OrgService) UpdateJobProfile(ctx context.Context, tenantID uuid.UUID, i
 	})
 }
 
-func (s *OrgService) ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID) ([]JobProfileJobFamilyRow, error) {
+func (s *OrgService) ListJobProfileJobFamilies(ctx context.Context, tenantID uuid.UUID, jobProfileID uuid.UUID, asOf time.Time) ([]JobProfileJobFamilyRow, error) {
 	if tenantID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_NO_TENANT", "tenant_id is required", nil)
 	}
 	if jobProfileID == uuid.Nil {
 		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "job_profile_id is required", nil)
 	}
+	if asOf.IsZero() {
+		return nil, newServiceError(http.StatusBadRequest, "ORG_INVALID_QUERY", "as_of is required", nil)
+	}
+	asOf = normalizeValidTimeDayUTC(asOf)
 	return inTx(ctx, tenantID, func(txCtx context.Context) ([]JobProfileJobFamilyRow, error) {
-		rows, err := s.repo.ListJobProfileJobFamilies(txCtx, tenantID, jobProfileID)
+		rows, err := s.repo.ListJobProfileJobFamilies(txCtx, tenantID, jobProfileID, asOf)
 		return rows, mapPgError(err)
 	})
 }

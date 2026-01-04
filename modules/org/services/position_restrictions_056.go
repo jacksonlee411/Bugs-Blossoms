@@ -363,7 +363,7 @@ func (s *OrgService) validatePositionRestrictionsAgainstSlice(ctx context.Contex
 		return newServiceError(http.StatusUnprocessableEntity, "ORG_POSITION_RESTRICTIONS_CATALOG_MISMATCH", "job_level_code is required", nil)
 	}
 
-	level, err := s.repo.GetJobLevelByCode(ctx, tenantID, strings.TrimSpace(*slice.JobLevelCode))
+	level, err := s.repo.GetJobLevelByCode(ctx, tenantID, strings.TrimSpace(*slice.JobLevelCode), slice.EffectiveDate)
 	if err != nil {
 		return mapPgError(err)
 	}
