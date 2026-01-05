@@ -2,11 +2,11 @@
 
 **状态**: 草拟中（2026-01-04 04:20 UTC）
 
-> 本计划的定位：为 `DEV-PLAN-078` 的 cutover 提供 **Position/Assignment 的 v4 权威契约**（DB Kernel + Go Facade + One Door），并与 `DEV-PLAN-077`（OrgUnit v4）对齐“事件 SoT + 同步投射 + 可重放”的范式。
+> 本计划的定位：作为 Greenfield HR v4 的 Position/Assignment 子域，提供 **Position/Assignment 的 v4 权威契约**（DB Kernel + Go Facade + One Door），并与 `DEV-PLAN-077`（OrgUnit v4）对齐“事件 SoT + 同步投射 + 可重放”的范式。
 
 ## 1. 背景与上下文 (Context)
 - 当前 Position/Assignment 位于 `modules/org` 的 schema 与实现中（`org_positions/org_position_slices/org_assignments` 等），并强依赖 `org_nodes`（FK）。
-- `DEV-PLAN-078` 选择彻底替换 OrgUnit（077）并 drop 旧表，因此 Position/Assignment 必须同步给出 v4 替代，否则无法 drop `org_nodes`。
+- 本计划按 Greenfield（从 0 开始）口径编写：暂不考虑迁移/兼容；如需承接存量 `modules/org` 的退场/替换，必须另立 dev-plan。
 - 本计划采用与 077 相同的 Kernel 边界：DB 负责不变量与投射，Go 只做鉴权/事务/调用与错误映射。
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
@@ -16,8 +16,8 @@
 - [ ] 表命名去掉 `org_` 前缀（见 3.2），并与 Job Catalog v4（`DEV-PLAN-080`）可组合使用。
 
 ### 2.2 非目标（明确不做）
-- 不提供对旧 API/旧数据的兼容；cutover 后仅以 v4 为准（由 `DEV-PLAN-078` 约束）。
-- 不保留/不替代旧的 outbox/audit/settings 等支撑能力（对齐 078 的“彻底方案”）。
+- 不提供对旧 API/旧数据的兼容；迁移/退场策略必须另立 dev-plan 承接。
+- 不保留/不替代旧的 outbox/audit/settings 等支撑能力（本系列优先收敛 Kernel 最小闭环；如需引入另立 dev-plan）。
 
 ## 2.3 工具链与门禁（SSOT 引用）
 > 本计划仅声明命中项与 SSOT 链接，不复制命令清单。
@@ -30,7 +30,7 @@
   - 命令入口：`Makefile`
   - CI 门禁：`.github/workflows/quality-gates.yml`
   - OrgUnit v4：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`
-  - Org v4 cutover：`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`
+  - Greenfield HR 模块骨架（Position/Assignment 归属 staffing）：`docs/dev-plans/083-greenfield-hr-modules-skeleton.md`
   - 多租户隔离（RLS）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`（对齐 `docs/dev-plans/019-multi-tenant-toolchain.md` / `docs/dev-plans/019A-rls-tenant-isolation.md`）
   - Job Catalog v4：`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
   - 时间语义（Valid Time=DATE）：`docs/dev-plans/064-effective-date-day-granularity.md`
@@ -47,7 +47,7 @@
 **结论（选定）**：Position/Assignment v4 表统一去掉 `org_` 前缀，采用 `positions/position_events/position_versions` 与 `assignments/assignment_events/assignment_versions`。
 
 原因：
-- `org_` 在本仓库中已强语义绑定 OrgUnit（组织树）子域；Position/Job Catalog 在 078 的 v4 里将按独立子域落地，继续使用 `org_` 容易造成“权威表达边界”混淆。
+- `org_` 在本仓库中已强语义绑定 OrgUnit（组织树）子域；且在 `DEV-PLAN-083` 的模块划分中，Position（`modules/staffing`）与 Job Catalog（`modules/jobcatalog`）为独立子域，继续使用 `org_` 容易造成“权威表达边界”混淆。
 - 去前缀后仍保留足够的域前缀（`position_*`/`assignment_*`），可降低与其他模块表名冲突的概率，并为未来从 `modules/org` 抽离模块预留空间。
 
 ### 3.3 时间语义（选定）
@@ -77,7 +77,7 @@
 - **停用不变量（选定）**：对任意 `query_date`，若 `position.lifecycle_status<>'active'`，则不允许存在 `status='active'` 的 assignments 引用该 position（可在同一裁决函数中实现为 `SUM(active allocated_fte)=0`）。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
-> 说明：以下为 schema 级合同（字段/约束/索引），具体 DDL 最终以 cutover 时落盘的 `modules/org/infrastructure/persistence/schema/org-schema.sql` 为准（由 078 约束）。
+> 说明：以下为 schema 级合同（字段/约束/索引）；具体 DDL 以实施阶段落盘的 schema SSOT 文件为准（对齐 `DEV-PLAN-083`：`modules/staffing/infrastructure/persistence/schema/`）。
 
 ### 4.1 `positions`（稳定实体）
 ```sql
@@ -214,7 +214,7 @@ ALTER TABLE position_versions
 > - 由 `replay_position_versions` 生成并在事务内校验（避免实现期靠应用层“补洞”导致漂移）。
 
 ### 4.4 `assignments` / `assignment_events` / `assignment_versions`
-> Assignment v4 作为 Position v4 的同域能力一并替换（对齐 078 的 drop 清单）。
+> Assignment v4 作为 Position v4 的同域能力一并落地（对齐 `DEV-PLAN-083`：归属 `modules/staffing`）。
 
 最小形状（合同约束重点）：
 - `assignment_events`：同 `position_events`，不变量为 `UNIQUE(tenant_id, assignment_id, effective_date)`。

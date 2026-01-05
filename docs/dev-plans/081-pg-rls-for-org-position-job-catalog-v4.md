@@ -2,13 +2,13 @@
 
 **状态**: 草拟中（2026-01-05 02:45 UTC）
 
-> 本计划聚焦：在 `DEV-PLAN-077/079/080` 的 v4 Kernel 表上 **默认启用 PostgreSQL RLS**，把“租户隔离”从应用层 `WHERE tenant_id=...` 的约定，升级为 DB 层可验证的强制约束；并与 `DEV-PLAN-019/019A` 的 RLS 注入与 DB 角色契约对齐，避免在 `DEV-PLAN-078` cutover 时临时补丁。
+> 本计划聚焦：在 `DEV-PLAN-077/079/080` 的 v4 Kernel 表上 **默认启用 PostgreSQL RLS**，把“租户隔离”从应用层 `WHERE tenant_id=...` 的约定，升级为 DB 层可验证的强制约束；并与 `DEV-PLAN-019/019A` 的 RLS 注入与 DB 角色契约对齐，确保 Greenfield v4 默认强隔离，不依赖实现期临时补丁。
 
 ## 1. 背景与上下文 (Context)
 - `DEV-PLAN-077/079/080` 将大量不变量与核心计算下沉到 PostgreSQL（advisory lock / GiST exclusion / ltree / jsonb 校验 / 同事务 replay），DB 已被选定为“Kernel/最终裁判”。
 - v4 表普遍以 `(tenant_id, <id>)` 复合唯一/外键对齐多租户，但隔离仍主要依赖应用层显式追加 `WHERE tenant_id = ...`，存在“漏写/误 join”导致跨租户泄露的系统性风险。
 - `DEV-PLAN-019/019A` 已确立 RLS PoC 的系统级契约：**事务内**注入 `app.current_tenant`（`set_config(..., true)`/`SET LOCAL`）+ policy 使用 `current_setting('app.current_tenant')::uuid` **fail-closed**；并已落地 `pkg/composables/rls.go:ApplyTenantRLS`。
-- 需要一个面向 v4 的“启用清单 + 迁移落盘 + Go 调用约束 + 验收/回滚”的方案，作为 078 cutover 及后续扩展到更多 tenant-scoped 表的模板。
+- 需要一个面向 v4 的“启用清单 + 迁移落盘 + Go 调用约束 + 验收/回滚”的方案，作为 v4 系列（077/079/080）的默认启用策略与后续扩展模板。
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
@@ -31,7 +31,7 @@
 - **SSOT 链接**：
   - 多租户工具链与 RLS 契约：`docs/dev-plans/019-multi-tenant-toolchain.md`、`docs/dev-plans/019A-rls-tenant-isolation.md`
   - Org/Position/Job Catalog v4：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`、`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`、`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
-  - cutover（无并行/防漂移）：`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`
+  - Greenfield HR 模块骨架（schema SSOT 目录约定）：`docs/dev-plans/083-greenfield-hr-modules-skeleton.md`
 
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.0 主流程（可解释性 / Mermaid）
@@ -50,7 +50,7 @@ flowchart TD
 ### 3.1 为什么 v4 优先启用 RLS（对 077-080 的分析）
 - v4 的写入/重放/校验大量依赖 DB 内函数与 SQL 片段，SQL 面积增大；仅靠应用侧 `WHERE tenant_id` 的“代码审查习惯”难以形成系统性兜底。
 - v4 数据模型已一致收敛到 `tenant_id`：事件表/versions/identity/关系表均显式携带并参与约束；RLS 可以用一条统一 policy 覆盖大部分表，落地成本可控。
-- `DEV-PLAN-078` 采用 big-bang cutover（不兼容/不并行/清库重建），为“在新表上默认开启 RLS”提供了天然落点：无需对旧表做渐进兼容。
+- 本系列按 Greenfield 口径实施，因此可以从 v4 表一开始就默认启用 RLS：无需对旧表做渐进兼容。
 
 ### 3.2 RLS 注入策略（沿用 019/019A）
 - **选定**：RLS policy 仅信任事务内注入的 `app.current_tenant`（`SELECT set_config('app.current_tenant', $1, true)` 或 `SET LOCAL app.current_tenant = ...`）。
@@ -158,7 +158,7 @@ CREATE POLICY tenant_isolation ON <table>
 
 ## 6. 实施步骤（建议顺序）
 1. [ ] 在 v4 schema SSOT 中引入 `current_tenant_id()` 与 `assert_current_tenant(...)`，并将写入口函数接入断言。
-2. [ ] 按 4.2-4.4 清单为 v4 表添加 RLS DDL（`ENABLE/FORCE` + `tenant_isolation` policy），并确保最终 SSOT 落在 `DEV-PLAN-078` 指定的 schema 文件：`modules/org/infrastructure/persistence/schema/org-schema.sql`。
+2. [ ] 按 4.2-4.4 清单为 v4 表添加 RLS DDL（`ENABLE/FORCE` + `tenant_isolation` policy），并确保最终 SSOT 落在对应模块的 schema SSOT 目录：`modules/orgunit/infrastructure/persistence/schema/`、`modules/jobcatalog/infrastructure/persistence/schema/`、`modules/staffing/infrastructure/persistence/schema/`（对齐 `DEV-PLAN-083`）。
 3. [ ] Go 层：在 v4 写路径/读路径统一走事务入口，并在事务内调用 `composables.ApplyTenantRLS`（对齐 019A 的注入契约）。
 4. [ ] 补齐测试（至少一条 DB/集成测试）：验证缺失 `app.current_tenant` 时 fail-closed；跨租户读写被拒绝；同租户正常。
 5. [ ] 本地验证与门禁对齐（命中项按 `AGENTS.md` 触发器矩阵执行），确保 `RLS_ENFORCE=enforce` + 非 superuser 且 `NOBYPASSRLS` 账号下稳定通过。

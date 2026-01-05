@@ -22,7 +22,7 @@
 - [ ] 实现需满足 082/083 的 DDD 分层与 One Door Policy：Go=Facade（鉴权/事务/调用/错误映射），DB=Kernel（裁决/投射/重放）。
 
 ### 2.2 非目标（明确不做）
-- 不做存量 `modules/org` 的迁移/替换 cutover（`DEV-PLAN-078` 类交付不在本计划范围内）。
+- 不做存量 `modules/org` 的迁移/替换 cutover；存量退场/兼容策略必须另立 dev-plan 承接。
 - 不引入 `effseq`，同一实体同日最多一条事件（对齐 077/079/080）。
 - 不在本计划内实现“跨模块异步事件/旧 outbox/audit/settings 支撑能力”的兼容；如需要另立计划。
 
