@@ -2,11 +2,11 @@
 
 **状态**: 草拟中（2026-01-04 04:20 UTC）
 
-> 本计划的定位：为 `DEV-PLAN-078` 的 cutover 提供 **Job Catalog v4 权威契约**（DB Kernel + Go Facade + One Door），并与 `DEV-PLAN-077/079` 对齐“事件 SoT + 同步投射 + 可重放”的范式。
+> 本计划的定位：作为 Greenfield HR v4 的 Job Catalog 子域，提供 **Job Catalog v4 权威契约**（DB Kernel + Go Facade + One Door），并与 `DEV-PLAN-077/079` 对齐“事件 SoT + 同步投射 + 可重放”的范式。
 
 ## 1. 背景与上下文 (Context)
 - 当前 Job Catalog 位于 `modules/org` 的 schema 与实现中（`org_job_*` + `*_slices`），并与 Position（`org_position_slices.job_profile_id/job_level_code/...`）形成强耦合校验与展示链路。
-- `DEV-PLAN-078` 选择彻底 drop 旧 `org_job_*` 相关表，因此 Job Catalog 必须同步给出 v4 替代，否则 Position v4（079）将失去引用对象。
+- 本计划按 Greenfield（从 0 开始）口径编写：暂不考虑迁移/兼容；如需承接存量 `modules/org` 的退场/替换，必须另立 dev-plan。
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 ### 2.1 核心目标
@@ -15,8 +15,8 @@
 - [ ] 表命名去掉 `org_` 前缀（见 3.2），并与 Position v4 可组合（079 的 FK 以 `(tenant_id, id)` 为基准）。
 
 ### 2.2 非目标（明确不做）
-- 不提供对旧 API/旧数据的兼容；cutover 后仅以 v4 为准（由 078 约束）。
-- 不保留/不替代旧的 outbox/audit/settings 等支撑能力（对齐 078 的“彻底方案”）。
+- 不提供对旧 API/旧数据的兼容；迁移/退场策略必须另立 dev-plan 承接。
+- 不保留/不替代旧的 outbox/audit/settings 等支撑能力（本系列优先收敛 Kernel 最小闭环；如需引入另立 dev-plan）。
 
 ## 2.3 工具链与门禁（SSOT 引用）
 > 本计划仅声明命中项与 SSOT 链接，不复制命令清单。
@@ -28,7 +28,7 @@
   - 触发器矩阵与本地必跑：`AGENTS.md`
   - 命令入口：`Makefile`
   - CI 门禁：`.github/workflows/quality-gates.yml`
-  - Org v4 cutover：`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`
+  - Greenfield HR 模块骨架（Job Catalog 归属 jobcatalog）：`docs/dev-plans/083-greenfield-hr-modules-skeleton.md`
   - OrgUnit v4：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`
   - Position v4：`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`
   - 多租户隔离（RLS）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`（对齐 `docs/dev-plans/019-multi-tenant-toolchain.md` / `docs/dev-plans/019A-rls-tenant-isolation.md`）
@@ -70,7 +70,7 @@
 - **成本可控**：Job Catalog 单个实体的事件通常很少（低频变更），按实体 replay 的 delete+rebuild 量级可预期且小于 Position/Assignment 的时间线规模。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
-> 说明：以下为 schema 级合同（字段/约束/索引），具体 DDL 最终以 cutover 时落盘的 `modules/org/infrastructure/persistence/schema/org-schema.sql` 为准（由 078 约束）。
+> 说明：以下为 schema 级合同（字段/约束/索引）；具体 DDL 以实施阶段落盘的 schema SSOT 文件为准（对齐 `DEV-PLAN-083`：`modules/jobcatalog/infrastructure/persistence/schema/`）。
 
 ### 4.1 Events（Write Side / SoT）
 > 决策：不使用 `entity_type/entity_id` 分发器的共享事件表，避免“多主体共用事件表”引入的复杂度；每类实体独立 events 表以满足“同表同日唯一”的合同。

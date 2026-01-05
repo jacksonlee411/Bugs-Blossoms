@@ -35,7 +35,7 @@
 
 - 触发器矩阵与本地必跑：`AGENTS.md`
 - 分层与依赖门禁（CleanArchGuard）：`.gocleanarch.yml`（入口：`make check lint`）
-- v4 DB Kernel 边界 SSOT：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`、`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`、`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`、`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
+- v4 DB Kernel 边界 SSOT：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`、`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`、`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
 
 ## 3. 分层框架总览（DDD + Ports & Adapters）
 
@@ -104,7 +104,7 @@
 - **One Door Policy（写入口唯一）**：除 `submit_*_event` 与运维 replay 外，应用层不得直写事件表/versions 表/identity 表，不得直调 `apply_*_logic`。
 
 **在四层目录中的表达方式（推荐）**：
-- `infrastructure/persistence/schema/**`：DB Kernel 的 schema/函数/约束（SSOT 文件路径以对应模块工具链为准；如 Org 见 078）。
+- `infrastructure/persistence/schema/**`：DB Kernel 的 schema/函数/约束（SSOT 文件路径以对应模块工具链为准；示例：OrgUnit v4 见 077）。
 - `domain/`：承载“稳定业务概念与契约类型”（IDs、枚举、命令入参类型、稳定错误码常量等），但不复写 Kernel 的裁决逻辑。
 - `services/`：只做 Facade：事务 + 调用 Kernel 端口 + 错误映射；避免在 Go 写“第二套投射/校验”。
 - `infrastructure/`：提供 Kernel 端口实现（例如用 pgx 调 `submit_*_event`），并在 Composition Root 注入到 services。

@@ -229,7 +229,7 @@ modules/{module}/
 - 职位分类（Job Catalog）identity legacy 列退场评估与清理（DEV-PLAN-075A）：`docs/dev-plans/075A-job-catalog-identity-legacy-columns-retirement.md`
 - Org 模块现状研究与 v4（事务性事件溯源 + 同步投射）差异评估（DEV-PLAN-076）：`docs/dev-plans/076-org-v4-transactional-event-sourcing-gap-analysis.md`
 - Org v4（事务性事件溯源 + 同步投射）完整方案（Greenfield）（DEV-PLAN-077）：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`
-- Org v4 全量替换（基于 077，无并行/无兼容/防漂移）（DEV-PLAN-078）：`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`
+- [Archived] Org v4 全量替换（历史参考，已不适用）（DEV-PLAN-078）：`docs/Archived/078-org-v4-full-replacement-no-compat.md`
 - Position v4（事务性事件溯源 + 同步投射）方案（去掉 org_ 前缀）（DEV-PLAN-079）：`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`
 - Job Catalog v4（事务性事件溯源 + 同步投射）方案（去掉 org_ 前缀）（DEV-PLAN-080）：`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
 - 启用 PostgreSQL RLS 强租户隔离（Org/Position/Job Catalog v4）（DEV-PLAN-081）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`
