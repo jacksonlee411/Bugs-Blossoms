@@ -1,6 +1,6 @@
 # DEV-PLAN-087：V4 技术栈与工具链版本冻结（Stack & Tooling Decisions）
 
-**状态**: 草拟中（2026-01-05 07:36 UTC）
+**状态**: 草拟中（2026-01-05 09:20 UTC）
 
 > 本文是 V4（全新实施，计划从 077 系列开始）的“技术栈 + 工具链”决策与版本基线文档：**明确我们用什么、用哪个版本、以什么为事实源（SSOT）**，避免本地/CI/部署版本漂移导致不可复现。
 
@@ -14,11 +14,11 @@
 ### 2.1 范围
 
 - 运行时与基础设施：Go、PostgreSQL、Redis、容器基底镜像。
-- UI 技术栈：Templ、HTMX、Alpine.js、Tailwind、核心前端依赖（以 vendored 静态资产为准）。
+- UI 技术栈：Astro（AHA UI Shell；见 `DEV-PLAN-086`）、Templ、HTMX、Alpine.js、Tailwind、核心前端依赖（以 vendored 静态资产为准）。
 - 数据与迁移工具链：sqlc、Atlas、Goose、SQL 格式化门禁（pg_format）。
 - 授权/路由/事件：Casbin、Routing Gates、Transactional Outbox（能力复用口径）。
 - 质量门禁与测试：golangci-lint、go-cleanarch、Go test、Playwright E2E。
-- 开发体验：Air、DevHub、Node/pnpm（用于 E2E；若采纳 `DEV-PLAN-086` 的 Astro 壳，也用于 UI build）。
+- 开发体验：Air、DevHub、Node/pnpm（用于 Astro UI build 与 E2E）。
 - 部署形态：Docker 镜像与 compose 拓扑（含 superadmin）。
 
 ### 2.2 原则（SSOT 与可复现）
@@ -28,7 +28,7 @@
   - CI 门禁：`.github/workflows/quality-gates.yml`
   - 本地服务编排：`devhub.yml`、`compose*.yml`
   - 示例环境变量：`.env.example`
-  - 版本与依赖：`go.mod`、`e2e/pnpm-lock.yaml`
+  - 版本与依赖：`go.mod`、`e2e/pnpm-lock.yaml`、以及 Astro UI 工程的 `package.json` 与 lockfile（新仓库固定为 `apps/web/package.json` + `apps/web/pnpm-lock.yaml`；由 `DEV-PLAN-086` 引入并在本计划内冻结）。
 - **版本冻结粒度**：
   - 开发/构建工具优先固定到**精确版本**（例如 `v0.3.857`）。
   - 容器镜像至少固定到**主版本 tag**（例如 `postgres:17`）；生产环境建议进一步固定 digest（由部署侧落地）。
@@ -57,7 +57,19 @@
 | `btree_gist` | enabled | `EXCLUDE USING gist` + `gist_uuid_ops`（no-overlap） | `migrations/org/00001_org_baseline.sql`；以及 `DEV-PLAN-077/079/080` |
 | `ltree` | enabled（OrgUnit） | 路径（子树/祖先链）查询 | `migrations/org/00001_org_baseline.sql`；以及 `DEV-PLAN-077` |
 
-### 3.2 UI 技术栈（Server-side Rendering）
+### 3.2 UI 技术栈（AHA：Astro Shell + Server-side HTML）
+
+### 3.2.1 UI Build / App Shell（Astro，AHA Stack）
+
+`DEV-PLAN-086` 已确定引入 Astro（AHA Stack：Astro + HTMX + Alpine）作为 v4 UI 的“壳（Shell）与组件编译层”。其本质是 **UI build 工具链**，不属于“服务端渲染库”范畴，但必须纳入 v4 的版本冻结与 SSOT。
+
+| 组件 | V4 版本 | 来源/说明 |
+| --- | --- | --- |
+| Astro | 必须 pin（随 v4 UI 工程落盘） | `DEV-PLAN-086`；以 `apps/web/package.json` + `apps/web/pnpm-lock.yaml` 为 SSOT（新仓库） |
+| pnpm | `10.24.0` | 统一用于 UI build 与 E2E；需在 `apps/web/package.json#packageManager` pin 并提交 `apps/web/pnpm-lock.yaml` |
+| Node.js | `20.x`（推荐） | UI build 与 E2E 共同依赖；建议在新仓库补齐可复现 pin（例如 `.tool-versions`/`.nvmrc`/CI） |
+
+### 3.2.2 Server-side HTML（Templ + HTMX + Alpine）
 
 | 组件 | V4 版本 | 来源/说明 |
 | --- | --- | --- |
@@ -163,7 +175,7 @@
 4. [ ] goimports：`make sqlc-generate` 固定 `v0.26.0`，但 devcontainer 里为 `v0.31.0` —— 统一版本并对齐格式化输出。
 5. [ ] Redis 镜像：当前为 `redis:latest`（浮动）—— 为 V4 生产/CI 口径增加 pin 策略（至少固定 major/minor，推荐 digest）。
 6. [ ] DevContainer：当前基底为 Go `1.23`（与 `go.mod` 不一致）—— 视团队是否继续使用 DevContainer，决定升级或移除（参考 `DEV-PLAN-002`）。
-7. [ ] Astro（AHA UI Shell，`DEV-PLAN-086`）：若确认为 v4 UI 方案，需要在新仓库 pin `Astro/Node/pnpm`（及其 lockfile），并明确静态资产构建与发布的 SSOT。
+7. [ ] Astro（AHA UI Shell，`DEV-PLAN-086`）：已确定为 v4 必选方案；必须在新仓库 pin `Astro/Node/pnpm`（含 `apps/web/pnpm-lock.yaml`），并明确静态资产构建与发布的 SSOT（`Makefile`/CI）。
 8. [ ] ORY Kratos（`DEV-PLAN-088`）：若确认为 v4 AuthN 方案，需要 pin `ory/kratos` 镜像版本（建议 digest）与配置格式，并在本地编排/CI 中加入可复现的启动口径。
 9. [ ] 100% 覆盖率门禁（`DEV-PLAN-088`）：新仓库需明确“覆盖率统计口径/排除项/生成物处理/CI 入口”，避免实现期临时拼装导致口径漂移。
 
