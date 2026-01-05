@@ -223,14 +223,13 @@ modules/{module}/
 - Docker 中 PostgreSQL CPU 偏高调查与建议（DEV-PLAN-071）：`docs/dev-plans/071-postgres-docker-high-cpu-investigation.md`
 - 对标 Workday 的职位体系（Job Architecture）（DEV-PLAN-072）：`docs/dev-plans/072-job-architecture-workday-alignment.md`
 - Job Catalog 二级菜单中文名修正为“职位分类” + 职种创建补齐（DEV-PLAN-072A）：`docs/dev-plans/072A-job-catalog-zh-nav-rename-and-job-family-create.md`
-- V4 技术栈与工具链版本冻结（DEV-PLAN-087）：`docs/dev-plans/087-v4-tech-stack-and-toolchain-versions.md`
 - DEV-PLAN-073 任职记录页增加字段（职类/职种/职位模板/职级）：`docs/dev-plans/073-job-data-add-job-architecture-fields.md`
 - DEV-PLAN-074 取消职位模板职种“百分比分配”（保留多职种配置）：`docs/dev-plans/074-remove-job-profile-allocation-percent.md`
 - 职位分类（Job Catalog）主数据属性 Effective Dating：切片化 + 同步展示 + 复用抽象（DEV-PLAN-075）：`docs/dev-plans/075-job-catalog-effective-dated-attributes.md`
 - 职位分类（Job Catalog）identity legacy 列退场评估与清理（DEV-PLAN-075A）：`docs/dev-plans/075A-job-catalog-identity-legacy-columns-retirement.md`
 - Org 模块现状研究与 v4（事务性事件溯源 + 同步投射）差异评估（DEV-PLAN-076）：`docs/dev-plans/076-org-v4-transactional-event-sourcing-gap-analysis.md`
 - Org v4（事务性事件溯源 + 同步投射）完整方案（Greenfield）（DEV-PLAN-077）：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`
-- Org v4 全量替换（基于 077，无并行/无兼容/防漂移）（DEV-PLAN-078）：`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`
+- [Archived] Org v4 全量替换（历史参考，已不适用）（DEV-PLAN-078）：`docs/Archived/078-org-v4-full-replacement-no-compat.md`
 - Position v4（事务性事件溯源 + 同步投射）方案（去掉 org_ 前缀）（DEV-PLAN-079）：`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`
 - Job Catalog v4（事务性事件溯源 + 同步投射）方案（去掉 org_ 前缀）（DEV-PLAN-080）：`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
 - 启用 PostgreSQL RLS 强租户隔离（Org/Position/Job Catalog v4）（DEV-PLAN-081）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`
@@ -239,6 +238,6 @@ modules/{module}/
 - 任职记录（Job Data / Assignments）v4 全新实现（Staffing，事件 SoT + 同步投射）（DEV-PLAN-084）：`docs/dev-plans/084-greenfield-assignment-job-data-v4.md`
 - Person 最小身份锚点（Pernr 1-8 位数字字符串，前导 0 同值）以支撑 Staffing 落地（DEV-PLAN-085）：`docs/dev-plans/085-person-minimal-identity-for-staffing.md`
 - 引入 Astro（AHA Stack）到 HTMX + Alpine 的 HRMS v4 UI 方案（077-084）（DEV-PLAN-086）：`docs/dev-plans/086-astro-aha-ui-shell-for-hrms-v4.md`
-- V4 租户管理与登录认证（Kratos 认人 → RLS 圈地 → Casbin 管事）（DEV-PLAN-088）：`docs/dev-plans/088-tenant-and-authn-v4.md`
+- V4 SuperAdmin 控制面认证与会话（与租户登录链路解耦）（DEV-PLAN-088A）：`docs/dev-plans/088A-superadmin-authn-v4.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
