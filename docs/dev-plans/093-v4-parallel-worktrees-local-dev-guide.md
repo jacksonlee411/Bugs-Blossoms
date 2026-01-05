@@ -59,6 +59,16 @@
    - `git worktree remove ../repo-wt-dev-a`
    - `git branch -d feature/<topic-a>`
 
+### 4.1 日常工作流（推荐）
+
+- `wt-main`：
+  - 定期同步：`git pull --ff-only`（保持目录干净）。
+  - 统一管理共享 infra：启动/停止 Postgres/Redis，避免在多个 worktree 同时操作 docker。
+  - 合并前/合并后按触发器矩阵跑门禁（入口见 `AGENTS.md`；推荐 `make preflight` 对齐 CI）。
+- `wt-dev-a` / `wt-dev-b`：
+  - 用于功能开发/复现/Review；需要更新基线时先 `git fetch origin`，再按团队口径 rebase/merge。
+  - 命中生成物/迁移等触发器时，在“产生改动的 worktree”内完成生成与提交，避免跨 worktree 误提交与漂移。
+
 ## 5. 共享本地基础设施（Postgres/Redis）
 
 > 默认采用 `DEV-PLAN-011C`：所有 worktree 共享一套 Postgres/Redis，端口固定为 `5438/6379`。
@@ -92,15 +102,32 @@
 
 ### 6.3 同时运行多个 server（可选）
 
-当确需同时跑 2~3 个 server（例如对比两条分支的行为），需要为每个 worktree 分配不同端口，并同步调整 `ORIGIN`/OAuth redirect 等依赖端口的配置：
+当确需同时跑 2~3 个 server（例如对比两条分支的行为），需要为每个 worktree 分配不同端口，并显式设置 `ORIGIN`（避免依赖默认推导）。另外，HTTP cookie **不区分端口**：如果多个 server 共享同一 hostname，登录态可能互相覆盖/污染。
 
-| worktree | `PORT` | `ORIGIN`（示例） |
-| --- | --- | --- |
-| `wt-main`（可选运行） | `3200` | `http://default.localhost:3200` |
-| `wt-dev-a` | `3201` | `http://default.localhost:3201` |
-| `wt-dev-b` | `3202` | `http://default.localhost:3202` |
+> 说明：`Makefile` 中的 E2E 目标默认使用 `PORT=3201`，建议并行开发端口避开 `3201`。
 
-> 注意：如果启用 OAuth（如 Google），必须同步更新对应的 redirect URL（示例见 `.env.example` 的 `GOOGLE_REDIRECT_URL`）；否则回调会打到错误端口。
+#### 6.3.1 推荐：不同 hostname（cookie 天然隔离）
+
+| worktree | `DOMAIN` | `PORT` | `ORIGIN`（示例） |
+| --- | --- | --- | --- |
+| `wt-main`（可选运行） | `main.default.localhost` | `3200` | `http://main.default.localhost:3200` |
+| `wt-dev-a` | `a.default.localhost` | `3202` | `http://a.default.localhost:3202` |
+| `wt-dev-b` | `b.default.localhost` | `3203` | `http://b.default.localhost:3203` |
+
+- 浏览器访问时使用对应的 hostname（否则 cookie 仍会混在一起）。
+- 若系统不自动解析 `*.localhost`，需要在 `/etc/hosts` 显式添加映射，或改用本机可解析的域名。
+
+#### 6.3.2 备选：同 hostname，不同 cookie key（隔离 cookie 名称）
+
+在保持同一 `DOMAIN` 的前提下，为每个 worktree 设置不同的：
+- `SID_COOKIE_KEY`（见 `pkg/configuration/environment.go`）
+- `OAUTH_STATE_COOKIE_KEY`（见 `pkg/configuration/environment.go`）
+
+示例：
+- `wt-dev-a`：`SID_COOKIE_KEY=sid_a`，`OAUTH_STATE_COOKIE_KEY=oauthState_a`
+- `wt-dev-b`：`SID_COOKIE_KEY=sid_b`，`OAUTH_STATE_COOKIE_KEY=oauthState_b`
+
+> OAuth：无论采用 6.3.1 还是 6.3.2，都必须同步更新 `GOOGLE_REDIRECT_URL`（示例见 `.env.example`），并与 `ORIGIN`/端口一致；否则回调会打到错误端口。
 
 ### 6.4 与 v4 RLS 的对齐（只在命中 v4 表时）
 
@@ -134,8 +161,13 @@
 
 ## 9. 验收标准（本计划完成定义）
 
-- [ ] 在两个不同 worktree 目录中分别执行 `docker compose -f compose.dev.yml up -d db redis`，均成功且不会创建第二套容器（对齐 `DEV-PLAN-011C`）。
+- [ ] 在两个不同 worktree 目录中分别执行 `docker compose -f compose.dev.yml up -d db redis` 后，`docker compose -f compose.dev.yml ps` 显示同一套容器（对齐 `DEV-PLAN-011C`）。
 - [ ] 3 worktree 模式下，能在不切分支的前提下完成：开发/复现/基线验证。
-- [ ] 如需并行运行多 server，按 §6.3 分配端口后可同时启动且互不抢占端口。
+- [ ] 如需并行运行多 server，按 §6.3 分配端口后可同时启动且互不抢占端口，并按 §6.3.1 或 §6.3.2 保证会话 cookie 不互相污染。
 - [ ] 指引中涉及的本地/部署口径不与 `DEV-PLAN-087` 冲突。
 
+## 10. 常见问题与排查（Troubleshooting）
+
+- 另一个 worktree 执行 `docker compose -f compose.dev.yml up` 报端口占用：通常表示你起了第二套 compose project；先 `docker compose ls`，并确保所有 worktree 都使用同一份 `compose.dev.yml`（且顶层 `name` 固定）。
+- 多个 server 并行时登录态“串号”：按 §6.3.1 使用不同 hostname，或按 §6.3.2 为每个 worktree 设置不同 cookie key；必要时清理浏览器对应站点的 cookies。
+- 误执行 `docker compose -f compose.dev.yml down -v`：重新 `up` 后按 `AGENTS.md` 的入口跑 `make db migrate up && make db seed` 恢复本地数据。
