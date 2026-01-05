@@ -18,7 +18,7 @@
 - 数据与迁移工具链：sqlc、Atlas、Goose、SQL 格式化门禁（pg_format）。
 - 授权/路由/事件：Casbin、Routing Gates、Transactional Outbox（能力复用口径）。
 - 质量门禁与测试：golangci-lint、go-cleanarch、Go test、Playwright E2E。
-- 开发体验：Air、DevHub、Node/pnpm（仅用于 E2E/工具）。
+- 开发体验：Air、DevHub、Node/pnpm（用于 E2E；若采纳 `DEV-PLAN-086` 的 Astro 壳，也用于 UI build）。
 - 部署形态：Docker 镜像与 compose 拓扑（含 superadmin）。
 
 ### 2.2 原则（SSOT 与可复现）
@@ -47,6 +47,16 @@
 | Docker 基底（构建） | `golang:1.24.10-alpine` | `Dockerfile`/`Dockerfile.superadmin` |
 | Docker 基底（运行） | `alpine:3.21` | `Dockerfile`/`Dockerfile.superadmin` |
 
+### 3.1.1 PostgreSQL 扩展（V4 Kernel 依赖）
+
+> 说明：`DEV-PLAN-077/079/080` 的 Kernel DDL 大量依赖下表扩展；因此它们属于 V4 的“运行时基线”，必须在 schema SSOT/迁移里显式创建，避免环境漂移。
+
+| 扩展 | V4 基线 | 用途（摘要） | 来源/说明 |
+| --- | --- | --- | --- |
+| `pgcrypto` | enabled | `gen_random_uuid()` 默认值等 | `migrations/org/00001_org_baseline.sql`、`migrations/person/00001_person_baseline.sql`；以及 `DEV-PLAN-077/079/080` |
+| `btree_gist` | enabled | `EXCLUDE USING gist` + `gist_uuid_ops`（no-overlap） | `migrations/org/00001_org_baseline.sql`；以及 `DEV-PLAN-077/079/080` |
+| `ltree` | enabled（OrgUnit） | 路径（子树/祖先链）查询 | `migrations/org/00001_org_baseline.sql`；以及 `DEV-PLAN-077` |
+
 ### 3.2 UI 技术栈（Server-side Rendering）
 
 | 组件 | V4 版本 | 来源/说明 |
@@ -69,6 +79,7 @@
 | sqlc（Go module） | `v1.30.0` | `go.mod`（工具依赖） |
 | Atlas（CLI） | `v0.38.0` | `Makefile` 的 `ATLAS_VERSION`（源码构建安装） |
 | Goose（CLI） | `v3.26.0` | `Makefile` 的 `GOOSE_VERSION`（`go install`） |
+| pgx（PostgreSQL driver） | `v5.7.5` | `go.mod`（Kernel port/adapters 推荐使用 `pgx`；见 `DEV-PLAN-083/084`） |
 | goimports（用于生成物整理） | `v0.26.0` | `Makefile` 的 `sqlc-generate` |
 | SQL 格式化（pg_format） | OS 包（未 pin） | CI 安装 `pgformatter`（Ubuntu apt），本地用 `make check sqlfmt` 对齐 |
 
@@ -111,6 +122,14 @@
 - `.templ` / Tailwind / sqlc 等生成物：**必须提交**，否则 CI 会失败。
 - UI/路由/Authz/DB 等“治理型契约”：新增例外属于契约变更，必须先更新对应 dev-plan SSOT 再落代码。
 
+### 4.3 RLS 与 DB Role（V4 运行态契约）
+
+> 说明：v4 Kernel 默认启用 PostgreSQL RLS（fail-closed）；该契约会影响本地开发、CI 与部署口径，因此在工具链决策里显式写出。
+
+- RLS 注入：事务内设置 `app.current_tenant`（`pkg/composables/rls.go`），policy 用 `current_setting('app.current_tenant')::uuid`（fail-closed），对齐 `DEV-PLAN-081`。
+- 运行态开关：凡访问 v4 表，`RLS_ENFORCE` 必须为 `enforce`（否则视为配置错误），对齐 `.env.example` 与 `DEV-PLAN-081`。
+- DB 账号：应用侧 `DB_USER` 必须为非 superuser，且不可带 `BYPASSRLS`（建议显式 `NOBYPASSRLS`）；superadmin 若需旁路能力，使用独立 role/连接池（见 `DEV-PLAN-088` 的边界）。
+
 ## 5. V4 开发环境指引（本地）
 
 > 目的：新人按此文档能完成“启动 + smoke”，细节以 `docs/CONTRIBUTING.MD`/`devhub.yml`/`Makefile` 为准。
@@ -122,7 +141,8 @@
 5. 启动开发服务：
    - 方式 A（推荐）：使用 DevHub（`make devtools`）按 `devhub.yml` 一键编排；
    - 方式 B：分别启动 `templ generate --watch`、`make css watch` 与 `air -c .air.toml`（命令与端口以 SSOT 为准）。
-6. E2E（可选）：进入 `e2e/`，用 `pnpm` 安装依赖并运行 Playwright（要求本地 DB 与 Go server 已启动）。
+6. v4 RLS（若命中 v4 表）：设置 `RLS_ENFORCE=enforce`，并确保 `DB_USER` 为非 superuser（否则 Postgres 会绕过 RLS）。
+7. E2E（可选）：进入 `e2e/`，用 `pnpm` 安装依赖并运行 Playwright（要求本地 DB 与 Go server 已启动）。
 
 ## 6. V4 部署指引（Docker）
 
@@ -143,6 +163,9 @@
 4. [ ] goimports：`make sqlc-generate` 固定 `v0.26.0`，但 devcontainer 里为 `v0.31.0` —— 统一版本并对齐格式化输出。
 5. [ ] Redis 镜像：当前为 `redis:latest`（浮动）—— 为 V4 生产/CI 口径增加 pin 策略（至少固定 major/minor，推荐 digest）。
 6. [ ] DevContainer：当前基底为 Go `1.23`（与 `go.mod` 不一致）—— 视团队是否继续使用 DevContainer，决定升级或移除（参考 `DEV-PLAN-002`）。
+7. [ ] Astro（AHA UI Shell，`DEV-PLAN-086`）：若确认为 v4 UI 方案，需要在新仓库 pin `Astro/Node/pnpm`（及其 lockfile），并明确静态资产构建与发布的 SSOT。
+8. [ ] ORY Kratos（`DEV-PLAN-088`）：若确认为 v4 AuthN 方案，需要 pin `ory/kratos` 镜像版本（建议 digest）与配置格式，并在本地编排/CI 中加入可复现的启动口径。
+9. [ ] 100% 覆盖率门禁（`DEV-PLAN-088`）：新仓库需明确“覆盖率统计口径/排除项/生成物处理/CI 入口”，避免实现期临时拼装导致口径漂移。
 
 ## 8. 验收标准（本计划完成定义）
 

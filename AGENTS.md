@@ -243,5 +243,6 @@ modules/{module}/
 - V4 SuperAdmin 控制面认证与会话（与租户登录链路解耦）（DEV-PLAN-088A）：`docs/dev-plans/088A-superadmin-authn-v4.md`
 - V4 多语言（仅 en/zh：UI 选择 + Accept-Language + 用户语言）（DEV-PLAN-089）：`docs/dev-plans/089-i18n-en-zh-only.md`
 - V4 Atlas + Goose 闭环指引（模块级 schema→迁移→门禁）（DEV-PLAN-090）：`docs/dev-plans/090-v4-atlas-goose-closed-loop-guide.md`
+- V4 sqlc 工具链使用指引与规范（SQL-first + DB Kernel + RLS）（DEV-PLAN-091）：`docs/dev-plans/091-sqlc-guidelines-for-v4.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
