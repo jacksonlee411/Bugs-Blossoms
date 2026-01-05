@@ -31,12 +31,14 @@
   - Org v4 cutover：`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`
   - OrgUnit v4：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`
   - Position v4：`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`
+  - 多租户隔离（RLS）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`（对齐 `docs/dev-plans/019-multi-tenant-toolchain.md` / `docs/dev-plans/019A-rls-tenant-isolation.md`）
   - 时间语义（Valid Time=DATE）：`docs/dev-plans/064-effective-date-day-granularity.md`
 
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.1 Kernel 边界（与 077/079 对齐）
 - **DB = Projection Kernel（权威）**：插入事件（幂等）+ 同步投射 versions + 不变量裁决 + 可 replay。
 - **Go = Command Facade**：鉴权/租户与操作者上下文 + 事务边界 + 调 Kernel + 错误映射到 `pkg/serrors`。
+- **多租户隔离（RLS）**：v4 tenant-scoped 表默认启用 PostgreSQL RLS（fail-closed；见 `DEV-PLAN-081`），因此访问 v4 的运行态必须 `RLS_ENFORCE=enforce`，并在事务内注入 `app.current_tenant`（对齐 `DEV-PLAN-019/019A`）。
 - **One Door Policy（写入口唯一）**：除各实体 `submit_*_event` 与运维 replay 外，应用层不得直写事件表/versions 表/identity 表（`job_family_groups/job_families/job_levels/job_profiles`）及关系表，不得直调 `apply_*_logic`。
 - **同步投射机制（选定）**：每次写入都触发**同事务全量重放**（delete+replay），保持逻辑简单，拒绝“增量缝补”分支。
 
@@ -387,6 +389,7 @@ CREATE OR REPLACE FUNCTION submit_job_profile_event(
 ```
 
 统一合同语义（必须）：
+0) 多租户上下文（RLS）：写入口函数开头必须断言 `p_tenant_id` 与 `app.current_tenant` 一致（对齐 `DEV-PLAN-081`）。
 1) 获取互斥锁：`org:v4:<tenant_id>:JobCatalog`（同一事务内）。
 2) 参数校验：`p_event_type` 必须为 `CREATE/UPDATE/DISABLE`；`p_payload` 必须为 object（空则视为 `{}`）。
 3) identity 处理：
@@ -406,6 +409,8 @@ CREATE OR REPLACE FUNCTION submit_job_profile_event(
 
 > `replay_*` / `apply_*_logic` 属于 Kernel 内部实现细节：用于把事件投射到各 `*_versions` 与关系表，禁止应用角色直接执行。
 
+> 多租户隔离（RLS，见 `DEV-PLAN-081`）：`replay_*` 函数开头必须断言 `p_tenant_id` 与 `app.current_tenant` 一致。
+
 ## 6. 读模型封装与查询
 函数签名（建议）：
 ```sql
@@ -421,6 +426,7 @@ CREATE OR REPLACE FUNCTION get_job_catalog_snapshot(
 ## 7. Go 层集成（事务 + 调用 DB）
 - Go 仅负责：鉴权 → 开事务 → 调对应实体的 `submit_*_event` → 提交。
 - 错误契约对齐 077：优先用 `SQLSTATE + constraint name` 做稳定映射；业务级拒绝使用“稳定 code（`MESSAGE`）+ `DETAIL`”的异常形状。
+- 多租户隔离（RLS）相关失败路径与稳定映射对齐 `DEV-PLAN-081`（fail-closed 缺 tenant 上下文 / tenant mismatch / policy 拒绝）。
 
 ### 7.1 错误契约（DB → Go → serrors）
 最小映射表（v1，示例 code；落地时以模块错误码表收敛为准）：
@@ -437,6 +443,7 @@ CREATE OR REPLACE FUNCTION get_job_catalog_snapshot(
 | profile↔families 违反“至少一个/恰好一个 primary” | 约束/触发器失败 | `23514/23505` + constraint name 或 DB exception `MESSAGE` | `JOB_PROFILE_FAMILY_CONSTRAINT_VIOLATION` |
 
 ## 8. 测试与验收标准 (Acceptance Criteria)
+- [ ] RLS（对齐 081）：缺失 `app.current_tenant` 时对 v4 表的读写必须 fail-closed；tenant mismatch 必须稳定失败可映射。
 - [ ] 事件幂等：同 `event_id` 重试不重复投射。
 - [ ] 全量重放：每次写入都在同一事务内 delete+replay 对应 versions，且写后读强一致。
 - [ ] 同日唯一：同一实体同日提交第二条事件被拒绝且可稳定映射错误码（每类实体独立 events 表）。
@@ -453,3 +460,5 @@ CREATE OR REPLACE FUNCTION get_job_catalog_snapshot(
 - Profile：`SELECT replay_job_profile_versions('<tenant_id>'::uuid, '<job_profile_id>'::uuid);`
 
 > 建议在执行前复用同一把维护互斥锁（`org:v4:<tenant_id>:JobCatalog`）确保与在线写入互斥。
+
+> 多租户隔离（RLS，见 `DEV-PLAN-081`）：replay 必须在显式事务内先注入 `app.current_tenant`，否则会 fail-closed。

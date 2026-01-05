@@ -5,7 +5,7 @@
 > 本计划的定位：以一次 cutover 的方式，把当前 `modules/org` 中的 **OrgUnit + Position + Job Catalog**（以及它们的旧支撑表）整体替换为 v4（事件 SoT + 同步投射）的实现，并在同一变更内删除旧 schema 与旧实现。  
 > 强约束：**不并行**（不保留双实现/双写/双读）、**不向后兼容**（允许破坏现有 API/UI/数据形态）、**杜绝漂移**（单一事实源、单一写入口、强门禁）。
 >
-> SSOT：OrgUnit v4=`DEV-PLAN-077`；Position v4=`DEV-PLAN-079`；Job Catalog v4=`DEV-PLAN-080`。
+> SSOT：OrgUnit v4=`DEV-PLAN-077`；Position v4=`DEV-PLAN-079`；Job Catalog v4=`DEV-PLAN-080`；多租户隔离（RLS）=`DEV-PLAN-081`。
 
 ## 1. 背景与上下文 (Context)
 - `DEV-PLAN-077` 定义了 OrgUnit v4 的 **权威契约**：SoT=`org_events`，同步投射到 `org_unit_versions`，DB Kernel + Go Facade，强一致读与可重放重建。
@@ -48,6 +48,7 @@
   - OrgUnit v4 目标架构（唯一权威）：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`
   - Position v4 目标架构（唯一权威）：`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`
   - Job Catalog v4 目标架构（唯一权威）：`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
+  - 多租户隔离（RLS）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`（对齐 `docs/dev-plans/019-multi-tenant-toolchain.md` / `docs/dev-plans/019A-rls-tenant-isolation.md`）
   - 时间语义（Valid Time=DATE）：`docs/dev-plans/064-effective-date-day-granularity.md`
 
 ## 3. 关键原则（本计划的“防漂移合约”）
@@ -200,7 +201,7 @@
    - [ ] 列出当前 OrgUnit/Position/Job Catalog schema 关键表与其 SSOT 文件位置（以 021A 定义为准）。
    - [ ] 列出 authz 依赖点（若存在），确认是否需要同步更新（不兼容允许改，但必须显式）。
 2. [X] 数据决策确认：强制不保留（5.1）
-3. [ ] v4 schema/Kernal 落地（按 077/079/080；遵守“新增表需确认”红线）
+3. [ ] v4 schema/Kernal 落地（按 077/079/080/081；遵守“新增表需确认”红线）
 4. [ ] Go Facade + 路由/UI 全量切换（按 077/079/080；删除旧实现）
 5. [ ] 清库/重建/seed（按 5.2 的执行口径）
 6. [ ] 删除遗留（旧表/旧函数/旧代码/旧测试断言）并通过全部门禁
@@ -221,6 +222,7 @@
 - [ ] 在 seed 初始化后，OrgUnit 的 Create/Move/Rename/Disable as-of 查询满足 077 的不变量与错误契约。
 - [ ] 在 seed 初始化后，Position/Assignment 的写入与 as-of 查询满足 079 的不变量与错误契约。
 - [ ] 在 seed 初始化后，Job Catalog 的写入与 as-of 查询满足 080 的不变量与错误契约。
+- [ ] RLS（对齐 081）：v4 tenant-scoped 表默认启用 RLS（ENABLE+FORCE+policy，fail-closed），且运行态 `RLS_ENFORCE=enforce` 下跨租户读写被拒绝/隔离。
 - [ ] 并发写互斥与 fail-fast 行为符合各 SSOT（busy 错误稳定可映射）。
 - [ ] 每次写入均触发“同事务全量重放”，且重放后 versions 同时满足 no-overlap + gapless（3.4）。
 
@@ -229,6 +231,8 @@
   - 缓解：在执行 cutover 前明确备份/快照策略与验证脚本（本计划不保留数据，但仍需要“可恢复的事故处理手段”；具体形式在实施阶段补齐并写入 readiness）。
 - **替换 PR 过大**：
   - 缓解：允许少量“纯重构/纯测试”前置 PR，但禁止主干出现双实现可达路径。
+- **RLS fail-closed 误配置风险**：v4 默认启用 RLS；若漏注入 `app.current_tenant` 或将 `RLS_ENFORCE=disabled`，会导致读写 fail-closed（表现为报错/无数据）。
+  - 缓解：按 `DEV-PLAN-081` 强制 `RLS_ENFORCE=enforce` + 非 superuser 且 `NOBYPASSRLS` 的 DB role；所有 v4 DB 访问统一走 `InTenantTx`/`ApplyTenantRLS`。
 - **数据丢失的组织风险**：
   - 缓解：在执行前获得明确确认（本计划已确认选项 A），并将“不可逆”写入变更说明与验收记录。
 
@@ -239,6 +243,7 @@
 - `docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`：OrgUnit v4 唯一权威契约（Kernel/Fascade/Schema/算法/错误契约）。
 - `docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`：Position v4 唯一权威契约（Kernel/Fascade/Schema/算法/错误契约）。
 - `docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`：Job Catalog v4 唯一权威契约（Kernel/Fascade/Schema/算法/错误契约）。
+- `docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`：v4 tenant-scoped 表启用 RLS 的权威契约（fail-closed、注入、错误/回滚口径）。
 - `docs/dev-plans/021A-org-atlas-goose-toolchain-and-gates.md`：Org Atlas+Goose 工具链与门禁口径（实施必需）。
 - `docs/dev-plans/064-effective-date-day-granularity.md`：Valid Time=DATE 语义约束（实施必需）。
 - `docs/dev-plans/045-simple-not-easy-review-guide.md`：实施/评审方法论（过程约束）。

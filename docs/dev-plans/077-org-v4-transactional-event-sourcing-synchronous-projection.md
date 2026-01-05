@@ -46,6 +46,7 @@ HR SaaS 的组织架构场景常见约束：
   - 命令入口：`Makefile`
   - CI 门禁：`.github/workflows/quality-gates.yml`
   - 时间语义（Valid Time=DATE）：`docs/dev-plans/064-effective-date-day-granularity.md`
+  - 多租户隔离（RLS）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`（对齐 `docs/dev-plans/019-multi-tenant-toolchain.md` / `docs/dev-plans/019A-rls-tenant-isolation.md`）
 
 ## 3. 架构与关键决策 (Architecture & Decisions)
 ### 3.1 架构图 (Mermaid)
@@ -114,10 +115,10 @@ flowchart TD
 - gapless：由重放算法生成并在事务内校验（见 §5.3）。
 - root 唯一：`org_trees`（见 4.3）+ 重放期校验。
 - 防环 move：重放期校验（cycle detection）。
-- 多租户隔离：`tenant_id` 强制（RLS 若启用需 fail-closed；策略在实施阶段落盘）。
+- 多租户隔离：`tenant_id` 强制；v4 表默认启用 RLS（fail-closed；落盘口径见 `DEV-PLAN-081`），因此访问 v4 的运行态必须 `RLS_ENFORCE=enforce`（并使用非 superuser 且 `NOBYPASSRLS` 的 DB role）。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
-> 约定：PostgreSQL 17；多租户隔离通过 `tenant_id` 强制；RLS（若启用）需 fail-closed（具体策略在实施阶段随迁移落盘）。
+> 约定：PostgreSQL 17；多租户隔离通过 `tenant_id` 强制；v4 表默认启用 RLS（fail-closed；落盘口径见 `DEV-PLAN-081`）。
 
 ### 4.1 必备扩展
 ```sql
@@ -329,6 +330,8 @@ DECLARE
   v_payload jsonb;
   v_existing org_events%ROWTYPE;
 BEGIN
+  PERFORM assert_current_tenant(p_tenant_id);
+
   IF p_hierarchy_type <> 'OrgUnit' THEN
     RAISE EXCEPTION USING
       MESSAGE = 'ORG_INVALID_ARGUMENT',
@@ -430,6 +433,8 @@ DECLARE
   v_new_name text;
   v_manager_id uuid;
 BEGIN
+  PERFORM assert_current_tenant(p_tenant_id);
+
   IF p_hierarchy_type <> 'OrgUnit' THEN
     RAISE EXCEPTION USING
       MESSAGE = 'ORG_INVALID_ARGUMENT',
@@ -1097,6 +1102,8 @@ WHERE v.tenant_id=$1
 ## 7. Go 应用层集成（事务 + 锁 + 调用 DB）
 > 应用层只负责：鉴权 →（可选 try-lock）→ 开事务 → 调 `submit_org_event` → 提交。
 
+> 多租户隔离（RLS，见 `DEV-PLAN-081`）：v4 表默认启用 RLS，事务必须在第一条 SQL 前注入 `app.current_tenant`（复用 `composables.ApplyTenantRLS`）；`RLS_ENFORCE` 为 `disabled` 将导致 fail-closed（属于配置错误，而非“降级模式”）。
+
 建议形状（伪代码）：
 ```go
 func (s *OrgServiceV4) MoveOrg(ctx context.Context, tenantID uuid.UUID, cmd MoveCmd) error {
@@ -1133,6 +1140,7 @@ func (s *OrgServiceV4) MoveOrg(ctx context.Context, tenantID uuid.UUID, cmd Move
   - `MESSAGE` 必须是稳定 code（不拼接动态内容），动态信息放在 `DETAIL`；
   - Go 侧只解析 `MESSAGE` 做映射，不依赖自然语言与字符串包含关系；
 - 对“同日事件冲突”这类不变量，允许直接依赖唯一性约束报错（`23505`）做映射。
+- 多租户隔离（RLS）相关失败路径与稳定映射对齐 `DEV-PLAN-081`（fail-closed 缺 tenant 上下文 / tenant mismatch / policy 拒绝）。
 
 最小映射表（v1）：
 
@@ -1158,9 +1166,13 @@ func (s *OrgServiceV4) MoveOrg(ctx context.Context, tenantID uuid.UUID, cmd Move
 当投射逻辑缺陷导致 `org_unit_versions` 错误时，可通过重放 `org_events` 重建读模型。
 
 ### 8.2 Rebuild 流程（建议）
-1) 获取维护互斥锁（复用写锁 key，避免两套互斥语义）：`SELECT pg_advisory_lock(hashtextextended('org:v4:<tenant_id>:OrgUnit', 0));`
-2) 执行全量重放（函数内部会 delete 并重建 `org_trees/org_unit_versions`）：`SELECT replay_org_unit_versions('<tenant_id>'::uuid, 'OrgUnit');`
-3) 释放锁：`SELECT pg_advisory_unlock(hashtextextended('org:v4:<tenant_id>:OrgUnit', 0));`
+> 多租户隔离（RLS，见 `DEV-PLAN-081`）：rebuild/replay 必须在**显式事务**内先注入 `app.current_tenant`，否则会 fail-closed。
+
+1) `BEGIN;`
+2) 注入租户上下文：`SELECT set_config('app.current_tenant', '<tenant_id>', true);`
+3) 获取维护互斥锁（复用写锁 key）：`SELECT pg_advisory_xact_lock(hashtextextended('org:v4:<tenant_id>:OrgUnit', 0));`
+4) 执行全量重放：`SELECT replay_org_unit_versions('<tenant_id>'::uuid, 'OrgUnit');`
+5) `COMMIT;`
 
 > 注：本计划不引入“维护模式开关”；如需在线运行 rebuild，必须另开计划定义安全窗口与影响面控制。
 
@@ -1172,6 +1184,8 @@ func (s *OrgServiceV4) MoveOrg(ctx context.Context, tenantID uuid.UUID, cmd Move
   - [ ] Move 触发子树 path 重写后，祖先/子树查询与长名称拼接一致且不缺段。
   - [ ] 并发写：同一 tenant/hierarchy 下同时发起两次写入，第二个在 fail-fast 模式下稳定返回“busy”错误码。
   - [ ] 同一 `org_id` 在同一 `effective_date` 第二次提交（不同 `event_id`）稳定失败，并映射为 `ORG_EVENT_CONFLICT_SAME_DAY`。
+  - [ ] RLS（对齐 `DEV-PLAN-081`）：缺失 `app.current_tenant` 时对 v4 表的读写必须 fail-closed（不得以“空结果”掩盖注入遗漏）。
+  - [ ] RLS（对齐 `DEV-PLAN-081`）：`app.current_tenant` 与 `p_tenant_id` 不一致时，`submit_org_event/replay_org_unit_versions` 必须稳定失败（tenant mismatch）。
 - 性能（建议）：
   - [ ] `get_org_snapshot` 在 1k/10k 节点规模下 query 次数为常数（1 次），并可通过索引命中保持稳定延迟。
   - [ ] `EXPLAIN (ANALYZE, BUFFERS)` 显示 `get_org_snapshot` 的 snapshot 过滤命中 `org_unit_versions_active_day_gist`（或等价的 GiST/EXCLUDE 索引），避免全表 Seq Scan。
