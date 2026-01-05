@@ -17,7 +17,7 @@
 - [ ] UI/列表展示层：任职记录**仅显示生效日期（effective date）**；底层仍使用 `daterange` 的左闭右开 `[start,end)` 表达有效期（不改为闭区间）。
 - [ ] 以清晰契约替代“隐式耦合”：
   - 写路径输入统一使用 `person_uuid`（对齐 083），不再以 pernr 作为写侧主键；
-  - person 的 pernr→uuid 解析由 `modules/person` 提供 options/read API，`staffing` 不直读 `persons` 表。
+  - person 的 pernr→uuid 解析由 `modules/person` 提供 options/read API，`staffing` 不直读 `persons` 表（Person Identity 合同见 `DEV-PLAN-085`）。
 - [ ] 完整登记当前任职记录已实现功能，并逐项给出 v4 方案的落地方式（或明确不做）。
 - [ ] 实现需满足 082/083 的 DDD 分层与 One Door Policy：Go=Facade（鉴权/事务/调用/错误映射），DB=Kernel（裁决/投射/重放）。
 
@@ -220,4 +220,3 @@ modules/staffing/
    - gapless（最后一段 infinity）
    - 转移/终止/撤销（失败路径可解释）
 5. [ ] 通过相关门禁（引用 `AGENTS.md` 触发器矩阵）。
-

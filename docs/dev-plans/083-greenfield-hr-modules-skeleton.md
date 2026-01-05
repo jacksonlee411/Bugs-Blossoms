@@ -59,6 +59,7 @@
 - **ID 类型**：跨模块只通过 `uuid`（或 `pkg/**` 的强类型别名）传递 ID，不跨模块 import 领域对象。
 - **存在性校验**：
   - `staffing` 引用 `person`：写路径输入统一使用 `person_uuid`（而非 pernr）；pernr→uuid 的解析应由 `person` 模块提供 options/read API（UI 通过 HTMX/HTTP 获取），避免 `staffing` 直接查询 `persons` 表形成隐式耦合。
+  - Person Identity 最小合同与 pernr 约束（8 位数字字符串）见：`docs/dev-plans/085-person-minimal-identity-for-staffing.md`
   - `staffing` 引用 `jobcatalog`：建议以 `job_profile_id/job_level_id/...` 作为输入，并在 write side 记录必要的 label 快照（避免“改字典=改历史”与跨域查询耦合；对齐 080 的动机）。
   - `staffing` 引用 `orgunit`：建议以 `org_unit_id` 作为输入；组织路径/长名等展示型数据通过 `pkg/orglabels` 或独立 read API 提供（不把投射逻辑复制到 staffing）。
 
