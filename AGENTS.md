@@ -233,5 +233,7 @@ modules/{module}/
 - Position v4（事务性事件溯源 + 同步投射）方案（去掉 org_ 前缀）（DEV-PLAN-079）：`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`
 - Job Catalog v4（事务性事件溯源 + 同步投射）方案（去掉 org_ 前缀）（DEV-PLAN-080）：`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
 - 启用 PostgreSQL RLS 强租户隔离（Org/Position/Job Catalog v4）（DEV-PLAN-081）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`
+- DDD 分层框架方案（对齐 CleanArchGuard + v4 DB Kernel）（DEV-PLAN-082）：`docs/dev-plans/082-ddd-layering-framework.md`
+- Greenfield HR 模块骨架与契约（OrgUnit/JobCatalog/Staffing/Person）（DEV-PLAN-083）：`docs/dev-plans/083-greenfield-hr-modules-skeleton.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
