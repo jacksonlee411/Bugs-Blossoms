@@ -1,6 +1,6 @@
 # DEV-PLAN-088A：V4 SuperAdmin 控制面认证与会话（与租户登录链路解耦）
 
-**状态**: 草拟中（2026-01-05 08:00 UTC）
+**状态**: 草拟中（2026-01-05 08:05 UTC）
 
 > 适用范围：**全新实现的 V4 新代码仓库（Greenfield）**。  
 > 上游依赖：`DEV-PLAN-088`（V4 租户管理与登录认证总体方案）、`DEV-PLAN-081`（v4 RLS 推进）、`DEV-PLAN-019D`（控制面边界与回滚理念）。  
@@ -43,6 +43,10 @@ V4（Greenfield）将重构租户/认证/RLS，并要求：
 ### 3.3 决策 3：`sessions`（tenant app）不启用 RLS；控制面会话独立
 - 选择：tenant app 的 `sessions` 不启用 RLS（避免“先有 tenant 才能取 session”的循环）；控制面另建 `superadmin_sessions`，同样不启用 RLS。
 - 理由：会话查找必须发生在 tenant 注入之前；RLS 适用于业务表，而非 session 表。
+
+### 3.4 决策 4：SuperAdmin Identity 与 Tenant Identity 共享 Kratos（但 identifier 命名空间隔离）
+- 选择：复用同一 Kratos 实例，superadmin 使用独立 identifier 命名空间 `sa:{lower(email)}`；tenant app 仍使用 `{tenant_id}:{lower(email)}`（见 `DEV-PLAN-088`）。
+- 理由：避免再引入第二个 Kratos 部署组件；同时用命名空间消除“同一 email 多租户”与 superadmin 的冲突与歧义。
 
 ## 4. 架构与边界
 
@@ -114,6 +118,7 @@ flowchart LR
 - 重要约束：
   - SuperAdmin 入口必须是独立 host（例如 `superadmin.<apex>`），避免与 tenant 域名混用。
   - `sa_sid` cookie 必须 host-only；不得设置为 apex Domain，避免被租户站点携带。
+  - Kratos identifier 必须采用 `sa:{lower(email)}`；不得复用 tenant 的 `{tenant_id}:{email}` 规则。
 
 ### 6.3 Phase 2（可选）：接入企业 SSO（Jackson）
 单独出计划（例如 088B），并在 Tenant Console 中管理 superadmin 的 SSO 连接与回滚策略；不在本计划内展开。
@@ -131,6 +136,7 @@ flowchart LR
 ### 7.2 失败路径（必须显式）
 - `sa_sid` 无效/过期：统一 302 到 `/superadmin/login`（或 401 for API）。
 - bypass DB pool 不可用：控制面进入“只读/停写”模式，并给出明确错误提示；不得自动降级为 tenant pool（避免旁路消失导致误判）。
+  - audit log 写入失败：跨租户写操作必须 fail-closed（拒绝写入），不得“先写再说”。
 
 ### 7.3 回滚策略
 - Phase 1 回滚到 Phase 0：
@@ -148,7 +154,20 @@ flowchart LR
   - bypass pool 与 tenant pool 严格分离：tenant app 代码路径不可拿到 bypass pool。
   - 当启用 RLS 的业务表被访问时：tenant pool 必须被圈地；bypass pool 可以跨租户读写（仅在 superadmin 路径）。
 
-## 9. Simple > Easy Review（DEV-PLAN-045，自评）
+验收标准（最小集）：
+- [ ] tenant app 的 `sid` 不能访问 superadmin 路由（必须 302/401）。
+- [ ] superadmin 的 `sa_sid` 不能访问 tenant app 的登录态路由（必须 401）。
+- [ ] 所有跨租户写操作都能在 `superadmin_audit_logs` 找到对应记录，且 `payload` 不含 secret/token/cookie。
+- [ ] 任一旁路能力（bypass pool / write mode）在关闭时必须 fail-closed。
+
+## 9. Bootstrap（避免“第一天就锁死”）
+- Phase 0：通过部署侧 BasicAuth/allowlist 进入控制面，无需创建 superadmin principal。
+- Phase 1：提供一次性 CLI（例如 `cmd/superadmin bootstrap`）：
+  - 创建首个 `superadmin_principals`（email + display_name）。
+  - （可选）创建对应 Kratos identity（identifier `sa:{email}`），并输出一次性初始密码/恢复链接（不得落日志）。
+  - 记录可审计痕迹（时间、操作者、目标 email），但不得记录敏感凭据。
+
+## 10. Simple > Easy Review（DEV-PLAN-045，自评）
 
 ### 结构（解耦/边界）
 - 通过：用独立 cookie + 独立 session 表把控制面与数据面解耦；旁路能力仅在 superadmin 边界存在。
@@ -163,3 +182,7 @@ flowchart LR
 ### 维护（可理解/可解释）
 - 通过：控制面主流程可一句话描述：`sa_sid` 认证 → bypass pool 执行跨租户操作 → 写入审计。
 
+## 11. 停止线（命中即打回）
+- [ ] 控制面复用 tenant app 的 `sid` cookie 或 session 表。
+- [ ] bypass pool 不可用时自动降级到 tenant pool（属于安全降级错误）。
+- [ ] 跨租户写操作未写入审计日志仍然成功。
