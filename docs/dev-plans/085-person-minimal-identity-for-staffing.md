@@ -1,4 +1,4 @@
-# DEV-PLAN-085：Person 最小身份锚点（Pernr 8 位数字字符串）以支撑 Staffing 落地
+# DEV-PLAN-085：Person 最小身份锚点（Pernr 1-8 位数字字符串）以支撑 Staffing 落地
 
 **状态**: 草拟中（2026-01-05 04:26 UTC）
 
@@ -8,13 +8,13 @@
 
 为避免 `staffing` 与 `persons` 表形成隐式耦合（跨模块直接查表/解析），`DEV-PLAN-083/084` 明确要求：**pernr → person_uuid 的解析由 `modules/person` 提供 options/read API**，并把“人员身份”收敛为一个最小、稳定、可复用的契约。
 
-当前仓库已存在 `modules/person` 与 `persons` 表，但 `pernr` 尚未被约束为“8 位字符串”，也缺少一个面向集成方的“按 pernr 精确解析”的稳定 API 合同。本计划给出 **Person Identity 的最小化设计**，作为 `modules/staffing` 落地的前置契约。
+当前仓库已存在 `modules/person` 与 `persons` 表，但 `pernr` 尚未被约束为“最多 8 位数字字符串”，也缺少一个面向集成方的“按 pernr 精确解析”的稳定 API 合同。本计划给出 **Person Identity 的最小化设计**，作为 `modules/staffing` 落地的前置契约。
 
 ## 2. 目标与非目标 (Goals & Non-Goals)
 
 ### 2.1 核心目标
-- [ ] 冻结 Person Identity 的最小合同：`person_uuid` + `pernr`（**8 位字符串**）+ `display_name` + `status`。
-- [ ] 约束 `pernr` 的格式与唯一性：同租户唯一，且必须为 **8 位数字字符串**（保留前导 0）。
+- [ ] 冻结 Person Identity 的最小合同：`person_uuid` + `pernr`（**1-8 位数字字符串**）+ `display_name` + `status`。
+- [ ] 约束 `pernr` 的格式与唯一性：同租户唯一，且必须为 **1-8 位数字字符串**（最多 8 位；允许前导 0）。
 - [ ] 提供 `staffing`/前端可直接复用的 pernr→uuid 解析能力（options/read API），避免 `staffing` 在 Go/SQL 层直接读 `persons` 表做解析。
 - [ ] 保持与 `DEV-PLAN-082/083/084` 的边界一致：Person 仅负责身份锚点，不承载任职/组织/职位等跨域逻辑。
 
@@ -44,8 +44,8 @@
 
 ### 4.0 关键决策（冻结）
 
-1) **Pernr 形状**：选定 `pernr` 为 **8 位数字字符串**（`^[0-9]{8}$`），类型为 `text/string`，保留前导 0。  
-理由：本仓库语境已使用 SAP 术语 `pernr`，且 `DEV-PLAN-084` 的 UI/筛选会把它视为“工号”；将其收敛为 8 位数字有利于：一致性（避免多种格式并存）、可索引、可解释（少歧义）。  
+1) **Pernr 形状**：选定 `pernr` 为 **1-8 位数字字符串**（`^[0-9]{1,8}$`），类型为 `text/string`，允许前导 0。  
+理由：本仓库语境已使用 SAP 术语 `pernr`，且 `DEV-PLAN-084` 的 UI/筛选会把它视为“工号”；将其收敛为“最多 8 位数字”有利于：一致性（避免多种格式并存）、可索引、可解释（少歧义），且允许逐步从短工号过渡到更长工号。  
 若未来必须支持非数字工号，应以**显式的破坏性变更**升级本合同（放宽 regex + 回填/迁移策略），而不是在实现期隐式兼容。
 
 2) **解析契约单一来源**：`pernr → person_uuid` 的 **精确解析**必须由 `modules/person` 提供稳定 API（`persons:by-pernr`），`persons:options` 仅用于 UI 联想/选择，不作为精确解析的替代路径。
@@ -54,7 +54,7 @@
 
 **实体：Person（Identity）**
 - `person_uuid`：UUID，跨模块唯一身份锚点（write-side 使用）
-- `pernr`：**8 位数字字符串**（例如 `00001234`），同租户唯一
+- `pernr`：**1-8 位数字字符串**（例如 `1` / `00001234`），同租户唯一
 - `display_name`：展示名（非空，trim 后存储）
 - `status`：`active|inactive`
 - `created_at/updated_at`：审计时间（`timestamptz`；对齐 064 的“审计时间”语义）
@@ -62,7 +62,7 @@
 **不变量（必须）**
 - `pernr` 必须满足：
   - `btrim(pernr) = pernr`（无前后空格）
-  - `pernr ~ '^[0-9]{8}$'`（严格 8 位数字字符串；不自动补零，避免“隐式魔法”）
+  - `pernr ~ '^[0-9]{1,8}$'`（严格 1-8 位数字字符串；不自动补零/补位，避免“隐式魔法”）
 - `(tenant_id, pernr)` 唯一
 - `display_name` 非空且 trim 后存储
 
@@ -71,11 +71,11 @@
 > 实施阶段的 SSOT：`modules/person/infrastructure/persistence/schema/person-schema.sql`。
 
 - 现状：`persons.pernr` 为 `text`，仅有 trim check 与 unique。
-- 建议：新增 8 位数字 check constraint（可采用 Postgres `NOT VALID` + `VALIDATE CONSTRAINT` 的渐进方式，避免存量脏数据导致迁移中断）：
-  - `CONSTRAINT persons_pernr_8_digits_check CHECK (pernr ~ '^[0-9]{8}$')`
+- 建议：新增“最多 8 位数字”check constraint（可采用 Postgres `NOT VALID` + `VALIDATE CONSTRAINT` 的渐进方式，避免存量脏数据导致迁移中断）：
+  - `CONSTRAINT persons_pernr_max_8_digits_check CHECK (pernr ~ '^[0-9]{1,8}$')`
 
 **实施前置检查（避免盲目加约束）**
-- [ ] 统计存量 `persons.pernr` 是否存在非 8 位数字的值；若存在，明确修复策略（人工修正/数据回填/冻结迁移）。
+- [ ] 统计存量 `persons.pernr` 是否存在“非数字 / 空 / 超过 8 位”的值；若存在，明确修复策略（人工修正/数据回填/冻结迁移）。
 
 ### 4.3 对外接口契约（供 Staffing/前端复用）
 
@@ -86,12 +86,12 @@
   - 返回：`items[]`，每项含 `person_uuid/pernr/display_name`
   - 用途：表单选择器/搜索联想（Staffing create/edit）
 
-- `GET /person/api/persons:by-pernr?pernr=<8digits>`
+- `GET /person/api/persons:by-pernr?pernr=<digits_max8>`
   - 用途：**精确解析** pernr→person_uuid；Staffing/前端在以 pernr 作为筛选参数时，应先解析为 `person_uuid` 再查询 Staffing（避免 Staffing 自己做解析）
 
 **错误契约（稳定错误码）**
 - `persons:by-pernr`：
-  - 400 `PERSON_PERNR_INVALID`：缺少/非法 `pernr`（不匹配 `^[0-9]{8}$`）
+  - 400 `PERSON_PERNR_INVALID`：缺少/非法 `pernr`（不匹配 `^[0-9]{1,8}$`）
   - 404 `PERSON_NOT_FOUND`：该租户下不存在该 `pernr`
   - 500 `PERSON_INTERNAL`：内部错误
 
@@ -116,23 +116,23 @@
 ## 5. 实施步骤（Plan → Implement）
 
 1. [ ] 冻结 Person Identity 合同（本文档）并在 `AGENTS.md` Doc Map 登记。
-2. [ ] Go：在 `modules/person` 的 DTO/domain 层增加 `pernr` 8 位数字校验（错误信息本地化，错误码稳定）。
-3. [ ] DB：为 `persons.pernr` 增加 8 位 check constraint（必要时使用 `NOT VALID` 渐进落盘），并补齐存量数据校验策略。
+2. [ ] Go：在 `modules/person` 的 DTO/domain 层增加 `pernr` 1-8 位数字校验（错误信息本地化，错误码稳定）。
+3. [ ] DB：为 `persons.pernr` 增加“最多 8 位数字”check constraint（必要时使用 `NOT VALID` 渐进落盘），并补齐存量数据校验策略。
 4. [ ] API：补齐 `persons:by-pernr`（精确解析），并在 Staffing 表单/筛选中复用（由 084/Staffing 实施计划承接）。
 5. [ ] 测试：新增最小测试覆盖（pernr 校验、pernr 冲突、按 pernr 解析不存在/存在）。
 6. [ ] 门禁对齐：命中项按 `AGENTS.md` 触发器矩阵执行（Go + schema + doc）。
 
 ## 6. 验收标准 (Acceptance Criteria)
-- [ ] `pernr` 不满足 `^[0-9]{8}$` 时：创建 Person 必须失败（Go 校验 + DB 双保险）。
+- [ ] `pernr` 不满足 `^[0-9]{1,8}$` 时：创建 Person 必须失败（Go 校验 + DB 双保险）。
 - [ ] 同租户重复 `pernr`：必须以稳定错误码失败（409 / `PERSON_PERNR_CONFLICT` 或等价契约）。
 - [ ] `persons:options` 返回可用于 staffing 选人的最小字段：`person_uuid/pernr/display_name`。
 - [ ] `persons:by-pernr`：非法 pernr 必须 400 `PERSON_PERNR_INVALID`；存在则返回稳定结构；不存在则 404 `PERSON_NOT_FOUND`。
 
 ## 7. 风险与缓解
-- **存量数据不满足 8 位约束**：先做审计与修复策略，再落 DB constraint（必要时 `NOT VALID`）。
+- **存量数据不满足“最多 8 位数字”约束**：先做审计与修复策略，再落 DB constraint（必要时 `NOT VALID`）。
 - **边界漂移**：避免在 Person 中引入任职/组织/职位字段；Staffing 只依赖 `person_uuid`，展示数据通过 read API 或读侧 join（由 Staffing 计划明确）。
 
 ## 8. Simple > Easy Review（DEV-PLAN-045）
 - 通过：将 Person 收敛为“身份锚点”，不把 Staffing 的复杂度搬到 Person（避免“万能模块”）。
-- 通过：用明确的不变量（pernr 8 位）+ 稳定 API 合同替代隐式解析与跨模块查表。
+- 通过：用明确的不变量（pernr 最多 8 位数字）+ 稳定 API 合同替代隐式解析与跨模块查表。
 - 需警惕：为“省事”让 Staffing 直接依赖 `persons` 表做解析/写入会形成双权威与边界漂移，应在实现评审中阻断。
