@@ -1,6 +1,6 @@
 # DEV-PLAN-077：Org v4（事务性事件溯源 + 同步投射）完整方案（Greenfield）
 
-**状态**: 草拟中（2026-01-04 02:03 UTC）
+**状态**: 草拟中（2026-01-04 04:40 UTC）
 
 > 本计划是“干净/完整”的 v4 方案设计稿：以 **`org_events` 为 SoT**，以 **同步投射** 在同一事务内维护 **`org_unit_versions` 读模型**，并提供强一致读、可重放重建与并发互斥策略。  
 > **暂不考虑迁移与兼容**：不要求与现有 `modules/org` 的 schema/API/事件契约兼容；也不提供双写/灰度/回滚路径（另开计划承接）。
@@ -22,7 +22,7 @@ HR SaaS 的组织架构场景常见约束：
 ### 2.1 核心目标
 - [ ] 定义 **事件表 SoT**：`org_events`（append-only），记录业务意图与必要元数据（tenant/request/initiator/tx_time）。
 - [ ] 定义 **读模型表**：`org_unit_versions`（ltree path + daterange validity + no-overlap），支持毫秒级 as-of 查询与子树/祖先链查询。
-- [ ] 定义 **DB 投射引擎**：单入口函数 `submit_org_event(...)` + `apply_*_logic(...)`，在同一事务内完成事件写入与读模型更新。
+- [ ] 定义 **DB 投射引擎（选定：同事务全量重放）**：单入口函数 `submit_org_event(...)` 在同一事务内完成：事件写入（幂等）+ **全量重放**（删除并重建 `org_unit_versions`）+ 不变量校验。
 - [ ] 定义 **并发安全策略**：Postgres advisory lock，串行化同一棵组织树的写入（fail-fast 可选）。
 - [ ] 定义 **读模型封装**：`get_org_snapshot(...)`（含长名称拼接），提供“参数化视图”体验。
 - [ ] 定义 **可重放重建**：提供 rebuild 流程（truncate versions + replay events）与安全守卫（维护锁/互斥）。
@@ -54,7 +54,7 @@ flowchart TD
   API[OrgService (Go)] -->|Tx| DB[(Postgres)]
   DB --> E[(org_events\nSoT)]
   DB --> V[(org_unit_versions\nRead Model)]
-  DB --> F[submit_org_event/apply_*_logic\n(plpgsql)]
+  DB --> F[submit_org_event/replay_org_unit_versions\n(plpgsql)]
   API -->|read| Q[get_org_snapshot / queries]
   Q --> V
 ```
@@ -62,8 +62,8 @@ flowchart TD
 ### 3.2 关键设计决策（ADR 摘要）
 1. **SoT=事件表（选定）**
    - `org_events` 为 append-only；所有写入必须通过 `submit_org_event`。
-2. **同步投射（选定）**
-   - 同一事务内：插入事件 + 更新 `org_unit_versions`；写后读取强一致。
+2. **同步投射（选定：同事务全量重放）**
+   - 同一事务内：插入事件（幂等）+ **删除并重建 `org_unit_versions`**；写后读取强一致。
 3. **Valid Time（选定）**
    - 业务有效期使用 `date`；读模型使用 `daterange`（左闭右开 `[start,end)`），并用 EXCLUDE 约束防重叠。
 4. **路径表示（选定）**
@@ -71,12 +71,50 @@ flowchart TD
 5. **并发互斥（选定）**
    - 写入按“树维度”加 advisory lock：`pg_try_advisory_xact_lock(hashtextextended(lock_key, 0))`（fail-fast）或 `pg_advisory_xact_lock`（阻塞）。
    - 不使用 `hashtext`（32-bit）作为锁键哈希，避免高并发下的哈希碰撞导致“误互斥”。
-6. **高性能读索引（选定）**
+6. **同日事件唯一性（选定）**
+   - 明确规则：同一 `tenant_id + hierarchy_type + org_id + effective_date` **只能存在一条事件**（不引入 `EFFSEQ`，不支持同日多次变更）。
+   - 落地方式：在 `org_events` 上施加唯一性约束（见 4.4），把“事件顺序”从隐式约定变成可验证不变量。
+7. **gapless（选定，纳入合同）**
+   - `org_unit_versions` 必须无间隙：相邻切片必须满足 `upper(prev.validity)=lower(next.validity)`，最后一段 `upper(validity)='infinity'`；停用用 `status='disabled'` 表达而不是制造空洞。
+8. **高性能读索引（选定）**
    - `GiST(tenant_id, node_path, validity)` 实现 “Path + Time” 联合过滤；
    - `no-overlap`：`EXCLUDE USING gist (tenant_id, org_id, validity &&)`。
    - 对“按日取全量快照（validity @> day）且只取 active”的场景，可额外提供 `validity` 维度的 partial GiST（见 4.5）。
-7. **可重放（选定）**
-   - 版本表可丢弃重建：`TRUNCATE org_unit_versions` + replay `org_events`。
+9. **可重放（选定）**
+   - 版本表可丢弃重建：任何时刻可通过 **全量重放** `org_events` 重建 `org_unit_versions`（运维入口与步骤见 §8）。
+
+### 3.3 边界与可替换性（防止实现期漂移）
+> 同步投射把“正确性”集中到 DB 内核（Kernel）是一条**简单但不易**的路：一旦边界不清，实施期最常见的漂移是“在 Go 再写一套隐式投射/校验”，导致权威表达分裂。
+
+**本计划选定的边界（必须遵守）**：
+- **DB = Org Projection Kernel（权威）**：负责“写入原子性 + 集合更新 + 不变量强制 + 可重放”。
+- **Go = Command Facade（编排）**：负责“鉴权/会话上下文 + 事务边界 + 调用 Kernel + 错误映射/UX”。
+
+**One Door Policy（写入口唯一）**：
+- 除了 `submit_org_event(...)` 与 rebuild/replay 的维护入口外，应用层不得：
+  - 直接写 `org_events`/`org_unit_versions`；
+  - 直接调用 `replay_org_unit_versions(...)`（它是 Kernel 的内部实现细节，而非公共 API；只允许通过 `submit_org_event` 驱动）。
+- 实施阶段建议把该规则落为“可执行的约束”：例如 DB 权限隔离（仅授予应用角色执行 `submit_org_event`）、或将 `apply_*_logic` 置于单独 schema 并不暴露执行权限。
+
+**职责矩阵（Must / Should / Won’t）**：
+
+| 关注点 | DB（Kernel） | Go（Facade） |
+| --- | --- | --- |
+| 事件写入 + 读模更新的原子性 | Must | Won’t |
+| 全量重放（删除并重建 versions） | Must | Won’t |
+| 不变量强制（唯一性/不重叠/防环/根唯一） | Must | Should（仅做 UX 预校验） |
+| 并发互斥（advisory lock） | Must（最终裁判） | Should（可先 try-lock 以 fail-fast） |
+| 鉴权/租户上下文/操作者身份 | Won’t | Must |
+| 错误映射到 `pkg/serrors` | Should（提供稳定可识别的 DB 错误） | Must |
+| 读接口形状（snapshot/子树/祖先链） | Should（STABLE SQL + 索引对齐） | Should（封装调用/分页/缓存策略等） |
+
+**不变量归属（DB is the Judge）**：
+- 同日事件唯一性：`org_events_one_per_day_unique`（见 4.4）。
+- 版本窗不重叠：`org_unit_versions_no_overlap`（见 4.5）。
+- gapless：由重放算法生成并在事务内校验（见 §5.3）。
+- root 唯一：`org_trees`（见 4.3）+ 重放期校验。
+- 防环 move：重放期校验（cycle detection）。
+- 多租户隔离：`tenant_id` 强制（RLS 若启用需 fail-closed；策略在实施阶段落盘）。
 
 ## 4. 数据模型与约束 (Data Model & Constraints)
 > 约定：PostgreSQL 17；多租户隔离通过 `tenant_id` 强制；RLS（若启用）需 fail-closed（具体策略在实施阶段随迁移落盘）。
@@ -160,7 +198,10 @@ CREATE TABLE org_events (
   created_at       timestamptz NOT NULL DEFAULT now(),
 
   CONSTRAINT org_events_hierarchy_type_check CHECK (hierarchy_type IN ('OrgUnit')),
-  CONSTRAINT org_events_event_type_check CHECK (event_type IN ('CREATE','MOVE','RENAME','DISABLE'))
+  CONSTRAINT org_events_event_type_check CHECK (event_type IN ('CREATE','MOVE','RENAME','DISABLE')),
+
+  -- 不变量：同一节点同一生效日只允许一条事件（不引入 effseq）
+  CONSTRAINT org_events_one_per_day_unique UNIQUE (tenant_id, hierarchy_type, org_id, effective_date)
 );
 
 CREATE UNIQUE INDEX org_events_event_id_unique ON org_events (event_id);
@@ -168,7 +209,9 @@ CREATE INDEX org_events_tenant_org_effective_idx ON org_events (tenant_id, org_i
 CREATE INDEX org_events_tenant_type_effective_idx ON org_events (tenant_id, hierarchy_type, effective_date, id);
 ```
 
-> 说明：`event_id` 作为幂等键；重试时传相同 `event_id` 可确保“只写一次 + 不重复投射”。
+> 说明：
+> - `event_id` 作为幂等键；重试时传相同 `event_id` 可确保“只写一次 + 不重复投射”。
+> - 若对同一 `org_id` 在同一 `effective_date` 再提交另一条事件（不同 `event_id`），将触发唯一性约束失败并被拒绝（见 7.2 错误契约）。
 
 ### 4.5 `org_unit_versions`（Read Side / Projection）
 ```sql
@@ -248,7 +291,7 @@ SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0));
 ```
 
 ### 5.2 统一入口：`submit_org_event`
-**职责**：插入事件（幂等）+ 调用对应 `apply_*` 投射函数；同一事务提交。
+**职责**：插入事件（幂等）+ 调用 `replay_org_unit_versions` 触发**同事务全量重放**（删除并重建 `org_unit_versions`）；同一事务提交。
 
 函数签名（建议）：
 ```sql
@@ -265,7 +308,7 @@ CREATE OR REPLACE FUNCTION submit_org_event(
 ) RETURNS bigint;
 ```
 
-实现（可直接执行的 plpgsql；依赖 `apply_*_logic` 已创建）：
+实现（可直接执行的 plpgsql；内部调用 `replay_org_unit_versions` 全量重放）：
 ```sql
 CREATE OR REPLACE FUNCTION submit_org_event(
   p_event_id uuid,
@@ -285,18 +328,17 @@ DECLARE
   v_event_db_id bigint;
   v_payload jsonb;
   v_existing org_events%ROWTYPE;
-  v_parent_id uuid;
-  v_new_parent_id uuid;
-  v_name text;
-  v_new_name text;
-  v_manager_id uuid;
 BEGIN
   IF p_hierarchy_type <> 'OrgUnit' THEN
-    RAISE EXCEPTION 'unsupported hierarchy_type: %', p_hierarchy_type;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = format('unsupported hierarchy_type: %s', p_hierarchy_type);
   END IF;
 
   IF p_event_type NOT IN ('CREATE','MOVE','RENAME','DISABLE') THEN
-    RAISE EXCEPTION 'unsupported event_type: %', p_event_type;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = format('unsupported event_type: %s', p_event_type);
   END IF;
 
   v_lock_key := format('org:v4:%s:%s', p_tenant_id, p_hierarchy_type);
@@ -343,33 +385,136 @@ BEGIN
       OR v_existing.payload <> v_payload
       OR v_existing.request_id <> p_request_id
       OR v_existing.initiator_id <> p_initiator_id THEN
-      RAISE EXCEPTION 'idempotency key reused with different payload (event_id=%)', p_event_id;
+      RAISE EXCEPTION USING
+        MESSAGE = 'ORG_IDEMPOTENCY_REUSED',
+        DETAIL = format('idempotency key reused with different payload (event_id=%s)', p_event_id);
     END IF;
 
     RETURN v_existing.id;
   END IF;
 
-  IF p_event_type = 'CREATE' THEN
-    v_parent_id := (v_payload->>'parent_id')::uuid;
-    v_name := NULLIF(btrim(v_payload->>'name'), '');
-    v_manager_id := (v_payload->>'manager_id')::uuid;
-    PERFORM apply_create_logic(p_tenant_id, p_hierarchy_type, p_org_id, v_parent_id, p_effective_date, v_name, v_manager_id, v_event_db_id);
-  ELSIF p_event_type = 'MOVE' THEN
-    v_new_parent_id := (v_payload->>'new_parent_id')::uuid;
-    PERFORM apply_move_logic(p_tenant_id, p_hierarchy_type, p_org_id, v_new_parent_id, p_effective_date, v_event_db_id);
-  ELSIF p_event_type = 'RENAME' THEN
-    v_new_name := NULLIF(btrim(v_payload->>'new_name'), '');
-    PERFORM apply_rename_logic(p_tenant_id, p_hierarchy_type, p_org_id, p_effective_date, v_new_name, v_event_db_id);
-  ELSIF p_event_type = 'DISABLE' THEN
-    PERFORM apply_disable_logic(p_tenant_id, p_hierarchy_type, p_org_id, p_effective_date, v_event_db_id);
-  END IF;
+  -- 同日事件唯一性：
+  -- - 若同一 org_id + effective_date 已存在另一事件（不同 event_id），INSERT 将因约束失败而直接报错并回滚（无投射副作用）。
+
+  -- 全量重放：删除并重建 versions（同一事务内完成，写后读强一致）
+  PERFORM replay_org_unit_versions(p_tenant_id, p_hierarchy_type);
 
   RETURN v_event_db_id;
 END;
 $$;
 ```
 
-### 5.3 `apply_create_logic`
+### 5.3 重放引擎：`replay_org_unit_versions`
+**职责**：在同一事务内，以 `(effective_date, id)` 顺序重放 `org_events`，从零重建：
+- `org_trees`（root 锚点）
+- `org_unit_versions`（versions 投射）
+并在事务内校验 gapless 等不变量（纳入合同）。
+
+> 顺序说明：由于“同日事件唯一性”，同一 `org_id` 不存在同一天多事件，因此 replay 的顺序在业务意义上由 `effective_date` 决定；`id` 仅作为全局稳定次序（便于实现与排障）。
+
+实现（可直接执行的 plpgsql；复用 `apply_*_logic` 作为每条事件的投射步骤）：
+```sql
+CREATE OR REPLACE FUNCTION replay_org_unit_versions(
+  p_tenant_id uuid,
+  p_hierarchy_type text
+) RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_lock_key text;
+  v_event org_events%ROWTYPE;
+  v_payload jsonb;
+  v_parent_id uuid;
+  v_new_parent_id uuid;
+  v_name text;
+  v_new_name text;
+  v_manager_id uuid;
+BEGIN
+  IF p_hierarchy_type <> 'OrgUnit' THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = format('unsupported hierarchy_type: %s', p_hierarchy_type);
+  END IF;
+
+  v_lock_key := format('org:v4:%s:%s', p_tenant_id, p_hierarchy_type);
+  PERFORM pg_advisory_xact_lock(hashtextextended(v_lock_key, 0));
+
+  DELETE FROM org_unit_versions
+  WHERE tenant_id = p_tenant_id AND hierarchy_type = p_hierarchy_type;
+
+  -- org_trees 作为 root 锚点/不变量载体：在全量重放中同样由事件重建
+  DELETE FROM org_trees
+  WHERE tenant_id = p_tenant_id AND hierarchy_type = p_hierarchy_type;
+
+  FOR v_event IN
+    SELECT *
+    FROM org_events
+    WHERE tenant_id = p_tenant_id AND hierarchy_type = p_hierarchy_type
+    ORDER BY effective_date, id
+  LOOP
+    v_payload := COALESCE(v_event.payload, '{}'::jsonb);
+
+    IF v_event.event_type = 'CREATE' THEN
+      v_parent_id := NULLIF(v_payload->>'parent_id', '')::uuid;
+      v_name := NULLIF(btrim(v_payload->>'name'), '');
+      v_manager_id := NULLIF(v_payload->>'manager_id', '')::uuid;
+      PERFORM apply_create_logic(p_tenant_id, p_hierarchy_type, v_event.org_id, v_parent_id, v_event.effective_date, v_name, v_manager_id, v_event.id);
+    ELSIF v_event.event_type = 'MOVE' THEN
+      v_new_parent_id := NULLIF(v_payload->>'new_parent_id', '')::uuid;
+      PERFORM apply_move_logic(p_tenant_id, p_hierarchy_type, v_event.org_id, v_new_parent_id, v_event.effective_date, v_event.id);
+    ELSIF v_event.event_type = 'RENAME' THEN
+      v_new_name := NULLIF(btrim(v_payload->>'new_name'), '');
+      PERFORM apply_rename_logic(p_tenant_id, p_hierarchy_type, v_event.org_id, v_event.effective_date, v_new_name, v_event.id);
+    ELSIF v_event.event_type = 'DISABLE' THEN
+      PERFORM apply_disable_logic(p_tenant_id, p_hierarchy_type, v_event.org_id, v_event.effective_date, v_event.id);
+    ELSE
+      RAISE EXCEPTION USING
+        MESSAGE = 'ORG_INVALID_ARGUMENT',
+        DETAIL = format('unsupported event_type: %s', v_event.event_type);
+    END IF;
+  END LOOP;
+
+  -- gapless 校验（纳入合同）：相邻切片必须严丝合缝，且最后一段必须到 infinity
+  IF EXISTS (
+    WITH ordered AS (
+      SELECT
+        org_id,
+        validity,
+        lag(validity) OVER (PARTITION BY org_id ORDER BY lower(validity)) AS prev_validity
+      FROM org_unit_versions
+      WHERE tenant_id = p_tenant_id AND hierarchy_type = p_hierarchy_type
+    )
+    SELECT 1
+    FROM ordered
+    WHERE prev_validity IS NOT NULL
+      AND lower(validity) <> upper(prev_validity)
+    LIMIT 1
+  ) THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_VALIDITY_GAP',
+      DETAIL = 'org_unit_versions must be gapless';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM (
+      SELECT DISTINCT ON (org_id) org_id, validity
+      FROM org_unit_versions
+      WHERE tenant_id = p_tenant_id AND hierarchy_type = p_hierarchy_type
+      ORDER BY org_id, lower(validity) DESC
+    ) last
+    WHERE NOT upper_inf(last.validity)
+    LIMIT 1
+  ) THEN
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_VALIDITY_NOT_INFINITE',
+      DETAIL = 'last version validity must be unbounded (infinity)';
+  END IF;
+END;
+$$;
+```
+
+### 5.4 `apply_create_logic`
 payload（v1）：
 ```json
 {
@@ -410,10 +555,14 @@ DECLARE
   v_root_org_id uuid;
 BEGIN
   IF p_hierarchy_type <> 'OrgUnit' THEN
-    RAISE EXCEPTION 'unsupported hierarchy_type: %', p_hierarchy_type;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = format('unsupported hierarchy_type: %s', p_hierarchy_type);
   END IF;
   IF p_name IS NULL THEN
-    RAISE EXCEPTION 'name is required';
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = 'name is required';
   END IF;
 
   -- 同一 org_id 只允许 create 一次（greenfield 简化约束）
@@ -422,7 +571,9 @@ BEGIN
     FROM org_unit_versions
     WHERE tenant_id = p_tenant_id AND hierarchy_type = p_hierarchy_type AND org_id = p_org_id
   ) THEN
-    RAISE EXCEPTION 'org already exists: %', p_org_id;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_ALREADY_EXISTS',
+      DETAIL = format('org already exists: %s', p_org_id);
   END IF;
 
   -- root 唯一性（通过 org_trees 固化）
@@ -433,7 +584,9 @@ BEGIN
     FOR UPDATE;
 
     IF v_root_org_id IS NOT NULL THEN
-      RAISE EXCEPTION 'root already exists: %', v_root_org_id;
+      RAISE EXCEPTION USING
+        MESSAGE = 'ORG_ROOT_ALREADY_EXISTS',
+        DETAIL = format('root already exists: %s', v_root_org_id);
     END IF;
 
     INSERT INTO org_trees (tenant_id, hierarchy_type, root_org_id)
@@ -447,7 +600,9 @@ BEGIN
     WHERE t.tenant_id = p_tenant_id AND t.hierarchy_type = p_hierarchy_type;
 
     IF v_root_org_id IS NULL THEN
-      RAISE EXCEPTION 'tree root not initialized (tenant_id=%)', p_tenant_id;
+      RAISE EXCEPTION USING
+        MESSAGE = 'ORG_TREE_NOT_INITIALIZED',
+        DETAIL = format('tree root not initialized (tenant_id=%s)', p_tenant_id);
     END IF;
 
     SELECT v.node_path INTO v_parent_path
@@ -460,7 +615,9 @@ BEGIN
     LIMIT 1;
 
     IF v_parent_path IS NULL THEN
-      RAISE EXCEPTION 'parent not found at date (parent_id=%, as_of=%)', p_parent_id, p_effective_date;
+      RAISE EXCEPTION USING
+        MESSAGE = 'ORG_PARENT_NOT_FOUND_AS_OF',
+        DETAIL = format('parent not found at date (parent_id=%s, as_of=%s)', p_parent_id, p_effective_date);
     END IF;
 
     v_node_path := v_parent_path || org_ltree_label(p_org_id)::ltree;
@@ -493,7 +650,7 @@ END;
 $$;
 ```
 
-### 5.4 `apply_move_logic`（Split & Graft）
+### 5.5 `apply_move_logic`（Split & Graft）
 payload（v1）：
 ```json
 { "new_parent_id": "uuid" }
@@ -542,13 +699,19 @@ DECLARE
   v_root_org_id uuid;
 BEGIN
   IF p_hierarchy_type <> 'OrgUnit' THEN
-    RAISE EXCEPTION 'unsupported hierarchy_type: %', p_hierarchy_type;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = format('unsupported hierarchy_type: %s', p_hierarchy_type);
   END IF;
   IF p_new_parent_id IS NULL THEN
-    RAISE EXCEPTION 'new_parent_id is required';
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = 'new_parent_id is required';
   END IF;
   IF p_new_parent_id = p_org_id THEN
-    RAISE EXCEPTION 'new_parent_id cannot equal org_id';
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = 'new_parent_id cannot equal org_id';
   END IF;
 
   -- root 不允许被移动（root 固化在 org_trees）
@@ -556,7 +719,9 @@ BEGIN
   FROM org_trees t
   WHERE t.tenant_id = p_tenant_id AND t.hierarchy_type = p_hierarchy_type;
   IF v_root_org_id = p_org_id THEN
-    RAISE EXCEPTION 'root cannot be moved: %', p_org_id;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_ROOT_CANNOT_BE_MOVED',
+      DETAIL = format('root cannot be moved: %s', p_org_id);
   END IF;
 
   -- 锁定并获取旧路径
@@ -570,7 +735,9 @@ BEGIN
   FOR UPDATE;
 
   IF v_old_path IS NULL THEN
-    RAISE EXCEPTION 'target org not found at date (org_id=%, as_of=%)', p_org_id, p_effective_date;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_NOT_FOUND_AS_OF',
+      DETAIL = format('target org not found at date (org_id=%s, as_of=%s)', p_org_id, p_effective_date);
   END IF;
 
   -- 获取新 Parent 路径
@@ -584,12 +751,16 @@ BEGIN
   LIMIT 1;
 
   IF v_new_parent_path IS NULL THEN
-    RAISE EXCEPTION 'new parent not found at date (parent_id=%, as_of=%)', p_new_parent_id, p_effective_date;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_PARENT_NOT_FOUND_AS_OF',
+      DETAIL = format('new parent not found at date (parent_id=%s, as_of=%s)', p_new_parent_id, p_effective_date);
   END IF;
 
   -- 防环：新 parent 落在旧子树内
   IF v_new_parent_path <@ v_old_path THEN
-    RAISE EXCEPTION 'cycle move is not allowed (org_id=% -> new_parent_id=%)', p_org_id, p_new_parent_id;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_CYCLE_MOVE',
+      DETAIL = format('cycle move is not allowed (org_id=%s -> new_parent_id=%s)', p_org_id, p_new_parent_id);
   END IF;
 
   v_new_prefix := v_new_parent_path || org_ltree_label(p_org_id)::ltree;
@@ -656,7 +827,7 @@ END;
 $$;
 ```
 
-### 5.5 `apply_rename_logic`
+### 5.6 `apply_rename_logic`
 payload（v1）：
 ```json
 { "new_name": "string" }
@@ -672,6 +843,8 @@ payload（v1）：
    - 且 `lower(validity) >= p_effective_date`
    - 且（若 `stop_date` 非空）`lower(validity) < stop_date`
    - `SET name = new_name, last_event_id = p_event_db_id`
+
+> 约束说明：由于 3.2 已选定“同日事件唯一性”，同一 `org_id` 不会出现同一天多条事件，因此本策略不需要引入 `EFFSEQ` 或“同日排序”规则。
 
 SQL 实现（v1）：
 ```sql
@@ -745,10 +918,14 @@ DECLARE
   v_stop_date date;
 BEGIN
   IF p_hierarchy_type <> 'OrgUnit' THEN
-    RAISE EXCEPTION 'unsupported hierarchy_type: %', p_hierarchy_type;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = format('unsupported hierarchy_type: %s', p_hierarchy_type);
   END IF;
   IF p_new_name IS NULL THEN
-    RAISE EXCEPTION 'new_name is required';
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = 'new_name is required';
   END IF;
 
   -- 必须存在任一版本覆盖 effective_date
@@ -761,7 +938,9 @@ BEGIN
       AND status = 'active'
       AND validity @> p_effective_date
   ) THEN
-    RAISE EXCEPTION 'org not found at date (org_id=%, as_of=%)', p_org_id, p_effective_date;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_NOT_FOUND_AS_OF',
+      DETAIL = format('org not found at date (org_id=%s, as_of=%s)', p_org_id, p_effective_date);
   END IF;
 
   PERFORM split_org_unit_version_at(p_tenant_id, p_hierarchy_type, p_org_id, p_effective_date, p_event_db_id);
@@ -786,7 +965,7 @@ END;
 $$;
 ```
 
-### 5.6 `apply_disable_logic`
+### 5.7 `apply_disable_logic`
 payload（v1）：
 ```json
 { "status": "disabled" }
@@ -806,7 +985,9 @@ LANGUAGE plpgsql
 AS $$
 BEGIN
   IF p_hierarchy_type <> 'OrgUnit' THEN
-    RAISE EXCEPTION 'unsupported hierarchy_type: %', p_hierarchy_type;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_INVALID_ARGUMENT',
+      DETAIL = format('unsupported hierarchy_type: %s', p_hierarchy_type);
   END IF;
 
   IF NOT EXISTS (
@@ -818,7 +999,9 @@ BEGIN
       AND status = 'active'
       AND validity @> p_effective_date
   ) THEN
-    RAISE EXCEPTION 'org not found at date (org_id=%, as_of=%)', p_org_id, p_effective_date;
+    RAISE EXCEPTION USING
+      MESSAGE = 'ORG_NOT_FOUND_AS_OF',
+      DETAIL = format('org not found at date (org_id=%s, as_of=%s)', p_org_id, p_effective_date);
   END IF;
 
   PERFORM split_org_unit_version_at(p_tenant_id, p_hierarchy_type, p_org_id, p_effective_date, p_event_db_id);
@@ -938,32 +1121,65 @@ func (s *OrgServiceV4) MoveOrg(ctx context.Context, tenantID uuid.UUID, cmd Move
 }
 ```
 
-> 说明：锁既可在 Go 层 fail-fast，也可在 DB `submit_org_event` 内强制加锁（双保险）；实现阶段二选一或同时保留（以减少误用风险）。
+> 说明（与 3.3 边界一致）：DB 必须在 `submit_org_event` 内执行互斥锁（作为一致性策略的最终裁判），Go 可选先 `pg_try_advisory_xact_lock(...)` 做 fail-fast（拿到锁后再调用 `submit_org_event` 不会产生额外等待）。
+
+### 7.2 错误契约（DB → Go → serrors）
+> 目标：让失败路径“可解释且可映射”，避免实现期靠字符串匹配与试错收敛。
+
+约定（实现阶段建议遵守）：
+- Go 侧对 Postgres 错误优先用 `SQLSTATE`（例如 `23505`、`23P01`）+ `ConstraintName` 做稳定映射；
+- 对于业务级拒绝（cycle/not-found/idempotency-reused/invalid-argument 等），DB 必须使用“机器可识别”的异常：
+  - `RAISE EXCEPTION USING MESSAGE = '<STABLE_CODE>', DETAIL = '<dynamic details>'`；
+  - `MESSAGE` 必须是稳定 code（不拼接动态内容），动态信息放在 `DETAIL`；
+  - Go 侧只解析 `MESSAGE` 做映射，不依赖自然语言与字符串包含关系；
+- 对“同日事件冲突”这类不变量，允许直接依赖唯一性约束报错（`23505`）做映射。
+
+最小映射表（v1）：
+
+| 场景 | DB 侧来源 | 识别方式（建议） | Go `serrors` code |
+| --- | --- | --- | --- |
+| 组织树被占用（fail-fast lock） | `pg_try_advisory_xact_lock` 返回 false | 应用层布尔结果 | `ORG_BUSY` |
+| 幂等键复用但参数不同 | `submit_org_event` 明确拒绝 | DB exception `MESSAGE` | `ORG_IDEMPOTENCY_REUSED` |
+| 同一节点同日重复事件 | `org_events_one_per_day_unique` | `23505` + constraint name | `ORG_EVENT_CONFLICT_SAME_DAY` |
+| 参数非法 / 不支持的类型/事件 | `submit_org_event/replay_org_unit_versions/apply_*_logic` 参数校验 | DB exception `MESSAGE` | `ORG_INVALID_ARGUMENT` |
+| 重复创建同一节点 | `apply_create_logic` | DB exception `MESSAGE` | `ORG_ALREADY_EXISTS` |
+| root 已存在 / root 未初始化 | `apply_create_logic` | DB exception `MESSAGE` | `ORG_ROOT_ALREADY_EXISTS` / `ORG_TREE_NOT_INITIALIZED` |
+| as-of 找不到目标 | `apply_*_logic` | DB exception `MESSAGE` | `ORG_NOT_FOUND_AS_OF` |
+| as-of 找不到父节点 | `apply_*_logic` | DB exception `MESSAGE` | `ORG_PARENT_NOT_FOUND_AS_OF` |
+| move 形成环 | `apply_move_logic` | DB exception `MESSAGE` | `ORG_CYCLE_MOVE` |
+| root 不允许 move | `apply_move_logic` | DB exception `MESSAGE` | `ORG_ROOT_CANNOT_BE_MOVED` |
+| 有效期重叠（破坏 no-overlap） | `org_unit_versions_no_overlap` | `23P01` + constraint name | `ORG_VALIDITY_OVERLAP` |
+| gapless 被破坏（出现间隙/末段非 infinity） | `replay_org_unit_versions` 校验失败 | DB exception `MESSAGE` | `ORG_VALIDITY_GAP` / `ORG_VALIDITY_NOT_INFINITE` |
+
+> 注：上表的 code 命名仅为示例，进入 077A/077B 时应以模块现有 `pkg/serrors` 规范与错误码表为准统一收敛。
 
 ## 8. 运维与灾备（Rebuild / Replay）
 ### 8.1 重建目标
 当投射逻辑缺陷导致 `org_unit_versions` 错误时，可通过重放 `org_events` 重建读模型。
 
 ### 8.2 Rebuild 流程（建议）
-1) 获取维护互斥锁：`pg_advisory_lock(hashtextextended('org:v4:rebuild:<tenant_id>:OrgUnit', 0))`
-2) `TRUNCATE TABLE org_unit_versions;`
-3) 按 `(effective_date, id) ASC` 读取事件并逐条调用 `apply_*_logic`（或复用 `submit_org_event` 的内部 apply 分发，但需跳过重复 insert）
-4) 释放锁
+1) 获取维护互斥锁（复用写锁 key，避免两套互斥语义）：`SELECT pg_advisory_lock(hashtextextended('org:v4:<tenant_id>:OrgUnit', 0));`
+2) 执行全量重放（函数内部会 delete 并重建 `org_trees/org_unit_versions`）：`SELECT replay_org_unit_versions('<tenant_id>'::uuid, 'OrgUnit');`
+3) 释放锁：`SELECT pg_advisory_unlock(hashtextextended('org:v4:<tenant_id>:OrgUnit', 0));`
 
 > 注：本计划不引入“维护模式开关”；如需在线运行 rebuild，必须另开计划定义安全窗口与影响面控制。
+
+> 顺序说明：由于“同日事件唯一性”，同一 `org_id` 不存在同一天多事件，因此 replay 的顺序在业务意义上由 `effective_date` 唯一决定；`id` 仅作为全局稳定次序（便于实现与排障）。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
 - 正确性（必须）：
   - [ ] Create→Move→Rename→Disable 的组合在任意 as-of 日期下可得到唯一且无重叠的版本窗（EXCLUDE 约束验证）。
   - [ ] Move 触发子树 path 重写后，祖先/子树查询与长名称拼接一致且不缺段。
   - [ ] 并发写：同一 tenant/hierarchy 下同时发起两次写入，第二个在 fail-fast 模式下稳定返回“busy”错误码。
+  - [ ] 同一 `org_id` 在同一 `effective_date` 第二次提交（不同 `event_id`）稳定失败，并映射为 `ORG_EVENT_CONFLICT_SAME_DAY`。
 - 性能（建议）：
   - [ ] `get_org_snapshot` 在 1k/10k 节点规模下 query 次数为常数（1 次），并可通过索引命中保持稳定延迟。
+  - [ ] `EXPLAIN (ANALYZE, BUFFERS)` 显示 `get_org_snapshot` 的 snapshot 过滤命中 `org_unit_versions_active_day_gist`（或等价的 GiST/EXCLUDE 索引），避免全表 Seq Scan。
 
 ## 10. 里程碑（实施拆分建议）
 > 本计划不实施，但给出可落地的拆分顺序（进入 077A/077B 时复用）。
 1) Schema：扩展 + `org_events/org_unit_versions` + 约束/索引/函数（最小可跑）。
-2) Engine：`submit_org_event` + `apply_create/move/rename/disable`。
+2) Engine：`submit_org_event` + `replay_org_unit_versions`（全量重放；内部复用 `apply_*_logic`）。
 3) Read：`get_org_snapshot` + 子树/祖先查询形状。
 4) Go：service/repo/错误码 + 最小 API（仅 org unit）。
 5) Rebuild：replay 工具（CLI 或 SQL），并补齐验收与 Readiness 记录。
