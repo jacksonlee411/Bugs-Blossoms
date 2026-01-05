@@ -248,5 +248,6 @@ modules/{module}/
 - V4 多工作区并行开发指引（3 worktree 模式 + 共享本地 infra）（DEV-PLAN-093）：`docs/dev-plans/093-v4-parallel-worktrees-local-dev-guide.md`
 - V4 全局路由策略统一（UI/HTMX/API/Webhooks）（DEV-PLAN-094）：`docs/dev-plans/094-v4-routing-strategy.md`
 - 文档创建与过程治理规范（DEV-PLAN-095）：`docs/dev-plans/095-docs-creation-and-governance-guide.md`
+- SetID 管理（V4，Greenfield）（DEV-PLAN-097）：`docs/dev-plans/097-v4-setid-management.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
