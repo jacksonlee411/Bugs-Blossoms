@@ -245,5 +245,6 @@ modules/{module}/
 - V4 Atlas + Goose 闭环指引（模块级 schema→迁移→门禁）（DEV-PLAN-090）：`docs/dev-plans/090-v4-atlas-goose-closed-loop-guide.md`
 - V4 sqlc 工具链使用指引与规范（SQL-first + DB Kernel + RLS）（DEV-PLAN-091）：`docs/dev-plans/091-sqlc-guidelines-for-v4.md`
 - V4 Authz（Casbin）工具链与实施方案（Greenfield）（DEV-PLAN-092）：`docs/dev-plans/092-v4-authz-casbin-toolchain.md`
+- V4 全局路由策略统一（UI/HTMX/API/Webhooks）（DEV-PLAN-094）：`docs/dev-plans/094-v4-routing-strategy.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
