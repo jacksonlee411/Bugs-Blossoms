@@ -155,7 +155,9 @@ table "org_nodes" {
   5. [ ] Readiness 验证记录。
 
 ## 9. 测试与验收标准 (Acceptance Criteria)
-- **单元测试**: 覆盖率 > 80%，必须覆盖“时间重叠”、“环路检测”、“空值处理”等边界情况。
+- **单元测试**:
+  - [ ] 覆盖边界：时间重叠、环路检测、空值/默认值、并发、幂等、错误映射等。
+  - [ ] 覆盖率门禁（如适用）：目标阈值、口径（Line/Branch）、统计范围与排除项（生成代码/第三方等），以及审计方式与证据链接。
 - **集成测试**: 真实 DB 环境下，并发写入不产生脏数据。
 - **Lint**: `make check lint` 通过，无 go-cleanarch 违规。
 - **Readiness**: 执行 `docs/dev-records/DEV-PLAN-XXX-READINESS.md` 记录命令与结果。

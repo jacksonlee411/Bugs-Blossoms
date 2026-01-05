@@ -237,5 +237,6 @@ modules/{module}/
 - Greenfield HR 模块骨架与契约（OrgUnit/JobCatalog/Staffing/Person）（DEV-PLAN-083）：`docs/dev-plans/083-greenfield-hr-modules-skeleton.md`
 - 任职记录（Job Data / Assignments）v4 全新实现（Staffing，事件 SoT + 同步投射）（DEV-PLAN-084）：`docs/dev-plans/084-greenfield-assignment-job-data-v4.md`
 - Person 最小身份锚点（Pernr 1-8 位数字字符串，前导 0 同值）以支撑 Staffing 落地（DEV-PLAN-085）：`docs/dev-plans/085-person-minimal-identity-for-staffing.md`
+- 引入 Astro（AHA Stack）到 HTMX + Alpine 的 HRMS v4 UI 方案（077-084）（DEV-PLAN-086）：`docs/dev-plans/086-astro-aha-ui-shell-for-hrms-v4.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
