@@ -1,6 +1,6 @@
 # DEV-PLAN-088：V4 租户管理与登录认证（Kratos 认人 → RLS 圈地 → Casbin 管事）
 
-**状态**: 草拟中（2026-01-05 07:50 UTC）
+**状态**: 草拟中（2026-01-05 07:52 UTC）
 
 > 适用范围：**全新实现的 V4 新代码仓库（Greenfield）**。本文总结现仓库在“租户/认证/会话/RLS/Authz”上的既有实现与已评审契约（`DEV-PLAN-019*`、`DEV-PLAN-081`），并给出 V4 的最小可落地方案。  
 > 对齐要求：`DEV-PLAN-082`（DDD 分层框架）、`DEV-PLAN-083`（HR 业务域 4 模块骨架）；本文引入一个 **平台 IAM/Tenancy 模块**，不计入 HR 业务域模块数量。
@@ -171,6 +171,10 @@
 - `POST /superadmin/tenants`：创建租户（含 primary_domain）
 - `GET /superadmin/tenants/{tenant_id}`：详情（基础信息 + is_active）
 - `POST /superadmin/tenants/{tenant_id}/disable|enable`：启停
+
+SuperAdmin 认证（MVP 建议）：
+- 由于本计划聚焦“租户登录链路 + 运行态隔离”，且新仓库处于早期阶段，Tenant Console MVP 可先采用 **环境级保护**（例如反代 BasicAuth / 仅内网可达 / 固定 allowlist）。
+- 后续若需要把 superadmin 也纳入同一套 Identity（Kratos/Jackson），建议单独出子计划（例如 088A），避免在本计划中引入第二套 session/主体模型而导致边界不清。
 
 ### 6.3 Bootstrap（避免“第一天就锁死”）
 - 最小要求：在没有任何 tenant/domain/principal 的情况下，能完成以下闭环：
