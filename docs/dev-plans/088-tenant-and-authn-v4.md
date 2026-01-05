@@ -1,6 +1,6 @@
 # DEV-PLAN-088：V4 租户管理与登录认证（Kratos 认人 → RLS 圈地 → Casbin 管事）
 
-**状态**: 草拟中（2026-01-05 07:44 UTC）
+**状态**: 草拟中（2026-01-05 07:50 UTC）
 
 > 适用范围：**全新实现的 V4 新代码仓库（Greenfield）**。本文总结现仓库在“租户/认证/会话/RLS/Authz”上的既有实现与已评审契约（`DEV-PLAN-019*`、`DEV-PLAN-081`），并给出 V4 的最小可落地方案。  
 > 对齐要求：`DEV-PLAN-082`（DDD 分层框架）、`DEV-PLAN-083`（HR 业务域 4 模块骨架）；本文引入一个 **平台 IAM/Tenancy 模块**，不计入 HR 业务域模块数量。
@@ -151,9 +151,13 @@
 
 ### 5.3 RLS（必须）
 - `tenants` / `tenant_domains`（控制面）默认不启用 RLS，由 superadmin server 保护访问边界。
-- `principals` / `sessions`（数据面）按需启用 RLS：
-  - 若 tenant app 与 superadmin 共享同一 DB role/连接池，则必须启用 RLS 且 superadmin 采用显式旁路（不建议）。
-  - 推荐：**superadmin 使用独立 DB role/连接池**（旁路在连接层完成），tenant app 的 DB role 强制开启 RLS。
+- `sessions`（数据面）**不启用 RLS**：
+  - 原因：`sid`→`session` 查询发生在 tenant 解析/注入之前；若对 `sessions` 启用 tenant RLS，将形成“先有 tenant 才能取 session / 先有 session 才能得 tenant”的环。
+  - 约束：只允许按 `token` 精确查询；不得提供“按 tenant 列表 session”等接口（防止横向枚举）。
+- `principals`（数据面）可启用 RLS：
+  - 登录入口已通过 Host 解析 tenant；因此可以在查询 principal 之前先注入 `app.current_tenant`。
+  - 若实现成本过高，可先不启用 RLS，但必须保持所有查询显式包含 `tenant_id`，并用测试覆盖“缺 tenant 即失败/不跨租户命中”。
+- 推荐：**superadmin 使用独立 DB role/连接池**（旁路在连接层完成），tenant app 的 DB role 对业务表强制开启 RLS（对齐 `DEV-PLAN-081` 的 v4 口径）。
 
 ## 6. 路由与 UI（最小集）
 
