@@ -12,12 +12,17 @@
 				"Assignments": "人员分配",
 				"Positions": "职位管理"
 			},
-				"Shared": {
-					"AsOf": "生效视图",
-					"EffectiveDate": "生效日期",
-					"NotFound": "未找到",
-					"Present": "至今"
-				},
+					"Shared": {
+						"AsOf": "生效视图",
+						"EffectiveDate": "生效日期",
+						"NotFound": "未找到",
+						"Present": "至今",
+						"WriteMode": {
+							"Label": "写入方式",
+							"Correct": "更正（就地）",
+							"UpdateFromDate": "从该日起生效"
+						}
+					},
 			"Nodes": {
 				"MetaTitle": "组织架构",
 				"Title": "组织架构"
@@ -64,15 +69,19 @@
 						"Position": {
 							"Placeholder": "请先选择部门，再搜索职位"
 						},
-						"Table": {
-							"Pernr": "工号",
-							"Effective": "生效区间",
-							"EventType": "操作类型",
-							"OrgNodeID": "部门",
-							"OrgNodeLongName": "组织长名称",
-							"Position": "职位"
-						}
-				},
+							"Table": {
+								"Pernr": "工号",
+								"Effective": "生效区间",
+								"EventType": "操作类型",
+								"OrgNodeID": "部门",
+								"OrgNodeLongName": "组织长名称",
+								"Position": "职位",
+								"JobFamilyGroup": "职类",
+								"JobFamily": "职种",
+								"JobProfile": "职位模板",
+								"JobLevel": "职级"
+							}
+					},
 			"Tree": {
 				"Title": "组织树",
 				"Empty": "暂无节点",
@@ -192,21 +201,20 @@
 						"Profiles": "职位模板",
 					"Levels": "职级"
 				},
-				"Fields": {
-					"Code": "编码",
-					"Name": "名称",
-					"Desc": "描述",
-					"IsActive": "状态",
-					"DisplayOrder": "排序",
-					"JobFamilies": "归属职种（分摊）",
-					"JobFamily": "职种",
-					"AllocationPercent": "比例（%）",
-					"IsPrimary": "主归属"
+					"Fields": {
+						"Code": "编码",
+						"Name": "名称",
+						"Desc": "描述",
+						"IsActive": "状态",
+						"DisplayOrder": "排序",
+						"JobFamilies": "归属职种",
+						"JobFamily": "职种",
+						"IsPrimary": "主归属"
+					},
+					"Hints": {
+						"JobFamiliesPrimaryOne": "请至少选择 1 个职种，并指定且仅指定 1 个主归属。"
+					}
 				},
-				"Hints": {
-					"JobFamiliesSum100": "归属职种比例合计必须为 100%，且必须且仅必须 1 个主归属。"
-				}
-			},
 					"Node": {
 						"CreateTitle": "新建节点",
 						"EditTitle": "编辑（Insert）",

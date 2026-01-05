@@ -121,7 +121,7 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
 		var catalogShadowErr *ServiceError
 		if catalogMode != "disabled" {
-			if err := s.validateJobProfileAndLevel(txCtx, tenantID, jobProfileID, jobLevelCode); err != nil {
+			if err := s.validateJobProfileAndLevel(txCtx, tenantID, in.EffectiveDate, jobProfileID, jobLevelCode); err != nil {
 				if catalogMode == "enforce" {
 					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.created", "org_position", uuid.Nil, in.EffectiveDate, catalogMode, err, logrus.Fields{
 						"org_node_id": in.OrgNodeID.String(),
@@ -149,8 +149,9 @@ func (s *OrgService) CreatePosition(ctx context.Context, tenantID uuid.UUID, req
 			return nil, err
 		}
 		if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, false, PositionSliceRow{
-			JobLevelCode: jobLevelCode,
-			JobProfileID: jobProfileID,
+			JobLevelCode:  jobLevelCode,
+			JobProfileID:  jobProfileID,
+			EffectiveDate: in.EffectiveDate,
 		}, parsedRestrictions); err != nil {
 			return nil, err
 		}
@@ -769,7 +770,7 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 		catalogMode := normalizeValidationMode(settings.PositionCatalogValidationMode)
 		var catalogShadowErr *ServiceError
 		if catalogMode != "disabled" {
-			if err := s.validateJobProfileAndLevel(txCtx, tenantID, jobProfileID, jobLevelCode); err != nil {
+			if err := s.validateJobProfileAndLevel(txCtx, tenantID, in.EffectiveDate, jobProfileID, jobLevelCode); err != nil {
 				if catalogMode == "enforce" {
 					maybeLogModeRejected(txCtx, "org.position_catalog.rejected", tenantID, requestID, initiatorID, "position.updated", "org_position", in.PositionID, in.EffectiveDate, catalogMode, err, logrus.Fields{
 						"position_id": in.PositionID.String(),
@@ -797,8 +798,9 @@ func (s *OrgService) UpdatePosition(ctx context.Context, tenantID uuid.UUID, req
 			return nil, err
 		}
 		if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, isAutoCreated, PositionSliceRow{
-			JobLevelCode: jobLevelCode,
-			JobProfileID: jobProfileID,
+			JobLevelCode:  jobLevelCode,
+			JobProfileID:  jobProfileID,
+			EffectiveDate: in.EffectiveDate,
 		}, parsedRestrictions); err != nil {
 			return nil, err
 		}
@@ -1103,7 +1105,7 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			}
 		}
 
-		if err := s.validateJobProfileAndLevel(txCtx, tenantID, jobProfileID, jobLevelCode); err != nil {
+		if err := s.validateJobProfileAndLevel(txCtx, tenantID, in.AsOf, jobProfileID, jobLevelCode); err != nil {
 			return nil, err
 		}
 
@@ -1116,8 +1118,9 @@ func (s *OrgService) CorrectPosition(ctx context.Context, tenantID uuid.UUID, re
 			return nil, err
 		}
 		if err := s.validatePositionRestrictionsAgainstSlice(txCtx, tenantID, isAutoCreated, PositionSliceRow{
-			JobLevelCode: jobLevelCode,
-			JobProfileID: jobProfileID,
+			JobLevelCode:  jobLevelCode,
+			JobProfileID:  jobProfileID,
+			EffectiveDate: target.EffectiveDate,
 		}, parsedRestrictions); err != nil {
 			return nil, err
 		}

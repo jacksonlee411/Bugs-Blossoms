@@ -21,6 +21,7 @@ async function ensureSeeded({ request }: { request: any }) {
 }
 
 async function ensureJobCatalogPath(args: { page: Page }) {
+	const effectiveDate = '2025-01-01';
 	const groupCode = 'FG-001';
 	const familyCode = 'F-001';
 	const profileCode = 'JP-001';
@@ -31,6 +32,7 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 			code: groupCode,
 			name: 'E2E Job family group',
 			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});
@@ -43,6 +45,7 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 			code: familyCode,
 			name: 'E2E Job family',
 			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});
@@ -56,11 +59,11 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 			job_families: [
 				{
 					job_family_id: family.id,
-					allocation_percent: 100,
 					is_primary: true,
 				},
 			],
 			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});
@@ -73,6 +76,7 @@ async function ensureJobCatalogPath(args: { page: Page }) {
 			name: 'E2E Job level',
 			display_order: 1,
 			is_active: true,
+			effective_date: effectiveDate,
 		},
 		failOnStatusCode: false,
 	});
@@ -151,6 +155,11 @@ async function createJobCatalogRowsViaUI(args: { page: Page; viewportName: strin
 		.filter({ has: args.page.locator('input[name="edit_id"]') })
 		.first();
 	await expect(editGroupForm.locator('input[name="code"]')).toHaveValue(groupCode);
+
+	const writeModeSelect = args.page.locator('#org-job-catalog-write-mode');
+	await expect(writeModeSelect).toBeVisible();
+	await writeModeSelect.selectOption('correct');
+
 	await editGroupForm.locator('input[name="name"]').fill('UI Job family group (updated)');
 	const updateGroupResp = args.page.waitForResponse((resp) => {
 		return resp.request().method() === 'PATCH' && resp.url().includes('/org/job-catalog/family-groups/');
@@ -208,13 +217,12 @@ async function createJobCatalogRowsViaUI(args: { page: Page; viewportName: strin
 		.filter({ has: args.page.locator('input[name="tab"][value="profiles"]') })
 		.filter({ has: args.page.locator('input[name="code"]') })
 		.first();
-	await profileForm.locator('input[name="code"]').fill(profileCode);
-	await profileForm.locator('input[name="name"]').fill('UI Job profile');
+		await profileForm.locator('input[name="code"]').fill(profileCode);
+		await profileForm.locator('input[name="name"]').fill('UI Job profile');
 
-	const family0Combobox = profileForm.locator('div[x-data^="combobox("]').first();
-	await setComboboxValue({ combobox: family0Combobox, query: familyCode, value: family.id });
-	await profileForm.locator('input[name="allocation_percent_0"]').fill('100');
-	await profileForm.locator('input[type="radio"][name="primary_index"][value="0"]').check();
+		const family0Combobox = profileForm.locator('div[x-data^="combobox("]').first();
+		await setComboboxValue({ combobox: family0Combobox, query: familyCode, value: family.id });
+		await profileForm.locator('input[type="radio"][name="primary_index"][value="0"]').check();
 
 	const createProfileResp = args.page.waitForResponse((resp) => {
 		return resp.request().method() === 'POST' && resp.url().includes('/org/job-catalog/profiles');

@@ -771,7 +771,7 @@ func (c *OrgUIController) JobFamilyGroupOptions(w http.ResponseWriter, r *http.R
 	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
 	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
 
-	rows, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	rows, err := c.org.ListJobFamilyGroups(r.Context(), tenantID, effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -842,7 +842,7 @@ func (c *OrgUIController) JobFamilyOptions(w http.ResponseWriter, r *http.Reques
 	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
 	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
 
-	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID, effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -859,7 +859,7 @@ func (c *OrgUIController) JobFamilyOptions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	rows, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+	rows, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID, effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -925,7 +925,21 @@ func (c *OrgUIController) JobFamilyIDOptions(w http.ResponseWriter, r *http.Requ
 	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
 	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
 
-	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID, effectiveDate)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	groupIDs := make([]uuid.UUID, 0, len(groups))
+	groupCodeByID := make(map[uuid.UUID]string, len(groups))
+	groupActiveByID := make(map[uuid.UUID]bool, len(groups))
+	for _, g := range groups {
+		groupIDs = append(groupIDs, g.ID)
+		groupCodeByID[g.ID] = strings.TrimSpace(g.Code)
+		groupActiveByID[g.ID] = g.IsActive
+	}
+
+	familiesByGroups, err := c.org.ListJobFamiliesByGroupIDsAsOf(r.Context(), tenantID, groupIDs, effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -938,32 +952,26 @@ func (c *OrgUIController) JobFamilyIDOptions(w http.ResponseWriter, r *http.Requ
 		Name       string
 	}
 	out := make([]opt, 0, 64)
-	for _, group := range groups {
-		if !includeInactive && !group.IsActive {
+	for _, row := range familiesByGroups {
+		groupCode := strings.TrimSpace(groupCodeByID[row.JobFamilyGroupID])
+		if groupCode == "" {
 			continue
 		}
-		groupCode := strings.TrimSpace(group.Code)
-		rows, err := c.org.ListJobFamilies(r.Context(), tenantID, group.ID)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		groupActive := groupActiveByID[row.JobFamilyGroupID]
+		if !includeInactive && (!groupActive || !row.IsActive) {
+			continue
 		}
-		for _, row := range rows {
-			if !includeInactive && !row.IsActive {
-				continue
-			}
-			familyCode := strings.TrimSpace(row.Code)
-			name := strings.TrimSpace(row.Name)
-			if q != "" && !strings.Contains(strings.ToLower(groupCode), q) && !strings.Contains(strings.ToLower(familyCode), q) && !strings.Contains(strings.ToLower(name), q) {
-				continue
-			}
-			out = append(out, opt{
-				ID:         row.ID,
-				GroupCode:  groupCode,
-				FamilyCode: familyCode,
-				Name:       name,
-			})
+		familyCode := strings.TrimSpace(row.Code)
+		name := strings.TrimSpace(row.Name)
+		if q != "" && !strings.Contains(strings.ToLower(groupCode), q) && !strings.Contains(strings.ToLower(familyCode), q) && !strings.Contains(strings.ToLower(name), q) {
+			continue
 		}
+		out = append(out, opt{
+			ID:         row.ID,
+			GroupCode:  groupCode,
+			FamilyCode: familyCode,
+			Name:       name,
+		})
 	}
 
 	sort.Slice(out, func(i, j int) bool {
@@ -1017,7 +1025,7 @@ func (c *OrgUIController) JobProfileOptions(w http.ResponseWriter, r *http.Reque
 	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
 	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
 
-	rows, err := c.org.ListJobProfiles(r.Context(), tenantID)
+	rows, err := c.org.ListJobProfiles(r.Context(), tenantID, effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1086,7 +1094,7 @@ func (c *OrgUIController) JobLevelOptions(w http.ResponseWriter, r *http.Request
 	includeInactive := strings.TrimSpace(param(r, "include_inactive")) == "1"
 	q := strings.ToLower(strings.TrimSpace(param(r, "q")))
 
-	rows, err := c.org.ListJobLevels(r.Context(), tenantID)
+	rows, err := c.org.ListJobLevels(r.Context(), tenantID, effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1240,9 +1248,10 @@ func (c *OrgUIController) CreateJobFamilyGroupUI(w http.ResponseWriter, r *http.
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.CreateJobFamilyGroup(r.Context(), tenantID, services.JobFamilyGroupCreate{
-		Code:     code,
-		Name:     name,
-		IsActive: isActive,
+		Code:          code,
+		Name:          name,
+		IsActive:      isActive,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1294,8 +1303,10 @@ func (c *OrgUIController) UpdateJobFamilyGroupUI(w http.ResponseWriter, r *http.
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.UpdateJobFamilyGroup(r.Context(), tenantID, id, services.JobFamilyGroupUpdate{
-		Name:     &name,
-		IsActive: &isActive,
+		Name:          &name,
+		IsActive:      &isActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     strings.TrimSpace(param(r, "write_mode")),
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1342,7 +1353,7 @@ func (c *OrgUIController) CreateJobFamilyUI(w http.ResponseWriter, r *http.Reque
 	name := strings.TrimSpace(param(r, "name"))
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
-	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID, effectiveDate)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1370,6 +1381,7 @@ func (c *OrgUIController) CreateJobFamilyUI(w http.ResponseWriter, r *http.Reque
 		Code:             code,
 		Name:             name,
 		IsActive:         isActive,
+		EffectiveDate:    effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1422,8 +1434,10 @@ func (c *OrgUIController) UpdateJobFamilyUI(w http.ResponseWriter, r *http.Reque
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.UpdateJobFamily(r.Context(), tenantID, id, services.JobFamilyUpdate{
-		Name:     &name,
-		IsActive: &isActive,
+		Name:          &name,
+		IsActive:      &isActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     strings.TrimSpace(param(r, "write_mode")),
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1488,11 +1502,12 @@ func (c *OrgUIController) CreateJobProfileUI(w http.ResponseWriter, r *http.Requ
 	}
 
 	_, err = c.org.CreateJobProfile(r.Context(), tenantID, services.JobProfileCreate{
-		Code:        code,
-		Name:        name,
-		Description: description,
-		IsActive:    isActive,
-		JobFamilies: jobFamilies,
+		Code:          code,
+		Name:          name,
+		Description:   description,
+		IsActive:      isActive,
+		JobFamilies:   jobFamilies,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1567,10 +1582,12 @@ func (c *OrgUIController) UpdateJobProfileUI(w http.ResponseWriter, r *http.Requ
 	}
 
 	_, err = c.org.UpdateJobProfile(r.Context(), tenantID, id, services.JobProfileUpdate{
-		Name:        &name,
-		Description: description,
-		IsActive:    &isActive,
-		JobFamilies: &jobFamilies,
+		Name:          &name,
+		Description:   description,
+		IsActive:      &isActive,
+		JobFamilies:   &jobFamilies,
+		EffectiveDate: effectiveDate,
+		WriteMode:     strings.TrimSpace(param(r, "write_mode")),
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1628,10 +1645,11 @@ func (c *OrgUIController) CreateJobLevelUI(w http.ResponseWriter, r *http.Reques
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.CreateJobLevel(r.Context(), tenantID, services.JobLevelCreate{
-		Code:         code,
-		Name:         name,
-		DisplayOrder: displayOrder,
-		IsActive:     isActive,
+		Code:          code,
+		Name:          name,
+		DisplayOrder:  displayOrder,
+		IsActive:      isActive,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1694,9 +1712,11 @@ func (c *OrgUIController) UpdateJobLevelUI(w http.ResponseWriter, r *http.Reques
 	isActive := strings.TrimSpace(param(r, "is_active")) != "0"
 
 	_, err = c.org.UpdateJobLevel(r.Context(), tenantID, id, services.JobLevelUpdate{
-		Name:         &name,
-		DisplayOrder: &displayOrder,
-		IsActive:     &isActive,
+		Name:          &name,
+		DisplayOrder:  &displayOrder,
+		IsActive:      &isActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     strings.TrimSpace(param(r, "write_mode")),
 	})
 	if err != nil {
 		formErr, _, statusCode := mapServiceErrorToForm(err)
@@ -1725,8 +1745,22 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 	groupCode = strings.TrimSpace(groupCode)
 	editID = strings.TrimSpace(editID)
 
+	effectiveDate, err := time.Parse(time.DateOnly, effectiveDateStr)
+	if err != nil {
+		return orgtemplates.JobCatalogPageProps{}, fmt.Errorf("invalid effective_date: %w", err)
+	}
+	effectiveDate = normalizeValidTimeDayUTC(effectiveDate)
+
+	writeMode := strings.TrimSpace(strings.ToLower(param(r, "write_mode")))
+	switch writeMode {
+	case services.WriteModeCorrect, services.WriteModeUpdateFromDate:
+	default:
+		writeMode = services.WriteModeUpdateFromDate
+	}
+
 	props := orgtemplates.JobCatalogPageProps{
 		EffectiveDate:       effectiveDateStr,
+		WriteMode:           writeMode,
 		Tab:                 tab,
 		JobFamilyGroupCode:  groupCode,
 		JobFamilyGroupLabel: "",
@@ -1738,7 +1772,7 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 		Errors:              pageErrs,
 	}
 
-	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID, effectiveDate)
 	if err != nil {
 		return props, err
 	}
@@ -1790,7 +1824,7 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 		if groupID == uuid.Nil {
 			return props, nil
 		}
-		rows, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+		rows, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID, effectiveDate)
 		if err != nil {
 			return props, err
 		}
@@ -1816,7 +1850,7 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 			}
 		}
 	case "profiles":
-		rows, err := c.org.ListJobProfiles(r.Context(), tenantID)
+		rows, err := c.org.ListJobProfiles(r.Context(), tenantID, effectiveDate)
 		if err != nil {
 			return props, err
 		}
@@ -1846,7 +1880,7 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 				}
 			}
 			if props.EditProfile != nil {
-				families, err := c.org.ListJobProfileJobFamilies(r.Context(), tenantID, props.EditProfile.ID)
+				families, err := c.org.ListJobProfileJobFamilies(r.Context(), tenantID, props.EditProfile.ID, effectiveDate)
 				if err != nil {
 					return props, err
 				}
@@ -1857,14 +1891,13 @@ func (c *OrgUIController) buildJobCatalogPageProps(
 						JobFamilyGroupCode: strings.TrimSpace(fam.JobFamilyGroupCode),
 						JobFamilyCode:      strings.TrimSpace(fam.JobFamilyCode),
 						JobFamilyName:      strings.TrimSpace(fam.JobFamilyName),
-						AllocationPercent:  fam.AllocationPercent,
 						IsPrimary:          fam.IsPrimary,
 					})
 				}
 			}
 		}
 	case "levels":
-		rows, err := c.org.ListJobLevels(r.Context(), tenantID)
+		rows, err := c.org.ListJobLevels(r.Context(), tenantID, effectiveDate)
 		if err != nil {
 			return props, err
 		}
@@ -2030,9 +2063,9 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 		nodeLabel := c.orgNodeLabelFor(r, tenantID, orgNodeID, effectiveDate)
 		jobProfileLabel := ""
 		if jobProfileID != uuid.Nil {
-			jobProfileLabel = c.jobProfileLabelFor(r, tenantID, jobProfileID)
+			jobProfileLabel = c.jobProfileLabelFor(r, tenantID, effectiveDate, jobProfileID)
 		}
-		_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, "", "", jobLevelCode)
+		_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, effectiveDate, "", "", jobLevelCode)
 		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
 			Mode:            orgui.PositionFormCreate,
 			EffectiveDate:   effectiveDateStr,
@@ -2084,9 +2117,9 @@ func (c *OrgUIController) CreatePosition(w http.ResponseWriter, r *http.Request)
 		nodeLabel := c.orgNodeLabelFor(r, tenantID, orgNodeID, effectiveDate)
 		jobProfileLabel := ""
 		if jobProfileID != uuid.Nil {
-			jobProfileLabel = c.jobProfileLabelFor(r, tenantID, jobProfileID)
+			jobProfileLabel = c.jobProfileLabelFor(r, tenantID, effectiveDate, jobProfileID)
 		}
-		_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, "", "", jobLevelCode)
+		_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, effectiveDate, "", "", jobLevelCode)
 		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
 			Mode:            orgui.PositionFormCreate,
 			EffectiveDate:   effectiveDateStr,
@@ -2220,8 +2253,8 @@ func (c *OrgUIController) EditPositionForm(w http.ResponseWriter, r *http.Reques
 	if row.JobLevelCode != nil {
 		jobLevelCode = strings.TrimSpace(*row.JobLevelCode)
 	}
-	jobProfileLabel := c.jobProfileLabelFor(r, tenantID, row.JobProfileID)
-	_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, "", "", jobLevelCode)
+	jobProfileLabel := c.jobProfileLabelFor(r, tenantID, effectiveDate, row.JobProfileID)
+	_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, effectiveDate, "", "", jobLevelCode)
 	templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
 		Mode:            orgui.PositionFormEdit,
 		EffectiveDate:   effectiveDateStr,
@@ -2353,9 +2386,9 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 		}
 		jobProfileLabel := ""
 		if jobProfileID != uuid.Nil {
-			jobProfileLabel = c.jobProfileLabelFor(r, tenantID, jobProfileID)
+			jobProfileLabel = c.jobProfileLabelFor(r, tenantID, effectiveDate, jobProfileID)
 		}
-		_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, "", "", jobLevelCodeRaw)
+		_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, effectiveDate, "", "", jobLevelCodeRaw)
 		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
 			Mode:            orgui.PositionFormEdit,
 			EffectiveDate:   effectiveDateStr,
@@ -2417,9 +2450,9 @@ func (c *OrgUIController) UpdatePosition(w http.ResponseWriter, r *http.Request)
 		}
 		jobProfileLabel := ""
 		if jobProfileID != uuid.Nil {
-			jobProfileLabel = c.jobProfileLabelFor(r, tenantID, jobProfileID)
+			jobProfileLabel = c.jobProfileLabelFor(r, tenantID, effectiveDate, jobProfileID)
 		}
-		_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, "", "", jobLevelCodeRaw)
+		_, _, levelLabel := c.jobCatalogLabelsFor(r, tenantID, effectiveDate, "", "", jobLevelCodeRaw)
 		templ.Handler(orgui.PositionForm(orgui.PositionFormProps{
 			Mode:            orgui.PositionFormEdit,
 			EffectiveDate:   effectiveDateStr,
@@ -2600,7 +2633,7 @@ func (c *OrgUIController) getPositionDetails(r *http.Request, tenantID uuid.UUID
 		details.ReportsToLabel = c.positionLabelFor(r, tenantID, *details.ReportsToPositionID, asOf, details.ReportsToPositionID.String())
 	}
 	if details != nil {
-		groupLabel, familyLabel, levelLabel := c.jobCatalogLabelsFor(r, tenantID, details.Row.JobFamilyGroupCode, details.Row.JobFamilyCode, details.Row.JobLevelCode)
+		groupLabel, familyLabel, levelLabel := c.jobCatalogLabelsFor(r, tenantID, asOf, details.Row.JobFamilyGroupCode, details.Row.JobFamilyCode, details.Row.JobLevelCode)
 		details.JobFamilyGroupLabel = groupLabel
 		details.JobFamilyLabel = familyLabel
 		details.JobLevelLabel = levelLabel
@@ -2608,10 +2641,11 @@ func (c *OrgUIController) getPositionDetails(r *http.Request, tenantID uuid.UUID
 	return details, mappers.PositionTimelineToViewModels(slices), nil
 }
 
-func (c *OrgUIController) jobCatalogLabelsFor(r *http.Request, tenantID uuid.UUID, jobFamilyGroupCode string, jobFamilyCode string, jobLevelCode string) (string, string, string) {
+func (c *OrgUIController) jobCatalogLabelsFor(r *http.Request, tenantID uuid.UUID, asOf time.Time, jobFamilyGroupCode string, jobFamilyCode string, jobLevelCode string) (string, string, string) {
 	jobFamilyGroupCode = strings.TrimSpace(jobFamilyGroupCode)
 	jobFamilyCode = strings.TrimSpace(jobFamilyCode)
 	jobLevelCode = strings.TrimSpace(jobLevelCode)
+	asOf = normalizeValidTimeDayUTC(asOf)
 
 	if jobFamilyGroupCode == "" && jobFamilyCode == "" && jobLevelCode == "" {
 		return "", "", ""
@@ -2621,7 +2655,7 @@ func (c *OrgUIController) jobCatalogLabelsFor(r *http.Request, tenantID uuid.UUI
 	var familyLabel string
 	var levelLabel string
 
-	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	groups, err := c.org.ListJobFamilyGroups(r.Context(), tenantID, asOf)
 	if err != nil {
 		return "", "", ""
 	}
@@ -2640,7 +2674,7 @@ func (c *OrgUIController) jobCatalogLabelsFor(r *http.Request, tenantID uuid.UUI
 	}
 
 	if group != nil && jobFamilyCode != "" {
-		families, err := c.org.ListJobFamilies(r.Context(), tenantID, group.ID)
+		families, err := c.org.ListJobFamilies(r.Context(), tenantID, group.ID, asOf)
 		if err != nil {
 			return groupLabel, "", ""
 		}
@@ -2653,7 +2687,7 @@ func (c *OrgUIController) jobCatalogLabelsFor(r *http.Request, tenantID uuid.UUI
 	}
 
 	if jobLevelCode != "" {
-		levels, err := c.org.ListJobLevels(r.Context(), tenantID)
+		levels, err := c.org.ListJobLevels(r.Context(), tenantID, asOf)
 		if err != nil {
 			return groupLabel, familyLabel, ""
 		}
@@ -2667,11 +2701,12 @@ func (c *OrgUIController) jobCatalogLabelsFor(r *http.Request, tenantID uuid.UUI
 	return groupLabel, familyLabel, levelLabel
 }
 
-func (c *OrgUIController) jobProfileLabelFor(r *http.Request, tenantID uuid.UUID, jobProfileID uuid.UUID) string {
+func (c *OrgUIController) jobProfileLabelFor(r *http.Request, tenantID uuid.UUID, asOf time.Time, jobProfileID uuid.UUID) string {
 	if jobProfileID == uuid.Nil {
 		return ""
 	}
-	rows, err := c.org.ListJobProfiles(r.Context(), tenantID)
+	asOf = normalizeValidTimeDayUTC(asOf)
+	rows, err := c.org.ListJobProfiles(r.Context(), tenantID, asOf)
 	if err != nil {
 		return jobProfileID.String()
 	}
@@ -2749,21 +2784,11 @@ func jobProfileJobFamiliesSetFromForm(r *http.Request) (services.JobProfileJobFa
 			return services.JobProfileJobFamiliesSet{}, fmt.Errorf("invalid job_family_id_%d", i)
 		}
 
-		percentRaw := strings.TrimSpace(param(r, fmt.Sprintf("allocation_percent_%d", i)))
-		if percentRaw == "" {
-			return services.JobProfileJobFamiliesSet{}, fmt.Errorf("allocation_percent_%d is required", i)
-		}
-		percent, err := strconv.Atoi(percentRaw)
-		if err != nil {
-			return services.JobProfileJobFamiliesSet{}, fmt.Errorf("invalid allocation_percent_%d", i)
-		}
-
 		items = append(items, indexed{
 			index: i,
 			item: services.JobProfileJobFamilySetItem{
-				JobFamilyID:       jobFamilyID,
-				AllocationPercent: percent,
-				IsPrimary:         false,
+				JobFamilyID: jobFamilyID,
+				IsPrimary:   false,
 			},
 		})
 	}
@@ -2777,9 +2802,22 @@ func jobProfileJobFamiliesSetFromForm(r *http.Request) (services.JobProfileJobFa
 		}
 		primaryIndex = v
 	}
-	for i := range items {
-		if items[i].index == primaryIndex {
-			items[i].item.IsPrimary = true
+
+	if primaryIndexRaw == "" && len(items) == 1 {
+		items[0].item.IsPrimary = true
+	} else {
+		foundPrimary := false
+		for i := range items {
+			if items[i].index == primaryIndex {
+				items[i].item.IsPrimary = true
+				foundPrimary = true
+			}
+		}
+		if primaryIndexRaw != "" && !foundPrimary {
+			return services.JobProfileJobFamiliesSet{}, errors.New("invalid primary_index")
+		}
+		if primaryIndexRaw == "" && len(items) > 1 {
+			return services.JobProfileJobFamiliesSet{}, errors.New("primary_index is required")
 		}
 	}
 

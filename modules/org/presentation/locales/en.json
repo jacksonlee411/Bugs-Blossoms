@@ -16,7 +16,12 @@
         "AsOf": "As of",
         "EffectiveDate": "Effective date",
         "NotFound": "Not found",
-        "Present": "Present"
+        "Present": "Present",
+        "WriteMode": {
+          "Label": "Write mode",
+          "Correct": "Correct",
+          "UpdateFromDate": "Update from date"
+        }
       },
       "Nodes": {
         "MetaTitle": "Org structure",
@@ -70,7 +75,11 @@
           "EventType": "Event type",
           "OrgNodeID": "Department",
           "OrgNodeLongName": "Org long name",
-          "Position": "Position"
+          "Position": "Position",
+          "JobFamilyGroup": "Job family group",
+          "JobFamily": "Job family",
+          "JobProfile": "Job profile",
+          "JobLevel": "Job level"
         }
       },
       "Tree": {
@@ -192,21 +201,20 @@
           "Profiles": "Job profiles",
           "Levels": "Levels"
         },
-        "Fields": {
-          "Code": "Code",
-          "Name": "Name",
-          "Desc": "Description",
-          "IsActive": "Status",
-          "DisplayOrder": "Display order",
-          "JobFamilies": "Job family allocations",
-          "JobFamily": "Job family",
-          "AllocationPercent": "Allocation (%)",
-          "IsPrimary": "Primary"
-        },
-        "Hints": {
-          "JobFamiliesSum100": "Allocations must sum to 100%, and exactly one primary is required."
-        }
-      },
+	        "Fields": {
+	          "Code": "Code",
+	          "Name": "Name",
+	          "Desc": "Description",
+	          "IsActive": "Status",
+	          "DisplayOrder": "Display order",
+	          "JobFamilies": "Job families",
+	          "JobFamily": "Job family",
+	          "IsPrimary": "Primary"
+	        },
+	        "Hints": {
+	          "JobFamiliesPrimaryOne": "Select one or more job families, and choose exactly one primary."
+	        }
+	      },
       "Node": {
         "CreateTitle": "Create node",
         "EditTitle": "Edit (Insert)",

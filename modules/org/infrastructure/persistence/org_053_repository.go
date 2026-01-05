@@ -124,10 +124,20 @@ func (r *OrgRepository) CopyJobProfileJobFamiliesToPositionSlice(ctx context.Con
 		return err
 	}
 	_, err = tx.Exec(ctx, `
-	INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, allocation_percent, is_primary)
-	SELECT $1, $3, job_family_id, allocation_percent, is_primary
-	FROM org_job_profile_job_families
-	WHERE tenant_id=$1 AND job_profile_id=$2
+	INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, is_primary)
+	SELECT $1, $3, sf.job_family_id, sf.is_primary
+	FROM org_position_slices ps
+	JOIN org_job_profile_slices jps
+		ON jps.tenant_id=ps.tenant_id
+		AND jps.job_profile_id=ps.job_profile_id
+		AND jps.effective_date <= ps.effective_date
+		AND jps.end_date >= ps.effective_date
+	JOIN org_job_profile_slice_job_families sf
+		ON sf.tenant_id=jps.tenant_id
+		AND sf.job_profile_slice_id=jps.id
+	WHERE ps.tenant_id=$1
+		AND ps.id=$3
+		AND ps.job_profile_id=$2
 	ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO NOTHING
 	`, pgUUID(tenantID), pgUUID(jobProfileID), pgUUID(positionSliceID))
 	return err
@@ -139,8 +149,8 @@ func (r *OrgRepository) CopyPositionSliceJobFamilies(ctx context.Context, tenant
 		return err
 	}
 	_, err = tx.Exec(ctx, `
-	INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, allocation_percent, is_primary)
-	SELECT tenant_id, $3, job_family_id, allocation_percent, is_primary
+	INSERT INTO org_position_slice_job_families (tenant_id, position_slice_id, job_family_id, is_primary)
+	SELECT tenant_id, $3, job_family_id, is_primary
 	FROM org_position_slice_job_families
 	WHERE tenant_id=$1 AND position_slice_id=$2
 	ON CONFLICT (tenant_id, position_slice_id, job_family_id) DO NOTHING

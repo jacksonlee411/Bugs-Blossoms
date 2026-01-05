@@ -478,6 +478,10 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeID") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.OrgNodeLongName") }</th>
 					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.Position") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.JobFamilyGroup") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.JobFamily") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.JobProfile") }</th>
+					<th class="py-2 pr-2">{ pageCtx.T("Org.UI.Assignments.Table.JobLevel") }</th>
 					if pageCtx.CanAuthz("org.assignments", "assign") {
 						<th class="py-2 pr-2">{ pageCtx.T("Actions") }</th>
 					}
@@ -560,6 +564,38 @@ templ AssignmentsTimeline(props AssignmentsTimelineProps) {
 }
 							}}
 							{ posLabel }
+						</td>
+						<td class="py-2 pr-2 text-200">
+							{{ jobFamilyGroup := strings.TrimSpace(row.JobFamilyGroup) }}
+							if jobFamilyGroup == "" {
+								<span class="text-xs text-400">—</span>
+							} else {
+								{ jobFamilyGroup }
+							}
+						</td>
+						<td class="py-2 pr-2 text-200">
+							{{ jobFamily := strings.TrimSpace(row.JobFamily) }}
+							if jobFamily == "" {
+								<span class="text-xs text-400">—</span>
+							} else {
+								{ jobFamily }
+							}
+						</td>
+						<td class="py-2 pr-2 text-200">
+							{{ jobProfile := strings.TrimSpace(row.JobProfile) }}
+							if jobProfile == "" {
+								<span class="text-xs text-400">—</span>
+							} else {
+								{ jobProfile }
+							}
+						</td>
+						<td class="py-2 pr-2 text-200">
+							{{ jobLevel := strings.TrimSpace(row.JobLevel) }}
+							if jobLevel == "" {
+								<span class="text-xs text-400">—</span>
+							} else {
+								{ jobLevel }
+							}
 						</td>
 						if pageCtx.CanAuthz("org.assignments", "assign") {
 							<td class="py-2 pr-2">

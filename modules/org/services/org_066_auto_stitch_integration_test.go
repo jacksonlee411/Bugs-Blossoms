@@ -250,7 +250,7 @@ SET freeze_mode=excluded.freeze_mode, freeze_grace_days=excluded.freeze_grace_da
 	asOf := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	end := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 
-	jobProfileID, _ := ensureTestJobProfileWith100PercentFamily(t, ctx, pool, tenantID)
+	jobProfileID, _ := ensureTestJobProfileWithPrimaryFamily(t, ctx, pool, tenantID)
 
 	orgNodeID := uuid.New()
 	_, err = pool.Exec(ctx, `

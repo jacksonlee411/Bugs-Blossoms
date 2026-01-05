@@ -15,6 +15,10 @@ type OrgAssignmentRow struct {
 	OrgNodeLabel    string
 	OrgNodeLongName string
 	PositionLabel   string
+	JobFamilyGroup  string
+	JobFamily       string
+	JobProfile      string
+	JobLevel        string
 	OperationType   string
 	EndEventType    string
 	EffectiveDate   time.Time

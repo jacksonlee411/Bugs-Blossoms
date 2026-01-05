@@ -30,7 +30,6 @@ type JobProfileJobFamilyRow struct {
 	JobFamilyGroupCode string
 	JobFamilyCode      string
 	JobFamilyName      string
-	AllocationPercent  int
 	IsPrimary          bool
 }
 

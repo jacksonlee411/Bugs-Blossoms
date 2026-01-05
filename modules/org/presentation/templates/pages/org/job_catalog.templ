@@ -17,6 +17,7 @@ import (
 
 type JobCatalogPageProps struct {
 	EffectiveDate string
+	WriteMode     string
 	Tab           string
 
 	JobFamilyGroupCode  string
@@ -65,6 +66,7 @@ func jobCatalogURL(tab, effectiveDate, groupCode, editID string) string {
 
 type JobCatalogHeaderProps struct {
 	EffectiveDate string
+	WriteMode     string
 }
 
 func jobLevelCode(row *viewmodels.JobLevelRow) string {
@@ -128,13 +130,6 @@ func jobProfileJobFamilyID(row *viewmodels.JobProfileJobFamilyRow) string {
 	return row.JobFamilyID.String()
 }
 
-func jobProfileJobFamilyPercent(row *viewmodels.JobProfileJobFamilyRow) string {
-	if row == nil {
-		return ""
-	}
-	return fmt.Sprintf("%d", row.AllocationPercent)
-}
-
 func jobFamilyGroupCode(row *viewmodels.JobFamilyGroupRow) string {
 	if row == nil {
 		return ""
@@ -170,7 +165,18 @@ templ JobCatalogHeader(props JobCatalogHeaderProps) {
 			<h1 class="text-lg font-semibold text-100">{ pageCtx.T("Org.UI.JobCatalog.Title") }</h1>
 			<span class="text-xs text-300">{ pageCtx.T("Org.UI.Shared.AsOf") }: { props.EffectiveDate }</span>
 		</div>
-		<div class="flex items-center gap-2">
+		<div class="flex items-center gap-3 flex-wrap">
+			<div class="flex items-center gap-2">
+				<label class="text-xs font-medium text-200" for="org-job-catalog-write-mode">{ pageCtx.T("Org.UI.Shared.WriteMode.Label") }</label>
+				<select
+					id="org-job-catalog-write-mode"
+					name="write_mode"
+					class="rounded-md border border-surface-400 bg-surface-100 px-3 py-2 text-sm text-100"
+				>
+					<option value="update_from_date" selected?={ strings.EqualFold(props.WriteMode, "update_from_date") }>{ pageCtx.T("Org.UI.Shared.WriteMode.UpdateFromDate") }</option>
+					<option value="correct" selected?={ strings.EqualFold(props.WriteMode, "correct") }>{ pageCtx.T("Org.UI.Shared.WriteMode.Correct") }</option>
+				</select>
+			</div>
 			<label class="text-xs font-medium text-200" for="effective-date">{ pageCtx.T("Org.UI.Shared.EffectiveDate") }</label>
 			<input
 				id="effective-date"
@@ -184,7 +190,7 @@ templ JobCatalogHeader(props JobCatalogHeaderProps) {
 				hx-select="#org-job-catalog-page"
 				hx-swap="outerHTML"
 				hx-push-url="true"
-				hx-include="#org-job-catalog-filters, #effective-date"
+				hx-include="#org-job-catalog-filters, #effective-date, #org-job-catalog-write-mode"
 			/>
 		</div>
 	</div>
@@ -198,7 +204,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 		},
 	}) {
 		<div id="org-job-catalog-page" class="p-6 space-y-4">
-			@JobCatalogHeader(JobCatalogHeaderProps{EffectiveDate: props.EffectiveDate})
+			@JobCatalogHeader(JobCatalogHeaderProps{EffectiveDate: props.EffectiveDate, WriteMode: props.WriteMode})
 			if len(props.Errors) > 0 {
 				<div class="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
 					<ul class="list-disc pl-5 space-y-1">
@@ -272,7 +278,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 								"hx-select":   "#org-job-catalog-page",
 								"hx-swap":     "outerHTML",
 								"hx-push-url": "true",
-								"hx-include":  "#org-job-catalog-filters, #effective-date",
+								"hx-include":  "#org-job-catalog-filters, #effective-date, #org-job-catalog-write-mode",
 							},
 						}) {
 							if strings.TrimSpace(props.JobFamilyGroupCode) != "" {
@@ -339,8 +345,12 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									@button.Primary(button.Props{
 										Size: button.SizeSM,
 										Attrs: templ.Attributes{
-											"type":       "submit",
-											"hx-include": "#org-job-catalog-filters, #effective-date",
+											"type":        "submit",
+											"hx-target":   "#org-job-catalog-page",
+											"hx-select":   "#org-job-catalog-page",
+											"hx-swap":     "outerHTML",
+											"hx-push-url": "true",
+											"hx-include":  "#org-job-catalog-filters, #effective-date, #org-job-catalog-write-mode",
 											ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/family-groups/%s", props.EditID), "/org/job-catalog/family-groups"),
 										},
 									}) {
@@ -447,8 +457,12 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 										@button.Primary(button.Props{
 											Size: button.SizeSM,
 											Attrs: templ.Attributes{
-												"type":       "submit",
-												"hx-include": "#org-job-catalog-filters, #effective-date",
+												"type":        "submit",
+												"hx-target":   "#org-job-catalog-page",
+												"hx-select":   "#org-job-catalog-page",
+												"hx-swap":     "outerHTML",
+												"hx-push-url": "true",
+												"hx-include":  "#org-job-catalog-filters, #effective-date, #org-job-catalog-write-mode",
 												ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/families/%s", props.EditID), "/org/job-catalog/families"),
 											},
 										}) {
@@ -557,7 +571,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 								}
 								<div class="rounded-md border border-surface-400 bg-surface-200 p-3 space-y-2">
 									<div class="text-sm font-medium text-100">{ pageCtx.T("Org.UI.JobCatalog.Fields.JobFamilies") }</div>
-									<div class="text-xs text-300">{ pageCtx.T("Org.UI.JobCatalog.Hints.JobFamiliesSum100") }</div>
+									<div class="text-xs text-300">{ pageCtx.T("Org.UI.JobCatalog.Hints.JobFamiliesPrimaryOne") }</div>
 									<div class="grid grid-cols-1 gap-2">
 										for i := 0; i < 4; i++ {
 											{{ var fam *viewmodels.JobProfileJobFamilyRow }}
@@ -565,7 +579,7 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 												{{ fam = &props.EditProfile.JobFamilies[i] }}
 											}
 											<div class="grid grid-cols-12 gap-2 items-end">
-												<div class="col-span-7">
+												<div class="col-span-10">
 													@base.Combobox(base.ComboboxProps{
 														Searchable:   true,
 														Label:        pageCtx.T("Org.UI.JobCatalog.Fields.JobFamily"),
@@ -578,15 +592,6 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 															<option value={ jobProfileJobFamilyID(fam) } selected>{ jobProfileJobFamilyLabel(fam) }</option>
 														}
 													}
-												</div>
-												<div class="col-span-3">
-													@input.Number(&input.Props{
-														Label: pageCtx.T("Org.UI.JobCatalog.Fields.AllocationPercent"),
-														Attrs: templ.Attributes{
-															"name":  fmt.Sprintf("allocation_percent_%d", i),
-															"value": jobProfileJobFamilyPercent(fam),
-														},
-													})
 												</div>
 												<div class="col-span-2 pb-2">
 													<label class="inline-flex items-center gap-2 text-sm text-200">
@@ -602,8 +607,12 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									@button.Primary(button.Props{
 										Size: button.SizeSM,
 										Attrs: templ.Attributes{
-											"type":       "submit",
-											"hx-include": "#org-job-catalog-filters, #effective-date",
+											"type":        "submit",
+											"hx-target":   "#org-job-catalog-page",
+											"hx-select":   "#org-job-catalog-page",
+											"hx-swap":     "outerHTML",
+											"hx-push-url": "true",
+											"hx-include":  "#org-job-catalog-filters, #effective-date, #org-job-catalog-write-mode",
 											ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/profiles/%s", props.EditID), "/org/job-catalog/profiles"),
 										},
 									}) {
@@ -713,8 +722,12 @@ templ JobCatalogPage(props JobCatalogPageProps) {
 									@button.Primary(button.Props{
 										Size: button.SizeSM,
 										Attrs: templ.Attributes{
-											"type":       "submit",
-											"hx-include": "#org-job-catalog-filters, #effective-date",
+											"type":        "submit",
+											"hx-target":   "#org-job-catalog-page",
+											"hx-select":   "#org-job-catalog-page",
+											"hx-swap":     "outerHTML",
+											"hx-push-url": "true",
+											"hx-include":  "#org-job-catalog-filters, #effective-date, #org-job-catalog-write-mode",
 											ternaryString(isEdit, "hx-patch", "hx-post"): ternaryString(isEdit, fmt.Sprintf("/org/job-catalog/levels/%s", props.EditID), "/org/job-catalog/levels"),
 										},
 									}) {

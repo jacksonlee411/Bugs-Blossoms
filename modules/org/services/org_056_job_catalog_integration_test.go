@@ -42,6 +42,7 @@ func setupOrg056DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 
 	migrations := []string{
 		"00001_org_baseline.sql",
+		"00002_org_migration_smoke.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
 		"20251221090000_org_reason_code_mode.sql",
@@ -57,6 +58,11 @@ func setupOrg056DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
+		"20260101020855_org_job_catalog_effective_dated_slices_phase_a.sql",
+		"20260101020930_org_job_catalog_effective_dated_slices_gates_and_backfill.sql",
+		"20260104100000_org_drop_job_profile_job_families_legacy.sql",
+		"20260104120000_org_drop_job_catalog_identity_legacy_columns.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -86,7 +92,7 @@ func setupOrg056DB(tb testing.TB) (context.Context, *pgxpool.Pool, uuid.UUID, uu
 
 func TestOrg056CatalogValidation_ShadowWritesButAudits(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
-	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, true)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, asOf, true)
 
 	initiatorID := uuid.New()
 	res, err := svc.CreatePosition(ctx, tenantID, "req-056-shadow", initiatorID, orgsvc.CreatePositionInput{
@@ -114,7 +120,7 @@ func TestOrg056CatalogValidation_ShadowWritesButAudits(t *testing.T) {
 
 func TestOrg056CatalogValidation_EnforceBlocksInvalidCodes(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
-	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, true)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, asOf, true)
 
 	_, err := pool.Exec(ctx, `UPDATE org_settings SET position_catalog_validation_mode='enforce' WHERE tenant_id=$1`, tenantID)
 	require.NoError(t, err)
@@ -143,7 +149,7 @@ func TestOrg056JobProfileInactive_EnforceBlocks(t *testing.T) {
 	_, err := pool.Exec(ctx, `UPDATE org_settings SET position_catalog_validation_mode='enforce' WHERE tenant_id=$1`, tenantID)
 	require.NoError(t, err)
 
-	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, false)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, asOf, false)
 
 	initiatorID := uuid.New()
 	_, err = svc.CreatePosition(ctx, tenantID, "req-056-profile-inactive", initiatorID, orgsvc.CreatePositionInput{
@@ -164,7 +170,7 @@ func TestOrg056JobProfileInactive_EnforceBlocks(t *testing.T) {
 
 func TestOrg056SetPositionRestrictions_RejectsMismatch(t *testing.T) {
 	ctx, _, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
-	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, true)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, asOf, true)
 
 	initiatorID := uuid.New()
 	pos, err := svc.CreatePosition(ctx, tenantID, "req-056-pos", initiatorID, orgsvc.CreatePositionInput{
@@ -195,7 +201,7 @@ func TestOrg056SetPositionRestrictions_RejectsMismatch(t *testing.T) {
 
 func TestOrg056AssignmentRestrictions_EnforceBlocksCorruptRestrictions(t *testing.T) {
 	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
-	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, true)
+	jobProfileID := seedOrg056JobProfile(t, ctx, tenantID, svc, asOf, true)
 
 	_, err := pool.Exec(ctx, `UPDATE org_settings SET position_restrictions_validation_mode='enforce' WHERE tenant_id=$1`, tenantID)
 	require.NoError(t, err)
@@ -233,12 +239,92 @@ func TestOrg056AssignmentRestrictions_EnforceBlocksCorruptRestrictions(t *testin
 	require.Equal(t, "ORG_POSITION_RESTRICTIONS_PROFILE_MISMATCH", svcErr.Code)
 }
 
-func seedOrg056JobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID, svc *orgsvc.OrgService, isActive bool) uuid.UUID {
+func TestOrg056JobCatalog_FamilyGroupUpdateFromDate_CreatesSlices(t *testing.T) {
+	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
+	_ = pool
+	_ = rootNodeID
+
+	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{
+		Code:          "TST",
+		Name:          "Base",
+		IsActive:      true,
+		EffectiveDate: asOf,
+	})
+	require.NoError(t, err)
+
+	d2 := time.Date(2025, 12, 2, 0, 0, 0, 0, time.UTC)
+	name0 := "U0"
+	active0 := true
+	_, err = svc.UpdateJobFamilyGroup(ctx, tenantID, group.ID, orgsvc.JobFamilyGroupUpdate{
+		Name:          &name0,
+		IsActive:      &active0,
+		EffectiveDate: d2,
+		WriteMode:     orgsvc.WriteModeUpdateFromDate,
+	})
+	require.NoError(t, err)
+
+	d3 := time.Date(2025, 12, 3, 0, 0, 0, 0, time.UTC)
+	name1 := "U1"
+	_, err = svc.UpdateJobFamilyGroup(ctx, tenantID, group.ID, orgsvc.JobFamilyGroupUpdate{
+		Name:          &name1,
+		IsActive:      &active0,
+		EffectiveDate: d3,
+		WriteMode:     orgsvc.WriteModeUpdateFromDate,
+	})
+	require.NoError(t, err)
+
+	assertNameAt := func(t *testing.T, d time.Time, want string) {
+		t.Helper()
+		rows, err := svc.ListJobFamilyGroups(ctx, tenantID, d)
+		require.NoError(t, err)
+		for _, r := range rows {
+			if r.ID == group.ID {
+				require.Equal(t, want, r.Name)
+				return
+			}
+		}
+		t.Fatalf("job family group not found: %s", group.ID)
+	}
+
+	assertNameAt(t, time.Date(2025, 12, 1, 0, 0, 0, 0, time.UTC), "Base")
+	assertNameAt(t, d2, "U0")
+	assertNameAt(t, d3, "U1")
+}
+
+func TestOrg056JobCatalog_FamilyGroupUpdate_RequiresWriteMode(t *testing.T) {
+	ctx, pool, tenantID, rootNodeID, asOf, svc := setupOrg056DB(t)
+	_ = pool
+	_ = rootNodeID
+
+	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{
+		Code:          "TST",
+		Name:          "Base",
+		IsActive:      true,
+		EffectiveDate: asOf,
+	})
+	require.NoError(t, err)
+
+	d2 := time.Date(2025, 12, 2, 0, 0, 0, 0, time.UTC)
+	name0 := "U0"
+	active0 := true
+	_, err = svc.UpdateJobFamilyGroup(ctx, tenantID, group.ID, orgsvc.JobFamilyGroupUpdate{
+		Name:          &name0,
+		IsActive:      &active0,
+		EffectiveDate: d2,
+		WriteMode:     "",
+	})
+	var svcErr *orgsvc.ServiceError
+	require.ErrorAs(t, err, &svcErr)
+	require.Equal(t, 400, svcErr.Status)
+	require.Equal(t, "ORG_INVALID_BODY", svcErr.Code)
+}
+
+func seedOrg056JobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID, svc *orgsvc.OrgService, asOf time.Time, isActive bool) uuid.UUID {
 	t.Helper()
 
-	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{Code: "FIN", Name: "Finance", IsActive: true})
+	group, err := svc.CreateJobFamilyGroup(ctx, tenantID, orgsvc.JobFamilyGroupCreate{Code: "FIN", Name: "Finance", IsActive: true, EffectiveDate: asOf})
 	require.NoError(t, err)
-	family, err := svc.CreateJobFamily(ctx, tenantID, orgsvc.JobFamilyCreate{JobFamilyGroupID: group.ID, Code: "FIN-ACC", Name: "Accounting", IsActive: true})
+	family, err := svc.CreateJobFamily(ctx, tenantID, orgsvc.JobFamilyCreate{JobFamilyGroupID: group.ID, Code: "FIN-ACC", Name: "Accounting", IsActive: true, EffectiveDate: asOf})
 	require.NoError(t, err)
 	profile, err := svc.CreateJobProfile(ctx, tenantID, orgsvc.JobProfileCreate{
 		Code:     "FIN-P1",
@@ -246,9 +332,10 @@ func seedOrg056JobProfile(t *testing.T, ctx context.Context, tenantID uuid.UUID,
 		IsActive: isActive,
 		JobFamilies: orgsvc.JobProfileJobFamiliesSet{
 			Items: []orgsvc.JobProfileJobFamilySetItem{
-				{JobFamilyID: family.ID, AllocationPercent: 100, IsPrimary: true},
+				{JobFamilyID: family.ID, IsPrimary: true},
 			},
 		},
+		EffectiveDate: asOf,
 	})
 	require.NoError(t, err)
 	return profile.ID

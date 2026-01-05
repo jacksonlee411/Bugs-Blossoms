@@ -381,23 +381,17 @@ CREATE TABLE org_job_family_groups (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     code varchar(64) NOT NULL,
-    name text NOT NULL,
-    is_active boolean NOT NULL DEFAULT TRUE,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_job_family_groups_tenant_id_id_key UNIQUE (tenant_id, id),
     CONSTRAINT org_job_family_groups_tenant_id_code_key UNIQUE (tenant_id, code)
 );
 
-CREATE INDEX org_job_family_groups_tenant_active_code_idx ON org_job_family_groups (tenant_id, is_active, code);
-
 CREATE TABLE org_job_families (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     job_family_group_id uuid NOT NULL,
     code varchar(64) NOT NULL,
-    name text NOT NULL,
-    is_active boolean NOT NULL DEFAULT TRUE,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_job_families_tenant_id_id_key UNIQUE (tenant_id, id),
@@ -405,134 +399,198 @@ CREATE TABLE org_job_families (
     CONSTRAINT org_job_families_tenant_id_group_code_key UNIQUE (tenant_id, job_family_group_id, code)
 );
 
-CREATE INDEX org_job_families_tenant_group_active_code_idx ON org_job_families (tenant_id, job_family_group_id, is_active, code);
-
 CREATE TABLE org_job_levels (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     code varchar(64) NOT NULL,
-    name text NOT NULL,
-    display_order int NOT NULL DEFAULT 0,
-    is_active boolean NOT NULL DEFAULT TRUE,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_job_levels_tenant_id_id_key UNIQUE (tenant_id, id),
-    CONSTRAINT org_job_levels_display_order_check CHECK (display_order >= 0),
     CONSTRAINT org_job_levels_tenant_id_code_key UNIQUE (tenant_id, code)
 );
-
-CREATE INDEX org_job_levels_tenant_active_order_code_idx ON org_job_levels (tenant_id, is_active, display_order, code);
 
 CREATE TABLE org_job_profiles (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     code varchar(64) NOT NULL,
-    name text NOT NULL,
-    description text NULL,
-    is_active boolean NOT NULL DEFAULT TRUE,
-    external_refs jsonb NOT NULL DEFAULT '{}' ::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_job_profiles_tenant_id_id_key UNIQUE (tenant_id, id),
-    CONSTRAINT org_job_profiles_external_refs_is_object_check CHECK (jsonb_typeof(external_refs) = 'object'),
     CONSTRAINT org_job_profiles_tenant_id_code_key UNIQUE (tenant_id, code)
 );
-
-CREATE INDEX org_job_profiles_tenant_active_code_idx ON org_job_profiles (tenant_id, is_active, code);
 
 ALTER TABLE org_position_slices
     ADD CONSTRAINT org_position_slices_job_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE RESTRICT;
 
-CREATE TABLE org_job_profile_job_families (
+-- DEV-PLAN-075: Effective-dated Job Catalog attribute slices (Phase A: schema + baseline backfill).
+CREATE TABLE org_job_family_group_slices (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
-    job_profile_id uuid NOT NULL,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    job_family_group_id uuid NOT NULL,
+    name text NOT NULL,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    effective_date date NOT NULL,
+    end_date date NOT NULL DEFAULT DATE '9999-12-31',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_family_group_slices_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_family_group_slices_effective_check CHECK (effective_date <= end_date),
+    CONSTRAINT org_job_family_group_slices_group_fk FOREIGN KEY (tenant_id, job_family_group_id) REFERENCES org_job_family_groups (tenant_id, id) ON DELETE RESTRICT
+);
+
+ALTER TABLE org_job_family_group_slices
+    ADD CONSTRAINT org_job_family_group_slices_no_overlap
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, job_family_group_id gist_uuid_ops WITH =, daterange(effective_date, end_date + 1, '[)') WITH &&);
+
+CREATE INDEX org_job_family_group_slices_tenant_group_effective_idx ON org_job_family_group_slices (tenant_id, job_family_group_id, effective_date);
+
+CREATE TABLE org_job_family_slices (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
     job_family_id uuid NOT NULL,
-    allocation_percent int NOT NULL,
+    name text NOT NULL,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    effective_date date NOT NULL,
+    end_date date NOT NULL DEFAULT DATE '9999-12-31',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_family_slices_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_family_slices_effective_check CHECK (effective_date <= end_date),
+    CONSTRAINT org_job_family_slices_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT
+);
+
+ALTER TABLE org_job_family_slices
+    ADD CONSTRAINT org_job_family_slices_no_overlap
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, job_family_id gist_uuid_ops WITH =, daterange(effective_date, end_date + 1, '[)') WITH &&);
+
+CREATE INDEX org_job_family_slices_tenant_family_effective_idx ON org_job_family_slices (tenant_id, job_family_id, effective_date);
+
+CREATE TABLE org_job_level_slices (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    job_level_id uuid NOT NULL,
+    name text NOT NULL,
+    display_order int NOT NULL DEFAULT 0,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    effective_date date NOT NULL,
+    end_date date NOT NULL DEFAULT DATE '9999-12-31',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_level_slices_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_level_slices_effective_check CHECK (effective_date <= end_date),
+    CONSTRAINT org_job_level_slices_display_order_check CHECK (display_order >= 0),
+    CONSTRAINT org_job_level_slices_level_fk FOREIGN KEY (tenant_id, job_level_id) REFERENCES org_job_levels (tenant_id, id) ON DELETE RESTRICT
+);
+
+ALTER TABLE org_job_level_slices
+    ADD CONSTRAINT org_job_level_slices_no_overlap
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, job_level_id gist_uuid_ops WITH =, daterange(effective_date, end_date + 1, '[)') WITH &&);
+
+CREATE INDEX org_job_level_slices_tenant_level_effective_idx ON org_job_level_slices (tenant_id, job_level_id, effective_date);
+
+CREATE TABLE org_job_profile_slices (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid (),
+    job_profile_id uuid NOT NULL,
+    name text NOT NULL,
+    description text NULL,
+    is_active boolean NOT NULL DEFAULT TRUE,
+    external_refs jsonb NOT NULL DEFAULT '{}' ::jsonb,
+    effective_date date NOT NULL,
+    end_date date NOT NULL DEFAULT DATE '9999-12-31',
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT org_job_profile_slices_tenant_id_id_key UNIQUE (tenant_id, id),
+    CONSTRAINT org_job_profile_slices_effective_check CHECK (effective_date <= end_date),
+    CONSTRAINT org_job_profile_slices_external_refs_is_object_check CHECK (jsonb_typeof(external_refs) = 'object'),
+    CONSTRAINT org_job_profile_slices_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE RESTRICT
+);
+
+ALTER TABLE org_job_profile_slices
+    ADD CONSTRAINT org_job_profile_slices_no_overlap
+    EXCLUDE USING gist (tenant_id gist_uuid_ops WITH =, job_profile_id gist_uuid_ops WITH =, daterange(effective_date, end_date + 1, '[)') WITH &&);
+
+CREATE INDEX org_job_profile_slices_tenant_profile_effective_idx ON org_job_profile_slices (tenant_id, job_profile_id, effective_date);
+
+CREATE TABLE org_job_profile_slice_job_families (
+    tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
+    job_profile_slice_id uuid NOT NULL,
+    job_family_id uuid NOT NULL,
     is_primary boolean NOT NULL DEFAULT FALSE,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT org_job_profile_job_families_pkey PRIMARY KEY (tenant_id, job_profile_id, job_family_id),
-    CONSTRAINT org_job_profile_job_families_profile_fk FOREIGN KEY (tenant_id, job_profile_id) REFERENCES org_job_profiles (tenant_id, id) ON DELETE CASCADE,
-    CONSTRAINT org_job_profile_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
-    CONSTRAINT org_job_profile_job_families_allocation_check CHECK (allocation_percent >= 1 AND allocation_percent <= 100)
+    CONSTRAINT org_job_profile_slice_job_families_pkey PRIMARY KEY (tenant_id, job_profile_slice_id, job_family_id),
+    CONSTRAINT org_job_profile_slice_job_families_slice_fk FOREIGN KEY (tenant_id, job_profile_slice_id) REFERENCES org_job_profile_slices (tenant_id, id) ON DELETE CASCADE,
+    CONSTRAINT org_job_profile_slice_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT
 );
 
-CREATE UNIQUE INDEX org_job_profile_job_families_primary_unique ON org_job_profile_job_families (tenant_id, job_profile_id)
+CREATE UNIQUE INDEX org_job_profile_slice_job_families_primary_unique ON org_job_profile_slice_job_families (tenant_id, job_profile_slice_id)
 WHERE
     is_primary = TRUE;
 
-CREATE INDEX org_job_profile_job_families_tenant_family_profile_idx ON org_job_profile_job_families (tenant_id, job_family_id, job_profile_id);
+CREATE INDEX org_job_profile_slice_job_families_tenant_family_slice_idx ON org_job_profile_slice_job_families (tenant_id, job_family_id, job_profile_slice_id);
 
-CREATE OR REPLACE FUNCTION org_job_profile_job_families_validate ()
+CREATE OR REPLACE FUNCTION org_job_profile_slice_job_families_validate ()
     RETURNS TRIGGER
     AS $$
 DECLARE
     t_id uuid;
-    p_id uuid;
-    sum_pct int;
+    s_id uuid;
     primary_count int;
     parent_exists boolean;
 BEGIN
     t_id := COALESCE(NEW.tenant_id, OLD.tenant_id);
-    p_id := COALESCE(NEW.job_profile_id, OLD.job_profile_id);
+    s_id := COALESCE(NEW.job_profile_slice_id, OLD.job_profile_slice_id);
     SELECT
         EXISTS (
             SELECT
                 1
             FROM
-                org_job_profiles p
+                org_job_profile_slices s
             WHERE
-                p.tenant_id = t_id
-                AND p.id = p_id) INTO parent_exists;
+                s.tenant_id = t_id
+                AND s.id = s_id) INTO parent_exists;
     IF NOT parent_exists THEN
         RETURN NULL;
     END IF;
     SELECT
-        COALESCE(SUM(allocation_percent), 0),
         COALESCE(SUM(
                 CASE WHEN is_primary THEN
                     1
                 ELSE
                     0
-                END), 0) INTO sum_pct,
-        primary_count
+                END), 0) INTO primary_count
     FROM
-        org_job_profile_job_families
+        org_job_profile_slice_job_families
     WHERE
         tenant_id = t_id
-        AND job_profile_id = p_id;
-    IF sum_pct <> 100 THEN
+        AND job_profile_slice_id = s_id;
+    IF primary_count <> 1 THEN
         RAISE EXCEPTION
-            USING ERRCODE = '23514', MESSAGE = format('job profile job families allocation must sum to 100 (tenant_id=%s job_profile_id=%s sum=%s)', t_id, p_id, sum_pct);
+            USING ERRCODE = '23000', CONSTRAINT = 'org_job_profile_slice_job_families_invalid_body', MESSAGE = format('job profile slice job families must have exactly one primary (tenant_id=%s job_profile_slice_id=%s count=%s)', t_id, s_id, primary_count);
         END IF;
-        IF primary_count <> 1 THEN
-            RAISE EXCEPTION
-                USING ERRCODE = '23514', MESSAGE = format('job profile job families must have exactly one primary (tenant_id=%s job_profile_id=%s count=%s)', t_id, p_id, primary_count);
-            END IF;
-            RETURN NULL;
+        RETURN NULL;
 END;
 $$
 LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS org_job_profile_job_families_validate_trigger ON org_job_profile_job_families;
+DROP TRIGGER IF EXISTS org_job_profile_slice_job_families_validate_trigger ON org_job_profile_slice_job_families;
 
-CREATE CONSTRAINT TRIGGER org_job_profile_job_families_validate_trigger
-    AFTER INSERT OR UPDATE OR DELETE ON org_job_profile_job_families DEFERRABLE INITIALLY DEFERRED
+CREATE CONSTRAINT TRIGGER org_job_profile_slice_job_families_validate_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON org_job_profile_slice_job_families DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW
-    EXECUTE FUNCTION org_job_profile_job_families_validate ();
+    EXECUTE FUNCTION org_job_profile_slice_job_families_validate ();
 
 CREATE TABLE org_position_slice_job_families (
     tenant_id uuid NOT NULL REFERENCES tenants (id) ON DELETE CASCADE,
     position_slice_id uuid NOT NULL,
     job_family_id uuid NOT NULL,
-    allocation_percent int NOT NULL,
     is_primary boolean NOT NULL DEFAULT FALSE,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     CONSTRAINT org_position_slice_job_families_pkey PRIMARY KEY (tenant_id, position_slice_id, job_family_id),
     CONSTRAINT org_position_slice_job_families_slice_fk FOREIGN KEY (tenant_id, position_slice_id) REFERENCES org_position_slices (tenant_id, id) ON DELETE CASCADE,
-    CONSTRAINT org_position_slice_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT,
-    CONSTRAINT org_position_slice_job_families_allocation_check CHECK (allocation_percent >= 1 AND allocation_percent <= 100)
+    CONSTRAINT org_position_slice_job_families_family_fk FOREIGN KEY (tenant_id, job_family_id) REFERENCES org_job_families (tenant_id, id) ON DELETE RESTRICT
 );
 
 CREATE UNIQUE INDEX org_position_slice_job_families_primary_unique ON org_position_slice_job_families (tenant_id, position_slice_id)
@@ -547,7 +605,6 @@ CREATE OR REPLACE FUNCTION org_position_slice_job_families_validate ()
 DECLARE
     t_id uuid;
     s_id uuid;
-    sum_pct int;
     primary_count int;
     parent_exists boolean;
 BEGIN
@@ -566,28 +623,22 @@ BEGIN
         RETURN NULL;
     END IF;
     SELECT
-        COALESCE(SUM(allocation_percent), 0),
         COALESCE(SUM(
                 CASE WHEN is_primary THEN
                     1
                 ELSE
                     0
-                END), 0) INTO sum_pct,
-        primary_count
+                END), 0) INTO primary_count
     FROM
         org_position_slice_job_families
     WHERE
         tenant_id = t_id
         AND position_slice_id = s_id;
-    IF sum_pct <> 100 THEN
+    IF primary_count <> 1 THEN
         RAISE EXCEPTION
-            USING ERRCODE = '23514', MESSAGE = format('position slice job families allocation must sum to 100 (tenant_id=%s position_slice_id=%s sum=%s)', t_id, s_id, sum_pct);
+            USING ERRCODE = '23514', MESSAGE = format('position slice job families must have exactly one primary (tenant_id=%s position_slice_id=%s count=%s)', t_id, s_id, primary_count);
         END IF;
-        IF primary_count <> 1 THEN
-            RAISE EXCEPTION
-                USING ERRCODE = '23514', MESSAGE = format('position slice job families must have exactly one primary (tenant_id=%s position_slice_id=%s count=%s)', t_id, s_id, primary_count);
-            END IF;
-            RETURN NULL;
+        RETURN NULL;
 END;
 $$
 LANGUAGE plpgsql;
@@ -1219,5 +1270,334 @@ CREATE CONSTRAINT TRIGGER org_assignments_gap_free
     AFTER INSERT OR UPDATE OR DELETE ON org_assignments DEFERRABLE INITIALLY DEFERRED
     FOR EACH ROW
     EXECUTE FUNCTION org_assignments_gap_free_trigger ();
+
+-- DEV-PLAN-075: Job Catalog slices must be gap-free (commit-time gate).
+CREATE OR REPLACE FUNCTION org_job_family_group_slices_gap_free_assert (p_tenant_id uuid, p_job_family_group_id uuid)
+    RETURNS void
+    AS $$
+DECLARE
+    has_gap boolean;
+    row_count bigint;
+    last_end date;
+BEGIN
+    WITH ordered AS (
+        SELECT
+            effective_date,
+            end_date,
+            lag(end_date) OVER (ORDER BY effective_date) AS prev_end_date
+        FROM
+            org_job_family_group_slices
+        WHERE
+            tenant_id = p_tenant_id
+            AND job_family_group_id = p_job_family_group_id
+        ORDER BY
+            effective_date
+)
+    SELECT
+        EXISTS (
+            SELECT
+                1
+            FROM
+                ordered
+            WHERE
+                prev_end_date IS NOT NULL
+                AND (prev_end_date + 1) <> effective_date),
+            (
+                SELECT
+                    COUNT(*)
+                FROM
+                    ordered),
+                (
+                    SELECT
+                        end_date
+                    FROM
+                        ordered
+                    ORDER BY
+                        effective_date DESC
+                    LIMIT 1) INTO has_gap,
+                row_count,
+                last_end;
+    IF row_count > 0 AND (has_gap OR last_end <> DATE '9999-12-31') THEN
+        RAISE EXCEPTION
+            USING ERRCODE = '23000', CONSTRAINT = 'org_job_family_group_slices_gap_free', MESSAGE = format('time slices must be gap-free (tenant_id=%s job_family_group_id=%s)', p_tenant_id, p_job_family_group_id);
+        END IF;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION org_job_family_group_slices_gap_free_trigger ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        PERFORM
+            org_job_family_group_slices_gap_free_assert (OLD.tenant_id, OLD.job_family_group_id);
+        RETURN NULL;
+    END IF;
+    IF TG_OP = 'UPDATE' AND (OLD.tenant_id,
+        OLD.job_family_group_id) IS DISTINCT FROM (NEW.tenant_id,
+    NEW.job_family_group_id) THEN
+        PERFORM
+            org_job_family_group_slices_gap_free_assert (OLD.tenant_id, OLD.job_family_group_id);
+    END IF;
+    PERFORM
+        org_job_family_group_slices_gap_free_assert (NEW.tenant_id, NEW.job_family_group_id);
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS org_job_family_group_slices_gap_free ON org_job_family_group_slices;
+
+CREATE CONSTRAINT TRIGGER org_job_family_group_slices_gap_free
+    AFTER INSERT OR UPDATE OR DELETE ON org_job_family_group_slices DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION org_job_family_group_slices_gap_free_trigger ();
+
+CREATE OR REPLACE FUNCTION org_job_family_slices_gap_free_assert (p_tenant_id uuid, p_job_family_id uuid)
+    RETURNS void
+    AS $$
+DECLARE
+    has_gap boolean;
+    row_count bigint;
+    last_end date;
+BEGIN
+    WITH ordered AS (
+        SELECT
+            effective_date,
+            end_date,
+            lag(end_date) OVER (ORDER BY effective_date) AS prev_end_date
+        FROM
+            org_job_family_slices
+        WHERE
+            tenant_id = p_tenant_id
+            AND job_family_id = p_job_family_id
+        ORDER BY
+            effective_date
+)
+    SELECT
+        EXISTS (
+            SELECT
+                1
+            FROM
+                ordered
+            WHERE
+                prev_end_date IS NOT NULL
+                AND (prev_end_date + 1) <> effective_date),
+            (
+                SELECT
+                    COUNT(*)
+                FROM
+                    ordered),
+                (
+                    SELECT
+                        end_date
+                    FROM
+                        ordered
+                    ORDER BY
+                        effective_date DESC
+                    LIMIT 1) INTO has_gap,
+                row_count,
+                last_end;
+    IF row_count > 0 AND (has_gap OR last_end <> DATE '9999-12-31') THEN
+        RAISE EXCEPTION
+            USING ERRCODE = '23000', CONSTRAINT = 'org_job_family_slices_gap_free', MESSAGE = format('time slices must be gap-free (tenant_id=%s job_family_id=%s)', p_tenant_id, p_job_family_id);
+        END IF;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION org_job_family_slices_gap_free_trigger ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        PERFORM
+            org_job_family_slices_gap_free_assert (OLD.tenant_id, OLD.job_family_id);
+        RETURN NULL;
+    END IF;
+    IF TG_OP = 'UPDATE' AND (OLD.tenant_id,
+        OLD.job_family_id) IS DISTINCT FROM (NEW.tenant_id,
+    NEW.job_family_id) THEN
+        PERFORM
+            org_job_family_slices_gap_free_assert (OLD.tenant_id, OLD.job_family_id);
+    END IF;
+    PERFORM
+        org_job_family_slices_gap_free_assert (NEW.tenant_id, NEW.job_family_id);
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS org_job_family_slices_gap_free ON org_job_family_slices;
+
+CREATE CONSTRAINT TRIGGER org_job_family_slices_gap_free
+    AFTER INSERT OR UPDATE OR DELETE ON org_job_family_slices DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION org_job_family_slices_gap_free_trigger ();
+
+CREATE OR REPLACE FUNCTION org_job_level_slices_gap_free_assert (p_tenant_id uuid, p_job_level_id uuid)
+    RETURNS void
+    AS $$
+DECLARE
+    has_gap boolean;
+    row_count bigint;
+    last_end date;
+BEGIN
+    WITH ordered AS (
+        SELECT
+            effective_date,
+            end_date,
+            lag(end_date) OVER (ORDER BY effective_date) AS prev_end_date
+        FROM
+            org_job_level_slices
+        WHERE
+            tenant_id = p_tenant_id
+            AND job_level_id = p_job_level_id
+        ORDER BY
+            effective_date
+)
+    SELECT
+        EXISTS (
+            SELECT
+                1
+            FROM
+                ordered
+            WHERE
+                prev_end_date IS NOT NULL
+                AND (prev_end_date + 1) <> effective_date),
+            (
+                SELECT
+                    COUNT(*)
+                FROM
+                    ordered),
+                (
+                    SELECT
+                        end_date
+                    FROM
+                        ordered
+                    ORDER BY
+                        effective_date DESC
+                    LIMIT 1) INTO has_gap,
+                row_count,
+                last_end;
+    IF row_count > 0 AND (has_gap OR last_end <> DATE '9999-12-31') THEN
+        RAISE EXCEPTION
+            USING ERRCODE = '23000', CONSTRAINT = 'org_job_level_slices_gap_free', MESSAGE = format('time slices must be gap-free (tenant_id=%s job_level_id=%s)', p_tenant_id, p_job_level_id);
+        END IF;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION org_job_level_slices_gap_free_trigger ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        PERFORM
+            org_job_level_slices_gap_free_assert (OLD.tenant_id, OLD.job_level_id);
+        RETURN NULL;
+    END IF;
+    IF TG_OP = 'UPDATE' AND (OLD.tenant_id,
+        OLD.job_level_id) IS DISTINCT FROM (NEW.tenant_id,
+    NEW.job_level_id) THEN
+        PERFORM
+            org_job_level_slices_gap_free_assert (OLD.tenant_id, OLD.job_level_id);
+    END IF;
+    PERFORM
+        org_job_level_slices_gap_free_assert (NEW.tenant_id, NEW.job_level_id);
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS org_job_level_slices_gap_free ON org_job_level_slices;
+
+CREATE CONSTRAINT TRIGGER org_job_level_slices_gap_free
+    AFTER INSERT OR UPDATE OR DELETE ON org_job_level_slices DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION org_job_level_slices_gap_free_trigger ();
+
+CREATE OR REPLACE FUNCTION org_job_profile_slices_gap_free_assert (p_tenant_id uuid, p_job_profile_id uuid)
+    RETURNS void
+    AS $$
+DECLARE
+    has_gap boolean;
+    row_count bigint;
+    last_end date;
+BEGIN
+    WITH ordered AS (
+        SELECT
+            effective_date,
+            end_date,
+            lag(end_date) OVER (ORDER BY effective_date) AS prev_end_date
+        FROM
+            org_job_profile_slices
+        WHERE
+            tenant_id = p_tenant_id
+            AND job_profile_id = p_job_profile_id
+        ORDER BY
+            effective_date
+)
+    SELECT
+        EXISTS (
+            SELECT
+                1
+            FROM
+                ordered
+            WHERE
+                prev_end_date IS NOT NULL
+                AND (prev_end_date + 1) <> effective_date),
+            (
+                SELECT
+                    COUNT(*)
+                FROM
+                    ordered),
+                (
+                    SELECT
+                        end_date
+                    FROM
+                        ordered
+                    ORDER BY
+                        effective_date DESC
+                    LIMIT 1) INTO has_gap,
+                row_count,
+                last_end;
+    IF row_count > 0 AND (has_gap OR last_end <> DATE '9999-12-31') THEN
+        RAISE EXCEPTION
+            USING ERRCODE = '23000', CONSTRAINT = 'org_job_profile_slices_gap_free', MESSAGE = format('time slices must be gap-free (tenant_id=%s job_profile_id=%s)', p_tenant_id, p_job_profile_id);
+        END IF;
+END;
+$$
+LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION org_job_profile_slices_gap_free_trigger ()
+    RETURNS TRIGGER
+    AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        PERFORM
+            org_job_profile_slices_gap_free_assert (OLD.tenant_id, OLD.job_profile_id);
+        RETURN NULL;
+    END IF;
+    IF TG_OP = 'UPDATE' AND (OLD.tenant_id,
+        OLD.job_profile_id) IS DISTINCT FROM (NEW.tenant_id,
+    NEW.job_profile_id) THEN
+        PERFORM
+            org_job_profile_slices_gap_free_assert (OLD.tenant_id, OLD.job_profile_id);
+    END IF;
+    PERFORM
+        org_job_profile_slices_gap_free_assert (NEW.tenant_id, NEW.job_profile_id);
+    RETURN NULL;
+END;
+$$
+LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS org_job_profile_slices_gap_free ON org_job_profile_slices;
+
+CREATE CONSTRAINT TRIGGER org_job_profile_slices_gap_free
+    AFTER INSERT OR UPDATE OR DELETE ON org_job_profile_slices DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW
+    EXECUTE FUNCTION org_job_profile_slices_gap_free_trigger ();
 
 -- EOF

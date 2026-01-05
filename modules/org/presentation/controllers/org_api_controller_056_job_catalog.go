@@ -22,7 +22,16 @@ func (c *OrgAPIController) ListJobFamilyGroups(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	rows, err := c.org.ListJobFamilyGroups(r.Context(), tenantID)
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", err.Error())
+		return
+	}
+	if asOf.IsZero() {
+		asOf = normalizeValidTimeDayUTC(time.Now().UTC())
+	}
+
+	rows, err := c.org.ListJobFamilyGroups(r.Context(), tenantID, asOf)
 	if err != nil {
 		writeServiceError(w, requestID, err)
 		return
@@ -31,9 +40,10 @@ func (c *OrgAPIController) ListJobFamilyGroups(w http.ResponseWriter, r *http.Re
 }
 
 type createJobFamilyGroupRequest struct {
-	Code     string `json:"code"`
-	Name     string `json:"name"`
-	IsActive *bool  `json:"is_active"`
+	Code          string `json:"code"`
+	Name          string `json:"name"`
+	IsActive      *bool  `json:"is_active"`
+	EffectiveDate string `json:"effective_date"`
 }
 
 func (c *OrgAPIController) CreateJobFamilyGroup(w http.ResponseWriter, r *http.Request) {
@@ -54,10 +64,16 @@ func (c *OrgAPIController) CreateJobFamilyGroup(w http.ResponseWriter, r *http.R
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", err.Error())
+		return
+	}
 	row, err := c.org.CreateJobFamilyGroup(r.Context(), tenantID, services.JobFamilyGroupCreate{
-		Code:     req.Code,
-		Name:     req.Name,
-		IsActive: isActive,
+		Code:          req.Code,
+		Name:          req.Name,
+		IsActive:      isActive,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -67,8 +83,10 @@ func (c *OrgAPIController) CreateJobFamilyGroup(w http.ResponseWriter, r *http.R
 }
 
 type updateJobFamilyGroupRequest struct {
-	Name     *string `json:"name"`
-	IsActive *bool   `json:"is_active"`
+	Name          *string `json:"name"`
+	IsActive      *bool   `json:"is_active"`
+	EffectiveDate string  `json:"effective_date"`
+	WriteMode     string  `json:"write_mode"`
 }
 
 func (c *OrgAPIController) UpdateJobFamilyGroup(w http.ResponseWriter, r *http.Request) {
@@ -90,9 +108,16 @@ func (c *OrgAPIController) UpdateJobFamilyGroup(w http.ResponseWriter, r *http.R
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
 		return
 	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", err.Error())
+		return
+	}
 	row, err := c.org.UpdateJobFamilyGroup(r.Context(), tenantID, id, services.JobFamilyGroupUpdate{
-		Name:     req.Name,
-		IsActive: req.IsActive,
+		Name:          req.Name,
+		IsActive:      req.IsActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     req.WriteMode,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -110,13 +135,22 @@ func (c *OrgAPIController) ListJobFamilies(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", err.Error())
+		return
+	}
+	if asOf.IsZero() {
+		asOf = normalizeValidTimeDayUTC(time.Now().UTC())
+	}
+
 	groupIDRaw := strings.TrimSpace(r.URL.Query().Get("job_family_group_id"))
 	groupID, err := uuid.Parse(groupIDRaw)
 	if err != nil {
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", "job_family_group_id is invalid")
 		return
 	}
-	rows, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID)
+	rows, err := c.org.ListJobFamilies(r.Context(), tenantID, groupID, asOf)
 	if err != nil {
 		writeServiceError(w, requestID, err)
 		return
@@ -129,6 +163,7 @@ type createJobFamilyRequest struct {
 	Code             string    `json:"code"`
 	Name             string    `json:"name"`
 	IsActive         *bool     `json:"is_active"`
+	EffectiveDate    string    `json:"effective_date"`
 }
 
 func (c *OrgAPIController) CreateJobFamily(w http.ResponseWriter, r *http.Request) {
@@ -149,11 +184,17 @@ func (c *OrgAPIController) CreateJobFamily(w http.ResponseWriter, r *http.Reques
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", err.Error())
+		return
+	}
 	row, err := c.org.CreateJobFamily(r.Context(), tenantID, services.JobFamilyCreate{
 		JobFamilyGroupID: req.JobFamilyGroupID,
 		Code:             req.Code,
 		Name:             req.Name,
 		IsActive:         isActive,
+		EffectiveDate:    effectiveDate,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -163,8 +204,10 @@ func (c *OrgAPIController) CreateJobFamily(w http.ResponseWriter, r *http.Reques
 }
 
 type updateJobFamilyRequest struct {
-	Name     *string `json:"name"`
-	IsActive *bool   `json:"is_active"`
+	Name          *string `json:"name"`
+	IsActive      *bool   `json:"is_active"`
+	EffectiveDate string  `json:"effective_date"`
+	WriteMode     string  `json:"write_mode"`
 }
 
 func (c *OrgAPIController) UpdateJobFamily(w http.ResponseWriter, r *http.Request) {
@@ -186,9 +229,16 @@ func (c *OrgAPIController) UpdateJobFamily(w http.ResponseWriter, r *http.Reques
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
 		return
 	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", err.Error())
+		return
+	}
 	row, err := c.org.UpdateJobFamily(r.Context(), tenantID, id, services.JobFamilyUpdate{
-		Name:     req.Name,
-		IsActive: req.IsActive,
+		Name:          req.Name,
+		IsActive:      req.IsActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     req.WriteMode,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -206,7 +256,16 @@ func (c *OrgAPIController) ListJobLevels(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	rows, err := c.org.ListJobLevels(r.Context(), tenantID)
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", err.Error())
+		return
+	}
+	if asOf.IsZero() {
+		asOf = normalizeValidTimeDayUTC(time.Now().UTC())
+	}
+
+	rows, err := c.org.ListJobLevels(r.Context(), tenantID, asOf)
 	if err != nil {
 		writeServiceError(w, requestID, err)
 		return
@@ -215,10 +274,11 @@ func (c *OrgAPIController) ListJobLevels(w http.ResponseWriter, r *http.Request)
 }
 
 type createJobLevelRequest struct {
-	Code         string `json:"code"`
-	Name         string `json:"name"`
-	DisplayOrder int    `json:"display_order"`
-	IsActive     *bool  `json:"is_active"`
+	Code          string `json:"code"`
+	Name          string `json:"name"`
+	DisplayOrder  int    `json:"display_order"`
+	IsActive      *bool  `json:"is_active"`
+	EffectiveDate string `json:"effective_date"`
 }
 
 func (c *OrgAPIController) CreateJobLevel(w http.ResponseWriter, r *http.Request) {
@@ -239,11 +299,17 @@ func (c *OrgAPIController) CreateJobLevel(w http.ResponseWriter, r *http.Request
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", err.Error())
+		return
+	}
 	row, err := c.org.CreateJobLevel(r.Context(), tenantID, services.JobLevelCreate{
-		Code:         req.Code,
-		Name:         req.Name,
-		DisplayOrder: req.DisplayOrder,
-		IsActive:     isActive,
+		Code:          req.Code,
+		Name:          req.Name,
+		DisplayOrder:  req.DisplayOrder,
+		IsActive:      isActive,
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -253,9 +319,11 @@ func (c *OrgAPIController) CreateJobLevel(w http.ResponseWriter, r *http.Request
 }
 
 type updateJobLevelRequest struct {
-	Name         *string `json:"name"`
-	DisplayOrder *int    `json:"display_order"`
-	IsActive     *bool   `json:"is_active"`
+	Name          *string `json:"name"`
+	DisplayOrder  *int    `json:"display_order"`
+	IsActive      *bool   `json:"is_active"`
+	EffectiveDate string  `json:"effective_date"`
+	WriteMode     string  `json:"write_mode"`
 }
 
 func (c *OrgAPIController) UpdateJobLevel(w http.ResponseWriter, r *http.Request) {
@@ -277,10 +345,17 @@ func (c *OrgAPIController) UpdateJobLevel(w http.ResponseWriter, r *http.Request
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
 		return
 	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", err.Error())
+		return
+	}
 	row, err := c.org.UpdateJobLevel(r.Context(), tenantID, id, services.JobLevelUpdate{
-		Name:         req.Name,
-		DisplayOrder: req.DisplayOrder,
-		IsActive:     req.IsActive,
+		Name:          req.Name,
+		DisplayOrder:  req.DisplayOrder,
+		IsActive:      req.IsActive,
+		EffectiveDate: effectiveDate,
+		WriteMode:     req.WriteMode,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -298,44 +373,35 @@ func (c *OrgAPIController) ListJobProfiles(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	rows, err := c.org.ListJobProfiles(r.Context(), tenantID)
+	asOf, err := parseEffectiveDate(r.URL.Query().Get("effective_date"))
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_QUERY", err.Error())
+		return
+	}
+	if asOf.IsZero() {
+		asOf = normalizeValidTimeDayUTC(time.Now().UTC())
+	}
+
+	rows, err := c.org.ListJobProfilesWithFamilies(r.Context(), tenantID, asOf)
 	if err != nil {
 		writeServiceError(w, requestID, err)
 		return
 	}
-
-	type jobProfileResponse struct {
-		services.JobProfileRow
-		JobFamilies []services.JobProfileJobFamilyRow `json:"job_families"`
-	}
-	out := make([]jobProfileResponse, 0, len(rows))
-	for _, row := range rows {
-		families, err := c.org.ListJobProfileJobFamilies(r.Context(), tenantID, row.ID)
-		if err != nil {
-			writeServiceError(w, requestID, err)
-			return
-		}
-		out = append(out, jobProfileResponse{
-			JobProfileRow: row,
-			JobFamilies:   families,
-		})
-	}
-
-	writeJSON(w, http.StatusOK, map[string]any{"items": out})
+	writeJSON(w, http.StatusOK, map[string]any{"items": rows})
 }
 
 type jobProfileJobFamilySetItemRequest struct {
-	JobFamilyID       uuid.UUID `json:"job_family_id"`
-	AllocationPercent int       `json:"allocation_percent"`
-	IsPrimary         bool      `json:"is_primary"`
+	JobFamilyID uuid.UUID `json:"job_family_id"`
+	IsPrimary   bool      `json:"is_primary"`
 }
 
 type createJobProfileRequest struct {
-	Code        string                              `json:"code"`
-	Name        string                              `json:"name"`
-	Description *string                             `json:"description"`
-	IsActive    *bool                               `json:"is_active"`
-	JobFamilies []jobProfileJobFamilySetItemRequest `json:"job_families"`
+	Code          string                              `json:"code"`
+	Name          string                              `json:"name"`
+	Description   *string                             `json:"description"`
+	IsActive      *bool                               `json:"is_active"`
+	JobFamilies   []jobProfileJobFamilySetItemRequest `json:"job_families"`
+	EffectiveDate string                              `json:"effective_date"`
 }
 
 func (c *OrgAPIController) CreateJobProfile(w http.ResponseWriter, r *http.Request) {
@@ -356,20 +422,25 @@ func (c *OrgAPIController) CreateJobProfile(w http.ResponseWriter, r *http.Reque
 	if req.IsActive != nil {
 		isActive = *req.IsActive
 	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", err.Error())
+		return
+	}
 	items := make([]services.JobProfileJobFamilySetItem, 0, len(req.JobFamilies))
 	for _, it := range req.JobFamilies {
 		items = append(items, services.JobProfileJobFamilySetItem{
-			JobFamilyID:       it.JobFamilyID,
-			AllocationPercent: it.AllocationPercent,
-			IsPrimary:         it.IsPrimary,
+			JobFamilyID: it.JobFamilyID,
+			IsPrimary:   it.IsPrimary,
 		})
 	}
 	row, err := c.org.CreateJobProfile(r.Context(), tenantID, services.JobProfileCreate{
-		Code:        req.Code,
-		Name:        req.Name,
-		Description: req.Description,
-		IsActive:    isActive,
-		JobFamilies: services.JobProfileJobFamiliesSet{Items: items},
+		Code:          req.Code,
+		Name:          req.Name,
+		Description:   req.Description,
+		IsActive:      isActive,
+		JobFamilies:   services.JobProfileJobFamiliesSet{Items: items},
+		EffectiveDate: effectiveDate,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)
@@ -379,10 +450,12 @@ func (c *OrgAPIController) CreateJobProfile(w http.ResponseWriter, r *http.Reque
 }
 
 type updateJobProfileRequest struct {
-	Name        *string                             `json:"name"`
-	Description optionalString                      `json:"description"`
-	IsActive    *bool                               `json:"is_active"`
-	JobFamilies []jobProfileJobFamilySetItemRequest `json:"job_families"`
+	Name          *string                             `json:"name"`
+	Description   optionalString                      `json:"description"`
+	IsActive      *bool                               `json:"is_active"`
+	JobFamilies   []jobProfileJobFamilySetItemRequest `json:"job_families"`
+	EffectiveDate string                              `json:"effective_date"`
+	WriteMode     string                              `json:"write_mode"`
 }
 
 func (c *OrgAPIController) UpdateJobProfile(w http.ResponseWriter, r *http.Request) {
@@ -404,25 +477,31 @@ func (c *OrgAPIController) UpdateJobProfile(w http.ResponseWriter, r *http.Reque
 		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", "invalid json body")
 		return
 	}
+	effectiveDate, err := parseRequiredEffectiveDate(req.EffectiveDate)
+	if err != nil {
+		writeAPIError(w, http.StatusBadRequest, requestID, "ORG_INVALID_BODY", err.Error())
+		return
+	}
 
 	var jobFamilies *services.JobProfileJobFamiliesSet
 	if req.JobFamilies != nil {
 		items := make([]services.JobProfileJobFamilySetItem, 0, len(req.JobFamilies))
 		for _, it := range req.JobFamilies {
 			items = append(items, services.JobProfileJobFamilySetItem{
-				JobFamilyID:       it.JobFamilyID,
-				AllocationPercent: it.AllocationPercent,
-				IsPrimary:         it.IsPrimary,
+				JobFamilyID: it.JobFamilyID,
+				IsPrimary:   it.IsPrimary,
 			})
 		}
 		jobFamilies = &services.JobProfileJobFamiliesSet{Items: items}
 	}
 
 	row, err := c.org.UpdateJobProfile(r.Context(), tenantID, id, services.JobProfileUpdate{
-		Name:        req.Name,
-		Description: fieldIfSetString(req.Description),
-		IsActive:    req.IsActive,
-		JobFamilies: jobFamilies,
+		Name:          req.Name,
+		Description:   fieldIfSetString(req.Description),
+		IsActive:      req.IsActive,
+		JobFamilies:   jobFamilies,
+		EffectiveDate: effectiveDate,
+		WriteMode:     req.WriteMode,
 	})
 	if err != nil {
 		writeServiceError(w, requestID, err)

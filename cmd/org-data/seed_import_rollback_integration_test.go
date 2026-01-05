@@ -37,6 +37,7 @@ func TestOrgData_SeedImport_ApplyAndRollbackByManifest(t *testing.T) {
 	root := filepath.Clean(filepath.Join("..", ".."))
 	migrations := []string{
 		"00001_org_baseline.sql",
+		"00002_org_migration_smoke.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
 		"20251218150000_org_outbox.sql",
@@ -49,7 +50,14 @@ func TestOrgData_SeedImport_ApplyAndRollbackByManifest(t *testing.T) {
 		"20251222120000_org_personnel_events.sql",
 		"20251227090000_org_valid_time_day_granularity.sql",
 		"20251228120000_org_eliminate_effective_on_end_on.sql",
+		"20251228140000_org_assignment_employment_status.sql",
+		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
+		"20260101020855_org_job_catalog_effective_dated_slices_phase_a.sql",
+		"20260101020930_org_job_catalog_effective_dated_slices_gates_and_backfill.sql",
+		"20260104100000_org_drop_job_profile_job_families_legacy.sql",
+		"20260104120000_org_drop_job_catalog_identity_legacy_columns.sql",
 	}
 	for _, f := range migrations {
 		sql := readGooseUpSQL(t, filepath.Join(root, "migrations", "org", f))

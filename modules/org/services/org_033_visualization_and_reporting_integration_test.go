@@ -39,6 +39,7 @@ func TestOrg033NodePathAndExport(t *testing.T) {
 
 	files := []string{
 		"00001_org_baseline.sql",
+		"00002_org_migration_smoke.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
 		"20251218150000_org_outbox.sql",
@@ -54,6 +55,7 @@ func TestOrg033NodePathAndExport(t *testing.T) {
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(t, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))
@@ -143,7 +145,7 @@ func TestOrg033PersonPath(t *testing.T) {
 	targetNodeID := nodes[len(nodes)-1].ID
 
 	// Minimal position + primary assignment as-of.
-	jobProfileID, _ := ensureTestJobProfileWith100PercentFamily(t, ctx, pool, tenantID)
+	jobProfileID, _ := ensureTestJobProfileWithPrimaryFamily(t, ctx, pool, tenantID)
 	positionID := uuid.New()
 	endDate := time.Date(9999, 12, 31, 0, 0, 0, 0, time.UTC)
 	_, err = pool.Exec(ctx, `
@@ -260,6 +262,7 @@ func applyAllOrgMigrationsFor033(tb testing.TB, ctx context.Context, pool *pgxpo
 
 	files := []string{
 		"00001_org_baseline.sql",
+		"00002_org_migration_smoke.sql",
 		"20251218005114_org_placeholders_and_event_contracts.sql",
 		"20251218130000_org_settings_and_audit.sql",
 		"20251218150000_org_outbox.sql",
@@ -275,6 +278,11 @@ func applyAllOrgMigrationsFor033(tb testing.TB, ctx context.Context, pool *pgxpo
 		"20251228140000_org_assignment_employment_status.sql",
 		"20251228150000_org_gap_free_constraint_triggers.sql",
 		"20251230090000_org_job_architecture_workday_profiles.sql",
+		"20251231120000_org_remove_job_family_allocation_percent.sql",
+		"20260101020855_org_job_catalog_effective_dated_slices_phase_a.sql",
+		"20260101020930_org_job_catalog_effective_dated_slices_gates_and_backfill.sql",
+		"20260104100000_org_drop_job_profile_job_families_legacy.sql",
+		"20260104120000_org_drop_job_catalog_identity_legacy_columns.sql",
 	}
 	for _, f := range files {
 		sql := readGooseUpSQL(tb, filepath.Clean(filepath.Join("..", "..", "..", "migrations", "org", f)))

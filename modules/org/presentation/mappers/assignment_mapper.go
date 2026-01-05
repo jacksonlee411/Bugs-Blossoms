@@ -13,6 +13,34 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 	if strings.HasPrefix(subject, "person:") {
 		pernr = strings.TrimPrefix(subject, "person:")
 	}
+	formatCodeName := func(code, name string) string {
+		code = strings.TrimSpace(code)
+		name = strings.TrimSpace(name)
+		if code != "" && name != "" {
+			return fmt.Sprintf("%s — %s", code, name)
+		}
+		if code != "" {
+			return code
+		}
+		return name
+	}
+	labelFromPtrs := func(code, name *string) string {
+		c := ""
+		if code != nil {
+			c = *code
+		}
+		n := ""
+		if name != nil {
+			n = *name
+		}
+		return formatCodeName(c, n)
+	}
+	jobLevelLabel := func(code, name *string) string {
+		if name == nil || strings.TrimSpace(*name) == "" {
+			return ""
+		}
+		return labelFromPtrs(code, name)
+	}
 	out := make([]viewmodels.OrgAssignmentRow, 0, len(rows))
 	for _, r := range rows {
 		code := ""
@@ -73,6 +101,10 @@ func AssignmentsToTimeline(subject string, rows []services.AssignmentViewRow) *v
 			OrgNodeLabel:    strings.TrimSpace(orgLabel),
 			OrgNodeLongName: "",
 			PositionLabel:   strings.TrimSpace(posLabel),
+			JobFamilyGroup:  strings.TrimSpace(labelFromPtrs(r.JobFamilyGroupCode, r.JobFamilyGroupName)),
+			JobFamily:       strings.TrimSpace(labelFromPtrs(r.JobFamilyCode, r.JobFamilyName)),
+			JobProfile:      strings.TrimSpace(labelFromPtrs(r.JobProfileCode, r.JobProfileName)),
+			JobLevel:        strings.TrimSpace(jobLevelLabel(r.JobLevelCode, r.JobLevelName)),
 			OperationType:   startEventType,
 			EndEventType:    endEventType,
 			EffectiveDate:   r.EffectiveDate,
