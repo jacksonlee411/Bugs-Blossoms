@@ -31,6 +31,7 @@
   - CI 门禁：`.github/workflows/quality-gates.yml`
   - OrgUnit v4：`docs/dev-plans/077-org-v4-transactional-event-sourcing-synchronous-projection.md`
   - Org v4 cutover：`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`
+  - 多租户隔离（RLS）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`（对齐 `docs/dev-plans/019-multi-tenant-toolchain.md` / `docs/dev-plans/019A-rls-tenant-isolation.md`）
   - Job Catalog v4：`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
   - 时间语义（Valid Time=DATE）：`docs/dev-plans/064-effective-date-day-granularity.md`
 
@@ -38,6 +39,7 @@
 ### 3.1 Kernel 边界（与 077 对齐）
 - **DB = Projection Kernel（权威）**：插入事件（幂等）+ 同步投射 versions + 不变量裁决 + 可 replay。
 - **Go = Command Facade**：鉴权/租户与操作者上下文 + 事务边界 + 调 Kernel + 错误映射到 `pkg/serrors`。
+- **多租户隔离（RLS）**：v4 tenant-scoped 表默认启用 PostgreSQL RLS（fail-closed；见 `DEV-PLAN-081`），因此访问 v4 的运行态必须 `RLS_ENFORCE=enforce`，并在事务内注入 `app.current_tenant`（对齐 `DEV-PLAN-019/019A`）。
 - **One Door Policy（写入口唯一）**：除 `submit_*_event` 与运维 replay 外，应用层不得直写事件表/versions 表/identity 表（`positions/assignments`），不得直调 `apply_*_logic`。
 - **同步投射机制（选定）**：每次写入都触发**同事务全量重放**（delete+replay），保持逻辑简单，拒绝增量缝补逻辑分叉。
 
@@ -327,6 +329,7 @@ CREATE OR REPLACE FUNCTION submit_position_event(
 ```
 
 合同语义（必须）：
+0) 多租户上下文（RLS）：函数开头必须断言 `p_tenant_id` 与 `app.current_tenant` 一致（对齐 `DEV-PLAN-081`）。
 1) 获取互斥锁：`org:v4:<tenant_id>:Position`（同一事务内）。
 2) 参数校验：`p_event_type` 必须为 `CREATE/UPDATE/DISABLE`；`p_payload` 必须为 object（空则视为 `{}`）。
 3) identity 处理：
@@ -340,6 +343,7 @@ CREATE OR REPLACE FUNCTION submit_position_event(
 
 ### 5.3 `replay_position_versions`
 合同语义（必须）：
+- 多租户上下文（RLS）：函数开头必须断言 `p_tenant_id` 与 `app.current_tenant` 一致（对齐 `DEV-PLAN-081`）。
 - `DELETE FROM position_versions WHERE tenant_id=? AND position_id=?;`
 - 按 `(effective_date, id)` 顺序读取该 `position_id` 的全部事件并重建切片：
   - 每条事件产生一个新的版本窗 `[effective_date, next_effective_date)`；
@@ -406,6 +410,7 @@ CREATE OR REPLACE FUNCTION submit_assignment_event(
 ```
 
 合同语义（必须）：
+0) 多租户上下文（RLS）：函数开头必须断言 `p_tenant_id` 与 `app.current_tenant` 一致（对齐 `DEV-PLAN-081`）。
 1) 获取互斥锁：`org:v4:<tenant_id>:Position`（同一事务内）。
 2) identity 处理：
    - `CREATE`：创建 `assignments` 行；若已存在则拒绝（`ASSIGNMENT_ALREADY_EXISTS`）。
@@ -444,6 +449,7 @@ CREATE OR REPLACE FUNCTION get_assignment_snapshot(
 ## 7. Go 层集成（事务 + 调用 DB）
 - Go 仅负责：鉴权 →（可选 try-lock）→ 开事务 → 调 `submit_*_event` → 提交。
 - 错误契约对齐 077：优先用 `SQLSTATE + constraint name` 做稳定映射；业务级拒绝使用“稳定 code（`MESSAGE`）+ `DETAIL`”的异常形状。
+- 多租户隔离（RLS）相关失败路径与稳定映射对齐 `DEV-PLAN-081`（fail-closed 缺 tenant 上下文 / tenant mismatch / policy 拒绝）。
 
 ### 7.1 错误契约（DB → Go → serrors）
 最小映射表（v1，示例 code；落地时以模块错误码表收敛为准）：
@@ -463,6 +469,7 @@ CREATE OR REPLACE FUNCTION get_assignment_snapshot(
 | 占编超限 | `submit_assignment_event` 校验失败 | DB exception `MESSAGE` | `ASSIGNMENT_CAPACITY_EXCEEDED` |
 
 ## 8. 测试与验收标准 (Acceptance Criteria)
+- [ ] RLS（对齐 081）：缺失 `app.current_tenant` 时对 v4 表的读写必须 fail-closed；tenant mismatch 必须稳定失败可映射。
 - [ ] 事件幂等：同 `event_id` 重试不重复投射。
 - [ ] 全量重放：每次写入都在同一事务内 delete+replay 对应 versions，且写后读强一致。
 - [ ] 同日唯一：同一实体同日提交第二条事件被拒绝且可稳定映射错误码。
@@ -478,3 +485,5 @@ CREATE OR REPLACE FUNCTION get_assignment_snapshot(
 - Assignment：`SELECT replay_assignment_versions('<tenant_id>'::uuid, '<assignment_id>'::uuid);`
 
 > 建议在执行前复用同一把维护互斥锁（`org:v4:<tenant_id>:Position`）确保与在线写入互斥。
+
+> 多租户隔离（RLS，见 `DEV-PLAN-081`）：replay 必须在显式事务内先注入 `app.current_tenant`，否则会 fail-closed。
