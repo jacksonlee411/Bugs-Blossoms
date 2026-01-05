@@ -239,10 +239,11 @@ modules/{module}/
 - Person 最小身份锚点（Pernr 1-8 位数字字符串，前导 0 同值）以支撑 Staffing 落地（DEV-PLAN-085）：`docs/dev-plans/085-person-minimal-identity-for-staffing.md`
 - 引入 Astro（AHA Stack）到 HTMX + Alpine 的 HRMS v4 UI 方案（077-084）（DEV-PLAN-086）：`docs/dev-plans/086-astro-aha-ui-shell-for-hrms-v4.md`
 - V4 技术栈与工具链版本冻结（DEV-PLAN-087）：`docs/dev-plans/087-v4-tech-stack-and-toolchain-versions.md`
-- V4 租户与认证（tenant/authn）v4（DEV-PLAN-088）：`docs/dev-plans/088-tenant-and-authn-v4.md`
+- V4 租户管理与登录认证（Kratos 认人 → RLS 圈地 → Casbin 管事）（DEV-PLAN-088）：`docs/dev-plans/088-tenant-and-authn-v4.md`
 - V4 SuperAdmin 控制面认证与会话（与租户登录链路解耦）（DEV-PLAN-088A）：`docs/dev-plans/088A-superadmin-authn-v4.md`
 - V4 多语言（仅 en/zh：UI 选择 + Accept-Language + 用户语言）（DEV-PLAN-089）：`docs/dev-plans/089-i18n-en-zh-only.md`
 - V4 Atlas + Goose 闭环指引（模块级 schema→迁移→门禁）（DEV-PLAN-090）：`docs/dev-plans/090-v4-atlas-goose-closed-loop-guide.md`
 - V4 sqlc 工具链使用指引与规范（SQL-first + DB Kernel + RLS）（DEV-PLAN-091）：`docs/dev-plans/091-sqlc-guidelines-for-v4.md`
+- V4 Authz（Casbin）工具链与实施方案（Greenfield）（DEV-PLAN-092）：`docs/dev-plans/092-v4-authz-casbin-toolchain.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
