@@ -232,8 +232,10 @@ modules/{module}/
 - Org v4 全量替换（基于 077，无并行/无兼容/防漂移）（DEV-PLAN-078）：`docs/dev-plans/078-org-v4-full-replacement-no-compat.md`
 - Position v4（事务性事件溯源 + 同步投射）方案（去掉 org_ 前缀）（DEV-PLAN-079）：`docs/dev-plans/079-position-v4-transactional-event-sourcing-synchronous-projection.md`
 - Job Catalog v4（事务性事件溯源 + 同步投射）方案（去掉 org_ 前缀）（DEV-PLAN-080）：`docs/dev-plans/080-job-catalog-v4-transactional-event-sourcing-synchronous-projection.md`
+- 启用 PostgreSQL RLS 强租户隔离（Org/Position/Job Catalog v4）（DEV-PLAN-081）：`docs/dev-plans/081-pg-rls-for-org-position-job-catalog-v4.md`
 - DDD 分层框架方案（对齐 CleanArchGuard + v4 DB Kernel）（DEV-PLAN-082）：`docs/dev-plans/082-ddd-layering-framework.md`
 - Greenfield HR 模块骨架与契约（OrgUnit/JobCatalog/Staffing/Person）（DEV-PLAN-083）：`docs/dev-plans/083-greenfield-hr-modules-skeleton.md`
 - 任职记录（Job Data / Assignments）v4 全新实现（Staffing，事件 SoT + 同步投射）（DEV-PLAN-084）：`docs/dev-plans/084-greenfield-assignment-job-data-v4.md`
+- 引入 Astro（AHA Stack）到 HTMX + Alpine 的 HRMS v4 UI 方案（077-084）（DEV-PLAN-086）：`docs/dev-plans/086-astro-aha-ui-shell-for-hrms-v4.md`
 - 文档收敛实施方案：`docs/dev-records/DEV-RECORD-001-DOCS-AUDIT.md`
 - 归档区说明：`docs/Archived/index.md`
